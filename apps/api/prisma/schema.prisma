@@ -1468,6 +1468,8 @@ model TelegramIntake {
   questionMessages  Json     @default("{}")
   /// `{ "<question id>": { optionId?, optionIds?, text? } }` picked so far.
   answers           Json     @default("{}")
+  /// #594: photos sent before the description, pending until the plan claims them.
+  attachmentIds     String[] @default([])
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

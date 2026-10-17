@@ -9,6 +9,11 @@ import { PlannerModule } from '../planner';
 import { ProjectsModule } from '../projects';
 import { SettingsModule } from '../settings/settings.module';
 import {
+  SPEECH_TO_TEXT_OPTIONS,
+  SpeechToText,
+  speechToTextOptionsFromEnv,
+} from './speech-to-text';
+import {
   TelegramAdminController,
   TelegramLinkController,
   TelegramWebAppController,
@@ -41,7 +46,9 @@ import { TelegramWebAppService } from './telegram-web-app.service';
  * runs the New work intake (`TelegramIntakeService`). #578: a card's review
  * actions on the card messages and notifications (`TelegramCardService`).
  * #580: the Mini App signs in with its `initData` (`TelegramWebAppService`)
- * and gets the web session `AuthModule` issues.
+ * and gets the web session `AuthModule` issues. #594: `/new` takes photos,
+ * stored through the global `AttachmentsService`, and voice messages,
+ * transcribed by `SpeechToText`.
  */
 @Module({
   imports: [
@@ -67,6 +74,11 @@ import { TelegramWebAppService } from './telegram-web-app.service';
   providers: [
     { provide: TELEGRAM_OPTIONS, useFactory: () => telegramOptionsFromEnv() },
     TelegramClient,
+    {
+      provide: SPEECH_TO_TEXT_OPTIONS,
+      useFactory: () => speechToTextOptionsFromEnv(),
+    },
+    SpeechToText,
     TelegramGuard,
     TelegramLinkingService,
     TelegramApprovalService,

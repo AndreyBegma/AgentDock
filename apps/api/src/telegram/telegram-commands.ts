@@ -24,6 +24,7 @@ export const HELP_TEXT = [
   '/board <column> — Jump to a column, for example /board todo',
   '/card <number> — Show one card; Move, Run and Stop are on it',
   '/new <description> — Start new work with the description in one message',
+  'With /new, send a photo or screenshot to attach it, or a voice message instead of typing.',
   '/start <code> — Link this chat; the link comes from AgentDock → Account → Notifications',
   'Buttons on notifications act on their own project, whatever this chat works on.',
 ].join('\n');

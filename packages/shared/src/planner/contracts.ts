@@ -1,3 +1,4 @@
+import type { AttachmentView } from '../attachments/contracts';
 import type { TaskDesignSummary } from '../design/contracts';
 import type {
   PlanAnswer,
@@ -267,6 +268,11 @@ export interface PlanIntakeView {
    * as null).
    */
   split?: PlanIntakeSplitView | null;
+  /**
+   * #594: the files the plan holds so far, oldest first — the web dialog's
+   * and those a Telegram `/new` sent (optional: absent reads as none).
+   */
+  attachments?: AttachmentView[];
 }
 
 /** #409: a split proposal as the person reviews it. */

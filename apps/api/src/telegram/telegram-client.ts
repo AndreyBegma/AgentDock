@@ -6,6 +6,8 @@ const CALL_TIMEOUT_MS = 15_000;
 /** The long poll's own timeout plus this much before the HTTP call is cut. */
 const POLL_GRACE_MS = 10_000;
 const DESCRIPTION_MAX = 200;
+/** #594: a file download — a photo or a voice message — gives up after this long. */
+const DOWNLOAD_TIMEOUT_MS = 60_000;
 
 /** Anything shaped like a bot token: `<bot id>:<secret>`. */
 const TOKEN_SHAPE = /\d{3,}:[A-Za-z0-9_-]{20,}/g;
@@ -25,6 +27,14 @@ export const redactToken = (text: string, token?: string): string => {
   }
   return out.replace(TOKEN_SHAPE, REDACTED);
 };
+
+/** #594: a file the bot downloads is cut off past its limit. */
+export class FileTooLargeError extends Error {
+  constructor() {
+    super('The file is over the size limit');
+    this.name = 'FileTooLargeError';
+  }
+}
 
 export type TelegramErrorKind = 'api' | 'network' | 'invalid_response';
 
@@ -76,11 +86,33 @@ export interface TelegramUser {
   username?: string;
 }
 
+/** #594: one size of a photo; Telegram sends several, the largest last. */
+export interface TelegramPhotoSize {
+  file_id: string;
+  width: number;
+  height: number;
+  file_size?: number;
+}
+
+/** #594: a file sent as a document, a voice message or an audio note. */
+export interface TelegramFileRef {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+}
+
 export interface TelegramMessage {
   message_id: number;
   chat: TelegramChat;
   from?: TelegramUser;
   text?: string;
+  /** #594: the text sent with a photo, a document or a voice message. */
+  caption?: string;
+  photo?: TelegramPhotoSize[];
+  document?: TelegramFileRef;
+  voice?: TelegramFileRef;
+  audio?: TelegramFileRef;
   /** The message this one answers; Telegram fills it, the sender cannot. */
   reply_to_message?: TelegramMessage;
 }
@@ -172,11 +204,41 @@ const isUser = (value: unknown): value is TelegramUser =>
   typeof value.id === 'number' &&
   (value.is_bot === undefined || typeof value.is_bot === 'boolean');
 
+const isFileId = (value: unknown): boolean =>
+  typeof value === 'string' && value.length > 0;
+
+const isOptional = (value: unknown, type: 'string' | 'number'): boolean =>
+  value === undefined || typeof value === type;
+
+const isPhotoSize = (value: unknown): value is TelegramPhotoSize =>
+  isObject(value) &&
+  isFileId(value.file_id) &&
+  typeof value.width === 'number' &&
+  typeof value.height === 'number' &&
+  isOptional(value.file_size, 'number');
+
+const isFileRef = (value: unknown): value is TelegramFileRef =>
+  isObject(value) &&
+  isFileId(value.file_id) &&
+  isOptional(value.file_name, 'string') &&
+  isOptional(value.mime_type, 'string') &&
+  isOptional(value.file_size, 'number');
+
+/** #594: a message's media, when present, has the shape this module reads. */
+const hasValidMedia = (value: Record<string, unknown>): boolean =>
+  isOptional(value.caption, 'string') &&
+  (value.photo === undefined ||
+    (Array.isArray(value.photo) && value.photo.every(isPhotoSize))) &&
+  (value.document === undefined || isFileRef(value.document)) &&
+  (value.voice === undefined || isFileRef(value.voice)) &&
+  (value.audio === undefined || isFileRef(value.audio));
+
 const isMessage = (value: unknown, depth = 0): value is TelegramMessage =>
   isObject(value) &&
   typeof value.message_id === 'number' &&
   isChat(value.chat) &&
   (value.text === undefined || typeof value.text === 'string') &&
+  hasValidMedia(value) &&
   (value.from === undefined || isUser(value.from)) &&
   // Telegram never nests a reply inside a reply's `reply_to_message`.
   (value.reply_to_message === undefined ||
@@ -221,8 +283,9 @@ const networkError = (error: unknown): TelegramApiError => {
 
 /**
  * The Bot API over HTTPS (spec 22 D7): `getMe`, the `getUpdates` long poll,
- * `sendMessage`, `editMessageText` (#574), `answerCallbackQuery` (D12) and
- * `setMyCommands` (#500) and `setChatMenuButton` (#580). Stateless — the token is passed per call, read from
+ * `sendMessage`, `editMessageText` (#574), `answerCallbackQuery` (D12),
+ * `setMyCommands` (#500), `setChatMenuButton` (#580), and `getFile` with
+ * the file download (#594). Stateless — the token is passed per call, read from
  * `BotTokenStore` by the caller. The base URL is `TELEGRAM_API_BASE`, which
  * tests point at a fake server: nothing here ever reaches the real API in a
  * test.
@@ -322,6 +385,73 @@ export class TelegramClient {
         ? { reply_markup: { inline_keyboard: inlineKeyboard } }
         : {}),
     });
+  }
+
+  /**
+   * #594: where a file the bot received can be downloaded from — its
+   * `file_path` — and its size when Telegram knows it.
+   */
+  async getFile(
+    token: string,
+    fileId: string,
+  ): Promise<{ path: string; size: number | null }> {
+    const result = await this.call(token, 'getFile', { file_id: fileId });
+    if (!isObject(result) || typeof result.file_path !== 'string') {
+      throw new TelegramApiError(
+        'invalid_response',
+        'getFile did not name a file path',
+      );
+    }
+    return {
+      path: result.file_path,
+      size: typeof result.file_size === 'number' ? result.file_size : null,
+    };
+  }
+
+  /**
+   * #594: the bytes of a file `getFile` named, refused past `maxBytes` —
+   * by its length up front, else while it streams in.
+   */
+  async downloadFile(
+    token: string,
+    filePath: string,
+    maxBytes: number,
+  ): Promise<Uint8Array> {
+    const base = this.options.apiBase.replace(/\/+$/, '');
+    const path = filePath.split('/').map(encodeURIComponent).join('/');
+    let response: Response;
+    try {
+      response = await this.options.fetch(`${base}/file/bot${token}/${path}`, {
+        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+      });
+    } catch (error) {
+      throw networkError(error);
+    }
+    if (!response.ok || !response.body) {
+      throw new TelegramApiError(
+        'api',
+        `file download: HTTP ${response.status}`,
+        response.status,
+      );
+    }
+    const length = Number(response.headers.get('content-length'));
+    if (Number.isFinite(length) && length > maxBytes) {
+      await response.body.cancel();
+      throw new FileTooLargeError();
+    }
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      for await (const chunk of response.body) {
+        size += chunk.byteLength;
+        if (size > maxBytes) throw new FileTooLargeError();
+        chunks.push(chunk);
+      }
+    } catch (error) {
+      if (error instanceof FileTooLargeError) throw error;
+      throw networkError(error);
+    }
+    return new Uint8Array(Buffer.concat(chunks));
   }
 
   /** Stops the button's spinner; `text` shows as a short notice. */
