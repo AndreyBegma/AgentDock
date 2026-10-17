@@ -49,6 +49,40 @@ const cssVar = (name: string, fallback: string) =>
   fallback;
 
 /**
+ * The 16 ANSI colours from glass-ui tokens: the hue ramp for the colours, `ink`
+ * levels for the greys. Muted on purpose — diffs and highlights sit on the
+ * glass sheet instead of shouting over it. Read at attach time so a theme
+ * switch is picked up by the next attach.
+ */
+function terminalTheme() {
+  const ink = cssVar('--color-ink', '#f2f2f6');
+  const background = cssVar('--color-ground', '#09090c');
+  return {
+    background,
+    foreground: ink,
+    cursor: ink,
+    cursorAccent: background,
+    selectionBackground: cssVar('--color-line-strong', '#ffffff24'),
+    black: cssVar('--color-raised', '#17171e'),
+    red: cssVar('--color-hue-6', '#f0606e'),
+    green: cssVar('--color-hue-2', '#2fbf94'),
+    yellow: cssVar('--color-hue-4', '#e69f00'),
+    blue: cssVar('--color-hue-1', '#5b9cf6'),
+    magenta: cssVar('--color-hue-8', '#cc79a7'),
+    cyan: cssVar('--color-info', '#5fb4f0'),
+    white: cssVar('--color-ink-2', '#b4b4b8'),
+    brightBlack: cssVar('--color-ink-3', '#6c6c70'),
+    brightRed: cssVar('--color-hue-6-ink', '#ff9da5'),
+    brightGreen: cssVar('--color-hue-2-ink', '#7ee0c0'),
+    brightYellow: cssVar('--color-hue-4-ink', '#f5c25c'),
+    brightBlue: cssVar('--color-hue-1-ink', '#a4c8ff'),
+    brightMagenta: cssVar('--color-hue-8-ink', '#efabd1'),
+    brightCyan: cssVar('--color-hue-7-ink', '#cbbcff'),
+    brightWhite: ink,
+  };
+}
+
+/**
  * One attach: ticket → `/terminal` socket → xterm (spec 29 D5–D6). Remounting
  * (a new `key`) is a new attach; unmounting detaches, and the session keeps
  * running. Output arrives as binary frames and is written as raw bytes, so no
@@ -97,13 +131,9 @@ export function TerminalView({
         disableStdin: mode === 'read',
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
         fontSize: 13,
+        lineHeight: 1.2,
         scrollback: 5000,
-        theme: {
-          background: cssVar('--color-surface', '#101015'),
-          foreground: cssVar('--color-ink', '#f2f2f6'),
-          cursor: cssVar('--color-ink', '#f2f2f6'),
-          selectionBackground: cssVar('--color-line-strong', '#ffffff24'),
-        },
+        theme: terminalTheme(),
       });
       const fit = new FitAddon();
       term.loadAddon(fit);
@@ -277,7 +307,7 @@ export function TerminalView({
       aria-label={
         mode === 'write' ? 'Terminal, in control' : 'Terminal, read-only'
       }
-      className="h-full min-h-64 w-full overflow-hidden rounded-control bg-surface p-2"
+      className="h-full min-h-64 w-full overflow-hidden rounded-control bg-ground p-2"
     />
   );
 }
