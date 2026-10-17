@@ -475,6 +475,16 @@ export const toCardDetail = (
   branch: card.branch,
   worktree: card.worktree,
   specPath: card.specPath,
+  specPr:
+    card.specRepo !== null &&
+    card.specPrNumber !== null &&
+    card.specPrUrl !== null
+      ? {
+          repo: card.specRepo,
+          number: card.specPrNumber,
+          url: card.specPrUrl,
+        }
+      : null,
   sessionId: card.sessionId,
   createdBy: card.createdBy,
   movedBy: card.movedBy,

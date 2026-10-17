@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
-import { applyDrop, clampDropIndex } from './board-state';
-import { boardView, card } from './fixtures';
+import { applyDrop, clampDropIndex, moveTargets } from './board-state';
+import { boardView, card, round } from './fixtures';
 import { describeBoardError } from './format';
 
 const ids = (view: ReturnType<typeof boardView>, column: string) =>
@@ -100,6 +100,30 @@ describe('clampDropIndex (#270 D4)', () => {
   });
 });
 
+describe('moveTargets (#515)', () => {
+  test('lists every other column the board rule allows, never the current one', () => {
+    expect(moveTargets(card(1, 'todo'))).toEqual([
+      'in_progress',
+      'finished',
+      'completed',
+    ]);
+    expect(moveTargets(card(1, 'completed'))).toEqual([
+      'todo',
+      'in_progress',
+      'finished',
+    ]);
+  });
+
+  test('an Inbox suggestion goes to To Do only', () => {
+    expect(moveTargets(card(1, 'inbox'))).toEqual(['todo']);
+  });
+
+  test('a running card may still leave In progress: the move asks to stop the worker', () => {
+    const running = card(1, 'in_progress', { round: round('running') });
+    expect(moveTargets(running)).toEqual(['todo', 'finished', 'completed']);
+  });
+});
+
 describe('describeBoardError', () => {
   const error = (
     status: number,
@@ -125,7 +149,10 @@ describe('describeBoardError', () => {
       'budget',
     );
     expect(describeBoardError(error(422, 'no_spec_dir'))).toContain(
-      'spec directory',
+      'Spec folder in Settings › Docs source',
+    );
+    expect(describeBoardError(error(422, 'no_docs_clone'))).toContain(
+      'local clone path',
     );
     expect(
       describeBoardError(error(503, 'command_unavailable'), 'r1'),

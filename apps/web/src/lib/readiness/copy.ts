@@ -116,9 +116,15 @@ export function readinessCopy(
       };
     case 'no_spec_dir':
       return {
-        text: 'This project has no spec directory, so a spec cannot be written on Run.',
+        text: 'This project has no spec folder, so a spec cannot be written on Run. Set the Spec folder in the docs source settings.',
         href: settingsHref(projectId, 'docs'),
-        cta: 'Set the docs source',
+        cta: 'Set the Spec folder',
+      };
+    case 'no_docs_clone':
+      return {
+        text: 'The docs repository has no local clone, so a spec cannot be written on Run. Set its local clone path in the docs source settings.',
+        href: settingsHref(projectId, 'docs'),
+        cta: 'Set the local clone',
       };
     case 'content_off':
       return {

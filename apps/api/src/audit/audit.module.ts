@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SettingsModule } from '../settings/settings.module';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
+import { AuditFoldJob } from './audit-fold.job';
 import { AuditQueryService } from './audit-query.service';
 import { AuditVerificationJob } from './audit-verification.job';
 import { AuditVerificationService } from './audit-verification.service';
@@ -14,6 +15,7 @@ import { AuditVerificationService } from './audit-verification.service';
   controllers: [AuditController],
   providers: [
     AuditService,
+    AuditFoldJob,
     AuditQueryService,
     AuditVerificationService,
     AuditVerificationJob,

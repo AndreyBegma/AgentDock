@@ -8,7 +8,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { DesignViewer } from '../../../../../../../../components/design/design-viewer';
 import { FullScreenLayer } from '../../../../../../../../components/design/full-screen-layer';
 import { AsyncSection } from '../../../../../../../../components/prerequisites/async-section';
@@ -30,11 +30,15 @@ import {
   describeDesignError,
 } from '../../../../../../../../lib/design/format';
 import { cardDesignApi } from '../../../../../../../../lib/design/href';
-import { useCardDesign } from '../../../../../../../../lib/design/use-design';
+import {
+  isStackDesignChange,
+  useCardDesign,
+} from '../../../../../../../../lib/design/use-design';
 import {
   applyViewerChange,
   resolveViewerState,
 } from '../../../../../../../../lib/design/viewer-state';
+import { useLive } from '../../../../../../../../lib/live/use-live';
 import { useErrorToast } from '../../../../../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../../../../../lib/section/use-section';
 import { useProjectDetail } from '../../../../use-project-detail';
@@ -54,11 +58,20 @@ export default function CardDesignViewerPage() {
   const role = useProjectDetail(projectId).data?.role ?? 'viewer';
   const canOperate = projectRoleAtLeast(role, 'operator');
   const section = useCardDesign(projectId, number);
-  // The card's switch and title; refetched when the design changes under it.
+  // #527: a stack design's approval lifts the gate on this card's Generate.
+  const [stackVersion, setStackVersion] = useState(0);
+  const inStack = useRef(false);
+  useLive(`project:${projectId}`, (message) => {
+    if (inStack.current && isStackDesignChange(message.event, message.data)) {
+      setStackVersion((v) => v + 1);
+    }
+  });
+  // The card's switch, title and stack; refetched when the design changes under it.
   const card = useSection(
     () => fetchCard(projectId, number),
-    [projectId, number, section.data?.updatedAt],
+    [projectId, number, section.data?.updatedAt, stackVersion],
   );
+  inStack.current = Boolean(card.data?.stack);
   const back = boardCardHref(projectId, number);
 
   if (!Number.isInteger(number) || number < 1 || isNotFound(card.error)) {
@@ -170,6 +183,7 @@ export default function CardDesignViewerPage() {
                 actions={section.actions}
                 approval={approval}
                 launch={card.data}
+                stack={card.data?.stack}
                 onChange={(change) =>
                   router.replace(
                     `${window.location.pathname}${applyViewerChange(search, change)}`,

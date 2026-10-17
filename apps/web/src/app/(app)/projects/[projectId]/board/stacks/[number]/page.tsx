@@ -19,13 +19,16 @@ import { PageHeader } from '@andrewbehma/glass-ui/page-header';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { ArrowDown, ArrowLeft, Layers, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { MockupFrame } from '../../../../../../../components/design/mockup-frame';
+import { ScaledPreview } from '../../../../../../../components/design/scaled-preview';
 import { Markdown } from '../../../../../../../components/markdown/markdown';
+import { useNarrow } from '../../../../../../../components/shell/narrow';
 import { api } from '../../../../../../../lib/api';
 import {
   addStackCard,
@@ -48,6 +51,7 @@ import {
   addableCards,
   approvableRevision,
   currentStageText,
+  designSwitch,
   gateNote,
   isGated,
   openComments,
@@ -63,6 +67,7 @@ import {
   stackDesignApi,
   stackDesignHref,
 } from '../../../../../../../lib/design/href';
+import { mobilePreset } from '../../../../../../../lib/design/mobile-preview';
 import { formatCost } from '../../../../../../../lib/format';
 import { useLive } from '../../../../../../../lib/live/use-live';
 import { useErrorToast } from '../../../../../../../lib/section/use-error-toast';
@@ -203,50 +208,70 @@ function StackDetail({
   const viewer = stackDesignHref(projectId, stack.number);
   const cost = formatCost(stack.costUsd);
 
+  const reviewing = stack.design?.status === 'reviewing';
+  const approve = approvable ? (
+    <Button
+      variant="solid"
+      disabled={busy}
+      onClick={() =>
+        run(
+          () =>
+            api(`${stackDesignApi(projectId, stack.number)}/approve`, {
+              method: 'POST',
+              body: { revisionId: approvable.id },
+            }),
+          true,
+        )
+      }
+    >
+      Approve design
+    </Button>
+  ) : (
+    <Link href={viewer} className={buttonClassName({ variant: 'solid' })}>
+      Pick and approve
+    </Link>
+  );
+  const generate = (
+    <Button
+      variant="solid"
+      disabled={busy}
+      onClick={() =>
+        run(
+          () =>
+            api(`${stackDesignApi(projectId, stack.number)}/generate`, {
+              method: 'POST',
+            }),
+          true,
+        )
+      }
+    >
+      Generate design
+    </Button>
+  );
+
   const actions = canOperate ? (
     stack.design === null ? null : stack.design.status === 'idle' ? (
-      <Button
-        variant="solid"
-        disabled={busy}
-        onClick={() =>
-          run(
-            () =>
-              api(`${stackDesignApi(projectId, stack.number)}/generate`, {
-                method: 'POST',
-              }),
-            true,
-          )
-        }
-      >
-        Generate design
-      </Button>
-    ) : stack.design.status === 'reviewing' ? (
+      generate
+    ) : reviewing ? (
       <>
         <Link href={viewer} className={buttonClassName({ variant: 'glass' })}>
           Revise design
         </Link>
-        {approvable ? (
-          <Button
-            variant="solid"
-            disabled={busy}
-            onClick={() =>
-              run(
-                () =>
-                  api(`${stackDesignApi(projectId, stack.number)}/approve`, {
-                    method: 'POST',
-                    body: { revisionId: approvable.id },
-                  }),
-                true,
-              )
-            }
-          >
-            Approve design
-          </Button>
-        ) : (
-          <Link href={viewer} className={buttonClassName({ variant: 'solid' })}>
-            Pick and approve
-          </Link>
-        )}
+        {approve}
+      </>
+    ) : null
+  ) : null;
+  // #526: below `lg` the same actions sit in a dock; Revise design opens the
+  // viewer just as Open viewer does, so the dock keeps the one.
+  const dock = canOperate ? (
+    stack.design?.status === 'idle' ? (
+      generate
+    ) : reviewing ? (
+      <>
+        {approve}
+        <Link href={viewer} className={buttonClassName({ variant: 'glass' })}>
+          Open viewer
+        </Link>
       </>
     ) : null
   ) : null;
@@ -296,7 +321,12 @@ function StackDetail({
             </span>
           </div>
         }
-        actions={actions ?? undefined}
+        actions={
+          actions ? (
+            // Below `lg` the same actions sit in the dock (#526).
+            <div className="hidden items-center gap-2 lg:flex">{actions}</div>
+          ) : undefined
+        }
       />
 
       {gated ? (
@@ -305,7 +335,7 @@ function StackDetail({
         </Banner>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <Description
             projectId={projectId}
@@ -327,9 +357,23 @@ function StackDetail({
           design={design}
           canOperate={canOperate}
           busy={busy}
-          run={run}
+          onChanged={onChanged}
         />
       </div>
+
+      {dock ? (
+        // #526: Approve design and Open viewer stay in reach on a phone, above
+        // the tab bar (3.5rem and the safe area, as its spacer).
+        <>
+          <div aria-hidden="true" className="h-14 lg:hidden" />
+          <section
+            aria-label="Design actions"
+            className="glass-strong fixed inset-x-4 bottom-[calc(var(--dock-bottom)+0.5rem)] z-chrome flex items-center gap-2 rounded-sheet p-2 lg:hidden [&>*]:h-11 [&>*]:flex-1"
+          >
+            {dock}
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -638,75 +682,69 @@ function StackDesignAside({
   design,
   canOperate,
   busy,
-  run,
+  onChanged,
 }: {
   projectId: string;
   stack: BoardStackDetail;
   design: TaskDesignView | undefined;
   canOperate: boolean;
   busy: boolean;
-  run: (job: () => Promise<unknown>, design?: boolean) => Promise<void>;
+  onChanged: () => void;
 }) {
   const viewer = stackDesignHref(projectId, stack.number);
   const preview = design ? previewRevision(design) : null;
   const frame = preview?.frames[0];
-  const setNeeded = (needed: boolean) =>
-    run(
-      () =>
-        api(stackDesignApi(projectId, stack.number), {
-          method: 'PATCH',
-          body: { needed },
-        }),
-      true,
-    );
+  const narrow = useNarrow();
   return (
     <aside
       aria-label="Stack design"
-      className="flex flex-col gap-2 lg:sticky lg:top-16 lg:self-start"
+      className="flex flex-col gap-2 max-lg:order-first lg:sticky lg:top-16 lg:self-start"
     >
       <SectionHeader
         title="Stack design"
         description="The whole result. Each card’s own design is kept separately."
       />
       <div className="flex flex-col gap-3 rounded-surface bg-surface p-3">
+        <DesignSwitch
+          projectId={projectId}
+          stack={stack}
+          canOperate={canOperate}
+          busy={busy}
+          onChanged={onChanged}
+        />
         {stack.design === null ? (
-          <>
-            <p className="text-sm text-ink-2">
-              This stack has no shared design: its cards run without waiting for
-              one.
-            </p>
-            {canOperate && stack.design === null ? (
-              <div>
-                <Button
-                  size="sm"
-                  variant="glass"
-                  disabled={busy}
-                  onClick={() => setNeeded(true)}
-                >
-                  Draw a stack design first
-                </Button>
-              </div>
-            ) : null}
-          </>
+          <p className="text-sm text-ink-2">
+            This stack has no shared design: its cards run without waiting for
+            one.
+          </p>
         ) : (
           <>
-            <div className="aspect-[4/3] overflow-hidden rounded-control border border-line">
-              {frame ? (
-                <MockupFrame
-                  src={frame.htmlUrl}
-                  title={`${stack.label} design · variant ${preview?.variant}`}
-                  theme="light"
-                  pinMode={false}
-                  pins={[]}
-                  onPin={() => {}}
-                  onWheel={() => {}}
-                />
-              ) : (
-                <div className="flex size-full items-center justify-center text-sm text-ink-3">
-                  Not drawn yet
-                </div>
-              )}
-            </div>
+            {frame && narrow ? (
+              <ScaledPreview
+                src={frame.htmlUrl}
+                title={`${stack.label} design · variant ${preview?.variant}`}
+                preset={mobilePreset(design?.viewports ?? [])}
+                href={viewer}
+              />
+            ) : (
+              <div className="aspect-[4/3] overflow-hidden rounded-control border border-line">
+                {frame ? (
+                  <MockupFrame
+                    src={frame.htmlUrl}
+                    title={`${stack.label} design · variant ${preview?.variant}`}
+                    theme="light"
+                    pinMode={false}
+                    pins={[]}
+                    onPin={() => {}}
+                    onWheel={() => {}}
+                  />
+                ) : (
+                  <div className="flex size-full items-center justify-center text-sm text-ink-3">
+                    Not drawn yet
+                  </div>
+                )}
+              </div>
+            )}
             <KeyValueList
               dense
               items={[
@@ -742,24 +780,86 @@ function StackDesignAside({
             <div className="flex flex-wrap gap-2">
               <Link
                 href={viewer}
-                className={buttonClassName({ variant: 'glass', size: 'sm' })}
+                className={buttonClassName({
+                  variant: 'glass',
+                  size: 'sm',
+                  className: 'max-lg:h-11',
+                })}
               >
                 Open full size
               </Link>
-              {canOperate && stack.design.status !== 'approved' ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => setNeeded(false)}
-                >
-                  Turn the design off
-                </Button>
-              ) : null}
             </div>
           </>
         )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * #502: "Stack design required" — off lifts the design-first gate, on holds
+ * it until the design is approved. Revisions and the approval are kept
+ * either way. It flips at once and returns if the request fails; it is
+ * locked while a design turn runs, and read-only to a viewer.
+ */
+function DesignSwitch({
+  projectId,
+  stack,
+  canOperate,
+  busy,
+  onChanged,
+}: {
+  projectId: string;
+  stack: BoardStackDetail;
+  canOperate: boolean;
+  busy: boolean;
+  onChanged: () => void;
+}) {
+  const showError = useErrorToast();
+  const { required, locked } = designSwitch(stack);
+  const [pending, setPending] = useState<boolean | null>(null);
+  // A fresh stack carries the outcome; the optimistic value has done its job.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on every refetch
+  useEffect(() => setPending(null), [stack]);
+  const disabled = !canOperate || locked || busy || pending !== null;
+  const toggle = async (needed: boolean) => {
+    setPending(needed);
+    try {
+      await api(stackDesignApi(projectId, stack.number), {
+        method: 'PATCH',
+        body: { needed },
+      });
+      onChanged();
+    } catch (error) {
+      setPending(null);
+      showError(describeDesignError(error, projectId));
+    }
+  };
+  return (
+    <div className="flex items-center gap-3 rounded-control bg-hover px-3 py-2">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span
+          id="stack-design-required"
+          className="text-sm font-medium text-ink"
+        >
+          Stack design required
+        </span>
+        <span className="text-xs text-ink-3">
+          {locked
+            ? 'A design turn is running. Stop it first.'
+            : 'No card of the stack runs until the design is approved.'}
+        </span>
+      </span>
+      <span
+        inert={disabled || undefined}
+        className={disabled ? 'opacity-60' : undefined}
+      >
+        <Toggle
+          labelledBy="stack-design-required"
+          checked={pending ?? required}
+          onChange={toggle}
+        />
+      </span>
+    </div>
   );
 }

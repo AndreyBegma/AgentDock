@@ -1,9 +1,10 @@
-import type {
-  TokenSavedView,
-  TokenSaverBeforeAfter,
-  TokenSaverFilterSavings,
-  TokenSaverRunKind,
-  TokenSaverSummary,
+import {
+  isUnfilteredId,
+  type TokenSavedView,
+  type TokenSaverBeforeAfter,
+  type TokenSaverFilterSavings,
+  type TokenSaverRunKind,
+  type TokenSaverSummary,
 } from '@agentdock/shared';
 import type { ChartSeries } from '@andrewbehma/glass-ui/chart';
 import { passThroughShare } from './format';
@@ -154,7 +155,7 @@ export const topFilters = (
   limit: number,
 ): TokenSaverFilterSavings[] =>
   filters
-    .filter((f) => f.filter !== 'none')
+    .filter((f) => !isUnfilteredId(f.filter))
     .slice()
     .sort(bySaved)
     .slice(0, limit);
@@ -162,8 +163,9 @@ export const topFilters = (
 /**
  * The dashboard's "filters that most often returned the original" (D13): by
  * the share of their commands that passed through, then by how many; a filter
- * that never passed through is left out. `none` (an uncovered command) is
- * the extreme case and stays in — it is exactly what the person should see.
+ * that never passed through is left out. `none` and the `none:*` reasons (no
+ * filter ran) are the extreme case and stay in — exactly what the person
+ * should see.
  */
 export function mostPassedThrough(
   filters: readonly TokenSaverFilterSavings[],

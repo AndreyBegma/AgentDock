@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import {
   type HelloMessage,
@@ -64,6 +70,24 @@ describe('agentdock-runner CLI', () => {
     expect(await runCli([], deps())).toBe(EXIT.usage);
   });
 
+  describe('policy', () => {
+    it('show prints the effective policy; set changes it in runner.json', async () => {
+      expect(await runCli(['policy', 'show'], deps())).toBe(EXIT.ok);
+      expect(JSON.parse(stdout.join('')).maxPermissionMode).toBe('auto');
+      expect(stderr.join('')).toContain('No root is allowed');
+      expect(
+        await runCli(['policy', 'set', 'terminal.write', 'true'], deps()),
+      ).toBe(EXIT.ok);
+      const config = JSON.parse(readFileSync(paths().configFile, 'utf8'));
+      expect(config.policy.terminal).toEqual({ write: true });
+    });
+
+    it('prints its usage for an unknown verb', async () => {
+      expect(await runCli(['policy', 'grant'], deps())).toBe(EXIT.usage);
+      expect(stderr.join('')).toContain('Usage: agentdock-runner policy');
+    });
+  });
+
   describe('pair', () => {
     const pairWith = (code: string) =>
       runCli(['pair', '--server', server.origin, '--code', code], deps());
@@ -120,6 +144,52 @@ describe('agentdock-runner CLI', () => {
       expect(config.profiles).toHaveLength(1);
       expect(stderr.join('')).toContain('"previousRunnerId":"rn_old"');
       expect(output()).not.toContain(fresh);
+    });
+
+    it('allows the --allow-root directories as real paths, and says so (ADR-0047)', async () => {
+      server.pairing = () => Response.json({ runnerId: 'rn_1', token: TOKEN });
+      const dev = join(home, 'dev');
+      mkdirSync(dev, { recursive: true });
+      const code = await runCli(
+        [
+          'pair',
+          '--server',
+          server.origin,
+          '--code',
+          'ABCD-EFGH',
+          '--allow-root',
+          dev,
+        ],
+        deps(),
+      );
+      expect(code).toBe(EXIT.ok);
+      const config = JSON.parse(readFileSync(paths().configFile, 'utf8'));
+      expect(config.policy.allowedRoots).toEqual([realpathSync(dev)]);
+      expect(config.policy.maxPermissionMode).toBe('auto');
+      expect(stdout.join('')).toContain('Projects may be watched under:');
+    });
+
+    it('refuses a missing --allow-root before pairing', async () => {
+      const code = await runCli(
+        [
+          'pair',
+          '--server',
+          server.origin,
+          '--code',
+          'ABCD-EFGH',
+          '--allow-root',
+          join(home, 'missing'),
+        ],
+        deps(),
+      );
+      expect(code).toBe(EXIT.usage);
+      expect(server.pairingBodies).toEqual([]);
+    });
+
+    it('without --allow-root, says no project root is allowed yet', async () => {
+      server.pairing = () => Response.json({ runnerId: 'rn_1', token: TOKEN });
+      expect(await pairWith('ABCD-EFGH')).toBe(EXIT.ok);
+      expect(stdout.join('')).toContain('No project root is allowed yet');
     });
 
     describe('profile detection', () => {
@@ -325,6 +395,7 @@ describe('agentdock-runner CLI', () => {
         projects: [],
         disabledCommands,
         otlp: null,
+        policy: { allowedRoots: ['/'] },
       });
 
     const start = (exec: Exec = machineWithoutCodex()) => {
@@ -506,6 +577,7 @@ describe('agentdock-runner CLI', () => {
         projects: [],
         disabledCommands: [],
         otlp: null,
+        policy: { allowedRoots: ['/'] },
       });
       const { controller, exit, live } = start();
       await live();
@@ -534,6 +606,37 @@ describe('agentdock-runner CLI', () => {
       await live();
       server.close(4401, 'revoked');
       expect(await exit).toBe(EXIT.terminalClose);
+    });
+
+    it('a replaced connection (4409) leaves the status `status` prints, then exits 78 (C-108)', async () => {
+      paired();
+      const { exit, live } = start();
+      await live();
+      server.close(4409, 'replaced by a newer connection');
+      expect(await exit).toBe(EXIT.terminalClose);
+      const expected =
+        'replaced by another connection at 2026-10-07T18:00:00.000Z, re-pair if this was not you';
+      expect(stderr.join('')).toContain(`stopped: ${expected}`);
+
+      stdout = [];
+      expect(await runCli(['status'], deps())).toBe(EXIT.ok);
+      expect(stdout.join('')).toContain(`stopped:  ${expected}\n`);
+    });
+
+    it('a new run clears the last stop from `status`', async () => {
+      paired();
+      const first = start();
+      await first.live();
+      server.close(4409, 'replaced');
+      expect(await first.exit).toBe(EXIT.terminalClose);
+
+      const second = start();
+      await second.live();
+      stdout = [];
+      await runCli(['status'], deps());
+      expect(stdout.join('')).not.toContain('stopped:');
+      second.controller.abort();
+      expect(await second.exit).toBe(EXIT.ok);
     });
   });
 

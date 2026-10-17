@@ -22,6 +22,7 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   'pr.awaiting_approval': 'Pull request awaiting approval',
   'runner.offline': 'Runner offline',
   'runner.online': 'Runner back online',
+  'runner.connection_replaced': 'Runner connection replaced',
   'budget.exceeded': 'Budget exceeded',
   'budget.threshold': 'Budget threshold reached',
   'schedule.disabled': 'Schedule disabled',
@@ -31,6 +32,7 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   'card.background_stalled': 'Card worker stuck on its own background task',
   'cards.suggested': 'Cards suggested from your sessions',
   'steward.incident': 'Steward needs you on stuck work',
+  'account.throttled': 'Sign-in attempts throttled',
 };
 
 /** What a notification of the kind reads like, under the rule's name. */
@@ -43,6 +45,8 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'pr.awaiting_approval': 'PR #157 is ready and waits for your approval',
   'runner.offline': 'Runner build-box went offline',
   'runner.online': 'Runner build-box is back online',
+  'runner.connection_replaced':
+    'Another connection took over runner build-box — re-pair if it was not you',
   'budget.exceeded': 'luna-watch spent its whole monthly budget',
   'budget.threshold': 'luna-watch reached 80 % of its monthly budget',
   'schedule.disabled': 'The nightly review schedule was turned off',
@@ -54,15 +58,23 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'cards.suggested': '3 cards suggested in the luna-watch Inbox',
   'steward.incident':
     'C-12 needs you: API error persisted after 2 nudges — open the terminal',
+  'account.throttled':
+    'Ana Diaz’s account had 5 wrong passwords from 203.0.113.7',
 };
 
-export type RuleGroup = 'fleet' | 'runners' | 'budgets' | 'schedules';
+export type RuleGroup =
+  | 'fleet'
+  | 'runners'
+  | 'budgets'
+  | 'schedules'
+  | 'security';
 
 export const RULE_GROUP_LABEL: Record<RuleGroup, string> = {
   fleet: 'Orchestrator and slots',
   runners: 'Runners',
   budgets: 'Budgets',
   schedules: 'Schedules',
+  security: 'Security',
 };
 
 const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
@@ -74,6 +86,7 @@ const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
   'pr.awaiting_approval': 'fleet',
   'runner.offline': 'runners',
   'runner.online': 'runners',
+  'runner.connection_replaced': 'runners',
   'budget.exceeded': 'budgets',
   'budget.threshold': 'budgets',
   'schedule.disabled': 'schedules',
@@ -83,6 +96,7 @@ const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
   'card.background_stalled': 'fleet',
   'cards.suggested': 'fleet',
   'steward.incident': 'fleet',
+  'account.throttled': 'security',
 };
 
 export type KindTone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -96,6 +110,7 @@ export const KIND_TONE: Record<NotificationKind, KindTone> = {
   'pr.awaiting_approval': 'warn',
   'runner.offline': 'danger',
   'runner.online': 'ok',
+  'runner.connection_replaced': 'danger',
   'budget.exceeded': 'danger',
   'budget.threshold': 'warn',
   'schedule.disabled': 'danger',
@@ -105,6 +120,7 @@ export const KIND_TONE: Record<NotificationKind, KindTone> = {
   'card.background_stalled': 'warn',
   'cards.suggested': 'neutral',
   'steward.incident': 'warn',
+  'account.throttled': 'danger',
 };
 
 export interface FeedState {

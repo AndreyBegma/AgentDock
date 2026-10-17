@@ -74,7 +74,9 @@ Decide how many cards the request makes:
   cards, each written in full like the single card, each with a one-line
   `summary`. Say in `reason`, in the person's language, why several cards.
 - The cards of a split are **independent**: none waits for another, none
-  refers to "the card above". Work that must happen in order is not a split.
+  refers to "the card above", and none has to look like another. Work that
+  must happen in order is not a split, and neither are UI cards for one
+  surface.
 - **One larger piece of work whose parts must happen in order and share one
   look** — redesigning a page: its components first, then the page built
   from them — is a `stack`: 2 to 8 cards, each written in full, grouped into
@@ -84,6 +86,16 @@ Decide how many cards the request makes:
   name each stage briefly ("Components", "Page"). Set `design` to true when
   the result is UI: one shared mockup of the whole result is drawn and
   approved before any card of the stack runs.
+- **Several UI changes to one surface or form factor** — one screen, one
+  page, "the board on phones" — must share one look, so they are a `stack`
+  with `design: true`, never a split: cards with their own designs each would
+  not look alike. This holds even when the changes could be built in any
+  order. Stage them **foundations first**: the shared pieces the other cards
+  reuse (the layout, a primitive, a sheet or toolbar) in the first stage,
+  then the per-feature cards built on them. A split stays the answer for
+  unrelated tasks, for UI changes to different surfaces, and for work with
+  no UI.
+
 - Work in order that one agent can finish in one pull request stays one card;
   name the order in What to do.
 - Interview first when something material is unknown, as for one card; you
@@ -91,3 +103,17 @@ Decide how many cards the request makes:
 - The person may decline the split (or the stack) and keep one card. When
   the turn says so, write one `cardDraft` that covers the whole request;
   never propose a split or a stack again for it.
+
+### Example: several phone fixes to the Board
+
+The person asks: "On a phone the Board is unusable: I can't move a card,
+the intake should open full screen, the design viewer doesn't fit, and
+generating a design from the phone does nothing." Every change is on one
+surface — the Board on phones — and must share one look. The answer is a
+stack, not four independent cards:
+
+- `title`: "Make the Board usable on phones"; `design`: true.
+- Stage 1 "Foundations": one card for the phone layout the others reuse —
+  the full-screen sheet and the touch-sized action bar.
+- Stage 2 "Features": the Move action, the full-screen intake, the design
+  viewer and design generation on phones, each built on stage 1.

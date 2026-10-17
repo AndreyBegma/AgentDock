@@ -77,6 +77,22 @@ describe('FilterBreakdown (#445 D13)', () => {
     expect(html).toContain('1 command ·');
   });
 
+  test('names why no filter ran (amendment 12)', () => {
+    const passed = { ...filters[1], passedThrough: 1 };
+    const html = renderToStaticMarkup(
+      <FilterBreakdown
+        filters={[
+          { ...passed, filter: 'none:compound' },
+          { ...passed, filter: 'none:uncovered' },
+          { ...passed, filter: 'none:mode' },
+        ]}
+      />,
+    );
+    expect(html).toContain('Compound command (not filtered)');
+    expect(html).toContain('No filter for this command');
+    expect(html).toContain('Not filtered in this permission mode');
+  });
+
   test('renders nothing for a round without filtered commands', () => {
     expect(renderToStaticMarkup(<FilterBreakdown filters={[]} />)).toBe('');
     expect(renderToStaticMarkup(<FilterBreakdown filters={undefined} />)).toBe(

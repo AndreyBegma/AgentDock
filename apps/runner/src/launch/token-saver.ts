@@ -27,12 +27,60 @@ export const TOKEN_SAVER_FILES = {
 export const AGENTDOCK_MCP_SERVER = 'agentdock';
 
 /**
- * D10: the share of the context window at which Claude Code compacts. The
- * setting is the env `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` — no settings key
- * (checked against Claude Code 2.1.301); the spec's default is 60 %.
+ * D10, amendment 12: the context size, in tokens, at which a Token saver
+ * session compacts — on every model, whatever its window.
  */
-export const AUTOCOMPACT_ENV = 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE';
-export const AUTOCOMPACT_PCT = 60;
+export const COMPACT_AT_TOKENS = 150_000;
+
+/**
+ * Amendment 12: Claude Code's absolute compaction window, in tokens. Checked
+ * against Claude Code 2.1.302: the window is `min(model window, max(100k,
+ * value))`, and it compacts at that window less the output reserve
+ * (`min(maxOutputTokens, 20000)`) less a 13000-token summary buffer.
+ * `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` is a share of that same window — on a 1M
+ * window 60 % was about 600k — and lowers the threshold further, so the
+ * launch pins it to 100 (no effect) over any value a profile carries.
+ */
+export const AUTOCOMPACT_WINDOW_ENV = 'CLAUDE_CODE_AUTO_COMPACT_WINDOW';
+export const AUTOCOMPACT_PCT_ENV = 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE';
+const COMPACT_OUTPUT_RESERVE = 20_000;
+const COMPACT_SUMMARY_BUFFER = 13_000;
+const COMPACT_WINDOW_FLOOR = 100_000;
+
+/** The window that makes Claude Code compact at `threshold` tokens. */
+export const autoCompactWindowFor = (threshold: number): number =>
+  Math.max(
+    COMPACT_WINDOW_FLOOR,
+    threshold + COMPACT_OUTPUT_RESERVE + COMPACT_SUMMARY_BUFFER,
+  );
+
+/**
+ * Where Claude Code 2.1.302 compacts a model with `modelWindow` tokens and
+ * `maxOutputTokens`, given the launch env — its formula, for the tests.
+ */
+export const compactThreshold = (
+  modelWindow: number,
+  maxOutputTokens: number,
+  env: Readonly<Record<string, string>>,
+): number => {
+  const configured = Number(env[AUTOCOMPACT_WINDOW_ENV]);
+  const window = Number.isFinite(configured)
+    ? Math.min(modelWindow, Math.max(COMPACT_WINDOW_FLOOR, configured))
+    : modelWindow;
+  const effective = window - Math.min(maxOutputTokens, COMPACT_OUTPUT_RESERVE);
+  const ceiling = effective - COMPACT_SUMMARY_BUFFER;
+  const pct = Number(env[AUTOCOMPACT_PCT_ENV]);
+  return pct > 0 && pct <= 100
+    ? Math.min(Math.floor(effective * (pct / 100)), ceiling)
+    : ceiling;
+};
+
+/**
+ * Amendment 12: the code-sentinel plugin's `/cs-eco` switch. Its hooks then
+ * guard whole reads, drop repeated ones and cut large MCP results; its Bash
+ * hook stands down, since `AGENTDOCK_FILTER_STATS` says the runner filters.
+ */
+export const CS_ECO_ENV = 'CS_ECO';
 
 /** The scout subagent's name, as the worker prompt names it (D9). */
 export const SCOUT_AGENT = 'scout';
@@ -184,7 +232,8 @@ export interface TokenSaverLaunch {
  * On: `--settings` (the filter hook), `--strict-mcp-config` with
  * `agentdock` (where the launch uses it) and the allowed servers copied
  * from the profile's own config (D6), the scout on `--agents` (D9), and the
- * env for compaction (D10) and the filter's stats and raw files.
+ * env for compaction (D10), the plugin's eco hooks (amendment 12) and the
+ * filter's stats and raw files.
  */
 export const tokenSaverLaunch = (
   input: TokenSaverLaunchInput,
@@ -247,7 +296,9 @@ export const tokenSaverLaunch = (
       ...(input.scout ? ['--agents', JSON.stringify(SCOUT_AGENTS)] : []),
     ],
     env: {
-      [AUTOCOMPACT_ENV]: String(AUTOCOMPACT_PCT),
+      [AUTOCOMPACT_WINDOW_ENV]: String(autoCompactWindowFor(COMPACT_AT_TOKENS)),
+      [AUTOCOMPACT_PCT_ENV]: '100',
+      [CS_ECO_ENV]: 'on',
       [LAUNCH_SETTINGS_ENV]: settingsFile,
       ...filterEnv(run),
     },

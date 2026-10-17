@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { headShaSchema } from '../protocol/commands/approvals';
 
 /**
  * Action requests (docs/specs/201-claude-code-integration.md D18): something a
@@ -77,6 +78,39 @@ export const actionRequestArgsSchemas = {
 export type ActionRequestArgs<K extends ActionRequestKind> = z.infer<
   (typeof actionRequestArgsSchemas)[K]
 >;
+
+/** The PR title kept on a `pr_approve` request, at most this long. */
+export const ACTION_REQUEST_PR_TITLE_MAX = 300;
+
+/**
+ * The stored `args` of a `pr_approve` request: what the session asked for
+ * plus what `pr.inspect` read when it was created — the head the person is
+ * shown and approves. Never taken from the session.
+ */
+export const prApproveBoundArgsSchema = z.strictObject({
+  pr: z.number().int().positive(),
+  headSha: headShaSchema,
+  title: z.string().max(ACTION_REQUEST_PR_TITLE_MAX),
+  url: z.url({ protocol: /^https?$/ }),
+});
+export type PrApproveBoundArgs = z.infer<typeof prApproveBoundArgsSchema>;
+
+/** The bound PR of a `pr_approve` request; null for another kind or old args. */
+export const boundPrOf = (request: {
+  kind: ActionRequestKind;
+  args: unknown;
+}): PrApproveBoundArgs | null => {
+  if (request.kind !== 'pr_approve') return null;
+  const parsed = prApproveBoundArgsSchema.safeParse(request.args);
+  return parsed.success ? parsed.data : null;
+};
+
+/** A commit id as people read it: its first 7 characters. */
+export const shortHeadSha = (sha: string): string => sha.slice(0, 7);
+
+/** The PR's diff at `headSha` — what the approver reviews. */
+export const prDiffUrl = (args: Pick<PrApproveBoundArgs, 'url' | 'headSha'>) =>
+  `${args.url.replace(/\/+$/, '')}/files/${args.headSha}`;
 
 /** A request as the API lists it to the web and answers `action.status` with. */
 export const actionRequestSummarySchema = z.object({

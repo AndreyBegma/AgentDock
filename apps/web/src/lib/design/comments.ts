@@ -1,4 +1,5 @@
 import type {
+  CardStackRef,
   DesignCommentView,
   DesignTheme,
   MockupPinMarker,
@@ -141,13 +142,27 @@ export function designWriteBlock(
   return null;
 }
 
+/**
+ * #527 (ADR-0044 §5): a card of a stack draws its own design on the stack's
+ * approved one — Generate and Revise wait while the stack design is needed
+ * and not approved. Null for a card in no stack, or one its stack lets draw.
+ */
+export function stackDrawBlock(
+  stack: CardStackRef | null | undefined,
+): string | null {
+  if (!stack?.gate) return null;
+  return `${stack.gate}: ${stack.label} “${stack.title}”. This card's design is drawn on it.`;
+}
+
 /** D10: Revise needs an open comment on the design. */
 export function reviseBlock(
   design: TaskDesignView,
   canOperate: boolean,
+  stackBlock: string | null = null,
 ): string | null {
   const block = designWriteBlock(design, canOperate);
   if (block) return block;
+  if (stackBlock) return stackBlock;
   if (!design.comments.some(isOpen)) {
     return 'Leave a comment first: Revise sends the open comments.';
   }

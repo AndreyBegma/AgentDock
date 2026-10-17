@@ -3,6 +3,10 @@ import {
   type ActionRequestStatus,
   type ActionRequestSummary,
   actionRequestArgsSchemas,
+  boundPrOf,
+  type PrApproveBoundArgs,
+  prDiffUrl,
+  shortHeadSha,
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
 
@@ -53,6 +57,20 @@ export const toolUseArgs = (
   return parsed.success ? parsed.data : null;
 };
 
+/**
+ * A `pr_approve` request's PR as the API read it at creation: the head an
+ * approval binds to (C-110), shortened, and its diff. Null for any other kind
+ * and for a request stored without a head.
+ */
+export const prApproveArgs = (
+  request: Pick<ActionRequestSummary, 'kind' | 'args'>,
+): (PrApproveBoundArgs & { shortHead: string; diffUrl: string }) | null => {
+  const pr = boundPrOf(request);
+  return pr
+    ? { ...pr, shortHead: shortHeadSha(pr.headSha), diffUrl: prDiffUrl(pr) }
+    : null;
+};
+
 /** What the request asks for, as a short title. */
 export const requestTitle = (request: ActionRequestSummary): string => {
   switch (request.kind) {
@@ -61,9 +79,9 @@ export const requestTitle = (request: ActionRequestSummary): string => {
       return toolName ? `Use ${toolName}` : KIND_LABEL.tool_use;
     }
     case 'pr_approve': {
-      const pr = actionRequestArgsSchemas.pr_approve.safeParse(request.args);
-      return pr.success
-        ? `Approve pull request #${pr.data.pr}`
+      const pr = request.args.pr;
+      return typeof pr === 'number'
+        ? `Approve pull request #${pr}`
         : KIND_LABEL.pr_approve;
     }
     case 'orchestrator_start': {

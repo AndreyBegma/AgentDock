@@ -18,7 +18,7 @@
 # RUNNER_RELEASE_DRY_RUN=1 also stops a tag run before it publishes. It is read
 # by the step shells, where variables do arrive.
 #
-# Nothing another pipeline wrote reaches the release (ADR-0046): no host cache
+# Nothing another pipeline wrote reaches the release (ADR-0049): no host cache
 # is mounted, `bun install` starts from an empty cache in the step's container
 # and keeps to bun.lock (--frozen-lockfile), and `build-release` ignores
 # turbo's cache. Only `ci-image` mounts the Docker socket.

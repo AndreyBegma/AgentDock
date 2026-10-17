@@ -10,6 +10,8 @@ export const AUTH_ERROR = {
   lastAdmin: 'last_admin',
   invalidTransition: 'invalid_transition',
   notFound: 'not_found',
+  /** 429: this source failed too often; `Retry-After` says when to try again. */
+  throttled: 'throttled',
 } as const;
 export type AuthErrorCode = (typeof AUTH_ERROR)[keyof typeof AUTH_ERROR];
 

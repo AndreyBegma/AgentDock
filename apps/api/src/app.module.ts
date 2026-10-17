@@ -25,6 +25,7 @@ import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
 import { PlannerModule } from './planner';
 import { PricesModule } from './prices/prices.module';
+import { ProjectRulesModule } from './project-rules';
 import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
 import { ReadinessModule } from './readiness';
@@ -104,6 +105,8 @@ import { WorkflowsModule } from './workflows';
     AttachmentsModule.forRoot(),
     SchedulesModule,
     BudgetsModule,
+    // Issue #528: per-project coding rules and their Markdown import.
+    ProjectRulesModule,
     // Issue #447: the Steward digest. Global, and here alone: its conditional
     // queue must not be registered while the graph loads.
     StewardDigestModule,

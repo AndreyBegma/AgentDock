@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root,:root[data-theme=dark]{color-scheme:dark;--ground:#0a1022;--surface:#111a33;--raised:#18223f;--content:rgb(27 38 71/.96);--ink:#f2f2f6;--ink2:rgb(242 242 246/.62);--ink3:rgb(242 242 246/.53);--line:rgb(255 255 255/.1);--line2:rgb(255 255 255/.18);--hover:rgb(255 255 255/.06);--accent:#5b5bf6;--onacc:#fff;--accsoft:rgb(91 91 246/.2);--accink:#b4b2ff;--scrim:rgb(10 16 34/.5);--h1:#5b9cf6;--h2:#2fbf94;--h3:#7cc95a;--h4:#e69f00;--h5:#e8743b;--h7:#a68bfa;--glass:rgb(24 34 63/.9);--shadow:rgb(0 0 0/.4)}
+:root[data-theme=light]{color-scheme:light;--ground:#fff;--surface:#f8faff;--raised:#f0f4fb;--content:rgb(255 255 255/.96);--ink:#18181b;--ink2:rgb(24 24 27/.72);--ink3:rgb(24 24 27/.64);--line:rgb(0 0 0/.1);--line2:rgb(0 0 0/.23);--hover:rgb(0 0 0/.06);--accent:#4f46e5;--accsoft:rgb(79 70 229/.12);--accink:#4338ca;--scrim:rgb(10 16 34/.3);--h1:#1f64d6;--h2:#00805e;--h3:#3a7d1c;--h4:#b36b00;--h5:#c24e00;--h7:#7244e0;--glass:rgb(255 255 255/.92);--shadow:rgb(0 0 0/.16)}
+*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--surface);color:var(--ink);font:14px/20px 'SF Pro Text',Inter,system-ui,sans-serif}
+h1,h2,p{margin:0}.row{display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
+figure{margin:0;display:flex;flex-direction:column;gap:8px;align-items:center}figcaption{font-size:12px;color:var(--ink3);max-width:375px;text-align:center}
+.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.phone{position:relative;width:375px;height:700px;overflow:hidden;border-radius:28px;border:1px solid var(--line2);background:radial-gradient(300px 260px at 0 0,color-mix(in oklab,var(--h1) 16%,transparent),transparent 70%),var(--ground)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border:1px solid transparent;border-radius:6px;font:600 14px inherit;font-family:inherit;cursor:pointer;color:var(--ink)}
+.btn-glass{background:var(--raised);border-color:var(--line2)}.btn-solid{background:var(--accent);color:var(--onacc)}.btn-ghost{background:transparent;color:var(--ink2)}
+.badge{display:inline-flex;align-items:center;height:18px;min-width:18px;padding:0 5px;border-radius:99px;font-size:10px;font-weight:600;background:var(--hover);color:var(--ink2);justify-content:center}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:99px;font-size:11px;font-weight:600;background:var(--accsoft);color:var(--accink)}
+.glass{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--line2);box-shadow:0 -12px 40px var(--shadow)}
+.scrim{position:absolute;inset:0;background:var(--scrim)}
+.bsheet{position:absolute;left:0;right:0;bottom:0;border-radius:12px 12px 0 0;padding:8px 8px 24px;display:flex;flex-direction:column}
+.grab{width:36px;height:4px;border-radius:99px;background:var(--line2);margin:4px auto 8px}
+.bh{padding:4px 12px 8px}.bh h2{font-size:16px;line-height:24px;font-weight:600}.bh p{font-size:13px;color:var(--ink2)}
+.list{display:flex;flex-direction:column;gap:2px}
+.opt{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 12px;border:0;background:transparent;border-radius:8px;font:inherit;font-size:15px;color:var(--ink);text-align:left;width:100%}
+.opt:active,.opt.press{background:var(--hover)}
+.opt .sw{width:10px;height:10px;border-radius:3px;flex-shrink:0}.opt .nm{flex:1}
+.opt[aria-current=true]{background:var(--accsoft);color:var(--accink);font-weight:600}
+.opt[aria-current=true] .badge{background:transparent;color:var(--accink)}
+.cancel{margin:8px 4px 0}
+.dialog{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);padding:20px;border-radius:12px;display:flex;flex-direction:column;gap:12px}
+.dialog h2{font-size:16px;line-height:24px;font-weight:600}.dialog p{color:var(--ink2)}
+.da{display:flex;justify-content:space-between;gap:8px;margin-top:8px}
+.desk{width:560px;border-radius:12px;border:1px solid var(--line2);background:var(--ground);padding:16px;position:relative;height:420px;overflow:hidden}
+.desk .dim{position:absolute;inset:0;background:var(--scrim)}
+.desk .pop{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:360px;padding:8px;border-radius:12px;display:flex;flex-direction:column}
+.specs{max-width:560px;font-size:12px;color:var(--ink2);display:grid;gap:4px;padding:12px 14px;border-radius:8px;background:var(--content);border:1px solid var(--line)}
+.specs b{color:var(--ink)}
+</style></head><body>
+<div class="row">
+<figure><div class="phone">
+ <div class="scrim"></div>
+ <div class="bsheet glass" role="dialog" aria-modal="true" aria-labelledby="t">
+  <div class="grab"></div>
+  <div class="bh"><h2 id="t">Move C-216</h2><p>Add a prominent Move action with a column picker</p></div>
+  <div class="list" role="list">
+   <button class="opt" aria-current="true"><span class="sw" style="background:var(--h1)"></span><span class="nm">Ready</span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span class="sr" style="font-size:11px;font-weight:600">Current</span></button>
+   <button class="opt"><span class="sw" style="background:var(--ink3)"></span><span class="nm">Backlog</span><span class="badge">12</span></button>
+   <button class="opt press"><span class="sw" style="background:var(--h2)"></span><span class="nm">In progress</span><span class="badge">4</span></button>
+   <button class="opt"><span class="sw" style="background:var(--h7)"></span><span class="nm">In review</span><span class="badge">2</span></button>
+   <button class="opt"><span class="sw" style="background:var(--h5)"></span><span class="nm">Blocked</span><span class="badge">1</span></button>
+  </div>
+  <button class="btn btn-ghost cancel">Cancel</button>
+ </div>
+</div><figcaption>3 · Column picker (glass-ui Sheet side=bottom). Rows are 52 px (min 44). Current column is accent-soft with a check and “Current”, and sits first so it is never lost. Only the targets the existing menu allows are listed.</figcaption></figure>
+
+<figure><div class="phone">
+ <div class="scrim" style="background:var(--scrim)"></div>
+ <div class="dialog glass" role="alertdialog" style="box-shadow:0 20px 48px var(--shadow)">
+  <h2>Start C-216 now?</h2>
+  <p>Moving it to In progress hands the card to the next free slot. This is the same confirmation the menu shows today.</p>
+  <div class="da"><button class="btn btn-ghost">Cancel</button><button class="btn btn-solid">Move to In progress</button></div>
+ </div>
+</div><figcaption>4 · Choosing In progress closes the picker and opens the existing confirm Dialog (board-view.tsx), unchanged. Other columns move immediately.</figcaption></figure>
+</div>
+
+<div class="row" style="margin-top:32px"><figure>
+ <div class="desk"><div class="dim"></div>
+  <div class="pop glass" style="box-shadow:0 20px 48px var(--shadow)">
+   <div class="bh"><h2>Move C-216</h2><p>Same picker on desktop, centred; drag-and-drop is untouched.</p></div>
+   <div class="list">
+    <button class="opt" aria-current="true"><span class="sw" style="background:var(--h1)"></span><span class="nm">Ready</span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></button>
+    <button class="opt"><span class="sw" style="background:var(--ink3)"></span><span class="nm">Backlog</span><span class="badge">12</span></button>
+    <button class="opt"><span class="sw" style="background:var(--h2)"></span><span class="nm">In progress</span><span class="badge">4</span></button>
+   </div>
+  </div>
+ </div>
+ <figcaption style="max-width:560px">Optional desktop use (card allows it).</figcaption></figure>
+ <div class="specs"><b>Spec notes</b>
+  <span>• Row: min-height 44 px (drawn 52), full-width button, 12 px gutters, 8 px radius.</span>
+  <span>• Current row: <code>aria-current="true"</code>, check icon plus text, so it is not colour-only.</span>
+  <span>• Sheet: glass-strong, 12 px top radius, safe-area bottom padding, 260 ms sheet easing; Cancel is a ghost button.</span>
+  <span>• Columns shown are examples; the real list is built from the existing menu's allowed-target logic.</span>
+ </div>
+</div>
+</body></html>

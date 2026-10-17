@@ -25,7 +25,21 @@ const lines = (body: string): string[] =>
 /** Leading list, quote and bold markers of a line: `- **Gate:**` → `Gate:**`. */
 const LEAD = String.raw`^\s*(?:[-*+>]\s+)*(?:\*\*|__)?`;
 
-const HEADING = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/;
+/** Linear on purpose: a lazy `(.*?)` between `\s*` runs backtracks cubically. */
+const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/;
+/** A longer line is never a heading, so a hostile body cannot make us scan it. */
+const HEADING_LINE_MAX = 1024;
+
+/** An ATX heading's level and title, closing `#`s dropped; null for any other line. */
+const heading = (line: string): { level: number; title: string } | null => {
+  if (line.length > HEADING_LINE_MAX) return null;
+  const match = HEADING.exec(line);
+  if (!match) return null;
+  const text = (match[2] ?? '').trimEnd();
+  const hashes = text.length - text.replace(/#+$/, '').length;
+  const title = (hashes ? text.slice(0, -hashes) : text).trimEnd();
+  return { level: match[1].length, title };
+};
 const CHECKBOX = /^\s*[-*+]\s+\[[ xX]\]\s+\S/;
 
 /** `#n` not preceded by `owner/repo` or a word: another repository's issue is not ours. */
@@ -71,20 +85,19 @@ interface Section {
   body: string[];
 }
 
-const sections = (body: string): Section[] => {
+export const sections = (body: string): Section[] => {
   const all = lines(body);
   const found: Section[] = [];
   all.forEach((line, i) => {
-    const heading = HEADING.exec(line);
-    if (!heading) return;
-    const level = heading[1].length;
+    const head = heading(line);
+    if (!head) return;
     const rest: string[] = [];
     for (const next of all.slice(i + 1)) {
-      const h = HEADING.exec(next);
-      if (h && h[1].length <= level) break;
+      const h = heading(next);
+      if (h && h.level <= head.level) break;
       rest.push(next);
     }
-    found.push({ title: heading[2], body: rest });
+    found.push({ title: head.title, body: rest });
   });
   return found;
 };

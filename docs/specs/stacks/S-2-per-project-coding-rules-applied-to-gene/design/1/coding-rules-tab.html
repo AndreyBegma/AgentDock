@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<title>Coding rules — Project settings</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71/.96);--color-scrim:rgb(10 16 34/.3);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-hue-1:#5b9cf6;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/.06);--glass-scrim:rgb(9 9 12/.55);--glass-scrim-strong:rgb(9 9 12/.64);--glass-brightness:.85;--glass-brightness-strong:.7;--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-rim:rgb(242 242 246/.8);--glass-rim-shade:rgb(9 9 12/.5);--glass-rim-strong:rgb(242 242 246/.22);--glass-rim-shade-strong:rgb(9 9 12/.2);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);--glass-shadow:rgb(0 0 0/.35);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255/.96);--color-scrim:rgb(24 24 27/.22);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.1);--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-hue-1:#1f64d6;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-ink:#006a4e;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0/.06);--glass-scrim:rgb(255 255 255/.52);--glass-scrim-strong:rgb(255 255 255/.64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);--glass-rim:rgb(255 255 255/.9);--glass-rim-shade:rgb(24 24 27/.18);--glass-rim-strong:rgb(255 255 255/.3);--glass-rim-shade-strong:rgb(24 24 27/.08);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);--glass-shadow:rgb(0 0 0/.12);--glass-shadow-strong:rgb(0 0 0/.16);--glass-shadow-clear:rgb(0 0 0/.08);--canvas-glow:10%}
+:root{--glass-filter:blur(26px) saturate(180%) brightness(var(--glass-brightness));--glass-filter-strong:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--size-field:28px;--dur-fast:100ms;--dur-base:150ms;--ease-sheet:cubic-bezier(.32,.72,0,1);--font-sans:"SF Pro Text",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+*,*::before,*::after{box-sizing:border-box}html{background:var(--color-ground);color:var(--color-ink)}body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}h1,h2,h3,p{margin:0}h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em}
+.text-xs{font-size:12px;line-height:16px}.text-ink-2{color:var(--color-ink-2)}.text-ink-3{color:var(--color-ink-3)}.mono,code,pre{font-family:var(--font-mono)}code{font-size:12px}.num,table,time{font-variant-numeric:tabular-nums}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.icon-sm{width:14px;height:14px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),radial-gradient(70vmax 50vmax at 45% 110%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:var(--glass-filter);-webkit-backdrop-filter:var(--glass-filter);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.shell{display:flex;gap:12px;padding:12px;min-height:100vh}.shell-rail{position:sticky;top:12px;height:calc(100vh - 24px);flex-shrink:0}.shell-col{display:flex;flex:1;min-width:0;flex-direction:column;gap:12px}
+.topbar{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;border-radius:var(--radius-surface)}.crumbs{flex:1;display:flex;align-items:center;gap:6px;color:var(--color-ink-2)}.crumbs .current{color:var(--color-ink);font-weight:500}
+.main{margin:0 auto;width:100%;max-width:80rem;padding-bottom:24px;display:flex;flex-direction:column;gap:20px}
+.rail{display:flex;flex-direction:column;gap:8px;width:240px;height:100%;padding:8px;border-radius:var(--radius-surface);overflow-y:auto}.rail-brand{display:flex;align-items:center;gap:8px;padding:8px 12px;font-weight:600}.rail-group{display:flex;flex-direction:column;gap:2px}.rail-group-title{display:flex;align-items:center;gap:6px;padding:8px 12px 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--color-ink-3)}
+.rail-item{display:flex;align-items:center;gap:12px;padding:7px 12px;border-radius:var(--radius-control);color:var(--color-ink-2);text-decoration:none}.rail-item:hover{background:var(--color-hover)}.rail-item[aria-current="page"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;font-weight:600;cursor:pointer;border:1px solid transparent;background:none;color:var(--color-ink);height:var(--size-control);padding:0 14px;font-size:14px;border-radius:var(--radius-control);transition:background-color var(--dur-fast)}
+.btn-sm{height:24px;padding:0 10px;font-size:12px;border-radius:4px}.btn-icon{padding:0;aspect-ratio:1}.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}.btn-glass{background:var(--color-raised);border-color:var(--color-line-strong)}.btn-ghost{color:var(--color-ink-2)}.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.page-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}.ph-text{display:flex;flex-direction:column;gap:4px}.ph-eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}.ph-desc{max-width:65ch;color:var(--color-ink-2)}
+.section-header{display:flex;align-items:center;justify-content:space-between;gap:16px}.section-header h2{font-size:16px;line-height:24px;font-weight:600}.section-header p{font-size:13px;color:var(--color-ink-2)}
+.meta-bar{display:flex;gap:16px;font-size:12px;color:var(--color-ink-3)}.meta-bar b{color:var(--color-ink);font-weight:600}
+.badge{display:inline-flex;align-items:center;white-space:nowrap;border-radius:999px;height:20px;padding:0 8px;font-size:12px;font-weight:500;background:var(--color-hover);color:var(--color-ink-2)}.badge-count{height:18px;min-width:18px;padding:0 5px;font-size:10px;font-weight:600;justify-content:center}.badge-warn{background:var(--color-warn);color:var(--color-ground)}
+.input,.select{width:100%;height:var(--size-field);padding:0 10px;font-family:inherit;font-size:14px;color:var(--color-ink);background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-control)}.select{appearance:none}
+.input-wrap{position:relative;display:flex;align-items:center}.input-wrap .icon{position:absolute;left:10px;color:var(--color-ink-3)}.input-wrap .input{padding-left:32px}
+.toggle{position:relative;display:inline-flex;width:44px;height:24px;flex-shrink:0;border-radius:999px;border:0;padding:0;cursor:pointer;background:var(--color-line-strong)}.toggle::after{content:"";position:absolute;top:4px;left:0;width:16px;height:16px;border-radius:999px;background:var(--color-ink);transform:translateX(4px);transition:transform var(--dur-base) var(--ease-sheet)}.toggle[aria-checked="true"]{background:var(--color-accent)}.toggle[aria-checked="true"]::after{background:var(--color-on-accent);transform:translateX(24px)}
+.segmented{display:inline-flex;gap:4px;padding:2px;height:var(--size-control);border-radius:999px}.segmented button{border:0;background:none;padding:0 12px;border-radius:999px;font-family:inherit;font-size:12px;font-weight:500;color:var(--color-ink-2);cursor:pointer}.segmented button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.tablist{display:flex;gap:4px;border-bottom:1px solid var(--color-line);overflow-x:auto}.tab{position:relative;padding:8px 12px;border:0;background:none;font-family:inherit;font-size:14px;font-weight:500;color:var(--color-ink-2);cursor:pointer;white-space:nowrap}.tab[aria-selected="true"]{color:var(--color-accent-ink)}.tab[aria-selected="true"]::after{content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:2px;border-radius:2px;background:var(--color-accent)}
+.toolbar-row{display:flex;align-items:center;gap:12px}.toolbar-row .search{flex:1;max-width:320px}.toolbar-row .end{margin-left:auto;display:flex;gap:8px}
+.card{border-radius:var(--radius-surface);background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}.card-flush{overflow:hidden}
+.table{width:100%;border-collapse:collapse}.table thead{border-bottom:1px solid var(--color-line);text-align:left;font-size:12px;color:var(--color-ink-3)}.table th,.table td{padding:10px 12px;vertical-align:middle}.table th{font-weight:500}.table tbody tr{border-bottom:1px solid var(--color-line)}.table tbody tr:last-child{border-bottom:0}.table tbody tr:hover{background:var(--color-hover)}
+.cell-primary{color:var(--color-ink);font-weight:500}.cell-sub{font-size:12px;color:var(--color-ink-3);max-width:60ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr.is-off .cell-primary{color:var(--color-ink-2)}
+.handle{color:var(--color-ink-3);cursor:grab}
+.banner{display:flex;align-items:center;gap:12px;padding:12px;border-radius:var(--radius-surface);border:1px solid color-mix(in oklab,var(--color-info) 30%,transparent);background:color-mix(in oklab,var(--color-info) 10%,transparent)}.banner>.icon{color:var(--color-info)}.banner-body{flex:1}
+.disclosure{border-radius:var(--radius-surface)}.disclosure summary{display:flex;align-items:center;gap:8px;padding:12px 16px;cursor:pointer;list-style:none;font-weight:600}.disclosure summary::-webkit-details-marker{display:none}.disclosure[open] summary .chev{transform:rotate(90deg)}.disclosure .body{padding:0 16px 16px;display:flex;flex-direction:column;gap:8px}
+.code{margin:0;padding:12px;border-radius:var(--radius-surface);background:var(--color-surface);border:1px solid var(--color-line);font-size:12px;line-height:18px;white-space:pre-wrap}
+.avatar{display:inline-grid;place-content:center;width:28px;height:28px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:12px;font-weight:600}
+.kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font-size:10px;color:var(--color-ink-3)}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="shell">
+  <aside class="shell-rail">
+    <nav class="rail glass" aria-label="Main">
+      <div class="rail-brand"><span class="swatch" style="background:var(--color-hue-7)"></span>AgentDock</div>
+      <div class="rail-group">
+        <div class="rail-group-title">Workspace</div>
+        <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Overview</a>
+        <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Projects</a>
+      </div>
+      <div class="rail-group">
+        <div class="rail-group-title"><span class="swatch" style="background:var(--color-hue-2)"></span>AgentDock</div>
+        <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/></svg>Board</a>
+        <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>Fleet</a>
+        <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>Queue</a>
+        <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>Approvals</a>
+        <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Activity</a>
+        <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>Skills</a>
+        <a class="rail-item" href="#" aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>Settings</a>
+      </div>
+    </nav>
+  </aside>
+  <div class="shell-col">
+    <header class="topbar glass">
+      <nav class="crumbs" aria-label="Breadcrumb"><span>Projects</span><span>/</span><span>AgentDock</span><span>/</span><span>Settings</span><span>/</span><span class="current">Coding rules</span></nav>
+      <button class="btn btn-glass btn-sm" type="button"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="kbd">⌘K</span></button>
+      <span class="avatar">AB</span>
+    </header>
+    <main id="main-content" class="main">
+      <header class="page-header">
+        <div class="ph-text">
+          <div class="ph-eyebrow">AgentDock</div>
+          <h1>Settings</h1>
+          <p class="ph-desc">How the fleet works on this project.</p>
+        </div>
+      </header>
+
+      <div class="tablist" role="tablist" aria-label="Project settings">
+        <button class="tab" role="tab" aria-selected="false" type="button">General</button>
+        <button class="tab" role="tab" aria-selected="false" type="button">Docs source</button>
+        <button class="tab" role="tab" aria-selected="true" type="button">Coding rules</button>
+        <button class="tab" role="tab" aria-selected="false" type="button">Orchestrator</button>
+        <button class="tab" role="tab" aria-selected="false" type="button">Members</button>
+        <button class="tab" role="tab" aria-selected="false" type="button">Budget</button>
+        <button class="tab" role="tab" aria-selected="false" type="button">Planner</button>
+        <button class="tab" role="tab" aria-selected="false" type="button">Design</button>
+        <button class="tab" role="tab" aria-selected="false" type="button">Board</button>
+        <button class="tab" role="tab" aria-selected="false" type="button">Token saver</button>
+      </div>
+
+      <div class="section-header">
+        <div>
+          <h2>Coding rules</h2>
+          <p>Every enabled rule goes into the prompt of each agent that works on this project. Drag to change the order.</p>
+        </div>
+        <div class="meta-bar"><span><b>7</b> rules</span><span><b>5</b> enabled</span><span><b>~410</b> prompt tokens</span></div>
+      </div>
+
+      <div class="banner" role="status">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3"/><path d="m4.9 4.9 2.1 2.1"/><path d="M3 12h3"/><path d="m4.9 19.1 2.1-2.1"/><path d="M12 18v3"/><path d="m17 17 2.1 2.1"/><path d="M18 12h3"/><path d="m17 7 2.1-2.1"/></svg>
+        <div class="banner-body"><b>3 rule candidates still to review.</b> <span class="text-ink-2">Found in CLAUDE.md and biome.json when the project was connected.</span></div>
+        <button class="btn btn-glass btn-sm" type="button">Review candidates</button>
+        <button class="btn btn-ghost btn-sm" type="button">Dismiss all</button>
+      </div>
+
+      <div class="toolbar-row">
+        <div class="input-wrap search"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input class="input" placeholder="Search rules" aria-label="Search rules"></div>
+        <div class="segmented glass" role="group" aria-label="Show"><button type="button" aria-pressed="true">All</button><button type="button" aria-pressed="false">Enabled</button><button type="button" aria-pressed="false">Disabled</button></div>
+        <div class="end">
+          <button class="btn btn-glass" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>Import Markdown</button>
+          <button class="btn btn-solid" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Add rule</button>
+        </div>
+      </div>
+
+      <div class="card card-flush">
+        <table class="table">
+          <thead><tr><th style="width:28px"><span class="sr-only">Order</span></th><th style="width:64px">Enabled</th><th>Rule</th><th>Source</th><th class="num">Updated</th><th><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody>
+            <tr><td class="handle"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg></td><td><button class="toggle" role="switch" aria-checked="true" aria-label="Enable: Bun only" type="button"></button></td><td><div class="cell-primary">Bun only</div><div class="cell-sub">Bun is the package manager. Never run npm install or yarn; versions are pinned exactly.</div></td><td><span class="badge">Scanned</span></td><td class="num text-ink-3"><time>Oct 12</time></td><td style="text-align:right"><button class="btn btn-ghost btn-icon btn-sm" aria-label="Row actions" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td></tr>
+            <tr><td class="handle"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg></td><td><button class="toggle" role="switch" aria-checked="true" aria-label="Enable: Prisma only in the API" type="button"></button></td><td><div class="cell-primary">Prisma only in the API</div><div class="cell-sub">Import Prisma only in apps/api, through PrismaService. The web app talks to the API over HTTP.</div></td><td><span class="badge">Scanned</span></td><td class="num text-ink-3"><time>Oct 12</time></td><td style="text-align:right"><button class="btn btn-ghost btn-icon btn-sm" aria-label="Row actions" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td></tr>
+            <tr><td class="handle"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg></td><td><button class="toggle" role="switch" aria-checked="true" aria-label="Enable: glass-ui components only" type="button"></button></td><td><div class="cell-primary">glass-ui components only</div><div class="cell-sub">Use only @andrewbehma/glass-ui components. A missing one is added to glass-ui, not written in the app.</div></td><td><span class="badge">Imported</span></td><td class="num text-ink-3"><time>Oct 14</time></td><td style="text-align:right"><button class="btn btn-ghost btn-icon btn-sm" aria-label="Row actions" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td></tr>
+            <tr><td class="handle"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg></td><td><button class="toggle" role="switch" aria-checked="true" aria-label="Enable: No any" type="button"></button></td><td><div class="cell-primary">No any</div><div class="cell-sub">TypeScript strict everywhere. Never use any; narrow unknown instead.</div></td><td><span class="badge">Imported</span></td><td class="num text-ink-3"><time>Oct 14</time></td><td style="text-align:right"><button class="btn btn-ghost btn-icon btn-sm" aria-label="Row actions" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td></tr>
+            <tr><td class="handle"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg></td><td><button class="toggle" role="switch" aria-checked="true" aria-label="Enable: A bug fix ships its test" type="button"></button></td><td><div class="cell-primary">A bug fix ships its test</div><div class="cell-sub">Every bug fix comes with the *.spec.ts test that would have caught it, next to the code.</div></td><td><span class="badge">Manual</span></td><td class="num text-ink-3"><time>Today</time></td><td style="text-align:right"><button class="btn btn-ghost btn-icon btn-sm" aria-label="Row actions" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td></tr>
+            <tr class="is-off"><td class="handle"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg></td><td><button class="toggle" role="switch" aria-checked="false" aria-label="Enable: Conventional commits" type="button"></button></td><td><div class="cell-primary">Conventional commits</div><div class="cell-sub">Prefix commit subjects with feat:, fix:, docs:, refactor: or test:.</div></td><td><span class="badge">Manual</span></td><td class="num text-ink-3"><time>Oct 9</time></td><td style="text-align:right"><button class="btn btn-ghost btn-icon btn-sm" aria-label="Row actions" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td></tr>
+            <tr class="is-off"><td class="handle"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg></td><td><button class="toggle" role="switch" aria-checked="false" aria-label="Enable: Max 300 lines per file" type="button"></button></td><td><div class="cell-primary">Max 300 lines per file</div><div class="cell-sub">Split a component or service once it passes 300 lines.</div></td><td><span class="badge">Imported</span></td><td class="num text-ink-3"><time>Oct 14</time></td><td style="text-align:right"><button class="btn btn-ghost btn-icon btn-sm" aria-label="Row actions" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="disclosure surface-content" open>
+        <summary><svg class="icon icon-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>What the worker sees<span class="text-xs text-ink-3" style="font-weight:400;margin-left:auto">Enabled rules only, in this order</span></summary>
+        <div class="body">
+<pre class="code">## Project coding rules
+
+Follow every rule below in the code you write for this project.
+
+1. **Bun only** — Bun is the package manager. Never run npm install or yarn; versions are pinned exactly.
+2. **Prisma only in the API** — Import Prisma only in apps/api, through PrismaService. The web app talks to the API over HTTP.
+3. **glass-ui components only** — Use only @andrewbehma/glass-ui components. A missing one is added to glass-ui, not written in the app.
+4. **No any** — TypeScript strict everywhere. Never use any; narrow unknown instead.
+5. **A bug fix ships its test** — Every bug fix comes with the *.spec.ts test that would have caught it, next to the code.</pre>
+          <p class="text-xs text-ink-3">Changes apply to the next agent run; agents already running keep the prompt they started with.</p>
+        </div>
+      </details>
+    </main>
+  </div>
+</div>
+</body>
+</html>

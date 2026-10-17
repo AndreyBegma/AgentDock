@@ -18,7 +18,7 @@
 # (https://staging-agentdock.luna-realm.com). No registry, no ssh: the agents
 # run on the staging host, and the steps that need it get the Docker socket.
 #
-# Trust levels (ADR-0046). A pull request is untrusted: it runs the pipeline
+# Trust levels (ADR-0049). A pull request is untrusted: it runs the pipeline
 # file and the build scripts of its own branch, and anyone who can push a
 # branch, a card worker included, can open one. So a step that can run on a
 # pull request gets no Docker socket, no host volume and no secret.
@@ -33,15 +33,19 @@
 #     or a staging build in particular.
 # scripts/check-ci.ts (`bun run check`) fails when a step that can run on a
 # pull request mounts a volume or reads a secret. It guards against mistakes;
-# a pull request can edit it too. The boundary is the Woodpecker settings in
-# deploy/README.md: every pull request waits for approval until pull requests
-# run on an agent without the Docker socket.
+# a pull request can edit it too. Until pull requests run on an agent without
+# the Docker socket, a same-repository pull request that edits this file can
+# still reach it: only forks wait for approval (#504). That gap is open and
+# recorded in ADR-0049 §7 and deploy/README.md.
 #
 # The CI Postgres holds throwaway data. It runs on tmpfs, with fsync,
 # synchronous_commit and full_page_writes off.
 #
 # The repository is public. The socket and staging mounts need it
-# "trusted → volumes" in Woodpecker. deploy/README.md lists the repository
+# "trusted → volumes" in Woodpecker, and pull requests from forks must wait
+# for approval (require_approval: forks). Pull requests from the repository's
+# own branches, board cards' included, start at once (#504); pull_requests or
+# all_events would gate them too. deploy/README.md lists the repository
 # settings.
 
 when:
@@ -88,7 +92,7 @@ services:
       - redis-server --requirepass ci --maxmemory-policy noeviction
 
 steps:
-  # Never on a pull request: the socket is root on the host (ADR-0046).
+  # Never on a pull request: the socket is root on the host (ADR-0049).
   - name: ci-image
     image: *docker_image
     when:

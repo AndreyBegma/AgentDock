@@ -37,10 +37,15 @@ no such owner.
    body, a `design` suggestion and 2 or more stages holding 2–8 cards in all,
    each written in full like a split card. The intake proposes a stack when
    the request is one larger piece of work whose parts must happen in order
-   and share one look, and a plain split when the parts are independent. The
+   and share one look, and a plain split when the parts are independent.
+   Several UI changes to one surface or form factor — one screen, one page,
+   the Board on phones — share one look too, so they are a stack with a
+   design, staged foundations first (the shared layout and primitives, then
+   the per-feature cards), even when they have no natural order (#524). The
    contract version stays 3: a stored output of an earlier turn still reads
-   back. In the review the person switches between **Split** and **Stack**,
-   moves cards between stages, and confirms in one step; Confirm
+   back. In the review the person switches between **Split** and **Stack**
+   (a split turned into a stack opens with a shared design and an empty
+   "Foundations" stage before "Features"), moves cards between stages, and confirms in one step; Confirm
    (`POST …/plans/:planId/split` with `stack`) creates the stack, its stages,
    its cards in To Do, the stage dependencies and — when asked — its design
    row in one transaction. Split cards stay independent as before.
@@ -60,8 +65,10 @@ no such owner.
    `## Design`.
 6. **Design first.** While a stack's design is needed and not approved, Run
    on any card of the stack is refused (`409 stack_design_not_approved`) and
-   disabled in the UI with the reason. A stack without a design — the person
-   switched it off — holds nothing.
+   disabled in the UI with the reason. Generate and Revise of a card's own
+   design are refused and disabled the same way (#527): until the stack
+   design is approved, a card's design turn has no reference to read (§5).
+   A stack without a design — the person switched it off — holds nothing.
 7. **On the Board a stack is one face.** It sits in the column of its least
    advanced unfinished card (Completed once every card is), shows its
    progress (accepted / total) and current stage, and expands in place to its

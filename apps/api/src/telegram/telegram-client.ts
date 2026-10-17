@@ -106,6 +106,14 @@ export interface InlineKeyboardButton {
   callback_data: string;
 }
 
+/** One entry of the bot's command menu (`setMyCommands`). */
+export interface BotCommand {
+  /** 1–32 characters of `a-z`, `0-9` and `_`, without the slash. */
+  command: string;
+  /** 1–256 characters. */
+  description: string;
+}
+
 /** What `sendMessage` may attach: buttons, or a prompt to reply to it. */
 export type TelegramReplyMarkup =
   | { inline_keyboard: InlineKeyboardButton[][] }
@@ -185,7 +193,7 @@ const networkError = (error: unknown): TelegramApiError => {
 
 /**
  * The Bot API over HTTPS (spec 22 D7): `getMe`, the `getUpdates` long poll,
- * `sendMessage` and `answerCallbackQuery` (D12). Stateless — the token is passed per call, read from
+ * `sendMessage`, `answerCallbackQuery` (D12) and `setMyCommands` (#500). Stateless — the token is passed per call, read from
  * `BotTokenStore` by the caller. The base URL is `TELEGRAM_API_BASE`, which
  * tests point at a fake server: nothing here ever reaches the real API in a
  * test.
@@ -266,6 +274,17 @@ export class TelegramClient {
     await this.call(token, 'answerCallbackQuery', {
       callback_query_id: callbackQueryId,
       text,
+    });
+  }
+
+  /**
+   * The command menu private chats show (#500): the bot is private-chat
+   * only, so the menu is scoped to them.
+   */
+  async setMyCommands(token: string, commands: BotCommand[]): Promise<void> {
+    await this.call(token, 'setMyCommands', {
+      commands,
+      scope: { type: 'all_private_chats' },
     });
   }
 

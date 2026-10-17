@@ -2,7 +2,7 @@
 
 Decisions: [ADR-0016](../docs/adr/0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md),
 [ADR-0018](../docs/adr/0018-pull-requests-test-what-changed.md),
-[ADR-0046](../docs/adr/0046-pull-request-pipelines-are-untrusted.md).
+[ADR-0049](../docs/adr/0049-pull-request-pipelines-are-untrusted.md).
 
 ## CI — what each pipeline runs
 
@@ -23,7 +23,7 @@ full suite. To test everything on a branch, run the pipeline by hand.
 
 ### Trust levels
 
-A pull request is **untrusted** (ADR-0046). Its pipeline runs the pipeline file
+A pull request is **untrusted** (ADR-0049). Its pipeline runs the pipeline file
 and build scripts of its own branch, and anyone who can push a branch, a card
 worker included, can open one. So a step that can run on a pull request gets:
 
@@ -47,8 +47,12 @@ every `docker build` runs with `--pull`.
 step mounts a volume, is privileged or reads a secret, when a tag step mounts
 anything but the Docker socket, or when `bun install` lacks
 `--frozen-lockfile`. A pull request can edit the check along with the
-pipeline, so it stops mistakes, not an attacker: the boundary is the
-Woodpecker settings below, which only a person can change (P-01).
+pipeline, so it stops mistakes, not an attacker. The real boundary is on the
+CI server: a separate Woodpecker agent for pull requests, without the Docker
+socket and trusted volumes, or *Require approval: pull requests* — settings
+only a person can change (P-01). Neither is in place yet: same-repository pull
+requests start without approval (#504), so a pull request that edits its
+pipeline file can still reach the Docker socket. See the setup below.
 
 The CI PostgreSQL is throwaway. Its data directory is on tmpfs, and it runs
 with `fsync`, `synchronous_commit` and `full_page_writes` off. The `test` step
@@ -79,12 +83,18 @@ Nothing is published on the host. The stack runs on its own compose network
 2. **Woodpecker.** Activate `AndreyBegma/AgentDock` and apply these settings:
    - *Trusted → volumes*: on. The trusted steps mount the Docker socket and
      the stack directory, and the postgres service mounts a tmpfs.
-   - *Require approval*: **pull requests** (all of them, not only forks).
-     Same-repository pull requests, card workers' included, run their own
-     pipeline file; on this agent, with trusted volumes on, an edited step
-     could mount the Docker socket. Keep it until pull requests run on a
-     separate Woodpecker agent without the Docker socket and without trusted
-     volumes (ADR-0046 §7); then pull requests may go back to *forks*.
+   - *Require approval*: forks (`require_approval: "forks"` in the API). The
+     repository is public, so a pull request from a fork must wait for a
+     maintainer. A pull request from a branch of `AndreyBegma/AgentDock`
+     itself — every board card's — must not: *Pull requests* or *All events*
+     gates those too (#504). Check the live value with
+     `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`.
+     This leaves a known gap (ADR-0049 §7): a same-repository pull request can
+     edit its own pipeline file and mount the Docker socket again, because
+     trusted volumes are on for the repository. It stays open until pull
+     requests run on a separate Woodpecker agent without the Docker socket and
+     without trusted volumes. To close it before then, set *Pull requests*
+     and accept that every card's pipeline waits for an Approve.
    - *Cancel previous pipelines*: push, pull_request.
    - Timeout: 60 min.
    - Run the Woodpecker server on PostgreSQL
@@ -94,7 +104,7 @@ Nothing is published on the host. The stack runs on its own compose network
      gets no pipeline (#484, ADR-0043).
 3. **Delete the old CI caches** once, on an existing host:
    `rm -rf /home/archi/ci-cache/agentdock`. No pipeline reads them any more
-   (ADR-0046), and pull requests could write to them before.
+   (ADR-0049), and pull requests could write to them before.
 4. **The first run.** Push to `develop`, or run the pipeline by hand on
    `develop`. `refresh.sh` creates the stack directory, copies the examples in
    and generates `POSTGRES_PASSWORD`, `REDIS_PASSWORD` and
@@ -142,6 +152,19 @@ Nothing is published on the host. The stack runs on its own compose network
   A 500, 502, 530 or a timeout there is a delivery Woodpecker never
   processed; *Redeliver* it, or close and reopen the PR. AgentDock does the
   close/reopen by itself for a board card's PR after 5 minutes (ADR-0043).
+- **A pipeline waits for approval on an own-branch PR** (#504): Woodpecker
+  shows "This pipeline is awaiting approval from a maintainer!" for a pull
+  request whose head is a branch of `AndreyBegma/AgentDock`, such as a board
+  card's. Run `gh pr view <number> --json isCrossRepository`: `false` means
+  the PR is not from a fork, so the gate comes from the repository setting.
+  `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`
+  then answers `"pull_requests"` or `"all_events"` instead of `"forks"`. Set
+  *Settings → General → Require approval* to *Forks* (an admin of the
+  Woodpecker repository can do it) and approve the pipelines already waiting
+  once; the next pull request starts at once. AgentDock pushes a card's
+  branch to `origin` and opens the PR with `gh pr create --head <branch>` in
+  the same repository, and the close/reopen retrigger (ADR-0043) acts on that
+  same PR, so neither one makes a PR look like a fork.
 - **`530` / error 1033** from the public URL means the hostname exists but no
   cloudflared connector is running. Check that `TUNNEL_TOKEN` is set and look
   at `docker logs agentdock-staging-cloudflared`.

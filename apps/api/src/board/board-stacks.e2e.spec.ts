@@ -487,6 +487,76 @@ describe('card stacks (e2e, #480)', () => {
       expect((await run(1)).status).toBe(200);
     });
 
+    const setNeeded = (needed: boolean) =>
+      h.author.send('patch', `${stackPath()}/design`, { needed });
+
+    it('#502: the design switched off lifts the gate, and switched back on holds it again with its revisions and approval kept', async () => {
+      await confirmedStack();
+      expect((await run(1)).status).toBe(409);
+
+      const off = await setNeeded(false);
+      expect(off.status).toBe(200);
+      expect((off.body as TaskDesignView).needed).toBe(false);
+      expect((await h.author.get(stackPath())).body.design).toBeNull();
+      expect((await run(1)).status).toBe(200);
+
+      const on = await setNeeded(true);
+      expect(on.status).toBe(200);
+      expect((await h.author.get(stackPath())).body.design).toMatchObject({
+        needed: true,
+        status: 'idle',
+      });
+      const refused = await run(2);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toBe(BOARD_ERROR.stackDesignNotApproved);
+
+      const { view } = await approveStackDesign();
+      expect((await setNeeded(false)).status).toBe(200);
+      const back = await setNeeded(true);
+      expect(back.status).toBe(200);
+      const kept = back.body as TaskDesignView;
+      expect(kept.status).toBe('approved');
+      expect(kept.approvedRevisionId).toBe(view.approvedRevisionId);
+      expect(kept.revisions).toHaveLength(view.revisions.length);
+      expect((await run(2)).status).toBe(200);
+
+      const audit = await h.auditOf('design.toggled');
+      expect(audit.map((a) => [a.before, a.after])).toEqual([
+        [
+          expect.objectContaining({ needed: true }),
+          expect.objectContaining({ needed: false }),
+        ],
+        [
+          expect.objectContaining({ needed: false }),
+          expect.objectContaining({ needed: true }),
+        ],
+        [
+          expect.objectContaining({ needed: true }),
+          expect.objectContaining({ needed: false }),
+        ],
+        [
+          expect.objectContaining({ needed: false }),
+          expect.objectContaining({ needed: true }),
+        ],
+      ]);
+    });
+
+    it('#502: a stack confirmed without a design can be switched on, which holds its cards', async () => {
+      await confirmedStack(false);
+      expect((await setNeeded(true)).status).toBe(200);
+      const refused = await run(1);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toBe(BOARD_ERROR.stackDesignNotApproved);
+    });
+
+    it('#502: a viewer cannot switch the stack design', async () => {
+      await confirmedStack();
+      const denied = await h.viewer.send('patch', `${stackPath()}/design`, {
+        needed: false,
+      });
+      expect(denied.status).toBe(403);
+    });
+
     it('a card keeps its own design beside the stack design, and its design turn reads the approved stack design', async () => {
       await confirmedStack();
       const { stack } = await approveStackDesign();
@@ -511,6 +581,136 @@ describe('card stacks (e2e, #480)', () => {
       expect(prompt).toContain('Whole page');
       // The card's own design is drawn for the card, not the stack.
       expect(prompt).toContain('`card-2`');
+    });
+
+    it("refuses Generate and Revise of a card's own design while the stack design is not approved, then draws it on the stack's reference (#527)", async () => {
+      await confirmedStack();
+      expect(
+        (
+          await h.author.send('patch', h.cardDesignBase(3), {
+            needed: true,
+          })
+        ).status,
+      ).toBe(200);
+      const prompts = h.turnPrompts().length;
+      for (const action of ['generate', 'revise']) {
+        const refused = await h.author.send(
+          'post',
+          `${h.cardDesignBase(3)}/${action}`,
+        );
+        expect(refused.status).toBe(409);
+        expect(refused.body.error).toBe(BOARD_ERROR.stackDesignNotApproved);
+        expect(refused.body.message).toContain('stack design');
+      }
+      expect(h.turnPrompts()).toHaveLength(prompts);
+      expect(
+        await h.ctx.prisma.planTurn.count({ where: { cardId: { not: null } } }),
+      ).toBe(0);
+      expect((await h.cardDesign(3)).status).toBe('idle');
+      const board = (await h.author.get(`/projects/${h.projectId}/board`))
+        .body as BoardView;
+      const face = board.columns
+        .flatMap((c) => c.cards)
+        .find((c) => c.number === 3);
+      expect(face?.stack?.gate).toBe(STACK_GATE_REASON);
+
+      await approveStackDesign();
+      expect(
+        (await h.author.send('post', `${h.cardDesignBase(3)}/generate`)).status,
+      ).toBe(201);
+      const prompt = h.turnPrompts().at(-1) ?? '';
+      expect(prompt).toContain(
+        "## The stack's approved design (S-1, reference)",
+      );
+      expect(prompt).toContain('Whole page');
+    });
+
+    it("every card of every stage draws its own design on the stack's approved design (#527)", async () => {
+      await confirmedStack();
+      await approveStackDesign();
+      for (const number of [1, 2, 3]) {
+        expect(
+          (
+            await h.author.send('patch', h.cardDesignBase(number), {
+              needed: true,
+            })
+          ).status,
+        ).toBe(200);
+        const before = h.turnPrompts().length;
+        expect(
+          (await h.author.send('post', `${h.cardDesignBase(number)}/generate`))
+            .status,
+        ).toBe(201);
+        const prompts = h.turnPrompts();
+        expect(prompts).toHaveLength(before + 1);
+        const prompt = prompts.at(-1) ?? '';
+        expect(prompt).toContain(`\`card-${number}\``);
+        expect(prompt).toContain(
+          "## The stack's approved design (S-1, reference)",
+        );
+        expect(prompt).toContain('Whole page');
+      }
+    });
+
+    it("every card of every stage commits the stack's frames in round 1 and lists them under ## Stack (#527)", async () => {
+      await h.ctx.prisma.project.update({
+        where: { id: h.projectId },
+        data: {
+          codeSentinelConfig: { orchestrator: { specDir: 'docs/specs' } },
+        },
+      });
+      await confirmedStack();
+      const { stack } = await approveStackDesign();
+      const path = stackDesignPath(
+        'docs/specs',
+        { number: stack.number, title: stack.title },
+        1,
+        'mockup',
+      );
+      expect(path).toBe(
+        'docs/specs/stacks/S-1-redesign-the-settings-page/design/1/mockup.html',
+      );
+      const stages = new Map([
+        [1, 'stage 1 of 2'],
+        [2, 'stage 1 of 2'],
+        [3, 'stage 2 of 2'],
+      ]);
+      for (const [number, stage] of stages) {
+        const before = h.cardSentOf('card.run').length;
+        const started = await h.author.send(
+          'post',
+          `${h.cardPath(number)}/run`,
+          { ignoreDependencies: true },
+        );
+        expect(started.status).toBe(200);
+        const sent = h.cardSentOf('card.run');
+        expect(sent).toHaveLength(before + 1);
+        const args = sent.at(-1) ?? {};
+        expect(args.files as CardRunFile[]).toContainEqual({
+          path,
+          content: MOCKUP.replace('Export', 'Whole page'),
+        });
+        const prompt = String(args.prompt);
+        const section = prompt.slice(prompt.indexOf('## Stack'));
+        expect(section).toContain(`S-1 "Redesign the Settings page", ${stage}`);
+        expect(section).toContain(path);
+      }
+    });
+
+    it("a stack whose design is off gates neither a card's design Generate nor Run (#527)", async () => {
+      await confirmedStack(false);
+      await h.seedProfile();
+      expect(
+        (await h.author.send('patch', h.cardDesignBase(2), { needed: true }))
+          .status,
+      ).toBe(200);
+      expect(
+        (await h.author.send('post', `${h.cardDesignBase(2)}/generate`)).status,
+      ).toBe(201);
+      expect(h.turnPrompts().at(-1) ?? '').not.toContain(
+        "## The stack's approved design",
+      );
+      expect((await run(1)).status).toBe(200);
     });
 
     it("the stack design turn draws the whole result from the stack's stages", async () => {

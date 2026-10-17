@@ -15,7 +15,7 @@ import type { PromptInput } from './plan-prompt';
 import { designDirPath, ISSUE_PLACEHOLDER } from './plan-send';
 import type { PlanProject } from './plan-store';
 import { plannerError } from './planner-error';
-import { specDirOf } from './planner-instructions.service';
+import { codeSpecDirOf, resolveSpecTarget } from './spec-target';
 
 /**
  * Spec 223: a failed design turn retried — its variant and batch, from its
@@ -93,7 +93,7 @@ export const designPromptParts = async (
     const approved = await loadApprovedDesign(prisma, plan.id, spec.task.key);
     if (!approved) return {};
     const dir = designDirPath(
-      specDirOf(project.codeSentinelConfig),
+      codeSpecDirOf(resolveSpecTarget(project)),
       ISSUE_PLACEHOLDER,
       spec.task.title,
       approved.variant,
