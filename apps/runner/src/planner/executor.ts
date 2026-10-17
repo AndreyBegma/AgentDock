@@ -500,7 +500,6 @@ export class PlanTurnExecutor {
       const created = await this.tmux.newSession(
         turn.tmuxSession,
         plan.worktree,
-        {},
         [
           ...this.options.selfCommand,
           'exec-run',

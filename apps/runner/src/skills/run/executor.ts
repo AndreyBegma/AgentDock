@@ -408,7 +408,6 @@ export class SkillRunExecutor {
       const created = await this.tmux.newSession(
         record.session,
         record.worktree,
-        {},
         [...this.options.selfCommand, 'exec-run', this.store.dir(record.runId)],
       );
       if (!created.ok)

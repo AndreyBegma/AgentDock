@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
@@ -33,6 +33,11 @@ import {
   rootRefusal,
 } from '../policy/check';
 import { nodeRealpath } from '../policy/roots';
+import {
+  type LaunchSpec,
+  RUN_FILES,
+  writeJsonAtomic,
+} from '../skills/run/record';
 import type { ControlDeps } from './deps';
 import { messageFileContent, writeAtomically } from './slot';
 import { watchedProject } from './target';
@@ -111,6 +116,22 @@ export const orchestratorTokenSaver = async (
   });
 };
 
+/**
+ * C-123: writes what the orchestrator session launches to `run.json` (0600)
+ * in its own dir (0700) — the env never goes on a tmux argv, where the
+ * process list shows it — and returns the argv that starts it: `exec-run`.
+ */
+const orchestratorLaunch = async (
+  deps: ControlDeps,
+  session: string,
+  spec: LaunchSpec,
+): Promise<string[]> => {
+  const dir = orchestratorSessionDir(deps, session);
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  writeJsonAtomic(join(dir, RUN_FILES.launch), spec);
+  return [...(deps.selfCommand ?? defaultSelfCommand()), 'exec-run', dir];
+};
+
 const sessionOf = async (
   deps: ControlDeps,
   args: OrchestratorTargetArgs,
@@ -162,11 +183,23 @@ export const startOrchestrator = async (
   if (await tmux.find(session)) throw alreadyRunning();
 
   const tokenSaver = await orchestratorTokenSaver(args, deps, profile, session);
+  const [binary, ...binaryArgs] = orchestratorArgv(
+    profile,
+    session,
+    args,
+    tokenSaver,
+  );
   const created = await tmux.newSession(
     session,
     project.root,
-    { ...profile.env, ...(tokenSaver?.env ?? {}) },
-    orchestratorArgv(profile, session, args, tokenSaver),
+    await orchestratorLaunch(deps, session, {
+      binary: binary ?? profile.runtime,
+      args: binaryArgs,
+      env: { ...profile.env, ...(tokenSaver?.env ?? {}) },
+      cwd: project.root,
+      interactive: true,
+      label: 'agentdock orchestrator',
+    }),
   );
   // Lost a race with a concurrent start: the other one holds the name.
   if (!created.ok && (await tmux.find(session))) throw alreadyRunning();
@@ -193,8 +226,11 @@ export const stopOrchestrator = async (
   const tmux = tmuxOf(deps);
   if (!(await tmux.find(session))) return { stopped: false };
   await tmux.killSession(session);
-  // #445 amendment 6: the session's raw outputs go with it.
+  // #445 amendment 6: the session's raw outputs go with it; C-123: its env too.
   removeRawDir(orchestratorSessionDir(deps, session));
+  await rm(join(orchestratorSessionDir(deps, session), RUN_FILES.launch), {
+    force: true,
+  });
   return { stopped: true };
 };
 

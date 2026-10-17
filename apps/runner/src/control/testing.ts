@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { WatchedProject } from '@agentdock/shared/protocol';
 import type { ConfigProfile } from '../config';
 import type { Exec, ExecResult } from '../detect/exec';
@@ -25,6 +28,23 @@ export interface FakeTmuxOptions {
   /** The runner-local policy; one that refuses nothing by default. */
   policy?: () => PolicyConfig;
 }
+
+/**
+ * C-123: where a fake orchestrator start writes its launch file — never the
+ * real `<state>/agentdock/orchestrator`. One per test process.
+ */
+let orchestratorDir: string | undefined;
+const fakeOrchestratorDir = (): string => {
+  if (!orchestratorDir) {
+    const dir = mkdtempSync(join(tmpdir(), 'agentdock-orch-'));
+    process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
+    orchestratorDir = dir;
+  }
+  return orchestratorDir;
+};
+
+/** The runner's argv in a fake start: `exec-run <dir>` is appended. */
+export const FAKE_SELF_COMMAND = ['/opt/agentdock-runner'] as const;
 
 const ok = (stdout = ''): ExecResult => ({ code: 0, stdout, stderr: '' });
 const fail = (stderr: string): ExecResult => ({ code: 1, stdout: '', stderr });
@@ -110,6 +130,8 @@ export const fakeTmux = (options: FakeTmuxOptions = {}) => {
     profiles: () => options.profiles ?? [],
     policy: options.policy ?? permissivePolicy,
     realpath: sameRealpath,
+    selfCommand: FAKE_SELF_COMMAND,
+    orchestratorDir: fakeOrchestratorDir(),
   };
   return {
     project,

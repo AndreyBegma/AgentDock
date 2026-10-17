@@ -2,6 +2,7 @@ import type {
   Capabilities,
   CommandErrorCode,
   EventSource,
+  ReportedProfileEnv,
   Runtime,
 } from '../protocol';
 
@@ -85,8 +86,11 @@ export interface AdminRuntimeProfile {
   runtime: Runtime;
   label: string;
   binary: string | null;
-  /** Paths only — credentials never leave the runner. */
-  env: Record<string, string>;
+  /**
+   * Names only (C-123): a value for an allowlisted path, `{ set: true }` for
+   * every other name — credentials never leave the runner.
+   */
+  env: ReportedProfileEnv;
   args: string[];
   authenticated: boolean;
   /** Absent from the runner's latest `hello`; kept because runs reference it. */

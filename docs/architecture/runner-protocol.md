@@ -121,7 +121,8 @@ still connects.
     },
     "profiles": [
       { "id": "claude-blacktoorroot", "runtime": "claude",
-        "env": { "CLAUDE_CONFIG_DIR": "~/.claude-profiles/blacktoorroot" },
+        "env": { "CLAUDE_CONFIG_DIR": "~/.claude-profiles/blacktoorroot",
+                 "ANTHROPIC_API_KEY": { "set": true } },
         "args": [], "authenticated": true }
     ],
     "codeSentinel": { "version": "1.23.0", "path": "~/.claude-profiles/blacktoorroot/plugins/code-sentinel" },
@@ -150,6 +151,14 @@ still connects.
   }
 }
 ```
+
+A profile's `env` is reported names only (C-123, ADR-0006): only
+`CLAUDE_CONFIG_DIR` and `CODEX_HOME` — paths, never credentials — carry their
+value; every other name is `{ "set": true }` and its value stays in the runner
+config. The schema rejects a value for any other name, more than 64 env entries
+or args, and a `binary`, arg or path longer than 4096 characters. The runner
+never puts an env value on a command line either: the orchestrator session
+reads its env from a 0600 launch file through `exec-run`, as card rounds do.
 
 `terminal` says whether the runner serves `terminal.attach`: it has Bun's PTY
 API (Bun ≥ 1.3.5, POSIX), tmux ≥ 3.2, and the command is not in

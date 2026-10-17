@@ -319,7 +319,6 @@ export class CardExecutor {
         const created = await this.tmux.newSession(
           tmuxSession,
           record.worktree,
-          {},
           [...this.options.selfCommand, 'exec-run', roundDir],
         );
         if (!created.ok) {
@@ -606,7 +605,6 @@ export class CardExecutor {
         const created = await this.tmux.newSession(
           record.tmuxSession,
           record.worktree,
-          {},
           [...this.options.selfCommand, 'exec-run', roundDir],
         );
         if (!created.ok) {

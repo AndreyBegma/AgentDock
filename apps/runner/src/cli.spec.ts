@@ -12,7 +12,7 @@ import {
   runtimeProfileSchema,
 } from '@agentdock/shared/protocol';
 import { type CliDeps, runCli } from './cli';
-import { saveConfig } from './config';
+import { type ConfigProfile, saveConfig } from './config';
 import type { RunnerConnection } from './connection';
 import type { Exec } from './detect/exec';
 import { resolvePaths } from './env';
@@ -451,14 +451,17 @@ describe('agentdock-runner CLI', () => {
   });
 
   describe('run', () => {
-    const paired = (disabledCommands: string[] = []) =>
+    const paired = (
+      disabledCommands: string[] = [],
+      profiles: ConfigProfile[] = [
+        { id: 'claude-default', runtime: 'claude', env: {}, args: [] },
+      ],
+    ) =>
       saveConfig(paths().configFile, {
         server: server.origin,
         runnerId: 'rn_1',
         token: TOKEN,
-        profiles: [
-          { id: 'claude-default', runtime: 'claude', env: {}, args: [] },
-        ],
+        profiles,
         projects: [],
         disabledCommands,
         otlp: null,
@@ -534,6 +537,33 @@ describe('agentdock-runner CLI', () => {
       controller.abort();
       expect(await exit).toBe(EXIT.ok);
       expect(output()).not.toContain(TOKEN);
+      expect(server.invalid).toEqual([]);
+    });
+
+    it('C-123: sends a profile env secret in hello as set, never its value', async () => {
+      paired(
+        [],
+        [
+          {
+            id: 'claude-work',
+            runtime: 'claude',
+            env: {
+              ANTHROPIC_API_KEY: 'sk-ant-x',
+              CLAUDE_CONFIG_DIR: '/home/dev/.claude-profiles/work',
+            },
+            args: [],
+          },
+        ],
+      );
+      const { controller, exit } = start();
+      const [hello] = (await server.waitFor('hello')) as HelloMessage[];
+      expect(hello.capabilities.profiles[0]?.env).toEqual({
+        ANTHROPIC_API_KEY: { set: true },
+        CLAUDE_CONFIG_DIR: '/home/dev/.claude-profiles/work',
+      });
+      expect(JSON.stringify(hello)).not.toContain('sk-ant-x');
+      controller.abort();
+      expect(await exit).toBe(EXIT.ok);
       expect(server.invalid).toEqual([]);
     });
 

@@ -281,19 +281,21 @@ export const detectCapabilities = async (
       claude: claude ? { version: claude } : null,
       codex: codex ? { version: codex } : null,
     },
-    profiles: withAuthentication(config.profiles, home).map((profile) =>
-      profile.runtime === 'claude'
+    // C-123: env names only — the config's values stay on this machine.
+    profiles: withAuthentication(config.profiles, home).map((profile, i) => {
+      const configured = config.profiles[i];
+      return configured?.runtime === 'claude'
         ? {
             ...profile,
             agentdock: readProfileAgentdock(
-              claudeConfigDir(profile, home),
+              claudeConfigDir(configured, home),
               config.otlp?.http ?? null,
             ),
             // #445 Amendment 2: names only, from the profile's own config.
-            mcpServers: profileMcpServerNames(profile, home),
+            mcpServers: profileMcpServerNames(configured, home),
           }
-        : profile,
-    ),
+        : profile;
+    }),
     codeSentinel,
     otlp: config.otlp,
     // #445 Amendment 4: this runner takes `tokenSaver` on launch commands.
