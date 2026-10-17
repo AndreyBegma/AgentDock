@@ -4,9 +4,9 @@ import {
   seedRunnerProject,
   seedUser,
 } from '../notifications/testing/notifications-e2e';
+import { TelegramAssistantService } from './telegram-assistant.service';
 import type { InlineKeyboardButton } from './telegram-client';
 import { BOT_COMMANDS, HELP_TEXT } from './telegram-commands';
-import { TelegramAssistantService } from './telegram-assistant.service';
 import { TelegramGuard } from './telegram-guard.service';
 import { LINK_REPLIES } from './telegram-linking.service';
 import { TelegramPoller } from './telegram-poller';
