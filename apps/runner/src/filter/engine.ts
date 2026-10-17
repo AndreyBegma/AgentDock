@@ -106,9 +106,9 @@ export const judge = (
 };
 
 /**
- * The compressed output with tokens and private-key blocks masked — the
- * pane's rules, which load nothing (`local/redact.ts` adds more rules but
- * pulls the protocol schemas onto this hot path).
+ * The compressed output, redacted by the runner's one redactor
+ * (`pane/redact.ts`, C-128), which loads no protocol schemas onto this hot
+ * path.
  */
 export const redactShown = (text: string): string =>
   redact(text.split('\n')).join('\n');

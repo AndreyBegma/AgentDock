@@ -58,6 +58,19 @@ describe('checkpointData', () => {
     );
   });
 
+  it('redacts the heading and the summary (C-128)', () => {
+    const data = checkpointData(
+      {
+        heading: 'blocked — API_KEY=abc123secret',
+        body: 'set DATABASE_URL=postgres://u:pw@h/db and retry',
+      },
+      0,
+    );
+    expect(data.heading).not.toContain('abc123secret');
+    expect(data.summary).not.toContain('pw@h');
+    expect(data.summary).toContain('DATABASE_URL=•••');
+  });
+
   it('never splits a character', () => {
     expect(truncateBytes('aé', 2)).toBe('a');
     expect(truncateBytes('abc', 5)).toBe('abc');

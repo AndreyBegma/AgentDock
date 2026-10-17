@@ -133,7 +133,7 @@ describe('filter -- <argv> (#445 D3, D4)', () => {
 
     const text = printed();
     expect(text).not.toContain(token);
-    expect(text).toContain('x-access-token:•••@github.com');
+    expect(text).toContain('https://***@github.com/acme/x');
     expect(readFileSync(join(dir, 'raw', '1.log'), 'utf8')).toBe(output);
     expect(stats()[0]?.row.keptBytes).toBe(Buffer.byteLength(text));
   });

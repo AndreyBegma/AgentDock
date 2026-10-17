@@ -12,6 +12,7 @@ import {
   AGENT_FILE_MAX_BYTES,
   readRegularFileInside,
 } from '../../fs/safe-read';
+import { redactText } from '../../pane/redact';
 import { truncateBytes } from './replies';
 
 /** `From: <sender>` — the header AgentDock's `slot.message` writes (spec 17 D7). */
@@ -109,7 +110,10 @@ export class MessageWatcher {
       this.contents.set(key, text);
       const message = newMessage(previous, text);
       if (!message) continue;
-      const body = truncateBytes(message.body, SLOT_MESSAGE_SEEN_MAX_BYTES);
+      const body = truncateBytes(
+        redactText(message.body),
+        SLOT_MESSAGE_SEEN_MAX_BYTES,
+      );
       const data: SlotMessageSeenData = {
         body,
         ...messageHeader(body),
