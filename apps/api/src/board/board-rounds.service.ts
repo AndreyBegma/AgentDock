@@ -23,6 +23,8 @@ import {
   cardSpecPrBody,
   cardWorkerPrompt,
   isActiveRoundPhase,
+  PROJECT_RULES_BLOCK_MAX_BYTES,
+  projectRulesBlock,
   stackDesignPath,
   stackLabel,
 } from '@agentdock/shared';
@@ -39,6 +41,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -158,6 +161,8 @@ const changeSinceLastRound = (
  */
 @Injectable()
 export class BoardRoundsService {
+  private readonly logger = new Logger(BoardRoundsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly work: BoardWork,
@@ -550,6 +555,7 @@ export class BoardRoundsService {
     const attached = await this.attachments.withClaim(card.id, claimIds);
     const attachmentRefs = attached.map(toAttachmentRef);
     const attachmentBriefs = attached.map(toAttachmentBrief);
+    const projectRules = await this.projectRulesSection(project.id);
     const prompt = ciFix
       ? cardCiFixPrompt(ciFix)
       : resume || (trigger === 'feedback' && feedback !== null)
@@ -601,6 +607,7 @@ export class BoardRoundsService {
                 }
               : null,
             attachments: attachmentBriefs,
+            projectRules,
           });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null && specPr === null
@@ -872,6 +879,27 @@ export class BoardRoundsService {
    * issue, so GitHub links the two. Stored at once, like the issue: a Run
    * that fails later does not publish again.
    */
+  /**
+   * C-227: the project's enabled rules as the prompt's section, read now —
+   * at dispatch — so an edit or a toggle reaches the next run. `null`
+   * without an enabled rule. Oversized rules are cut with a marker and a
+   * warning.
+   */
+  private async projectRulesSection(projectId: string): Promise<string | null> {
+    const rules = await this.prisma.projectRule.findMany({
+      where: { projectId, enabled: true },
+      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+      select: { title: true, description: true, enabled: true },
+    });
+    const block = projectRulesBlock(rules);
+    if (block.omitted > 0) {
+      this.logger.warn(
+        `Project ${projectId}: ${block.omitted} of ${rules.length} enabled coding rules did not fit the ${PROJECT_RULES_BLOCK_MAX_BYTES}-byte prompt block and were left out`,
+      );
+    }
+    return block.text;
+  }
+
   private async publishSpec(
     project: BoardProject,
     card: CardWithRounds,
