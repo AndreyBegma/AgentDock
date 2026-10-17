@@ -1,11 +1,13 @@
 import {
   PROJECT_RULE_ERROR,
+  type ProjectRuleCandidateInput,
   type ProjectRuleCreateRequest,
   type ProjectRuleImportResult,
   type ProjectRuleUpdateRequest,
   type ProjectRuleView,
   parseRulesMarkdown,
   ruleTitleKey,
+  textFieldsSchema,
 } from '@agentdock/shared';
 import { Injectable } from '@nestjs/common';
 import type { ProjectRule } from '@prisma/client';
@@ -214,6 +216,95 @@ export class ProjectRulesService {
       rules: rows.map(ruleView),
       skippedTitles,
     };
+  }
+
+  /**
+   * #584: the accepted scan candidates, appended in order as enabled rules
+   * with source `scanned`. A title already taken (`takenTitleKeys`), or
+   * repeated in the request, is skipped and reported, as an import does.
+   */
+  async addScanned(
+    projectId: string,
+    candidates: readonly ProjectRuleCandidateInput[],
+    ctx: AuditContext,
+  ): Promise<ProjectRuleImportResult> {
+    const taken = await this.takenTitleKeys(projectId);
+    const fresh: ProjectRuleCandidateInput[] = [];
+    const skippedTitles: string[] = [];
+    for (const candidate of candidates) {
+      const key = ruleTitleKey(candidate.title);
+      if (taken.has(key)) {
+        skippedTitles.push(candidate.title);
+      } else {
+        taken.add(key);
+        fresh.push(candidate);
+      }
+    }
+
+    const start = await this.nextPosition(projectId);
+    const rows =
+      fresh.length === 0
+        ? []
+        : await this.prisma.$transaction(
+            fresh.map((rule, i) =>
+              this.prisma.projectRule.create({
+                data: {
+                  projectId,
+                  title: rule.title,
+                  description: rule.description,
+                  enabled: true,
+                  position: start + i,
+                  source: 'scanned',
+                },
+              }),
+            ),
+          );
+    if (rows.length > 0) {
+      await this.record(
+        projectId,
+        ctx,
+        {},
+        { rules: rows.map(audited) },
+        'scan',
+        {
+          skipped: skippedTitles.length,
+          sources: [...new Set(fresh.map((c) => c.source))],
+        },
+      );
+    }
+    return {
+      created: rows.length,
+      skipped: skippedTitles.length,
+      rules: rows.map(ruleView),
+      skippedTitles,
+    };
+  }
+
+  /**
+   * The title keys a scanned candidate must not repeat: every rule's title
+   * as it is now, and as it was typed before its translation to English
+   * (ADR-0027), so a rescan of a guide in another language finds its rules.
+   */
+  async takenTitleKeys(projectId: string): Promise<Set<string>> {
+    const [rules, originals] = await Promise.all([
+      this.prisma.projectRule.findMany({
+        where: { projectId },
+        select: { title: true },
+      }),
+      this.prisma.textNormalization.findMany({
+        where: { projectId, ownerType: 'project_rule', ruleId: { not: null } },
+        select: { fields: true },
+      }),
+    ]);
+    const keys = new Set(rules.map((r) => ruleTitleKey(r.title)));
+    for (const row of originals) {
+      const fields = textFieldsSchema.safeParse(row.fields);
+      if (!fields.success) continue;
+      for (const field of fields.data) {
+        if (field.field === 'title') keys.add(ruleTitleKey(field.original));
+      }
+    }
+    return keys;
   }
 
   /** A rule of `projectId`; another project's rule is not found. */

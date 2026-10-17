@@ -1,6 +1,7 @@
 import type {
   CommandErrorCode,
   ProjectInspection,
+  ProjectScanRulesResult,
 } from '@agentdock/shared/protocol';
 import { TestRunnerSocket } from '../../runners/testing/runner-e2e';
 
@@ -41,7 +42,7 @@ export const inspection = (
 });
 
 export type Answer =
-  | { ok: true; output: ProjectInspection }
+  | { ok: true; output: ProjectInspection | ProjectScanRulesResult }
   | { ok: false; code: CommandErrorCode; message?: string }
   | 'silence';
 

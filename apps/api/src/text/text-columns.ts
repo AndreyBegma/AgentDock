@@ -1,4 +1,5 @@
 import {
+  PROJECT_RULE_TITLE_MAX,
   TEXT_ANSWER_FIELD_PREFIX,
   type TextOwnerType,
   textAnswerField,
@@ -22,6 +23,7 @@ export const TEXT_OWNER_KEYS = {
   plan: 'planId',
   plan_task: 'taskId',
   plan_turn: 'turnId',
+  project_rule: 'ruleId',
 } as const satisfies Record<TextOwnerType, string>;
 
 export type TextOwnerKey = (typeof TEXT_OWNER_KEYS)[TextOwnerType];
@@ -42,6 +44,7 @@ export const ownerOfRow = (row: {
   planId: string | null;
   taskId: string | null;
   turnId: string | null;
+  ruleId: string | null;
 }): TextOwnerRef => ({
   ownerType: row.ownerType,
   ownerId: row[TEXT_OWNER_KEYS[row.ownerType]] ?? '',
@@ -54,6 +57,7 @@ const TABLES: Record<TextOwnerType, string> = {
   plan: 'plans',
   plan_task: 'plan_tasks',
   plan_turn: 'plan_turns',
+  project_rule: 'project_rules',
 };
 
 /** `plan_turns.input` as far as text goes (`planTurnInputSchema`). */
@@ -154,6 +158,18 @@ export const readOwnerText = async (
       });
       return row ? turnInputFields(row.input) : null;
     }
+    case 'project_rule': {
+      const row = await db.projectRule.findUnique({
+        where: { id },
+        select: { title: true, description: true },
+      });
+      return row
+        ? fields([
+            ['title', row.title],
+            ['description', row.description],
+          ])
+        : null;
+    }
   }
 };
 
@@ -232,6 +248,20 @@ export const writeOwnerText = async (
       await tx.planTurn.update({
         where: { id },
         data: { input: input as Prisma.InputJsonValue },
+      });
+      return;
+    }
+    case 'project_rule': {
+      // A translation may run longer than the original; the title stays in bounds.
+      const title = value('title')?.slice(0, PROJECT_RULE_TITLE_MAX);
+      await tx.projectRule.update({
+        where: { id },
+        data: {
+          ...(title ? { title } : {}),
+          ...(value('description') !== undefined
+            ? { description: value('description') }
+            : {}),
+        },
       });
       return;
     }

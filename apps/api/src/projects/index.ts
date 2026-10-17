@@ -9,4 +9,5 @@ export {
   type ResolvedProjectAccess,
 } from './project-access.service';
 export { projectError, projectNotFound } from './project-error';
+export { ProjectInspector } from './project-inspector';
 export { ProjectsModule } from './projects.module';

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
+  PROJECT_RULE_ACCEPT_MAX,
   PROJECT_RULE_DESCRIPTION_MAX,
+  PROJECT_RULE_SOURCE_MAX,
   PROJECT_RULE_TITLE_MAX,
 } from '../../project-rules/contracts';
 import type { CommandDefinition } from '../commands';
@@ -22,9 +24,7 @@ export const PROJECT_SCAN_RULES_TIMEOUT_MS = 15_000;
 export const RULE_SCAN_FILE_MAX_BYTES = 256 * 1024;
 /** At most this many candidates come from one file, and from one scan. */
 export const RULE_SCAN_PER_FILE_MAX = 40;
-export const RULE_SCAN_CANDIDATES_MAX = 100;
-/** The `source` of a candidate: a file name relative to the root. */
-export const RULE_SCAN_SOURCE_MAX = 200;
+export const RULE_SCAN_CANDIDATES_MAX = PROJECT_RULE_ACCEPT_MAX;
 
 /**
  * `project.scan_rules`: the same argument as `project.inspect`, so the
@@ -40,7 +40,7 @@ export const ruleCandidateSchema = z.object({
   title: z.string().trim().min(1).max(PROJECT_RULE_TITLE_MAX),
   description: z.string().max(PROJECT_RULE_DESCRIPTION_MAX),
   /** The file it was read from, relative to the root (`CLAUDE.md`, `biome.json`). */
-  source: z.string().min(1).max(RULE_SCAN_SOURCE_MAX),
+  source: z.string().min(1).max(PROJECT_RULE_SOURCE_MAX),
 });
 export type RuleCandidate = z.infer<typeof ruleCandidateSchema>;
 

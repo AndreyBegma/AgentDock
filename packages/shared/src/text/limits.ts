@@ -14,6 +14,8 @@ export const TEXT_OWNER_TYPES = [
   'plan',
   'plan_task',
   'plan_turn',
+  /** #584: a rule created from a scanned candidate. */
+  'project_rule',
 ] as const;
 export type TextOwnerType = (typeof TEXT_OWNER_TYPES)[number];
 
@@ -102,6 +104,7 @@ export const TEXT_OWNER_FIELDS = {
   plan: ['brief'],
   plan_task: ['rewriteComment'],
   plan_turn: ['message'],
+  project_rule: ['title', 'description'],
 } as const satisfies Record<TextOwnerType, readonly string[]>;
 
 const ANSWER_FIELD = /^answers\.[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;

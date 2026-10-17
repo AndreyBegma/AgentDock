@@ -3,7 +3,11 @@ import type {
   ProjectErrorCode,
   Role,
 } from '@agentdock/shared';
-import type { ProjectInspection } from '@agentdock/shared/protocol';
+import type {
+  CommandResult,
+  ProjectInspection,
+  ProjectScanRulesResult,
+} from '@agentdock/shared/protocol';
 import { HttpException, Injectable } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import { RunnerCommandService } from '../runners/runner-command.service';
@@ -11,9 +15,15 @@ import { RunnerPresence } from '../runners/runner-presence';
 import { RunnerWatchList } from '../runners/runner-watch-list';
 import { projectError } from './project-error';
 
+type ProjectCommand =
+  | 'project.inspect'
+  | 'project.refresh'
+  | 'project.scan_rules';
+
 /**
- * Runs `project.inspect` / `project.refresh` on a runner and turns every way
- * they can fail into the HTTP error runner-protocol.md maps it to.
+ * Runs `project.inspect` / `project.refresh` / `project.scan_rules` on a
+ * runner and turns every way they can fail into the HTTP error
+ * runner-protocol.md maps it to.
  */
 @Injectable()
 export class ProjectInspector {
@@ -56,15 +66,35 @@ export class ProjectInspector {
     }
   }
 
-  private async run(
+  /**
+   * #584: coding-rule candidates read from the project's own docs at `path`.
+   * Admin only (the command's minimum role); a runner whose hello does not
+   * list the command is refused before anything is sent (ADR-0023).
+   */
+  scanRules(
     runnerId: string,
-    name: 'project.inspect' | 'project.refresh',
+    path: string,
+    ctx: AuditContext,
+  ): Promise<ProjectScanRulesResult> {
+    return this.run(runnerId, 'project.scan_rules', { path }, 'admin', ctx);
+  }
+
+  private async run<N extends ProjectCommand>(
+    runnerId: string,
+    name: N,
     args: Record<string, string>,
     role: Role,
     ctx: AuditContext,
-  ): Promise<ProjectInspection> {
+  ): Promise<CommandResult<N>> {
     if (!this.presence.isConnected(runnerId)) {
       throw projectError(409, 'runner_offline', 'The runner is not connected');
+    }
+    if (this.presence.missingCommand(runnerId, [name])) {
+      throw projectError(
+        409,
+        'runner_outdated',
+        `The runner does not serve ${name}; update it`,
+      );
     }
     const result = await this.commands.send(runnerId, name, args, {
       role,
