@@ -1,322 +1,149 @@
+<div align="center">
+
 # AgentDock
 
 **One place to see, steer, approve and pay for every AI coding agent you run.**
 
-**[agentdock.luna-realm.com](https://agentdock.luna-realm.com/)**: what AgentDock is, at a glance.
-
 [![Website](https://img.shields.io/badge/website-agentdock.luna--realm.com-black)](https://agentdock.luna-realm.com/)
+[![Docs: Wiki](https://img.shields.io/badge/docs-wiki-6d5dfc)](https://github.com/AndreyBegma/AgentDock/wiki)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![agentdock-runner on npm](https://img.shields.io/npm/v/agentdock-runner?label=agentdock-runner)](https://www.npmjs.com/package/agentdock-runner)
-[![@andrewbehma/glass-ui on npm](https://img.shields.io/npm/v/@andrewbehma/glass-ui?label=%40andrewbehma%2Fglass-ui)](https://www.npmjs.com/package/@andrewbehma/glass-ui)
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/mkQARkBs4C)
 
-![The fleet view: every slot, its issue, model, status, last checkpoint and pull request](docs/screenshots/fleet.png)
+[**Wiki**](https://github.com/AndreyBegma/AgentDock/wiki) ·
+[Getting started](https://github.com/AndreyBegma/AgentDock/wiki/Getting-Started) ·
+[How work flows](https://github.com/AndreyBegma/AgentDock/wiki/How-Work-Flows) ·
+[Token Saver](https://github.com/AndreyBegma/AgentDock/wiki/Token-Saver) ·
+[Self-hosting](https://github.com/AndreyBegma/AgentDock/wiki/Self-Hosting) ·
+[Architecture](https://github.com/AndreyBegma/AgentDock/wiki/Architecture)
 
-<sub>The fleet view, with example data. More on [agentdock.luna-realm.com](https://agentdock.luna-realm.com).</sub>
+</div>
 
-You run several AI coding agents — Claude Code and Codex — across many
-repositories and more than one machine. AgentDock shows every agent, every pull
-request and every dollar in one web app, and lets you start, stop, approve and
-schedule them without opening a terminal.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
+  <img alt="You talk to AgentDock from the web app, Telegram or the terminal; AgentDock drives Claude Code agents on your own machines through a runner on each one" src="docs/assets/hero-light.svg">
+</picture>
 
-It is a self-hosted control plane for agent fleets driven by the
-[Code Sentinel](https://github.com/AndreyBegma/code-sentinel-skills) orchestrator.
-Without it, a fleet is a pile of tmux sessions, git worktrees, markdown files
-inside `.git` and GitHub labels — per project, per machine. Nothing shows the
-whole fleet, nothing remembers what ran, and nothing records what it cost.
+AgentDock is a **self-hosted control plane for Claude Code agent fleets**. You
+describe work in one sentence. AgentDock interviews you, turns the answer into
+cards, can draw a design for them and runs a dedicated agent per card on your
+own machines. Each agent opens a pull request and fixes its own CI. You stay in
+charge of what merges, what it costs and what an agent may do. You do this from
+the browser, from Telegram or from the terminal you already use.
 
-**Who it is for:** a developer or a small team that runs coding agents
-unattended on their own machines and wants to watch them, steer them and keep
-their spend in check from one screen.
+It works alongside the [Code Sentinel](https://github.com/AndreyBegma/code-sentinel-skills)
+orchestrator, and GitHub issues and pull requests stay the source of truth.
 
-## What you get
+## Features
 
-Every item below is built and merged. Each links the specification it was built
-from.
+| | |
+|---|---|
+| **[Board and cards](https://github.com/AndreyBegma/AgentDock/wiki/Board-and-Cards)** | A per-project board (To Do → In progress → Finished → Completed). Cards have dependencies and Auto-run, and support bulk actions. |
+| **[New work intake](https://github.com/AndreyBegma/AgentDock/wiki/New-Work-Intake)** | One sentence goes in. A short interview follows. Out comes one card, a split or a staged stack, and you accept it before anything runs. |
+| **[Design and stacks](https://github.com/AndreyBegma/AgentDock/wiki/Design-and-Stacks)** | HTML mockups drawn from your project's UI profile, with pinned comments, revisions and approval. A stack shares one design. |
+| **[Card workers and shipping](https://github.com/AndreyBegma/AgentDock/wiki/Card-Workers-and-Shipping)** | Each card gets its own worktree and Claude session. It opens a draft PR, fixes red CI on its own and can auto-merge. |
+| **[Fleet and orchestrator](https://github.com/AndreyBegma/AgentDock/wiki/Fleet-and-Orchestrator)** | Code Sentinel slots, the queue of ready issues, PR approvals, a live terminal pane and an audited terminal attach. |
+| **[Sessions, usage and budgets](https://github.com/AndreyBegma/AgentDock/wiki/Sessions-Usage-and-Budgets)** | Every session is shown as a tree of turns, tools and subagents, priced at API-equivalent cost. Budgets can alert or stop new runs. |
+| **[Token Saver](https://github.com/AndreyBegma/AgentDock/wiki/Token-Saver)** | Agents read less: command output is filtered, oversized and repeated reads are guarded, history is compacted early, and the savings are measured. |
+| **[Steward](https://github.com/AndreyBegma/AgentDock/wiki/Steward)** | Spots stuck agent work, applies the few fixes that are safe and asks a person for the rest. |
+| **[Context handoff](https://github.com/AndreyBegma/AgentDock/wiki/Context-Handoff)** | A short note per card, so the next round or session starts in context and costs less. |
+| **[Claude Code integration](https://github.com/AndreyBegma/AgentDock/wiki/Claude-Code-Integration)** | A plugin with MCP tools and hooks. Terminal sessions appear on the board, and away mode sends permission prompts to your phone. |
+| **[Telegram](https://github.com/AndreyBegma/AgentDock/wiki/Telegram)** | Browse, run and accept cards, answer agents, approve PRs and send voice notes. A Mini App opens the board. |
+| **[AI assistant](https://github.com/AndreyBegma/AgentDock/wiki/AI-Assistant)** | A floating chat on every page that reads your board and fleet and drafts cards. It uses your own provider keys and spend caps. |
+| **[Automation](https://github.com/AndreyBegma/AgentDock/wiki/Automation)** | Skills from skills.sh, cron schedules, signed webhooks and a GitHub App. |
+| **[Security and access](https://github.com/AndreyBegma/AgentDock/wiki/Security-and-Access)** | Roles, an approval-gated sign-up and a hash-chained audit log. The runner keeps a local policy the server cannot change. |
 
-**Watch the fleet**
+> [!NOTE]
+> Orchestrator slots and card workers run **Claude Code** today. Codex sessions
+> are listed, but Codex workers are the next milestone and are not built yet
+> ([roadmap](docs/product/roadmap.md)).
 
-- **Fleet** — every orchestrator slot on every project: issue, branch, runtime,
-  model, last checkpoint, pull request and its checks, and whether it is idle,
-  out of quota or waiting at a prompt ([spec](docs/specs/11-fleet-observation.md),
-  [events](docs/specs/16-consume-code-sentinel-events.md)).
-- **Live pane** — a worker's terminal, streamed read-only into the browser
-  ([spec](docs/specs/18-live-worker-pane.md)). Admins can attach and type into it;
-  every attach is audited ([spec](docs/specs/29-terminal-attach.md)).
-- **Activity and history** — one live feed of everything that happened across
-  projects, and a record of every round, slot and run with its outcome, pull
-  request, tokens and cost ([spec](docs/specs/21-activity-feed-and-history.md)).
-
-**Steer it**
-
-- **Orchestrator control** — start, stop, `next` and `status` per project
-  through a runtime profile; stop a slot; message a worker
-  ([spec](docs/specs/17-orchestrator-and-slot-control.md)).
-- **Queue** — the project's GitHub issues with the ready label, each with its
-  computed state (ready, in flight, blocked on work, blocked on a person, no
-  spec); create an issue from the UI ([spec](docs/specs/19-task-queue.md)).
-- **Approvals** — a per-project switch: green pull requests wait for Approve or
-  Request changes instead of merging themselves
-  ([spec](docs/specs/20-merge-approval-queue.md)).
-
-**Count the cost**
-
-- **Sessions, tokens and cost** — Claude Code sessions as a tree of turns,
-  LLM requests, tools and subagents, each priced at API-equivalent cost from a
-  versioned price table; usage by project, issue, slot, model, runtime and day.
-  Codex sessions are listed, but their transcripts are not parsed yet; Codex
-  token usage over OpenTelemetry is experimental and off by default
-  ([sessions](docs/specs/12-agent-sessions.md),
-  [cost](docs/specs/13-tokens-and-cost.md)).
-- **Budgets** — per project or per user, per day, week or month; alert at
-  thresholds, or stop new orchestrator and skill runs at the limit
-  ([spec](docs/specs/28-budgets.md)).
-
-**Automate**
-
-- **Skills** — browse the [skills.sh](https://skills.sh) catalog, install a
-  skill to a project or a runtime profile, and run it on a project in its own
-  worktree; the result is a report or a pull request
-  ([spec](docs/specs/24-skills.md)).
-- **Schedules** — cron for skill runs and orchestrator commands, with a
-  missed-run policy; backed by BullMQ on Redis
-  ([spec](docs/specs/25-cron-schedules.md),
-  [BullMQ](docs/specs/123-schedules-on-bullmq.md)).
-- **Webhooks** — signed inbound triggers that run a skill or wake the
-  orchestrator, and signed, retried outbound deliveries with a delivery log
-  ([spec](docs/specs/26-webhooks.md)).
-- **GitHub App** — issue, pull request and check events pushed to AgentDock
-  instead of polled ([spec](docs/specs/27-github-app.md)).
-- **Notifications and Telegram** — an in-app notification centre and a Telegram
-  bot for the things only a person can clear: a question, a gate, a prompt, a
-  merge to approve, a budget hit ([spec](docs/specs/22-notifications-and-telegram.md)).
-
-**Stay in control**
-
-- **Roles** — local accounts; the first admin is created from the command line,
-  new accounts wait for an admin's approval; roles admin, operator and viewer,
-  with per-project access ([spec](docs/specs/3-auth-and-access.md)).
-- **Audit** — an append-only, hash-chained log of every privileged action, with
-  before and after ([spec](docs/specs/8-audit-log.md)).
-
-## How it works
+## How work flows
 
 ```mermaid
 flowchart LR
-  browser["Browser"] --> web["Web app<br/>Next.js"]
-  web --> api["API<br/>NestJS"]
-  api --> pg[("PostgreSQL")]
-  api --> redis[("Redis<br/>schedules")]
-
-  subgraph machine["Your machine (one runner per machine)"]
-    runner["agentdock-runner"]
-    tmux["tmux sessions"]
-    wt["git worktrees"]
-    cli["Claude Code / Codex CLIs"]
-    gh["gh"]
-    runner --> tmux
-    runner --> wt
-    runner --> cli
-    runner --> gh
-  end
-
-  runner -- "outbound WebSocket:<br/>events up, typed commands down" --> api
+  idea(["One sentence<br/>web · Telegram · assistant"]) --> intake["Interview<br/>one card · split · stack"]
+  intake --> todo["To Do<br/>you accept candidates"]
+  todo --> design{"Needs a<br/>design?"}
+  design -- yes --> mock["Mockups<br/>pin · revise · approve"] --> run
+  design -- no --> run["Run<br/>own worktree + Claude session"]
+  run --> pr["Draft PR<br/>→ ready on finish"]
+  pr --> ci{"CI"}
+  ci -- red --> fix["Fix round<br/>(up to 3)"] --> ci
+  ci -- green --> merge["Auto-merge<br/>or your Accept"]
+  merge --> done(["Completed<br/>worktree cleaned up"])
 ```
 
-The control plane (web, API, database) can run anywhere. Each machine that
-holds repositories runs one runner. The runner dials out to the API, so the
-machine needs no open port. Three decisions shape everything else:
+The full walkthrough is in **[How work flows](https://github.com/AndreyBegma/AgentDock/wiki/How-Work-Flows)**.
 
-- **The control plane never reads a project's filesystem; the runner does**
+## How it is built
+
+```mermaid
+flowchart LR
+  people["Browser · Telegram"] --> web["Web<br/>Next.js"] --> api["API<br/>NestJS"]
+  api --> pg[("PostgreSQL")]
+  api --> redis[("Redis")]
+  subgraph machine["Each of your machines"]
+    runner["agentdock-runner"] --> agents["tmux · worktrees<br/>Claude Code · gh"]
+  end
+  runner -- "outbound WebSocket<br/>events up · typed commands down" --> api
+```
+
+- **The control plane never reads a project's filesystem.** A runner on each
+  machine does, and it dials out, so the machine needs no open port
   ([ADR-0001](docs/adr/0001-control-plane-and-per-machine-runner.md)).
-- **The runner executes a typed command allowlist** — never an arbitrary shell
-  command ([ADR-0010](docs/adr/0010-typed-command-allowlist-on-the-runner.md)).
-- **GitHub issues are the task queue** — AgentDock has no tracker of its own
-  ([ADR-0004](docs/adr/0004-github-issues-are-the-task-queue.md)).
+- **The runner runs typed commands from an allowlist.** It never runs a shell
+  string ([ADR-0010](docs/adr/0010-typed-command-allowlist-on-the-runner.md)).
+- **GitHub is the task queue for the fleet.** Board cards belong to AgentDock
+  ([ADR-0004](docs/adr/0004-github-issues-are-the-task-queue.md),
+  [ADR-0024](docs/adr/0024-board-cards-and-dedicated-card-workers.md)).
 
-The architecture is in [docs/architecture/overview.md](docs/architecture/overview.md).
+More in **[Architecture](https://github.com/AndreyBegma/AgentDock/wiki/Architecture)**.
 
-## Quick start (local)
+## Quick start
 
-Requirements: [Bun](https://bun.sh) 1.4.0+, Node.js 24+, Docker (for
-PostgreSQL and Redis).
+Requirements: [Bun](https://bun.sh) 1.4.0+, Node.js 24+ and Docker.
 
 ```sh
 git clone https://github.com/AndreyBegma/AgentDock && cd AgentDock
 bun install
-
-# Environment: the examples work as they are for local development.
 cp docker/.env.example docker/.env
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 
-bun run db:setup       # PostgreSQL on :5421, Redis on :6421, migrations, seed
-bun run admin:create   # the first admin; the seed creates no users
-bun run start:dev      # API on http://localhost:8180, web on http://localhost:3517
+bun run db:setup       # PostgreSQL :5421, Redis :6421, migrations, seed
+bun run admin:create   # the first admin
+bun run start:dev      # API http://localhost:8180 · web http://localhost:3517
 ```
 
-Open http://localhost:3517 and sign in as the admin. `curl
-http://localhost:8180/health` checks the API.
-
-The passwords in `docker/.env` must match `DATABASE_URL` and `REDIS_URL` in
-`apps/api/.env`; the examples already agree. Every variable is documented in
-its `.env.example`.
-
-Next, put a runner on the machine that holds your repositories.
-
-## Install the runner
-
-The runner is a single binary, published as [packages](#packages) for
-`darwin-arm64`, `darwin-x64`, `linux-x64` and `linux-arm64`
-([ADR-0017](docs/adr/0017-runner-distribution-homebrew-and-npm.md)). First,
-get a one-time pairing code in the web app: **Admin → Runners → Add runner**.
-
-**Homebrew** (macOS and Linux):
+Then pair a runner on the machine that holds your repositories. Get a code at
+**Admin › Runners › Add runner**:
 
 ```sh
-brew install andreybegma/tap/agentdock-runner
-agentdock-runner pair --server <api-origin> --code XXXX-XXXX --allow-root ~/dev
-brew services start agentdock-runner
-```
-
-**npm** (or `bun add -g agentdock-runner`):
-
-```sh
-npm i -g agentdock-runner
-agentdock-runner pair --server <api-origin> --code XXXX-XXXX --allow-root ~/dev
+brew install andreybegma/tap/agentdock-runner      # or: npm i -g agentdock-runner
+agentdock-runner pair --server http://localhost:8180 --code XXXX-XXXX --allow-root ~/dev
 agentdock-runner install-service
 ```
 
-`install-service` writes a systemd user unit on Linux or a launchd agent on
-macOS, and prints the command that starts it.
-
-`--allow-root` names the folders your projects live in. The runner keeps a
-local security policy in its own config that the server cannot change
-([ADR-0047](docs/adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)):
-it watches no project outside those folders, launches nothing above `auto`,
-and refuses terminal typing, profile skill installs and messages into running
-sessions until you allow them on the machine. See and change it with
-`agentdock-runner policy show`, `policy allow-root <dir>` and
-`policy set <key> <value>`. An existing runner needs `policy allow-root` once
-after it upgrades.
-
-**From source** (needs Bun): `bun run build` in this repository produces
-`apps/runner/dist/agentdock-runner`.
-
-`<api-origin>` is the API, not the web app: `http://localhost:8180` for the
-local quick start, `https://<host>/api` behind the reference proxy. `pair` also
-detects the machine's Claude Code and Codex runtime profiles.
-
-Every AgentDock server serves a public **`/install`** page
-(http://localhost:3517/install locally) with these steps for that server.
-Commands, files and options are in [apps/runner/README.md](apps/runner/README.md).
-
-## Packages
-
-| Package | What it is |
-|---|---|
-| [`agentdock-runner`](https://www.npmjs.com/package/agentdock-runner) | The runner daemon on npm. It is laid out like esbuild: a thin package that pulls the one prebuilt binary for your platform through `optionalDependencies` on `agentdock-runner-{darwin,linux}-{arm64,x64}`. |
-| [`andreybegma/tap/agentdock-runner`](https://github.com/AndreyBegma/homebrew-tap) | The Homebrew formula: `brew install andreybegma/tap/agentdock-runner`. |
-| [Runner releases](https://github.com/AndreyBegma/AgentDock/releases?q=runner-v&expanded=true) | GitHub Releases tagged `runner-v*`, with the four prebuilt binaries as tarballs and `SHA256SUMS`. |
-| [`@andrewbehma/glass-ui`](https://www.npmjs.com/package/@andrewbehma/glass-ui) | The design system the web app is built on ([AndreyBegma/glass-ui](https://github.com/AndreyBegma/glass-ui)). |
-
-How a runner release is cut is in
-[deploy/README.md](deploy/README.md#releasing-the-runner).
-
-## Deploying
-
-There is no one-command production installer yet. The reference self-host
-recipe is the staging deployment, described in
-[deploy/README.md](deploy/README.md) and decided in
-[ADR-0016](docs/adr/0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md):
-
-- **Docker Compose** runs the API, the web app, PostgreSQL and Redis
-  ([deploy/staging/docker-compose.yml](deploy/staging/docker-compose.yml)).
-- **Caddy** gives them one origin: `/api/*` goes to the API, WebSockets
-  included, and everything else to the web app
-  ([Caddyfile](deploy/staging/Caddyfile)).
-- **A Cloudflare tunnel** (cloudflared) publishes that origin, so nothing is
-  exposed on the host.
-- The API applies migrations and the seed in its entrypoint. Secrets are
-  generated on the host on the first run, and the first admin is created with
-  the same `admin:create` CLI inside the API container.
-
-## Repository layout
-
-Bun workspaces and Turborepo.
-
-| Path | Package | Stack |
-|---|---|---|
-| [`apps/api`](apps/api) | `@agentdock/api` | NestJS 11, Prisma 7, PostgreSQL 16, BullMQ on Redis 7 — port 8180 |
-| [`apps/web`](apps/web) | `@agentdock/web` | Next.js 16 (App Router), React 19, Tailwind CSS 4 — port 3517 |
-| [`apps/runner`](apps/runner) | `@agentdock/runner`, published as `agentdock-runner` | Bun, compiled to a single binary |
-| [`packages/shared`](packages/shared) | `@agentdock/shared` | framework-free TypeScript shared by the API, the web app and the runner |
-| [`docker`](docker) | — | PostgreSQL and Redis for local development |
-| [`deploy`](deploy) | — | the staging stack, the CI image, release notes |
-
-The UI uses only components from
-[`@andrewbehma/glass-ui`](https://www.npmjs.com/package/@andrewbehma/glass-ui);
-a missing component is added to glass-ui, not written here
-([ADR-0011](docs/adr/0011-glass-ui-is-the-component-library.md)).
-
-## Development
-
-| Command | What it does |
-|---|---|
-| `bun run start:dev` | API and web in watch mode |
-| `bun run check` | Biome lint, format and import order, without writing |
-| `bun run test` | the test suites |
-| `bun run build` | build everything (Turborepo, cached) |
-| `bun run db:setup` | start PostgreSQL and Redis, apply migrations, seed |
-| `bun run db:migrate` | `prisma migrate dev`: create and apply a migration |
-| `bun run db:generate` | regenerate the Prisma client |
-| `bun run db:studio` | Prisma Studio |
-
-Conventions, in brief (the full list is in [CLAUDE.md](CLAUDE.md)):
-
-- **Bun** is the package manager, with versions pinned exactly.
-- **Biome** is the only linter and formatter.
-- **TypeScript** is strict everywhere, with no `any`.
-- Every API input is a DTO validated with `class-validator`.
-- Tests sit next to the code as `*.spec.ts`. A bug fix comes with the test that
-  would have caught it.
-- Prisma is used only by `apps/api`. The web app talks to the API over HTTP.
-- An architectural change records a new ADR in the same pull request.
-
-CI runs on Woodpecker. A pull request runs `check` and `build`, and tests only
-the packages it changed plus their dependents
-([ADR-0018](docs/adr/0018-pull-requests-test-what-changed.md)). Pull requests
-target `develop`; a push to `develop` deploys staging.
-
-New `@andrewbehma/glass-ui` releases arrive as pull requests into `develop`
-from Renovate ([`renovate.json`](renovate.json)). Renovate watches only that
-package, pinned exactly, and a person merges its pull requests. Every other
-dependency is updated by hand.
+Step-by-step guides:
+**[Getting started](https://github.com/AndreyBegma/AgentDock/wiki/Getting-Started)**,
+**[Installing the runner](https://github.com/AndreyBegma/AgentDock/wiki/Installing-the-Runner)**
+and **[Self-hosting](https://github.com/AndreyBegma/AgentDock/wiki/Self-Hosting)**.
 
 ## Documentation
 
-[`docs/`](docs/README.md) is the authority on what AgentDock is and how it is
-built.
-
-| Folder | What lives there |
+| Where | What |
 |---|---|
-| [`docs/product`](docs/product) | the [PRD](docs/product/prd.md), the [glossary](docs/product/glossary.md), the [roadmap](docs/product/roadmap.md) |
-| [`docs/architecture`](docs/architecture) | the [overview](docs/architecture/overview.md), the [runner protocol](docs/architecture/runner-protocol.md), the [event schema](docs/architecture/event-schema.md), the [data model](docs/architecture/data-model.md), [security](docs/architecture/security.md), the [cost model](docs/architecture/cost-model.md), the [GitHub App](docs/architecture/github-app.md) |
-| [`docs/adr`](docs/adr) | architecture decision records, numbered; superseded, never rewritten |
-| [`docs/specs`](docs/specs) | one specification per issue |
-| [`docs/ui`](docs/ui) | [glass-ui usage](docs/ui/glass-ui.md) and [screens](docs/ui/screens.md) |
-| [`docs/plugin`](docs/plugin) | [changes AgentDock needs in Code Sentinel](docs/plugin/code-sentinel-changes.md) |
+| [**Wiki**](https://github.com/AndreyBegma/AgentDock/wiki) | User guides: setup, every feature, self-hosting, FAQ |
+| [`docs/`](docs/README.md) | The engineering source of truth: [ADRs](docs/adr), [specs](docs/specs), [architecture](docs/architecture), [product](docs/product) |
+| [`apps/runner`](apps/runner/README.md) | Runner commands, files and environment |
+| [`deploy/`](deploy/README.md) | CI pipelines, the reference deployment, runner releases |
 
-## Roadmap
+## Contributing
 
-Milestones M1 (see the fleet), M2 (steer it) and M3 (automate) are built. Next
-is **M4 — Codex in the fleet**, which is **not built yet**: Codex workers in
-orchestrator slots, fenced by their own worktree, sandbox and a pre-merge
-ownership check ([ADR-0013](docs/adr/0013-codex-workers-and-their-fence.md)),
-then Codex as the orchestrator. Today Codex sessions are listed (their transcripts
-are not parsed yet), skills install for Codex profiles, and orchestrator slots
-run Claude Code. The
-full plan is in [docs/product/roadmap.md](docs/product/roadmap.md).
+Pull requests target `develop`. Read **[Contributing](https://github.com/AndreyBegma/AgentDock/wiki/Contributing)**
+and [CLAUDE.md](CLAUDE.md) for the conventions. An architectural change records
+a new ADR in the same pull request.
 
 ## License
 
