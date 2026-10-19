@@ -30,8 +30,11 @@ has an open pull request, but nothing did so on its own.
    stacked on the one left. Ready cards start through `BoardRoundsService.run`
    in stack, stage, then number order while the project's active rounds stay
    below `BoardSettings.maxRunning`, so every guard of a manual Run applies.
-3. **Only `max_running` waits.** A `max_running` refusal leaves the card
-   queued; it starts when a slot frees. Any other refusal (budget, profile,
+3. **Only `max_running` and an absent runner wait.** A `max_running`
+   refusal leaves the card queued; it starts when a slot frees. While the
+   project's runner is not connected — after an API restart, say — nothing
+   starts and nothing pauses; the runner's `hello` resumes the run. Any other
+   refusal (budget, profile,
    design, runner) or a round the run started that ends `failed` or `ended`
    pauses the run with the reason (`pausedCode`, `pausedMessage`,
    `pausedCardId`). A refused start is also stored on the card

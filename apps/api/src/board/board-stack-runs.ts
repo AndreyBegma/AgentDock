@@ -19,6 +19,8 @@ import type { BoardStackRun } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { SYSTEM_ACTOR, systemActorFor } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
+import { RunnerConnectHooks } from '../runners/runner-connect-hooks';
+import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { autoRunFailureOf, boardError } from './board-error';
 import { toSettingsView } from './board-mapper';
@@ -122,11 +124,18 @@ export class BoardStackRuns
     private readonly stacks: BoardStacks,
     private readonly dependencies: BoardDependencies,
     private readonly audit: AuditService,
+    private readonly commands: BoardCommands,
+    private readonly connectHooks: RunnerConnectHooks,
   ) {}
 
   onModuleInit(): void {
     this.work.onChanged((projectId) => {
       void this.nudge(projectId);
+    });
+    // A run waits while its runner is away; it goes on when the runner is back.
+    this.connectHooks.register({
+      name: 'board-stack-runs',
+      connected: (runnerId) => this.resumeAll(runnerId),
     });
   }
 
@@ -142,11 +151,14 @@ export class BoardStackRuns
     clearInterval(this.timer);
   }
 
-  /** Every project with a running stack run is evaluated. */
-  async resumeAll(): Promise<void> {
+  /** Every project with a running stack run — of `runnerId`, if given — is evaluated. */
+  async resumeAll(runnerId?: string): Promise<void> {
     try {
       const runs = await this.prisma.boardStackRun.findMany({
-        where: { state: 'running' },
+        where: {
+          state: 'running',
+          ...(runnerId ? { stack: { project: { runnerId } } } : {}),
+        },
         select: { stack: { select: { projectId: true } } },
       });
       const projects = new Set(runs.map((r) => r.stack.projectId));
@@ -434,7 +446,9 @@ export class BoardStackRuns
             (b.entry.card.stage?.position ?? 0) ||
           a.entry.card.number - b.entry.card.number,
       );
-    let full = false;
+    // Without its runner nothing starts, and nothing pauses: the run waits.
+    const { runnerId } = await this.work.project(projectId);
+    let held = !this.commands.isConnected(runnerId);
     for (const { run, entry } of candidates) {
       if (paused.has(run.id)) continue;
       const ready = await this.isReady(entry.card.id);
@@ -443,8 +457,8 @@ export class BoardStackRuns
         continue;
       }
       if (await this.setStatus(entry, 'queued')) changed.add(run.stack.id);
-      if (full || !(await this.hasRoom(projectId))) {
-        full = true;
+      if (held || !(await this.hasRoom(projectId))) {
+        held = true;
         continue;
       }
       try {
@@ -452,7 +466,7 @@ export class BoardStackRuns
       } catch (error) {
         const { code, message } = autoRunFailureOf(error);
         if (code === BOARD_ERROR.maxRunning) {
-          full = true;
+          held = true;
           continue;
         }
         if (WAITS_FOR_DEPENDENCY.has(code)) {

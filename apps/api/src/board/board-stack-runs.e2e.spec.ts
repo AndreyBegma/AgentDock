@@ -385,6 +385,21 @@ describe('Run stack (e2e, #652)', () => {
     expect((await w.card(a.number)).rounds[0].authorId).toBe(w.operatorId);
   });
 
+  it('waits without pausing while the runner is away, and goes on when it connects', async () => {
+    const [a, b] = await cards(2);
+    await staged([a, b], []);
+    w.offline = true;
+    expect((await runStack()).status).toBe(200);
+    expect(w.sent('card.run')).toEqual([]);
+    expect((await stack()).run).toMatchObject({ state: 'running', queued: 2 });
+
+    w.offline = false;
+    await w.connectHooks.connected(w.runnerId);
+    await w.work.settled();
+    expect(await started()).toEqual([a.number, b.number]);
+    expect(await w.audit('stack.run_paused')).toEqual([]);
+  });
+
   it('is refused for viewers and while the stack design is not approved', async () => {
     const [a, b] = await cards(2);
     await staged([a, b], [], true);
