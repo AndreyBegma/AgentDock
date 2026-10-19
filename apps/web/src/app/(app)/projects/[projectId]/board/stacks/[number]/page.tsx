@@ -47,6 +47,7 @@ import {
   boardCardPageHref,
   boardHref,
 } from '../../../../../../../lib/board/href';
+import { prTargetText } from '../../../../../../../lib/board/pull-request';
 import {
   addableCards,
   approvableRevision,
@@ -583,6 +584,17 @@ function StageRow({
         <StatusPill size="sm" status="done" label="Accepted" />
       ) : pill ? (
         <StatusPill size="sm" status={pill.status} label={pill.label} />
+      ) : null}
+      {card.prTarget ? (
+        // #636: where the card's PR goes — its dependency's branch or the base.
+        <Tooltip content={`Pull request into ${card.prTarget.branch}`}>
+          <span>
+            <Chip size="sm">
+              {card.prNumber !== null ? `PR #${card.prNumber} ` : ''}
+              {prTargetText(card.prTarget)}
+            </Chip>
+          </span>
+        </Tooltip>
       ) : null}
       {card.after.length > 0 ? (
         <Chip size="sm" tone="warn">
