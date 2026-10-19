@@ -281,7 +281,8 @@ export class CardExecutor {
       try {
         // #359 D8: the follow-up branch, from the updated base, first.
         if (args.newBranch) await startFollowUpBranch(deps, record);
-        await ensureWorktree(deps, record);
+        // #640: a new branch starts from the dependency's when one is given.
+        await ensureWorktree(deps, record, args.startFrom);
         this.trust(profile, record);
         // #359 D3: the worker's PR description goes under `.agentdock/`,
         // excluded whether or not the card has attachments.

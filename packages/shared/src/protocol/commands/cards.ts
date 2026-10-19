@@ -176,6 +176,13 @@ export type CardDraftPullRequest = z.infer<typeof cardDraftPullRequestSchema>;
  * existing worktree before it resumes the session — the follow-up of a
  * merged card. `branch` must not exist yet, locally or on the remote.
  *
+ * #640 (ADR-0063): with `startFrom`, a new branch is created from
+ * `origin/<startFrom>` — a dependency card's unmerged branch, fetched first —
+ * instead of `origin/<base>`. Only where the runner creates `branch` (it
+ * exists neither locally nor on origin); `base` stays what the PR targets and
+ * what "ahead" is counted against. Taken by a runner that advertises
+ * `cardStartFrom`.
+ *
  * Both are taken by a runner that advertises `card.checks` (the same
  * release); an older one refuses them as `invalid_args`, so the API sends
  * them only to a runner that advertises it.
@@ -203,6 +210,8 @@ export const cardRunArgsSchema = z
     pullRequest: cardDraftPullRequestSchema.optional(),
     /** #359 D8: create `branch` from the updated `origin/<base>` first. */
     newBranch: z.boolean().optional(),
+    /** #640: create a new `branch` from `origin/<startFrom>`, not `origin/<base>`. */
+    startFrom: gitRefSchema.optional(),
     /** #445 D11: the project's Token saver; absent is off (a runner without the `tokenSaver` capability refuses it). */
     tokenSaver: tokenSaverConfigSchema.optional(),
   })
@@ -215,6 +224,19 @@ export const cardRunArgsSchema = z
   .refine((a) => a.newBranch !== true || a.session.resume, {
     message: 'newBranch needs a resumed session',
     path: ['newBranch'],
+  })
+  .refine(
+    (a) =>
+      a.startFrom === undefined ||
+      (a.startFrom !== a.base && a.startFrom !== a.branch),
+    {
+      message: 'startFrom must be neither the base nor the branch',
+      path: ['startFrom'],
+    },
+  )
+  .refine((a) => a.startFrom === undefined || a.newBranch !== true, {
+    message: 'a follow-up branch starts from the base',
+    path: ['startFrom'],
   })
   .refine((a) => a.pullRequest === undefined || a.branch !== a.base, {
     message: 'a pushed branch must not be the base branch',

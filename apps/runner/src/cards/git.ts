@@ -93,15 +93,18 @@ export const fetchRef = (deps: GitDeps, root: string, ref: string) =>
  * D5: the card's worktree, created when it is missing — on round 1, and on a
  * round after `card.close` removed it. The branch is the local one when it
  * survived, else `origin/<branch>` when it was pushed, else a new branch from
- * `origin/<base>`.
+ * `origin/<base>` — #640 (ADR-0063): from `origin/<startFrom>` when given, a
+ * dependency card's unmerged branch.
  */
 export const ensureWorktree = async (
   deps: GitDeps,
   record: Pick<CardRecord, 'root' | 'worktree' | 'branch' | 'base'>,
+  startFrom?: string,
 ): Promise<'existing' | 'created'> => {
   const { root, worktree, branch, base } = record;
   if (existsSync(worktree)) return 'existing';
-  await fetchRef(deps, root, base);
+  const from = startFrom ?? base;
+  await fetchRef(deps, root, from);
   await fetchRef(deps, root, branch);
   if (await commitOf(deps, root, `refs/heads/${branch}`)) {
     await gitOk(deps.exec, [
@@ -117,8 +120,8 @@ export const ensureWorktree = async (
   }
   const start =
     (await commitOf(deps, root, `refs/remotes/origin/${branch}`)) ??
-    (await commitOf(deps, root, `refs/remotes/origin/${base}`));
-  if (!start) throw new Error(`origin/${base} does not exist`);
+    (await commitOf(deps, root, `refs/remotes/origin/${from}`));
+  if (!start) throw new Error(`origin/${from} does not exist`);
   await gitOk(deps.exec, [
     '-C',
     root,
