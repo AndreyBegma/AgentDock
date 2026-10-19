@@ -193,7 +193,10 @@ describe('Telegram free text goes to the assistant (e2e, #620)', () => {
       const model = String(body?.model);
       calls.push({
         model,
-        system: String(body?.system ?? ''),
+        // A cached prompt goes as text blocks (the stable part, then the tail).
+        system: Array.isArray(body?.system)
+          ? (body.system as { text: string }[]).map((b) => b.text).join('\n\n')
+          : String(body?.system ?? ''),
         body: body ?? {},
       });
       if (model === HAIKU) return answer([{ text: ['Queue ', 'blockers'] }]);

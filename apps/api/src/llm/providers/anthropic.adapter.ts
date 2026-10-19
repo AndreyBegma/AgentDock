@@ -6,6 +6,7 @@ import {
   type LlmAdapter,
   type LlmAdapterCall,
   type LlmMessage,
+  type LlmRequest,
   type LlmStopReason,
   type LlmStreamEvent,
 } from '../types';
@@ -110,6 +111,31 @@ export const toAnthropicMessages = (
   return out;
 };
 
+/**
+ * The `system` parameter. With `cachePrefix` the stable text is its own block
+ * with a cache breakpoint and the tail follows it, so a changing tail never
+ * invalidates the cached tools and instructions.
+ */
+export const anthropicSystem = (
+  request: Pick<LlmRequest, 'system' | 'systemTail' | 'cachePrefix'>,
+): { system?: string | Anthropic.TextBlockParam[] } => {
+  const { system, systemTail } = request;
+  if (!system && !systemTail) return {};
+  if (!request.cachePrefix) {
+    return { system: [system, systemTail].filter(Boolean).join('\n\n') };
+  }
+  const blocks: Anthropic.TextBlockParam[] = [];
+  if (system) {
+    blocks.push({
+      type: 'text',
+      text: system,
+      cache_control: { type: 'ephemeral' },
+    });
+  }
+  if (systemTail) blocks.push({ type: 'text', text: systemTail });
+  return { system: blocks };
+};
+
 /** Anthropic through `@anthropic-ai/sdk` (ADR-0059). */
 export class AnthropicAdapter implements LlmAdapter {
   readonly provider = 'anthropic' as const;
@@ -143,17 +169,21 @@ export class AnthropicAdapter implements LlmAdapter {
         {
           model: request.model,
           max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
-          ...(request.system ? { system: request.system } : {}),
+          ...anthropicSystem(request),
           messages: toAnthropicMessages(request.messages),
           ...(request.tools?.length
             ? {
-                tools: request.tools.map((tool) => ({
+                tools: request.tools.map((tool, i, all) => ({
                   name: tool.name,
                   description: tool.description,
                   input_schema: {
                     type: 'object' as const,
                     ...tool.inputSchema,
                   },
+                  // One breakpoint after the last tool caches every tool.
+                  ...(request.cachePrefix && i === all.length - 1
+                    ? { cache_control: { type: 'ephemeral' as const } }
+                    : {}),
                 })),
               }
             : {}),
