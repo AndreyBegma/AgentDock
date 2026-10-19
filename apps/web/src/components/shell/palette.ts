@@ -5,6 +5,7 @@ import type {
   RunSummary,
   SessionSummary,
 } from '@agentdock/shared';
+import { BOARD_ASK_QUESTION_MAX } from '@agentdock/shared';
 import type { CommandPaletteGroup } from '@andrewbehma/glass-ui/command-palette';
 import {
   FolderGit2,
@@ -13,6 +14,7 @@ import {
   type LucideIcon,
   Palette,
   Play,
+  Sparkles,
   SquareTerminal,
   User,
 } from 'lucide-react';
@@ -38,6 +40,27 @@ export interface PaletteInput {
   plans: readonly PlanSummary[];
   /** The theme the "Switch theme" action reads as its hint. */
   themeLabel: string;
+}
+
+/** #660: the palette row that asks the Board the query, as a question. */
+export const ASK_PREFIX = 'ask:';
+
+/**
+ * #660 Ask the Board: any query of three characters or more can be asked as
+ * a question. Its row comes last, so Enter on a query that matches a page
+ * still opens the page.
+ */
+export function askItem(query: string): Item | null {
+  const question = query.trim();
+  if (question.length < 3 || question.length > BOARD_ASK_QUESTION_MAX) {
+    return null;
+  }
+  return {
+    id: `${ASK_PREFIX}${question}`,
+    label: `Ask the Board: “${question}”`,
+    hint: 'AI',
+    icon: Sparkles,
+  };
 }
 
 /** Project pages listed for a query: every project times eight pages adds up. */
@@ -196,5 +219,10 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
     ...group('recent', 'Recent', recent),
     ...group('admin', 'Admin', admin),
     ...group('actions', 'Actions', actions),
+    ...group(
+      'ask',
+      'Ask the Board',
+      [askItem(input.query)].filter((item): item is Item => item !== null),
+    ),
   ];
 }

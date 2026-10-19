@@ -196,6 +196,8 @@ describe('Assistant (e2e)', () => {
       const { body } = await requestOf(input, init);
       const model = String(body?.model);
       const system = String(body?.system ?? '');
+      // #660: a queued card's triage runs beside the chat; it gets no hints.
+      if (system.startsWith('You triage')) return answer([{ text: ['{}'] }]);
       calls.push({ model, system, body: body ?? {} });
       if (model === HAIKU) {
         return answer([{ text: ['Queue ', 'blockers'] }], {

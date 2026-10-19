@@ -6,7 +6,7 @@ import type {
   SessionSummary,
 } from '@agentdock/shared';
 import { visibleNav } from './nav';
-import { type PaletteInput, paletteGroups } from './palette';
+import { askItem, type PaletteInput, paletteGroups } from './palette';
 
 const project = (id: string, displayName: string) =>
   ({ id, displayName, repo: `acme/${id}` }) as ProjectSummary;
@@ -179,5 +179,28 @@ describe('paletteGroups', () => {
       const hints = group.items.map((item) => item.hint).filter(Boolean);
       if (hints.length > 1) expect(new Set(hints).size).toBeGreaterThan(1);
     }
+  });
+});
+
+describe('askItem (#660)', () => {
+  test('offers any query as a question, last', () => {
+    const groups = paletteGroups(
+      input({ query: 'Какие карточки упали на проверках?' }),
+    );
+    expect(groups.at(-1)).toMatchObject({
+      id: 'ask',
+      title: 'Ask the Board',
+      items: [
+        {
+          id: 'ask:Какие карточки упали на проверках?',
+          label: 'Ask the Board: “Какие карточки упали на проверках?”',
+        },
+      ],
+    });
+  });
+
+  test('offers nothing for an empty or a one-letter query', () => {
+    expect(askItem('')).toBeNull();
+    expect(askItem(' a ')).toBeNull();
   });
 });

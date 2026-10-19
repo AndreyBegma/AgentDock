@@ -8,6 +8,7 @@ export * from './attachments';
 export * from './audit';
 export * from './auth';
 export * from './board';
+export * from './board-ai';
 export * from './budgets';
 export * from './control';
 export * from './design';

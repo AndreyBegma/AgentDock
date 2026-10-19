@@ -10,6 +10,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BoardModule } from './board';
+import { BoardAiModule } from './board-ai';
 import { BudgetsModule } from './budgets';
 import { BullmqModule } from './bullmq';
 import { CaptureModule } from './capture';
@@ -125,6 +126,8 @@ import { WorkflowsModule } from './workflows';
     AssistantModule,
     // Issue #658: one-click card and session summaries.
     SummariesModule,
+    // #660: Ask the Board and triage hints.
+    BoardAiModule,
   ],
   controllers: [HealthController],
 })
