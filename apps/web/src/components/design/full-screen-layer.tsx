@@ -10,6 +10,8 @@ import {
 type LayerProps = {
   label: string;
   children: ReactNode;
+  /** Kept mounted but not shown, so what is typed in it survives a close. */
+  hidden?: boolean;
   /** Leaving goes up to a parent: the phone bar shows Back. Wins over `onClose`. */
   onBack?: () => void;
   /** Leaving dismisses a layer with no parent: the phone bar shows Close. */
@@ -34,11 +36,13 @@ export function FullScreenLayerFrame({
   onBack,
   onClose,
   bar,
+  hidden,
 }: LayerProps) {
   const onExit = onBack ?? onClose;
   return (
     <section
       aria-label={label}
+      hidden={hidden}
       className={`fixed inset-0 z-[calc(var(--z-index-chrome)+1)] flex flex-col bg-ground text-ink${
         onExit ? ` ${PHONE_BACK_BAR_CLEARANCE}` : ''
       }`}

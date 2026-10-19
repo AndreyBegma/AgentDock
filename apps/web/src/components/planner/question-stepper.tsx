@@ -26,6 +26,14 @@ import {
 import { QuestionCard } from './question-card';
 
 /**
+ * #678: the Previous / Next row pinned just above the phone back bar (60 px
+ * tall at its own offset), so it follows the soft keyboard with it.
+ */
+const THUMB_NAV =
+  'glass-strong fixed inset-x-2.5 bottom-[calc(max(env(safe-area-inset-bottom),12px)+var(--keyboard-inset)+68px)] z-[calc(var(--z-index-chrome)+2)] flex-nowrap rounded-[18px] p-1.5 pr-3';
+const THUMB_BUTTON = 'h-(--size-tap) px-4 text-[15px]';
+
+/**
  * A round one question at a time (#337 D3): question *k of n* with Previous
  * / Next, a dot per question (filled once answered, ringed when current),
  * **Send answers** for the whole round, and — when `onGenerate` is given —
@@ -37,11 +45,18 @@ export function QuestionStepper({
   questions,
   disabled,
   disabledReason,
+  thumbNav = false,
   onSubmit,
   onGenerate,
 }: {
   questions: readonly PlanQuestion[];
   disabled?: boolean;
+  /**
+   * In a full-screen phone layer (#678): Previous and Next stick to the
+   * bottom of the scroll area at the 44 px tap size, so stepping back
+   * between questions stays in the thumb zone.
+   */
+  thumbNav?: boolean;
   /** Why the round cannot be sent now, beside the buttons. */
   disabledReason?: string;
   /** Resolves when the turn was accepted; rejects to keep the answers. */
@@ -88,7 +103,7 @@ export function QuestionStepper({
 
   return (
     <form
-      className="flex min-w-0 flex-col gap-3"
+      className={`flex min-w-0 flex-col gap-3${thumbNav ? ' pb-16' : ''}`}
       onSubmit={(e) => {
         e.preventDefault();
         void send('send');
@@ -131,13 +146,19 @@ export function QuestionStepper({
         onAccept={() => setRound((r) => acceptRecommendation(r, current))}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div
+        data-thumb-nav={thumbNav ? '' : undefined}
+        className={`flex flex-wrap items-center justify-between gap-2${
+          thumbNav ? ` ${THUMB_NAV}` : ''
+        }`}
+      >
         <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="glass"
             disabled={at === 0}
             onClick={() => setStep(at - 1)}
+            className={thumbNav ? THUMB_BUTTON : undefined}
           >
             Previous
           </Button>
@@ -146,6 +167,7 @@ export function QuestionStepper({
             variant="glass"
             disabled={at >= questions.length - 1}
             onClick={() => setStep(at + 1)}
+            className={thumbNav ? THUMB_BUTTON : undefined}
           >
             Next
           </Button>
