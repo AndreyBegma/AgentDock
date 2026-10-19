@@ -5,6 +5,7 @@ import type {
   TokenSaverSummary,
 } from '@agentdock/shared';
 import { BoardWorld, ROOT_B } from '../board/testing/board-e2e';
+import { usageByRun } from '../history/run-usage';
 import type { LocalCall } from '../local/local-call';
 import { LocalHandlers } from '../local/local-handlers';
 
@@ -530,6 +531,261 @@ describe('token saver (e2e)', () => {
         },
       ]);
       expect(body.runnerVersion).toBe('0.12.2');
+    });
+
+    describe('cost per round (#663 D5)', () => {
+      const at = (day: number, hour: number, minute = 0) =>
+        new Date(Date.UTC(2026, 9, day, hour, minute));
+
+      const claudeSession = (externalId: string) =>
+        w.ctx.prisma.agentSession.create({
+          data: {
+            runnerId: w.runnerId,
+            runtime: 'claude',
+            externalId,
+            cwd: '/srv/dev/.wt-widget-card-x',
+            origin: 'run',
+            startedAt: at(1, 0),
+            lastEventAt: at(30, 0),
+          },
+        });
+
+      let requestSeq = 0;
+      const request = (
+        sessionId: string,
+        ts: Date,
+        over: Partial<{
+          costUsd: string | null;
+          turnId: string | null;
+          querySource: 'main' | 'subagent';
+          input: number;
+          cacheRead: number;
+          cacheWrite5m: number;
+          cacheWrite1h: number;
+        }> = {},
+      ) => {
+        requestSeq += 1;
+        return w.ctx.prisma.llmRequest.create({
+          data: {
+            sessionId,
+            requestId: `req_${requestSeq}`,
+            ts,
+            model: 'claude-opus-5-5',
+            querySource: 'main',
+            input: 100,
+            output: 10,
+            cacheRead: 800,
+            cacheWrite5m: 100,
+            cacheWrite1h: 0,
+            costUsd: '0.100000',
+            ...over,
+          },
+        });
+      };
+
+      const turn = (sessionId: string, promptId: string, startedAt: Date) =>
+        w.ctx.prisma.turn.create({
+          data: { sessionId, promptId, startedAt },
+        });
+
+      /** A further round of card 1, with its own run in `[start, end]`. */
+      const extraRound = async (
+        round: number,
+        trigger: 'feedback' | 'ci_fix',
+        start: Date,
+        end: Date,
+      ) => {
+        const card = await w.card(1);
+        const run = await w.ctx.prisma.run.create({
+          data: {
+            kind: 'card',
+            projectId: w.a,
+            status: 'succeeded',
+            triggeredByType: 'user',
+            startedAt: start,
+            endedAt: end,
+            updatedAt: end,
+          },
+        });
+        await w.ctx.prisma.boardCardRound.create({
+          data: {
+            cardId: card.id,
+            round,
+            runId: run.id,
+            trigger,
+            cardTitle: card.title,
+            cardBody: card.body,
+            cardKind: 'feature',
+          },
+        });
+        return run.id;
+      };
+
+      it('measures each session kind per week: median, p90, cache share, peak and turns', async () => {
+        const first = await ranCard();
+        await w.ctx.prisma.run.update({
+          where: { id: first },
+          data: { startedAt: at(13, 10), endedAt: at(13, 11) },
+        });
+        await extraRound(2, 'feedback', at(14, 10), at(14, 11));
+        await extraRound(3, 'feedback', at(15, 10), at(15, 11));
+        await extraRound(4, 'ci_fix', at(15, 12), at(15, 13));
+        // The next ISO week (Monday 2026-10-19).
+        await extraRound(5, 'feedback', at(20, 10), at(20, 11));
+        const card = await w.card(1);
+        const session = await claudeSession(card.sessionId as string);
+
+        // Round 1: two turns, $0.10 + $0.10; the larger request is the peak.
+        const t1 = await turn(session.id, 'p1', at(13, 10, 1));
+        const t2 = await turn(session.id, 'p2', at(13, 10, 5));
+        await request(session.id, at(13, 10, 2), { turnId: t1.id });
+        await request(session.id, at(13, 10, 6), {
+          turnId: t2.id,
+          cacheRead: 5_000,
+        });
+        // Rounds 2 and 3: one request each, no turn named — one main request.
+        await request(session.id, at(14, 10, 2), { costUsd: '0.400000' });
+        await request(session.id, at(15, 10, 2), { costUsd: '1.000000' });
+        await request(session.id, at(15, 10, 3), {
+          querySource: 'subagent',
+          costUsd: '0.000000',
+        });
+        // Round 4 (CI fix): unpriced.
+        await request(session.id, at(15, 12, 2), { costUsd: null });
+        await request(session.id, at(20, 10, 2));
+
+        const body = (await w.viewer.get(summary())).body as TokenSaverSummary;
+        const card13 = body.costPerRound.find(
+          (r) => r.sessionKind === 'card' && r.week === '2026-10-12',
+        );
+        // Round costs 0.20, 0.40, 1.00: median 0.40, p90 0.40 + 0.8 × 0.60.
+        expect(card13).toEqual({
+          sessionKind: 'card',
+          week: '2026-10-12',
+          rounds: 3,
+          pricedRounds: 3,
+          medianUsd: '0.400000',
+          p90Usd: '0.880000',
+          cacheReadShare: expect.any(Number),
+          medianPeakContext: 1_000,
+          medianTurns: 1,
+        });
+        // 800 × 4 + 5 000 read of 1 000 × 4 + 5 000 + 800 … every input token.
+        const reads = 800 * 4 + 5_000;
+        expect(card13?.cacheReadShare).toBeCloseTo(reads / (reads + 200 * 5));
+        expect(
+          body.costPerRound.map((r) => [r.sessionKind, r.week, r.rounds]),
+        ).toEqual([
+          ['card', '2026-10-12', 3],
+          ['card', '2026-10-19', 1],
+          ['ci_fix', '2026-10-12', 1],
+        ]);
+        expect(
+          body.costPerRound.find((r) => r.sessionKind === 'ci_fix'),
+        ).toMatchObject({ pricedRounds: 0, medianUsd: null, p90Usd: null });
+      });
+
+      it('counts a card design turn in the card’s design session', async () => {
+        await w.createCard();
+        const card = await w.card(1);
+        const designSessionId = '00000000-0000-4000-8000-000000000663';
+        await w.ctx.prisma.boardCard.update({
+          where: { id: card.id },
+          data: { designSessionId },
+        });
+        const run = await w.ctx.prisma.run.create({
+          data: {
+            kind: 'plan',
+            projectId: w.a,
+            status: 'succeeded',
+            triggeredByType: 'user',
+            startedAt: at(14, 9),
+            endedAt: at(14, 10),
+            updatedAt: at(14, 10),
+          },
+        });
+        await w.ctx.prisma.planTurn.create({
+          data: { cardId: card.id, runId: run.id, action: 'design', input: {} },
+        });
+        const session = await claudeSession(designSessionId);
+        await request(session.id, at(14, 9, 10), { costUsd: '0.250000' });
+        await request(session.id, at(14, 9, 20), { costUsd: '0.250000' });
+
+        const body = (await w.viewer.get(summary())).body as TokenSaverSummary;
+        expect(body.costPerRound).toEqual([
+          expect.objectContaining({
+            sessionKind: 'design',
+            week: '2026-10-12',
+            rounds: 1,
+            medianUsd: '0.500000',
+            medianTurns: 2,
+          }),
+        ]);
+        // The run's own usage counts the design session too (it had none).
+        const usage = await usageByRun(w.ctx.prisma, [run.id]);
+        expect(usage.get(run.id)).toMatchObject({
+          requests: 2,
+          costUsd: '0.500000',
+        });
+      });
+
+      it('measures the assistant chat reply by reply, for its project only', async () => {
+        const call = (costUsd: string, cacheRead: number) =>
+          w.ctx.prisma.llmCall.create({
+            data: {
+              ts: at(14, 9),
+              provider: 'anthropic',
+              model: 'claude-sonnet-5-5',
+              feature: 'assistant',
+              outcome: 'ok',
+              input: 1_000,
+              cacheRead,
+              costUsd,
+              priceVersion: 1,
+              durationMs: 1,
+            },
+          });
+        const reply = async (projectId: string, calls: string[]) => {
+          const conversation = await w.ctx.prisma.assistantConversation.create({
+            data: { userId: w.operatorId, projectId },
+          });
+          await w.ctx.prisma.assistantMessage.create({
+            data: {
+              conversationId: conversation.id,
+              role: 'assistant',
+              content: 'Done.',
+              displayContent: 'Done.',
+              language: 'en',
+              llmCallIds: calls,
+              createdAt: at(14, 9),
+            },
+          });
+        };
+        const a = await call('0.010000', 0);
+        const b = await call('0.030000', 3_000);
+        await reply(w.a, [a.id, b.id]);
+        await reply(w.b, [(await call('9.000000', 0)).id]);
+
+        const body = (await w.viewer.get(summary())).body as TokenSaverSummary;
+        expect(body.costPerRound).toEqual([
+          {
+            sessionKind: 'assistant',
+            week: '2026-10-12',
+            rounds: 1,
+            pricedRounds: 1,
+            medianUsd: '0.040000',
+            p90Usd: '0.040000',
+            cacheReadShare: 3_000 / 5_000,
+            medianPeakContext: 4_000,
+            medianTurns: 2,
+          },
+        ]);
+      });
+
+      it('a member of another project cannot read it', async () => {
+        expect((await w.operatorOfB.get(summary(w.a))).status).toBe(404);
+        expect((await w.outsider.get(summary(w.a))).status).toBe(404);
+      });
     });
 
     it('refuses a reversed or too long range', async () => {

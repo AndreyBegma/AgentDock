@@ -2,10 +2,14 @@ import {
   FILTER_ID_NONE,
   FILTER_ID_NONE_COMPOUND,
   FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE_OFF,
   FILTER_ID_NONE_UNCOVERED,
+  FILTER_ID_READ_REFUSED,
   type ProjectRuntimeProfile,
   type TokenSavedView,
   type TokenSaverRunKind,
+  type TokenSaverSessionKind,
+  type TokenSaverUnmeasuredKind,
 } from '@agentdock/shared';
 import { ApiError, describeError } from '../api';
 import { formatCost, formatNumber, formatTokens } from '../format';
@@ -35,6 +39,8 @@ const UNFILTERED_LABEL: Record<string, string> = {
   [FILTER_ID_NONE_COMPOUND]: 'Compound command (not filtered)',
   [FILTER_ID_NONE_UNCOVERED]: 'No filter for this command',
   [FILTER_ID_NONE_MODE]: 'Not filtered in this permission mode',
+  [FILTER_ID_NONE_OFF]: 'Filter switched off for this launch',
+  [FILTER_ID_READ_REFUSED]: 'Whole-file read refused (use Read)',
 };
 
 /** #648: what each `none:*` reason means, for the reason table. */
@@ -46,6 +52,28 @@ export const UNFILTERED_HINT: Record<string, string> = {
   [FILTER_ID_NONE_UNCOVERED]: 'No filter family covers the program.',
   [FILTER_ID_NONE_MODE]:
     'The session ran in a permission mode where the hook never rewrites (only bypass, auto and plan do).',
+  [FILTER_ID_NONE_OFF]:
+    'A filter family covers the program, but the launch switched that family off.',
+};
+
+/** #663: what a session kind of cost per round is called on screen. */
+export const SESSION_KIND_LABEL: Record<TokenSaverSessionKind, string> = {
+  card: 'Card round',
+  ci_fix: 'CI-fix round',
+  design: 'Design',
+  plan: 'Planner',
+  worker: 'Orchestrator worker',
+  card_capture: 'Capture',
+  text_normalize: 'Normalize',
+  assistant: 'Assistant chat',
+};
+
+/** #663: the launches cost per round cannot measure yet, as a person reads them. */
+export const UNMEASURED_KIND_LABEL: Record<TokenSaverUnmeasuredKind, string> = {
+  skill: 'skill runs',
+  schedule: 'schedules',
+  ui_profile: 'UI profile builds',
+  card_assess: 'model assessments',
 };
 
 /** A filter id as a person reads it. */
@@ -79,6 +107,13 @@ export function formatRate(rate: number): string {
   if (!Number.isFinite(rate) || rate <= 0) return '0%';
   const percent = rate * 100;
   return percent < 1 ? '<1%' : `${formatNumber(percent, 0)}%`;
+}
+
+/** A signed change as a percent, `−12%` / `+3%` / `0%`; blank when unknown. */
+export function formatChange(change: number | null): string {
+  if (change === null) return '';
+  if (change === 0) return '0%';
+  return `${change < 0 ? '−' : '+'}${formatRate(Math.abs(change))}`;
 }
 
 /**

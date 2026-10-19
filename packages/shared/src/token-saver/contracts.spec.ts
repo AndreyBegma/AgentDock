@@ -16,7 +16,9 @@ import {
   FILTER_ID_NONE,
   FILTER_ID_NONE_COMPOUND,
   FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE_OFF,
   FILTER_ID_NONE_UNCOVERED,
+  FILTER_ID_READ_REFUSED,
   FILTER_STATS_EVENT,
   FILTER_STATS_MAX_ROWS,
   type FilterStatRow,
@@ -27,6 +29,7 @@ import {
   TOKEN_SAVER_DEFAULT,
   TOKEN_SAVER_MCP_ALLOW_MAX,
   tokenSaverConfigSchema,
+  UNFILTERED_FILTER_IDS,
 } from './contracts';
 import { estimateTokensSaved, estimateUsdSaved } from './estimate';
 
@@ -241,6 +244,22 @@ describe('filter.stats rows (#445 D12)', () => {
       );
     }
     expect(isUnfilteredId('js/jest')).toBe(false);
+  });
+
+  it('accepts a switched-off family and the read refusal (#663 D8, D9)', () => {
+    const passed = { ...row, rawBytes: 0, keptBytes: 0, passedThrough: true };
+    expect(
+      filterStatRowSchema.safeParse({ ...passed, filter: FILTER_ID_NONE_OFF })
+        .success,
+    ).toBe(true);
+    expect(isUnfilteredId(FILTER_ID_NONE_OFF)).toBe(true);
+    expect(UNFILTERED_FILTER_IDS).toContain(FILTER_ID_NONE_OFF);
+    expect(
+      filterStatRowSchema.safeParse({ ...row, filter: FILTER_ID_READ_REFUSED })
+        .success,
+    ).toBe(true);
+    // A refusal is its own filter, not a pass-through reason.
+    expect(isUnfilteredId(FILTER_ID_READ_REFUSED)).toBe(false);
   });
 
   it('accepts the orchestrator and manual sessions without a run', () => {

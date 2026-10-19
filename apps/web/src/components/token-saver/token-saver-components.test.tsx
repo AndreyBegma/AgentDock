@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { emptySummary } from '../../lib/token-saver/summary';
+import {
+  CostPerRoundTable,
+  CostPerRoundWeeksTable,
+  UnmeasuredKindsNote,
+} from './cost-per-round';
 import { DescriptionIncompleteBadge } from './description-incomplete-badge';
 import { FilterBreakdown } from './filter-breakdown';
 import { SavedBadge } from './saved-badge';
@@ -165,6 +170,7 @@ describe('the unfiltered breakdown (#648)', () => {
     expect(html).toContain('No filter for this command');
     expect(html).toContain('Not filtered in this permission mode');
     expect(html).toContain('No filter (runner too old to say why)');
+    expect(html).toContain('Filter switched off for this launch');
     expect(html).toContain('75%');
   });
 
@@ -227,5 +233,57 @@ describe('the prompt cache (#648)', () => {
     expect(html).toContain('Card worker');
     expect(html).toContain('80%');
     expect(html).toContain('5k');
+  });
+});
+
+describe('cost per round (#663 D5)', () => {
+  const row = (week: string, medianUsd: string) => ({
+    sessionKind: 'ci_fix' as const,
+    week,
+    rounds: 4,
+    pricedRounds: 4,
+    medianUsd,
+    p90Usd: '3.000000',
+    cacheReadShare: 0.97,
+    medianPeakContext: 148_000,
+    medianTurns: 12.5,
+  });
+
+  test('leads with the newest week per kind and the change since the first', () => {
+    const html = renderToStaticMarkup(
+      <CostPerRoundTable
+        rows={[row('2026-10-05', '2.000000'), row('2026-10-12', '1.500000')]}
+        empty={<p>none</p>}
+      />,
+    );
+    expect(html).toContain('CI-fix round');
+    expect(html).toContain('Week of Oct 12');
+    expect(html).toContain('$1.50');
+    expect(html).toContain('$3.00');
+    expect(html).toContain('97%');
+    expect(html).toContain('148k');
+    expect(html).toContain('12.5');
+    expect(html).toContain('−25%');
+  });
+
+  test('shows the empty state with no round, and every week in the weekly table', () => {
+    expect(
+      renderToStaticMarkup(
+        <CostPerRoundTable rows={[]} empty={<p>no rounds</p>} />,
+      ),
+    ).toBe('<p>no rounds</p>');
+    const weeks = renderToStaticMarkup(
+      <CostPerRoundWeeksTable
+        rows={[row('2026-10-05', '2.000000'), row('2026-10-12', '1.500000')]}
+      />,
+    );
+    expect(weeks).toContain('Week of Oct 5');
+    expect(weeks).toContain('Week of Oct 12');
+  });
+
+  test('names the launches it cannot measure', () => {
+    const html = renderToStaticMarkup(<UnmeasuredKindsNote />);
+    expect(html).toContain('skill runs');
+    expect(html).toContain('model assessments');
   });
 });

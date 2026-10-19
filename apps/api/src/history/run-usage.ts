@@ -34,6 +34,9 @@ export const EMPTY_USAGE: RunUsage = {
  *   fork for a task turn, else the plan's — by its id on the project's
  *   runner. The plan worktree sits outside the project root, so the session
  *   has no `projectId` to match on;
+ * - a design turn (#243 D2, #480): the card's or the stack's design session
+ *   (`designSessionId`), by its id on the project's runner. Its plan turn
+ *   names the card or the stack instead of a plan (#663).
  * - a board card round (issue #242 D4): the card's Claude session, by its id
  *   on the project's runner. Every round resumes the same session, so the
  *   run's window is what splits its requests between rounds.
@@ -58,6 +61,22 @@ const RUN_SESSIONS = Prisma.sql`
   JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
     AND se2.runtime = 'claude'
     AND se2."externalId" = COALESCE(t."sessionId", p."sessionId")::text
+  UNION ALL
+  SELECT pt."runId", se2.id
+  FROM plan_turns pt
+  JOIN board_cards c ON c.id = pt."cardId"
+  JOIN projects pr ON pr.id = c."projectId"
+  JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
+    AND se2.runtime = 'claude'
+    AND se2."externalId" = c."designSessionId"::text
+  UNION ALL
+  SELECT pt."runId", se2.id
+  FROM plan_turns pt
+  JOIN board_stacks st ON st.id = pt."stackId"
+  JOIN projects pr ON pr.id = st."projectId"
+  JOIN sessions se2 ON se2."runnerId" = pr."runnerId"
+    AND se2.runtime = 'claude'
+    AND se2."externalId" = st."designSessionId"::text
   UNION ALL
   SELECT cr."runId", se2.id
   FROM board_card_rounds cr
@@ -210,6 +229,125 @@ export const runCostsByKind = async (
     avgUsd:
       row.avgUsd === null ? null : new Prisma.Decimal(row.avgUsd).toFixed(6),
   }));
+};
+
+/**
+ * #663 D5: the rounds of one session kind in one ISO week. `kind` is a run's
+ * kind refined: a card round started for CI is `ci_fix`, a design turn is
+ * `design`, a worker slot is `worker`.
+ */
+export interface RoundCostGroup {
+  kind: string;
+  /** The Monday of the UTC ISO week the round started in, `YYYY-MM-DD`. */
+  week: string;
+  rounds: number;
+  pricedRounds: number;
+  /** Decimal strings over the priced rounds; null when none is priced. */
+  medianUsd: string | null;
+  p90Usd: string | null;
+  input: number;
+  cacheRead: number;
+  /** 5-minute and 1-hour writes together. */
+  cacheWrite: number;
+  medianPeakContext: number;
+  medianTurns: number;
+}
+
+export interface RoundCostRow {
+  kind: string;
+  week: string;
+  rounds: number;
+  pricedRounds: number;
+  medianUsd: string | null;
+  p90Usd: string | null;
+  input: bigint;
+  cacheRead: bigint;
+  cacheWrite: bigint;
+  medianPeakContext: number | null;
+  medianTurns: number | null;
+}
+
+/**
+ * Aggregates a per-round CTE `rounds (kind, week, cost, input, "cacheRead",
+ * "cacheWrite", peak, turns)` by kind and week.
+ */
+export const ROUND_COST_COLUMNS = Prisma.sql`
+  kind, week, COUNT(*)::int AS rounds,
+  COUNT(cost)::int AS "pricedRounds",
+  (percentile_cont(0.5) WITHIN GROUP (ORDER BY cost))::text AS "medianUsd",
+  (percentile_cont(0.9) WITHIN GROUP (ORDER BY cost))::text AS "p90Usd",
+  COALESCE(SUM(input), 0)::bigint AS input,
+  COALESCE(SUM("cacheRead"), 0)::bigint AS "cacheRead",
+  COALESCE(SUM("cacheWrite"), 0)::bigint AS "cacheWrite",
+  (percentile_cont(0.5) WITHIN GROUP (ORDER BY peak))::float8 AS "medianPeakContext",
+  (percentile_cont(0.5) WITHIN GROUP (ORDER BY turns))::float8 AS "medianTurns"`;
+
+/** The UTC ISO week of a timestamp column, as its Monday `YYYY-MM-DD`. */
+export const isoWeekOf = (column: Prisma.Sql): Prisma.Sql =>
+  Prisma.sql`to_char(date_trunc('week', ${column} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`;
+
+export const toRoundCostGroup = (row: RoundCostRow): RoundCostGroup => {
+  const usd = (v: string | null) =>
+    v === null ? null : new Prisma.Decimal(v).toFixed(6);
+  return {
+    kind: row.kind,
+    week: row.week,
+    rounds: row.rounds,
+    pricedRounds: row.pricedRounds,
+    medianUsd: usd(row.medianUsd),
+    p90Usd: usd(row.p90Usd),
+    input: Number(row.input),
+    cacheRead: Number(row.cacheRead),
+    cacheWrite: Number(row.cacheWrite),
+    medianPeakContext: Math.round(row.medianPeakContext ?? 0),
+    medianTurns: row.medianTurns ?? 0,
+  };
+};
+
+/**
+ * #663 D5: cost per round of a project's ended runs started in `[from, to)`,
+ * by refined kind and ISO week — from the same requests `usageByRun` counts.
+ * A round is a run with at least one request. Its peak context is its largest
+ * request (input + cache read + cache write); its turns are its distinct
+ * turns, or its main-loop requests when no request names a turn.
+ */
+export const roundCostsByKind = async (
+  prisma: PrismaService,
+  projectId: string,
+  from: Date,
+  to: Date,
+): Promise<RoundCostGroup[]> => {
+  const rows = await prisma.$queryRaw<RoundCostRow[]>`
+    WITH rounds AS (
+      SELECT
+        CASE
+          WHEN r.kind = 'card' AND cr.trigger = 'ci_fix' THEN 'ci_fix'
+          WHEN r.kind = 'plan' AND pt."planId" IS NULL THEN 'design'
+          WHEN r.kind = 'orchestrator_slot' THEN 'worker'
+          ELSE r.kind::text
+        END AS kind,
+        ${isoWeekOf(Prisma.sql`r."startedAt"`)} AS week,
+        SUM(l."costUsd") AS cost,
+        SUM(l.input) AS input,
+        SUM(l."cacheRead") AS "cacheRead",
+        SUM(l."cacheWrite5m" + l."cacheWrite1h") AS "cacheWrite",
+        MAX(l.input + l."cacheRead" + l."cacheWrite5m" + l."cacheWrite1h") AS peak,
+        COALESCE(
+          NULLIF(COUNT(DISTINCT l."turnId"), 0),
+          COUNT(*) FILTER (WHERE l."querySource" = 'main')
+        ) AS turns
+      ${RUN_REQUESTS}
+      LEFT JOIN board_card_rounds cr ON cr."runId" = r.id
+      LEFT JOIN plan_turns pt ON pt."runId" = r.id
+      WHERE r."projectId" = ${projectId}
+        AND r."startedAt" >= ${from} AND r."startedAt" < ${to}
+        AND r."endedAt" IS NOT NULL
+      GROUP BY r.id, cr.trigger, pt."planId"
+    )
+    SELECT ${ROUND_COST_COLUMNS}
+    FROM rounds
+    GROUP BY kind, week`;
+  return rows.map(toRoundCostGroup);
 };
 
 /** #648: the prompt cache of the ended runs of one kind. */
