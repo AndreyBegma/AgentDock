@@ -21,7 +21,7 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { ArrowDown, ArrowLeft, Layers, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, Layers, Play, Square, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -36,6 +36,8 @@ import {
   fetchBoard,
   fetchStack,
   removeStackCard,
+  runStack,
+  stopStack,
   updateStack,
 } from '../../../../../../../lib/board/actions';
 import {
@@ -52,12 +54,18 @@ import { prTargetText } from '../../../../../../../lib/board/pull-request';
 import {
   addableCards,
   approvableRevision,
+  CARD_RUN_PILL,
+  canStopStack,
   currentStageText,
   designSwitch,
   gateNote,
   isGated,
   openComments,
+  PAUSE_HINT,
+  pauseText,
   previewRevision,
+  runStackControl,
+  stackRunPill,
   stageLinkText,
 } from '../../../../../../../lib/board/stack-page';
 import {
@@ -321,6 +329,14 @@ function StackDetail({
         </Banner>
       ) : null}
 
+      <StackRun
+        projectId={projectId}
+        stack={stack}
+        canOperate={canOperate}
+        busy={busy}
+        run={run}
+      />
+
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <Description
@@ -361,6 +377,74 @@ function StackDetail({
         </>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * #652: Run stack — its button, Stop, the run's state and, when it paused,
+ * why. The button is disabled for a viewer and while the design holds the
+ * stack (ADR-0044 §6).
+ */
+function StackRun({
+  projectId,
+  stack,
+  canOperate,
+  busy,
+  run,
+}: {
+  projectId: string;
+  stack: BoardStackDetail;
+  canOperate: boolean;
+  busy: boolean;
+  run: (job: () => Promise<unknown>) => Promise<void>;
+}) {
+  const control = runStackControl(stack, canOperate);
+  const pill = stack.run ? stackRunPill(stack.run) : null;
+  const paused = stack.run ? pauseText(stack.run) : null;
+  const button = (
+    <Button
+      size="sm"
+      variant="solid"
+      disabled={busy || control.disabled}
+      onClick={() => run(() => runStack(projectId, stack.number))}
+    >
+      <Play aria-hidden="true" className="size-3.5" />
+      {control.label}
+    </Button>
+  );
+  return (
+    <section aria-label="Stack run" className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {control.reason ? (
+          <Tooltip content={control.reason}>
+            <span>{button}</span>
+          </Tooltip>
+        ) : (
+          button
+        )}
+        {canOperate && canStopStack(stack.run) ? (
+          <Button
+            size="sm"
+            variant="glass"
+            disabled={busy}
+            onClick={() => run(() => stopStack(projectId, stack.number))}
+          >
+            <Square aria-hidden="true" className="size-3.5" />
+            Stop
+          </Button>
+        ) : null}
+        {pill ? <StatusPill status={pill.status} label={pill.label} /> : null}
+        <span className="text-xs text-ink-3">
+          Starts every card in To Do as it becomes ready, within the project’s
+          limit of running card workers.
+        </span>
+      </div>
+      {paused ? (
+        <Banner tone="warn" title="The stack run is paused">
+          {paused} {PAUSE_HINT}
+        </Banner>
+      ) : null}
+    </section>
   );
 }
 
@@ -580,6 +664,14 @@ function StageRow({
             </Chip>
           </span>
         </Tooltip>
+      ) : null}
+      {card.run ? (
+        // #652: the card's place in the stack run.
+        <StatusPill
+          size="sm"
+          status={CARD_RUN_PILL[card.run].status}
+          label={CARD_RUN_PILL[card.run].label}
+        />
       ) : null}
       {card.after.length > 0 ? (
         <Chip size="sm" tone="warn">

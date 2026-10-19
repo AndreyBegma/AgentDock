@@ -19,6 +19,7 @@ const ref = (stage: number) => ({
 });
 
 const stack: BoardStackView = {
+  run: null,
   id: 'stack-3',
   number: 3,
   label: 'S-3',
@@ -61,12 +62,12 @@ const actions = {
   run: async () => true,
 } as unknown as CardActions;
 
-const render = (defaultOpen: boolean) => {
+const render = (defaultOpen: boolean, over: Partial<BoardStackView> = {}) => {
   if (!isStackItem(face)) throw new Error('no stack face');
   return renderToStaticMarkup(
     <StackFace
       projectId="p1"
-      item={face}
+      item={{ ...face, stack: { ...face.stack, ...over } }}
       canOperate
       actions={actions}
       defaultOpen={defaultOpen}
@@ -98,6 +99,37 @@ describe('StackFace (#480)', () => {
     expect(html).toContain('Completed');
     expect(html).toContain('To Do');
     expect(html).toContain(`Run C-2: ${STACK_GATE_REASON}`);
+  });
+
+  test('#652: shows the stack run — running, paused — and nothing before a run', () => {
+    expect(render(false)).not.toContain('data-status="paused"');
+    const running = render(false, {
+      run: {
+        state: 'running',
+        pause: null,
+        queued: 1,
+        waiting: 0,
+        running: 2,
+        startedAt: '2026-10-19T12:00:00.000Z',
+      },
+    });
+    expect(running).toContain('2 running');
+    const paused = render(false, {
+      run: {
+        state: 'paused',
+        pause: {
+          code: 'round_failed',
+          message: 'The round of C-2 failed',
+          card: 2,
+          at: '2026-10-19T12:00:00.000Z',
+        },
+        queued: 1,
+        waiting: 0,
+        running: 0,
+        startedAt: '2026-10-19T12:00:00.000Z',
+      },
+    });
+    expect(paused).toContain('Run paused');
   });
 
   test('a card of a stack wears the stack label on its own face', () => {
