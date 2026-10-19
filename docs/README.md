@@ -17,6 +17,7 @@ decision (`adr/`) in the same pull request that makes it.
 | [`adr/`](adr/) | architecture decision records, numbered, never rewritten — superseded |
 | [`specs/`](specs/) | one specification per issue, `<issue>-<slug>.md` (`orchestrator.specDir`) |
 | [`ui/`](ui/) | [glass-ui usage and gaps](ui/glass-ui.md), [screens](ui/screens.md) |
+| [`research/`](research/) | surveys that inform decisions, e.g. the [token-saving survey](research/token-saving-survey.md) |
 | [`plugin/`](plugin/) | [changes AgentDock needs in code-sentinel](plugin/code-sentinel-changes.md) |
 
 ## Workflow
