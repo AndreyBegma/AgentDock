@@ -12,7 +12,6 @@ import type { CardRunFile } from '@agentdock/shared/protocol';
 import { CardDesignHarness } from '../design/testing/card-design-e2e';
 import { designResult, MOCKUP } from '../design/testing/design-e2e';
 import { block } from '../planner/testing/planner-e2e';
-import { BoardWork } from './board-work';
 
 /**
  * #480 (docs/specs/480-add-card-stacks-staged-cards-sharing-one.md,
@@ -762,11 +761,13 @@ describe('card stacks (e2e, #480)', () => {
         const section = prompt.slice(prompt.indexOf('## Stack'));
         expect(section).toContain(`S-1 "Redesign the Settings page", ${stage}`);
         expect(section).toContain(path);
-        // #638: the next stage runs once this one's pull request is ready.
-        await h.author.send('post', `${h.cardPath(number)}/finish`);
+        // #638: the next stage runs once this one is done; with two cards
+        // per stage, #636 (ADR-0064) wants them landed — accepted, no PR.
+        await h.ctx.prisma.boardCard.update({
+          where: { projectId_number: { projectId: h.projectId, number } },
+          data: { column: 'completed', completedAt: new Date() },
+        });
       }
-      // The finishes collect in the background; the next reset waits for them.
-      await h.ctx.app.get(BoardWork).settled();
     });
 
     it("a stack whose design is off gates neither a card's design Generate nor Run (#527)", async () => {

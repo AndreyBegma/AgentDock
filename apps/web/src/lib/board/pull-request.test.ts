@@ -4,7 +4,23 @@ import {
   collectMessage,
   noPrText,
   prChipText,
+  prTargetText,
 } from './pull-request';
+
+describe('prTargetText (#636)', () => {
+  test('names the dependency a stacked PR goes into, else the base', () => {
+    expect(prTargetText(null)).toBeNull();
+    expect(prTargetText({ branch: 'develop', stackedOn: null })).toBe(
+      'into develop',
+    );
+    expect(
+      prTargetText({
+        branch: 'feat/1-login',
+        stackedOn: { number: 1, label: 'C-1' },
+      }),
+    ).toBe('into C-1’s branch');
+  });
+});
 
 describe('prChipText (#329 D6)', () => {
   test('shows the number in every column, with the state when known', () => {

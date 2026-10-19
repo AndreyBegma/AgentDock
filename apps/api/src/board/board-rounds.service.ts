@@ -66,7 +66,10 @@ import { TextNormalizer } from '../text/text-normalizer';
 import { TokenSaverService } from '../token-saver/token-saver.service';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
-import { BoardDependencies } from './board-dependencies.service';
+import {
+  BoardDependencies,
+  type StackedBase,
+} from './board-dependencies.service';
 import { BoardFailure, boardError } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
@@ -207,9 +210,21 @@ export class BoardRoundsService {
     }
     // #480 (ADR-0044): no card of a stack runs before its design is approved.
     await this.stacks.assertStackApproved(card.id);
-    // #638 (ADR-0064): an open dependency refuses the Run; nothing overrides it.
-    await this.dependencies.assertRunnable(card.id);
-    await this.start(card, 'run', dto, null, actor, [], null, autoRunAfter);
+    // #638 (ADR-0065): an open dependency refuses the Run; nothing overrides
+    // it. #636: one unmerged dependency with an open PR stacks the card on
+    // its branch.
+    const stacked = await this.dependencies.assertRunnable(card.id);
+    await this.start(
+      card,
+      'run',
+      dto,
+      null,
+      actor,
+      [],
+      null,
+      autoRunAfter,
+      stacked,
+    );
     return this.board.detail(projectId, number);
   }
 
@@ -371,6 +386,8 @@ export class BoardRoundsService {
     ciFix: CardCiFixInput | null = null,
     /** #443: the accepted dependency an Auto-run when ready round starts after. */
     autoRunAfter: number | null = null,
+    /** #636: the dependency a Run stacks the card on; `null` is the base. */
+    stacked: StackedBase | null = null,
   ): Promise<void> {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
@@ -423,6 +440,17 @@ export class BoardRoundsService {
       ),
     };
 
+    // #636: a Run that opens a new PR chooses its base — the dependency's
+    // branch it is stacked on, else the project base; a card with an open
+    // PR, and every other round, keeps the base the card has.
+    const choosesBase =
+      trigger === 'run' &&
+      (card.prNumber === null ||
+        card.mergedAt !== null ||
+        card.prState === 'closed');
+    const base = choosesBase
+      ? (stacked?.branch ?? project.base)
+      : (card.prBase ?? project.base);
     // A session is resumed once Claude has run in it (D5); a round 1 that
     // never started is started again.
     const resume =
@@ -567,7 +595,7 @@ export class BoardRoundsService {
             body: card.body,
             kind: card.kind,
             branch,
-            base: project.base,
+            base,
             specPath,
             specPr: specPr
               ? { repo: specPr.repo, url: specPr.url, branch: specPr.branch }
@@ -619,7 +647,7 @@ export class BoardRoundsService {
       cardId: card.id,
       projectId: project.id,
       root: project.rootPath,
-      base: project.base,
+      base,
       shortId: card.shortId,
       branch,
       session: { id: sessionId, resume },
@@ -718,6 +746,12 @@ export class BoardRoundsService {
           sessionId,
           branch,
           specPath,
+          ...(choosesBase
+            ? {
+                prBase: stacked?.branch ?? null,
+                prBaseCardId: stacked?.cardId ?? null,
+              }
+            : {}),
           ...(remembered.model !== undefined
             ? { model: remembered.model }
             : {}),

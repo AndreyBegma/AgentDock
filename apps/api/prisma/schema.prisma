@@ -3088,10 +3088,20 @@ model BoardCard {
   planId                  String?
   /// #480 (ADR-0044): the stage of the stack the card belongs to; at most one.
   stageId                 String?
+  /// #636 (ADR-0064): the branch the card's PR targets and its worktree was
+  /// cut from, when it is not the project base — the branch of the one
+  /// unmerged dependency it is stacked on. `null` is the project base.
+  prBase                  String?
+  /// #636: the dependency `prBase` belongs to; both are cleared once that
+  /// dependency merges and the card's PR is retargeted onto the base.
+  prBaseCardId            String?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
   project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  prBaseCard         BoardCard?             @relation("BoardCardPrBase", fields: [prBaseCardId], references: [id], onDelete: SetNull)
+  /// #636: the cards stacked on this one's branch.
+  stackedOn          BoardCard[]            @relation("BoardCardPrBase")
   plan               Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
   stage              BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
   trackedSession     AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
@@ -3124,6 +3134,7 @@ model BoardCard {
   @@index([projectId, fingerprint])
   @@index([planId])
   @@index([stageId])
+  @@index([prBaseCardId])
   @@map("board_cards")
 }
 

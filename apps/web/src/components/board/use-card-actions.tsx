@@ -172,7 +172,7 @@ export function useCardActions({
     return pending?.kind === 'stop' ? 'Stop worker' : 'Delete';
   };
 
-  // #638 (ADR-0064): an open dependency holds Run on every surface; a card
+  // #638 (ADR-0065): an open dependency holds Run on every surface; a card
   // the board still shows as runnable is refused here, and a stale board
   // by the API's 409 `dependency_open`.
   const run = async (

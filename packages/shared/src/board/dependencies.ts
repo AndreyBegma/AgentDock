@@ -4,7 +4,7 @@ import type { BoardColumn } from './types';
 /**
  * Card dependencies (#337 D8): `cardId` runs after `dependsOnId`. The graph
  * stays acyclic — checked on insert — and Run refuses while a dependency is
- * open, with no override (#638, ADR-0064).
+ * open, with no override (#638, ADR-0065).
  */
 
 export interface CardDependencyEdge {
@@ -55,7 +55,7 @@ export const findDependencyCycle = (
 };
 
 /**
- * #638 (ADR-0064): a dependency is satisfied once its pull request is ready
+ * #638 (ADR-0065): a dependency is satisfied once its pull request is ready
  * (Finished) or it is accepted (Completed). Leaving both opens it again.
  */
 export const DEPENDENCY_SATISFIED_COLUMNS = [

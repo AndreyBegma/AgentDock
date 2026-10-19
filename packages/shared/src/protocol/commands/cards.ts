@@ -47,6 +47,8 @@ export const CARD_TIMEOUTS_MS = {
   checks: 30_000,
   /** #484: `gh pr view`, `gh pr close`, then `gh pr reopen`. */
   ciRetrigger: 45_000,
+  /** #636: `gh pr view`, then `gh pr edit --base`. */
+  prRetarget: 45_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
@@ -683,3 +685,63 @@ export const cardCiRetriggerCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardCiRetriggerCommandName = keyof typeof cardCiRetriggerCommands;
+
+// card.prRetarget
+
+/**
+ * #636 (ADR-0064, ADR-0010, advertised per ADR-0023): moves a stacked card
+ * PR onto another base once the dependency it was stacked on has merged —
+ * `gh pr view <pr> --json state,baseRefName`, then `gh pr edit <pr> --base
+ * <base>`, argument arrays only, in the project root. The control plane never
+ * runs git itself (ADR-0001).
+ *
+ * Only an open (or draft) PR is edited; a PR already on `base` is left as it
+ * is and answers `retargeted: true` with `alreadyThere`.
+ */
+export const cardPrRetargetArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  pr: z.number().int().positive(),
+  /** The branch the PR goes into from now on — the project base. */
+  base: gitRefSchema,
+});
+export type CardPrRetargetArgs = z.infer<typeof cardPrRetargetArgsSchema>;
+
+/**
+ * Why nothing was retargeted: `not_open` — merged or closed; `gh_failed` —
+ * `gh` could not view or edit it.
+ */
+export const cardPrRetargetFailReasonSchema = z.enum(['not_open', 'gh_failed']);
+export type CardPrRetargetFailReason = z.infer<
+  typeof cardPrRetargetFailReasonSchema
+>;
+
+/** A refusal is a result, not a command error. */
+export const cardPrRetargetResultSchema = z.discriminatedUnion('retargeted', [
+  z.object({
+    retargeted: z.literal(true),
+    /** The PR already went into `base`; nothing was edited. */
+    alreadyThere: z.boolean(),
+  }),
+  z.object({
+    retargeted: z.literal(false),
+    error: cardPrRetargetFailReasonSchema,
+    message: stepErrorSchema,
+  }),
+]);
+export type CardPrRetargetResult = z.infer<typeof cardPrRetargetResultSchema>;
+
+/**
+ * #636: `card.prRetarget`, an operator command, in the `commands` allowlist
+ * beside `card.ciRetrigger`.
+ */
+export const cardPrRetargetCommands = {
+  'card.prRetarget': {
+    args: cardPrRetargetArgsSchema,
+    result: cardPrRetargetResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.prRetarget,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardPrRetargetCommandName = keyof typeof cardPrRetargetCommands;

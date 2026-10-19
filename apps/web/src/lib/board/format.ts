@@ -47,7 +47,7 @@ import {
   RUNNER_STATUS_COMMAND,
   SETUP_CLAUDE_COMMAND,
 } from '../runners/install';
-import { runWaitsFor } from './dependencies';
+import { labelList } from './dependencies';
 import { noPrText } from './pull-request';
 
 // #624: the dialog that blocks a waiting round, as notifications say it too.
@@ -420,10 +420,18 @@ export function describeBoardError(
   runnerName?: string | null,
 ): string {
   const code = errorCode(error);
-  // #638: the refusal names what the Run waits for.
-  if (code === BOARD_ERROR.dependencyOpen && error instanceof ApiError) {
-    const waits = runWaitsFor(dependencyRefsOf(error.body?.dependencies));
-    if (waits) return `${waits}: no ready pull request yet.`;
+  // #638, #636: a dependency refusal names the cards it is about.
+  if (
+    (code === BOARD_ERROR.dependencyOpen ||
+      code === BOARD_ERROR.dependenciesUnmerged) &&
+    error instanceof ApiError
+  ) {
+    const names = labelList(dependencyRefsOf(error.body?.dependencies));
+    if (names) {
+      return code === BOARD_ERROR.dependencyOpen
+        ? `Waits for ${names}: no ready pull request to build on yet.`
+        : `${names} are not merged yet; a card branches from one dependency only.`;
+    }
   }
   const shared = code
     ? BOARD_ACTION_ERROR_TEXT[code as BoardErrorCode]

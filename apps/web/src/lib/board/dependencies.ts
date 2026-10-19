@@ -8,7 +8,7 @@ import {
 
 /**
  * Card dependencies (#337 D8): "after C-12" on the face, the list in the
- * sheet, and why Run is held while one is still open (#638, ADR-0064). They
+ * sheet, and why Run is held while one is still open (#638, ADR-0065). They
  * never block a move or Accept.
  */
 
@@ -60,7 +60,9 @@ export const isOpenDependency = (column: BoardColumn): boolean =>
   !isDependencySatisfied(column);
 
 /** "C-84" / "C-84 and C-86" / "C-84, C-86 and C-90". */
-const labelList = (refs: readonly Pick<CardDependencyRef, 'label'>[]) => {
+export const labelList = (
+  refs: readonly Pick<CardDependencyRef, 'label'>[],
+) => {
   const labels = refs.map((d) => d.label);
   if (labels.length <= 1) return labels[0] ?? '';
   return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;

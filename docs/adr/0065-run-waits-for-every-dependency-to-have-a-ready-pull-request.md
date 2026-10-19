@@ -1,9 +1,10 @@
-# ADR-0064: Run waits for every dependency to have a ready pull request
+# ADR-0065: Run waits for every dependency to have a ready pull request
 
 Status: accepted · Date: 2026-10-19 ·
 Issue: [#638](https://github.com/AndreyBegma/AgentDock/issues/638) ·
-Amends [#337 D8](../specs/337-planner-on-the-board.md) and
-[ADR-0044](0044-stacks-staged-cards-under-one-shared-design.md) §2
+Amends [#337 D8](../specs/337-planner-on-the-board.md),
+[ADR-0044](0044-stacks-staged-cards-under-one-shared-design.md) §2 and
+[ADR-0064](0064-a-dependent-card-branches-from-its-dependency-with-a-stacked-pr.md) §1
 
 ## Context
 
@@ -53,6 +54,15 @@ means.
    faces are refreshed through `board.changed`. A dependant that is already
    running is not stopped.
 6. Moving and Accept stay unblocked by dependencies.
+7. **The gate runs before the stacked base (ADR-0064).** `assertRunnable`
+   first refuses an open dependency (this ADR), then chooses the base among
+   the dependencies not landed in the project base, as ADR-0064 §1 says:
+   none — the base; one with an open PR from a finished round — stacked on
+   its branch; one without such a PR — `dependency_open`; two or more —
+   `dependencies_unmerged`. ADR-0064 §1's "`ignoreDependencies` checks
+   nothing and starts the card from the project base" no longer holds:
+   `dependencies_unmerged` is a refusal like `dependency_open`, with no
+   "Run anyway", and the web app names the cards in the toast.
 
 ADR-0044 §2 now reads "Everything that reads dependencies — Run's gate,
 Ready / Waiting, Auto-run when ready — applies to stacks without knowing about
@@ -64,8 +74,11 @@ them."
   When a person truly needs to start it anyway, they remove the dependency in
   the sheet — a visible, audited change — instead of clicking past a warning.
 - A dependant may start from a dependency whose pull request is still in
-  review and may change. Which branch the dependant starts from is a
-  separate decision.
+  review and may change; ADR-0064 stacks it on that branch.
+- A card that waits for two or more Finished, unmerged dependencies shows
+  Run enabled (every dependency is satisfied) and is refused with
+  `dependencies_unmerged` until all but one are merged. An Auto-run that
+  meets this refusal stores it on the card, like any refused auto-run.
 - `CardReadiness.accepted` is renamed `satisfied`: it counts dependencies in
   Finished or Completed.
 - Auto-run after an automatic Finished runs as AgentDock, so the project's

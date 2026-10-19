@@ -25,6 +25,7 @@ import { ArrowDown, ArrowLeft, Layers, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { GenerateDesignLink } from '../../../../../../../components/design/generate-design-link';
 import { MockupFrame } from '../../../../../../../components/design/mockup-frame';
 import { ScaledPreview } from '../../../../../../../components/design/scaled-preview';
 import { Markdown } from '../../../../../../../components/markdown/markdown';
@@ -47,6 +48,7 @@ import {
   boardCardPageHref,
   boardHref,
 } from '../../../../../../../lib/board/href';
+import { prTargetText } from '../../../../../../../lib/board/pull-request';
 import {
   addableCards,
   approvableRevision,
@@ -231,23 +233,7 @@ function StackDetail({
       Pick and approve
     </Link>
   );
-  const generate = (
-    <Button
-      variant="solid"
-      disabled={busy}
-      onClick={() =>
-        run(
-          () =>
-            api(`${stackDesignApi(projectId, stack.number)}/generate`, {
-              method: 'POST',
-            }),
-          true,
-        )
-      }
-    >
-      Generate design
-    </Button>
-  );
+  const generate = <GenerateDesignLink href={viewer} />;
 
   const actions = canOperate ? (
     stack.design === null ? null : stack.design.status === 'idle' ? (
@@ -583,6 +569,17 @@ function StageRow({
         <StatusPill size="sm" status="done" label="Accepted" />
       ) : pill ? (
         <StatusPill size="sm" status={pill.status} label={pill.label} />
+      ) : null}
+      {card.prTarget ? (
+        // #636: where the card's PR goes — its dependency's branch or the base.
+        <Tooltip content={`Pull request into ${card.prTarget.branch}`}>
+          <span>
+            <Chip size="sm">
+              {card.prNumber !== null ? `PR #${card.prNumber} ` : ''}
+              {prTargetText(card.prTarget)}
+            </Chip>
+          </span>
+        </Tooltip>
       ) : null}
       {card.after.length > 0 ? (
         <Chip size="sm" tone="warn">

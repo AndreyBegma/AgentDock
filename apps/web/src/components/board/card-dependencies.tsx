@@ -26,7 +26,7 @@ import { useSection } from '../../lib/section/use-section';
  * request is ready), accepted (Completed) or open with its column (#443,
  * #638) — the header counts the open ones. An operator adds one by its
  * number and removes one; a cycle or a card of another project is refused
- * by the API and said here. An open dependency holds Run (ADR-0064); it
+ * by the API and said here. An open dependency holds Run (ADR-0065); it
  * never blocks a move or Accept.
  */
 export function CardDependenciesSection({

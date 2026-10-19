@@ -185,14 +185,19 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       const { a, b, c } = await world();
       await autoRun(c.number);
 
-      await finish(a.number);
+      // A is accepted with no PR (landed, #636); C still waits for B.
+      await accept(a.number);
       await w.work.settled();
       expect((await w.card(c.number)).column).toBe('todo');
 
       await finish(b.number);
       await w.work.settled();
-      // A's and B's own Runs, then C's.
-      expect(w.sent('card.run')).toHaveLength(3);
+      // B's own Run, then C's — after B's collect opened its PR, stacked on
+      // B's branch (ADR-0064).
+      expect(w.sent('card.run')).toHaveLength(2);
+      expect(w.sent('card.run')[1]).toMatchObject({
+        base: (await w.card(b.number)).branch,
+      });
       const card = await w.card(c.number);
       expect(card.column).toBe('in_progress');
       expect(card.autoRunWhenReady).toBe(false);
@@ -200,13 +205,9 @@ describe('card readiness and auto-run (e2e, #443)', () => {
         expect.objectContaining({ round: 1, autoRunAfter: b.number }),
       ]);
 
-      const accepted = await w.operator.send(
-        'post',
-        `${cardPath(b.number)}/accept`,
-      );
-      expect(accepted.status).toBe(200);
+      expect((await accept(b.number)).status).toBe(200);
       await w.work.settled();
-      expect(w.sent('card.run')).toHaveLength(3);
+      expect(w.sent('card.run')).toHaveLength(2);
       expect((await w.card(c.number)).rounds).toHaveLength(1);
       expect(await w.audit('card.auto_run_failed')).toEqual([]);
     });

@@ -129,7 +129,7 @@ separate page whose tasks reach the Board only as read-only projections
   - **Run** on a card with a dependency not in Completed answers `409
     dependency_open`, unless the request carries `ignoreDependencies: true`.
     The UI asks "C-12 is not completed yet. Run anyway?".
-    *Superseded by [ADR-0064](../adr/0064-run-waits-for-every-dependency-to-have-a-ready-pull-request.md)
+    *Superseded by [ADR-0065](../adr/0065-run-waits-for-every-dependency-to-have-a-ready-pull-request.md)
     (#638): a dependency is satisfied in Finished or Completed, an open one
     refuses Run with no override, and `ignoreDependencies` is gone.*
   - Moving and Accept are not blocked. A person can add or remove a
