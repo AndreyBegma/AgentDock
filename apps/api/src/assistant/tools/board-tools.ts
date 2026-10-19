@@ -313,7 +313,7 @@ export class AssistantBoardTools implements OnModuleInit {
             { userId: ctx.user.id, role: p.role, ctx: ctx.ctx },
           );
           // #660: hints for the new card, in the background.
-          await this.triage.request([card.id], ctx.user.id);
+          this.triage.request([card.id], ctx.user.id);
           return {
             summary: `Queued ${card.label} in To Do`,
             data: { number: card.number, label: card.label, column: 'todo' },

@@ -379,7 +379,7 @@ export class PlanCandidatesService {
     }
     for (const planId of planIds) this.store.publish(projectId, planId);
     // #660: hints for the new cards, in the background.
-    await this.triage.request(
+    this.triage.request(
       made.cards.map((card) => card.id),
       actor.userId,
     );

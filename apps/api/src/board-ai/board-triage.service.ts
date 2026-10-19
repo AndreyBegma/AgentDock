@@ -81,18 +81,27 @@ export class BoardTriage {
     private readonly work: BoardWork,
   ) {}
 
-  /** Triage of new cards, in the background; a card already triaged is skipped. */
-  async request(cardIds: readonly string[], userId: string | null) {
+  /**
+   * Triage of new cards, in the background; a card already triaged is
+   * skipped. Never throws: a failure here must not fail the card's creation.
+   */
+  request(cardIds: readonly string[], userId: string | null): void {
     if (cardIds.length === 0) return;
-    const created = await this.prisma.boardCardTriage.createManyAndReturn({
-      data: cardIds.map((cardId) => ({ cardId, userId })),
-      skipDuplicates: true,
-      select: { cardId: true },
-    });
     const run = (async () => {
-      for (const { cardId } of created) await this.run(cardId);
+      const created = await this.prisma.boardCardTriage.createManyAndReturn({
+        data: cardIds.map((cardId) => ({ cardId, userId })),
+        skipDuplicates: true,
+        select: { cardId: true },
+      });
+      for (const { cardId } of created) {
+        await this.run(cardId).catch((error: unknown) =>
+          this.logger.warn(
+            `triage of ${cardId} failed: ${(error as Error).message}`,
+          ),
+        );
+      }
     })().catch((error: unknown) =>
-      this.logger.warn(`triage failed: ${(error as Error).message}`),
+      this.logger.warn(`triage not started: ${(error as Error).message}`),
     );
     this.running.add(run);
     void run.finally(() => this.running.delete(run));
