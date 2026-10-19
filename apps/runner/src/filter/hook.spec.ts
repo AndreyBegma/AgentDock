@@ -201,6 +201,16 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
       expect(filterOf('bun test', 'default')).toBe('js/bun-test');
       expect(filterOf('bun test --watch', 'auto')).toBe('js/bun-test');
     });
+
+    it('names the program, never its arguments (#648)', () => {
+      const programOf = (command: string, mode?: string) => {
+        runFilterHook(JSON.stringify(preToolUse(command, {}, mode)), deps);
+        return stats().at(-1)?.row.program;
+      };
+      expect(programOf('cd apps && git log --oneline -5')).toBe('git log');
+      expect(programOf('ls -la src', 'default')).toBe('ls');
+      expect(programOf('FOO=1 git status > out.log')).toBe('git status');
+    });
   });
 
   it('leaves the command alone when a deny rule matches it, even in bypass mode', () => {
