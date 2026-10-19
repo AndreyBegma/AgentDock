@@ -12,6 +12,7 @@ import type { CardRunFile } from '@agentdock/shared/protocol';
 import { CardDesignHarness } from '../design/testing/card-design-e2e';
 import { designResult, MOCKUP } from '../design/testing/design-e2e';
 import { block } from '../planner/testing/planner-e2e';
+import { BoardWork } from './board-work';
 
 /**
  * #480 (docs/specs/480-add-card-stacks-staged-cards-sharing-one.md,
@@ -479,6 +480,19 @@ describe('card stacks (e2e, #480)', () => {
   });
 
   describe('design-first gate', () => {
+    it('refuses a later stage for its design before its dependencies (#638)', async () => {
+      await confirmedStack();
+      const refused = await run(3);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toBe(BOARD_ERROR.stackDesignNotApproved);
+
+      await approveStackDesign();
+      const waiting = await run(3);
+      expect(waiting.status).toBe(409);
+      expect(waiting.body.error).toBe(BOARD_ERROR.dependencyOpen);
+      expect(h.cardSentOf('card.run')).toHaveLength(0);
+    });
+
     it('refuses Run on every card of the stack while its design is not approved, then lets it run with the design as reference', async () => {
       await confirmedStack();
       const refused = await run(1);
@@ -735,11 +749,7 @@ describe('card stacks (e2e, #480)', () => {
       ]);
       for (const [number, stage] of stages) {
         const before = h.cardSentOf('card.run').length;
-        const started = await h.author.send(
-          'post',
-          `${h.cardPath(number)}/run`,
-          { ignoreDependencies: true },
-        );
+        const started = await run(number);
         expect(started.status).toBe(200);
         const sent = h.cardSentOf('card.run');
         expect(sent).toHaveLength(before + 1);
@@ -752,7 +762,11 @@ describe('card stacks (e2e, #480)', () => {
         const section = prompt.slice(prompt.indexOf('## Stack'));
         expect(section).toContain(`S-1 "Redesign the Settings page", ${stage}`);
         expect(section).toContain(path);
+        // #638: the next stage runs once this one's pull request is ready.
+        await h.author.send('post', `${h.cardPath(number)}/finish`);
       }
+      // The finishes collect in the background; the next reset waits for them.
+      await h.ctx.app.get(BoardWork).settled();
     });
 
     it("a stack whose design is off gates neither a card's design Generate nor Run (#527)", async () => {

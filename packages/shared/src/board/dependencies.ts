@@ -3,8 +3,8 @@ import type { BoardColumn } from './types';
 
 /**
  * Card dependencies (#337 D8): `cardId` runs after `dependsOnId`. The graph
- * stays acyclic — checked on insert — and Run warns about an open dependency
- * without blocking it.
+ * stays acyclic — checked on insert — and Run refuses while a dependency is
+ * open, with no override (#638, ADR-0063).
  */
 
 export interface CardDependencyEdge {
@@ -54,14 +54,26 @@ export const findDependencyCycle = (
   return null;
 };
 
-/** The dependencies Run warns about: every one not in Completed. */
+/**
+ * #638 (ADR-0063): a dependency is satisfied once its pull request is ready
+ * (Finished) or it is accepted (Completed). Leaving both opens it again.
+ */
+export const DEPENDENCY_SATISFIED_COLUMNS = [
+  'finished',
+  'completed',
+] as const satisfies readonly BoardColumn[];
+
+export const isDependencySatisfied = (column: BoardColumn): boolean =>
+  (DEPENDENCY_SATISFIED_COLUMNS as readonly BoardColumn[]).includes(column);
+
+/** The dependencies that hold Run back: every one not satisfied. */
 export const openDependencies = <T extends Pick<CardDependencyRef, 'column'>>(
   dependencies: readonly T[],
-): T[] => dependencies.filter((d) => d.column !== 'completed');
+): T[] => dependencies.filter((d) => !isDependencySatisfied(d.column));
 
 /**
  * #443: Ready / Waiting — only a card in To Do with at least one dependency
- * has it; accepted means in Completed, however many PRs the card had.
+ * has it; ready once every dependency is satisfied (#638).
  */
 export const cardReadiness = (
   column: BoardColumn,
@@ -71,7 +83,7 @@ export const cardReadiness = (
   const open = openDependencies(dependencies);
   return {
     state: open.length === 0 ? 'ready' : 'waiting',
-    accepted: dependencies.length - open.length,
+    satisfied: dependencies.length - open.length,
     total: dependencies.length,
     open,
   };

@@ -23,6 +23,7 @@ import {
   cardLabel,
   cardPullRequestBody,
   isActiveRoundPhase,
+  isDependencySatisfied,
   positionForIndex,
   type Role,
   RUN_UPDATED_LIVE_EVENT,
@@ -100,11 +101,12 @@ export type RoundCollectedHook = (
 ) => Promise<void>;
 
 /**
- * #443: what follows a card's acceptance — Auto-run when ready of the cards
- * that depend on it. `BoardAutoRun` registers it; `BoardWork` cannot depend
- * on it (it starts rounds, which move cards through here).
+ * #443, #638: what follows a card entering Finished or Completed — Auto-run
+ * when ready of the cards that depend on it. `BoardAutoRun` registers it;
+ * `BoardWork` cannot depend on it (it starts rounds, which move cards
+ * through here).
  */
-export type CardAcceptedHook = (
+export type CardSatisfiedHook = (
   projectId: string,
   card: Pick<BoardCard, 'id' | 'number'>,
   actor: BoardActor,
@@ -231,7 +233,7 @@ export class BoardWork implements OnModuleInit {
   private readonly logger = new Logger(BoardWork.name);
   private readonly pending = new Set<Promise<void>>();
   private roundCollected: RoundCollectedHook | null = null;
-  private cardAccepted: CardAcceptedHook | null = null;
+  private cardSatisfied: CardSatisfiedHook | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -477,12 +479,22 @@ export class BoardWork implements OnModuleInit {
     }
     for (const run of ended) this.publishRun(project.id, run.runId, run.status);
     this.publish(project.id, fresh.id);
-    // #443: the cards that wait for this one change Ready / Waiting.
-    if (effects.includes('accept') || effects.includes('reopen')) {
+    // #443, #638: entering or leaving Finished / Completed changes Ready /
+    // Waiting — and whether Run is open — of the cards that wait for it.
+    const entered = fresh.column !== request.to;
+    if (
+      entered &&
+      (isDependencySatisfied(fresh.column) || isDependencySatisfied(request.to))
+    ) {
       await this.publishDependants(project.id, fresh.id);
     }
-    if (effects.includes('accept') && this.cardAccepted) {
-      const hook = this.cardAccepted;
+    // #638: reaching Finished satisfies a dependency, and so does Accept; the
+    // auto-run's claim lets a dependant start once, whichever comes first.
+    if (
+      this.cardSatisfied &&
+      (effects.includes('accept') || (entered && request.to === 'finished'))
+    ) {
+      const hook = this.cardSatisfied;
       this.track(
         hook(project.id, fresh, actor).catch((error: unknown) => {
           this.logger.error(
@@ -537,9 +549,9 @@ export class BoardWork implements OnModuleInit {
     );
   }
 
-  /** #443: `BoardAutoRun` registers what follows a card's acceptance. */
-  onAccepted(hook: CardAcceptedHook): void {
-    this.cardAccepted = hook;
+  /** #443, #638: `BoardAutoRun` registers what follows Finished or Accept. */
+  onSatisfied(hook: CardSatisfiedHook): void {
+    this.cardSatisfied = hook;
   }
 
   /** #359: `BoardShipping` registers what follows a round's collect. */

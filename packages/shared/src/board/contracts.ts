@@ -95,7 +95,7 @@ export interface CardRoundBrief {
   wiringReason?: CardRunWiringReason | null;
   /**
    * #443: Auto-run when ready started the round, after this dependency's
-   * number was accepted; `null` for a round a person or AgentDock started.
+   * number reached Finished (#638) or was accepted; `null` for a round a person or AgentDock started.
    * Optional so older fixtures stay valid.
    */
   autoRunAfter?: number | null;
@@ -228,8 +228,8 @@ export interface BoardCardView {
    */
   autoRunFailure: CardAutoRunFailure | null;
   /**
-   * #443: Auto-run when ready — accepting the last open dependency starts
-   * the Run. Off by default; it turns itself off when it fires.
+   * #443, #638: Auto-run when ready — the last open dependency reaching
+   * Finished (or being accepted) starts the Run. Off by default; it turns itself off when it fires.
    */
   autoRunWhenReady: boolean;
   /**
@@ -294,18 +294,18 @@ export interface CardDependencyRef {
   number: number;
   /** `C-<number>`. */
   label: string;
-  /** Open while not `completed`. */
+  /** Open while not `finished` or `completed` (#638). */
   column: BoardColumn;
 }
 
 /**
- * #443: a To Do card with dependencies is `ready` once every one is accepted
- * (in Completed, whatever PRs it had), `waiting` while one is open.
+ * #443: a To Do card with dependencies is `ready` once every one is
+ * satisfied — in Finished or Completed (#638) — `waiting` while one is open.
  */
 export interface CardReadiness {
   state: 'ready' | 'waiting';
-  /** Dependencies in Completed. */
-  accepted: number;
+  /** Dependencies in Finished or Completed. */
+  satisfied: number;
   total: number;
   /** The open ones, in number order: "Waits for C-84". */
   open: CardDependencyRef[];
@@ -375,7 +375,7 @@ export interface CardRoundView {
   trigger: CardRoundTrigger;
   /**
    * #443: Auto-run when ready started the round, after this dependency's
-   * number was accepted; `null` otherwise. Optional so older fixtures stay valid.
+   * number reached Finished (#638) or was accepted; `null` otherwise. Optional so older fixtures stay valid.
    */
   autoRunAfter?: number | null;
   /**
@@ -662,11 +662,6 @@ export interface RunBoardCardRequest {
    */
   profileKey?: string;
   permissionMode?: OrchestratorPermissionMode;
-  /**
-   * #337 D8: run although a dependency is not in Completed. Without it, such
-   * a Run is 409 `dependency_open` naming the open ones.
-   */
-  ignoreDependencies?: boolean;
 }
 
 /** `POST /board/cards/:number/feedback` (D9). */
@@ -805,8 +800,8 @@ export const BOARD_ERROR = {
   /** 422 (#329 D7/D8): `deleteBranch: true` on a `terminal` card. */
   branchDeleteRefused: 'branch_delete_refused',
   /**
-   * 409 (#337 D8): Run on a card with a dependency not in Completed, without
-   * `ignoreDependencies`; `dependencies` names the open ones.
+   * 409 (#337 D8, #638): Run on a card with a dependency not in Finished or
+   * Completed — there is no override; `dependencies` names the open ones.
    */
   dependencyOpen: 'dependency_open',
   /** 409 (#337 D8): the dependency would close a cycle. */
@@ -839,7 +834,7 @@ export interface BoardErrorBody {
   profileKey?: string;
   /** `attachment_error`: why the attachment was refused (#309). */
   code?: AttachmentRefusal;
-  /** `dependency_open` (#337 D8): the open dependencies — "C-12 is not completed yet". */
+  /** `dependency_open` (#337 D8, #638): the open dependencies — "Waits for C-12". */
   dependencies?: CardDependencyRef[];
   /** `stack_refused` of a grouping (#588): the cards that cannot join, by number. */
   cards?: number[];
@@ -856,9 +851,9 @@ export interface CardAutoRunFailure {
   message: string;
   at: string;
   /**
-   * #443: the accepted dependency's number when Auto-run when ready tried
-   * the start; `null` when approving the design did. Optional so older
-   * fixtures stay valid.
+   * #443, #638: the dependency's number whose Finished or Accept made
+   * Auto-run when ready try the start; `null` when approving the design did.
+   * Optional so older fixtures stay valid.
    */
   after?: number | null;
 }

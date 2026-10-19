@@ -34,6 +34,7 @@ import {
 } from '../../lib/attachments/format';
 import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
+import { runWaitsFor } from '../../lib/board/dependencies';
 import {
   AUTO_COLLECT_HINT,
   AUTO_COLLECT_LABEL,
@@ -165,7 +166,7 @@ function roundItems(
             <span>
               Started after{' '}
               <span className="font-mono">C-{round.autoRunAfter}</span> was
-              accepted
+              ready
             </span>
           ) : null}
           {round.feedback ? (
@@ -390,6 +391,8 @@ export function CardDetailBody({
   const runBlocked = readiness.blockers('run').length > 0;
   // #480: the card's stack holds Run until its design is approved.
   const stackGate = card.stack?.gate ?? null;
+  // #638: so does a dependency without a ready pull request — no override.
+  const waitsFor = runWaitsFor(card.dependsOn);
   const [title, setTitle] = useState(card.title);
   const [body, setBody] = useState(card.body);
   const [kind, setKind] = useState(card.kind);
@@ -625,9 +628,9 @@ export function CardDetailBody({
       {failure && failure.after != null ? (
         // #443: the reason a manual Run in the same state gets.
         <Banner tone="warn" title="Auto-run could not start">
-          After <span className="font-mono">C-{failure.after}</span> was
-          accepted: {autoRunReason(failure)} — the same reason a manual Run
-          would give. Press Run once that is fixed.
+          After <span className="font-mono">C-{failure.after}</span> was ready:{' '}
+          {autoRunReason(failure)} — the same reason a manual Run would give.
+          Press Run once that is fixed.
         </Banner>
       ) : failure ? (
         <Banner tone="warn">
@@ -653,13 +656,20 @@ export function CardDetailBody({
               kind="work"
               label={canRetry(card) ? 'Run again' : 'Run'}
               variant={card.column === 'todo' ? 'solid' : 'glass'}
-              disabled={actions.busy || runBlocked || stackGate !== null}
+              disabled={
+                actions.busy ||
+                runBlocked ||
+                stackGate !== null ||
+                waitsFor !== null
+              }
               describedBy={
                 stackGate
                   ? 'board-stack-gate'
-                  : runBlocked
-                    ? 'board-run-reason'
-                    : undefined
+                  : waitsFor
+                    ? 'board-run-waits'
+                    : runBlocked
+                      ? 'board-run-reason'
+                      : undefined
               }
               onLaunch={async (request) => {
                 // The toast says why; a refusal keeps the popover open.
@@ -725,9 +735,10 @@ export function CardDetailBody({
           project code before it is.
         </p>
       ) : null}
-      {canOperate && canRun(card) && card.readiness?.state === 'waiting' ? (
-        <p className="-mt-3 text-xs text-ink-3">
-          Run still works while waiting; it only warns.
+      {canOperate && waitsFor && (canRun(card) || canRetry(card)) ? (
+        <p id="board-run-waits" className="-mt-3 text-xs text-ink-3">
+          {waitsFor}. Run opens once every card it depends on has a ready pull
+          request (Finished) or is accepted.
         </p>
       ) : null}
       {canOperate && offer?.reason ? (

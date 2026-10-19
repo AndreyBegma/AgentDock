@@ -35,8 +35,8 @@ const byNumber = (a: { number: number }, b: { number: number }) =>
 
 /**
  * Card dependencies (#337 D8): `cardId` runs after `dependsOnId`, both of one
- * project, the graph acyclic. Run warns about an open one (`dependency_open`)
- * unless told to go on; moving and Accept never look.
+ * project, the graph acyclic. Run refuses while one is open
+ * (`dependency_open`, #638); moving and Accept never look.
  */
 @Injectable()
 export class BoardDependencies {
@@ -149,11 +149,11 @@ export class BoardDependencies {
   }
 
   /**
-   * Run's check (D8): without `ignore`, a dependency not in Completed refuses
-   * the Run with `dependency_open`, naming the open ones.
+   * Run's check (D8, #638 ADR-0063): a dependency not in Finished or
+   * Completed refuses the Run with `dependency_open`, naming the open ones.
+   * There is no override.
    */
-  async assertRunnable(cardId: string, ignore: boolean): Promise<void> {
-    if (ignore) return;
+  async assertRunnable(cardId: string): Promise<void> {
     const open = openDependencies(
       (await this.refsOf([cardId])).get(cardId) ?? [],
     );
@@ -162,7 +162,7 @@ export class BoardDependencies {
     throw boardError(
       409,
       BOARD_ERROR.dependencyOpen,
-      `${names} ${open.length === 1 ? 'is' : 'are'} not completed yet`,
+      `Waits for ${names}: no ready pull request yet`,
       { dependencies: open },
     );
   }

@@ -3,7 +3,8 @@
 Status: accepted · Date: 2026-10-16 · Amends [ADR-0037](0037-new-work-is-one-intake-that-can-split.md) §4,
 [ADR-0025](0025-a-design-has-one-owner-a-plan-task-or-a-board-card.md) §1–§4 ·
 Issue: [#480](https://github.com/AndreyBegma/AgentDock/issues/480) ·
-Spec: [`docs/specs/480-add-card-stacks-staged-cards-sharing-one.md`](../specs/480-add-card-stacks-staged-cards-sharing-one.md)
+Spec: [`docs/specs/480-add-card-stacks-staged-cards-sharing-one.md`](../specs/480-add-card-stacks-staged-cards-sharing-one.md) ·
+Amended by [ADR-0063](0063-run-waits-for-every-dependency-to-have-a-ready-pull-request.md) (§2: Run's warning is now a gate)
 
 ## Context
 
