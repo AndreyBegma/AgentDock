@@ -21,6 +21,7 @@ import { TraceTree } from '@andrewbehma/glass-ui/trace-tree';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SummaryPanel } from '../../../../components/ai/summary-panel';
 import { PageHeader } from '../../../../components/page-header/page-header';
 import { ScrollX } from '../../../../components/scroll-x/scroll-x';
 import { AttachManualButton } from '../../../../components/sessions/attach-manual-button';
@@ -30,6 +31,8 @@ import {
 } from '../../../../components/sessions/origin-badge';
 import { SessionContentTimeline } from '../../../../components/sessions/session-content-timeline';
 import { useCurrentUser } from '../../../../components/shell/user-context';
+import { summarizeSession } from '../../../../lib/ai/actions';
+import { canSummarizeSession } from '../../../../lib/ai/format';
 import { ApiError, api } from '../../../../lib/api';
 import { formatNumber, pluralize } from '../../../../lib/format';
 import { Time } from '../../../../lib/format/time';
@@ -308,6 +311,12 @@ export default function SessionPage() {
     s.hasContent === true &&
     projectId !== null &&
     canReadContent(project?.role);
+  const canSummarize =
+    showContent &&
+    canSummarizeSession({
+      hasContent: s.hasContent,
+      shipSessionContent: project?.shipSessionContent,
+    });
   const origin = Date.parse(s.startedAt);
   const info = selected ? trace.info.get(selected) : undefined;
   const node = info ? describeNode(info) : null;
@@ -453,6 +462,20 @@ export default function SessionPage() {
           </Card>
         ) : null}
       </div>
+
+      {canSummarize && projectId ? (
+        <Card pad="md" className="mt-6">
+          <SummaryPanel
+            key={s.id}
+            title="Summary"
+            headingId="session-summary"
+            hint="What was asked, what the agent did and what remains, from the session's stored content."
+            summarize={(regenerate) =>
+              summarizeSession(projectId, s.id, regenerate)
+            }
+          />
+        </Card>
+      ) : null}
 
       {showContent && projectId ? (
         <SessionContentTimeline

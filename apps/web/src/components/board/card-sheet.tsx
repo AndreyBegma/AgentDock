@@ -27,6 +27,7 @@ import { ExternalLink, Move, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { PolicyRefusalText } from '@/components/runners/policy-refusal';
+import { summarizeCard } from '../../lib/ai/actions';
 import { ApiError } from '../../lib/api';
 import {
   describeUploadFailure,
@@ -81,6 +82,7 @@ import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { cardSessionMessenger } from '../../lib/session-message/actions';
 import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
+import { SummaryPanel } from '../ai/summary-panel';
 import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
 import { CardAttachmentsSection } from '../attachments/card-attachments-section';
@@ -848,6 +850,18 @@ export function CardDetailBody({
       />
     </section>
   );
+  // #658: the card and its PR in a few sentences, in the reader's language.
+  const summarySection = (
+    <SummaryPanel
+      key={card.id}
+      title="Summary"
+      headingId="card-summary"
+      hint="The card and its pull request in a few sentences: what changed, CI, the review state and what remains."
+      summarize={(regenerate) =>
+        summarizeCard(projectId, card.number, regenerate)
+      }
+    />
+  );
   // #447 D15: fleet cards are observed, not run by the board — no Issue link there.
   const stewardSection = fleet ? null : (
     <CardStewardSection
@@ -1081,6 +1095,7 @@ export function CardDetailBody({
             className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4"
           >
             {panel(runSection)}
+            {panel(summarySection)}
             {panel(designSection)}
             {panel(dependenciesSection)}
             {panel(autoRunSection)}
@@ -1119,6 +1134,7 @@ export function CardDetailBody({
           </NextLink>
         </div>
         {runSection}
+        {summarySection}
         {designSection}
         {dependenciesSection}
         {autoRunSection}
