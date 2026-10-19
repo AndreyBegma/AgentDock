@@ -80,8 +80,11 @@ export const ok = <T>(output: T): BoardSendResult<T> => ({
   status: 'ok',
   output,
 });
-export const failed = (code: 'internal' | 'not_found') =>
-  ({ status: 'error', error: { code } }) as const;
+export const failed = (code: 'internal' | 'not_found', message?: string) =>
+  ({
+    status: 'error',
+    error: { code, ...(message === undefined ? {} : { message }) },
+  }) as const;
 
 /**
  * The board's e2e world: two projects on one runner, a Claude profile, an

@@ -12,6 +12,7 @@ import {
   approveRunOffer,
   autoRunFailureText,
   blockingDialogText,
+  collectFailedBadge,
   confidenceLabel,
   finishRefusedText,
   fleetHref,
@@ -80,6 +81,8 @@ export function CardFace({
   const offer = approveRunOffer(card);
   const pill = roundPill(card.round);
   const badge = shippingBadge(card);
+  // #630: a collect that failed is on the face, not only in the sheet.
+  const notPushed = collectFailedBadge(card);
   const cost = formatCost(card.costUsd);
   // #337 D8: "after C-12", warning while it is not completed.
   const after = dependencyChip(card.dependsOn);
@@ -234,6 +237,13 @@ export function CardFace({
             <Tooltip content={autoRunFailureText(card.autoRunFailure)}>
               <span>
                 <Badge tone="warn" size="md" label="Didn’t start" />
+              </span>
+            </Tooltip>
+          ) : null}
+          {notPushed ? (
+            <Tooltip content={notPushed.text}>
+              <span>
+                <Badge tone="warn" size="md" label={notPushed.label} />
               </span>
             </Tooltip>
           ) : null}
