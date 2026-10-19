@@ -18,6 +18,7 @@ import { BoardRoundsService } from './board-rounds.service';
 import { BoardSessionMessages } from './board-session-message.service';
 import { BoardShipping } from './board-shipping';
 import { BoardSink } from './board-sink';
+import { BoardStackRuns } from './board-stack-runs';
 import { BoardStacks } from './board-stacks';
 import { BoardTerminalService } from './board-terminal.service';
 import { BoardWork } from './board-work';
@@ -59,6 +60,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     // #359: a card ships itself — CI watched, fixed, merged.
     BoardShipping,
     BoardSink,
+    // #652: Run stack — a stack's cards queued within the agent limit.
+    BoardStackRuns,
     // #480: stacks — staged cards under one shared design.
     BoardStacks,
     BoardTerminalService,
