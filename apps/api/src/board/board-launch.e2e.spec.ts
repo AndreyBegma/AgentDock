@@ -166,10 +166,7 @@ describe('board launch overrides (e2e, #322)', () => {
 
     it('shows the effort and the recommended one on the card', async () => {
       const { number } = await withEffort('low');
-      const detail = await w.operator.send(
-        'get',
-        `${w.path()}/board/cards/${number}`,
-      );
+      const detail = await w.operator.get(`${w.path()}/board/cards/${number}`);
       expect(detail.body).toMatchObject({
         effort: null,
         recommendation: {
