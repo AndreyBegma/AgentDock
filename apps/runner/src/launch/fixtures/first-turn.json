@@ -1,0 +1,35 @@
+{
+  "about": "#663 (ADR-0068): the first turn of a launch, recorded from Claude Code with the launch's prefix settings, an empty strict MCP list, the launch agents and a one-line prompt. The total of input, cache read and cache write is the fixed prefix (system prompt, tools, CLAUDE.md files, memory index, skill listing). Re-record it when PREFIX_SETTINGS, LAUNCH_AGENTS or the Claude Code version changes.",
+  "claudeCode": "2.1.303",
+  "recordedAt": "2026-10-19",
+  "settings": {
+    "includeGitInstructions": false,
+    "skillListingMaxDescChars": 200
+  },
+  "baseline": {
+    "about": "The card launch without the prefix settings (model sonnet). Without --exclude-dynamic-system-prompt-sections as well it was 28598.",
+    "usage": {
+      "input_tokens": 2,
+      "cache_read_input_tokens": 12071,
+      "cache_creation_input_tokens": 16287
+    }
+  },
+  "turns": {
+    "card": {
+      "about": "A card or CI-fix round: --exclude-dynamic-system-prompt-sections (model opus).",
+      "usage": {
+        "input_tokens": 2,
+        "cache_read_input_tokens": 22861,
+        "cache_creation_input_tokens": 0
+      }
+    },
+    "plan": {
+      "about": "A Planner turn, and a design turn of a card, a stack or a plan task: the same launch kind (model opus).",
+      "usage": {
+        "input_tokens": 2,
+        "cache_read_input_tokens": 10688,
+        "cache_creation_input_tokens": 12411
+      }
+    }
+  }
+}
