@@ -5,6 +5,7 @@ import {
   FILTER_NONE_UNCOVERED,
   findFilter,
 } from './engine';
+import { switchedOffFamilies } from './env';
 import {
   type PermissionRules,
   permissionFor,
@@ -13,6 +14,11 @@ import {
   settingsFiles,
 } from './permissions';
 import { programOfLine } from './program';
+import {
+  isRefusedRead,
+  READ_REFUSAL_ID,
+  READ_REFUSAL_MESSAGE,
+} from './read-refusal';
 import {
   type HookCommand,
   parseHookCommand,
@@ -98,8 +104,18 @@ export const isLongRunning = (
   }
 };
 
+/** #663 D8: the PreToolUse answer that refuses a Bash call. */
+export interface HookRefusal {
+  hookSpecificOutput: {
+    hookEventName: 'PreToolUse';
+    permissionDecision: 'deny';
+    permissionDecisionReason: string;
+  };
+}
+
 export type HookDecision =
   | { rewrite: HookOutput }
+  | { refuse: HookRefusal; program?: string }
   | { passThrough: string; filter: string; program?: string };
 
 /** What the hook does with one PreToolUse input. Never throws. */
@@ -120,6 +136,21 @@ export const decideHook = (
   // #610: only the first command of each pipeline is ever wrapped, so the
   // filter and the long-running check look at those, past any `cd <path> &&`.
   const parsed = parseHookCommand(command);
+  // #663 D8: a whole-file read through Bash goes through `Read`, in any mode.
+  // An unparsed line is never refused (fail open); family `tool` switches it off.
+  if (isRefusedRead(parsed) && !switchedOffFamilies(deps.env).has('tool')) {
+    const program = programOfLine(command, parsed);
+    return {
+      refuse: {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: READ_REFUSAL_MESSAGE,
+        },
+      },
+      ...(program === undefined ? {} : { program }),
+    };
+  }
   const covered = parsed ? coveredStages(parsed, deps.filters) : [];
   const first = covered[0]?.filter;
   const wrapped = new Set(
@@ -270,6 +301,22 @@ export const runFilterHook = (stdin: string, deps: HookDeps): string => {
     const decision = decideHook(JSON.parse(stdin), deps);
     if (!decision) return '';
     if ('rewrite' in decision) return JSON.stringify(decision.rewrite);
+    if ('refuse' in decision) {
+      writeStat(
+        target,
+        {
+          filter: READ_REFUSAL_ID,
+          program: decision.program,
+          rawBytes: 0,
+          keptBytes: 0,
+          bypassed: false,
+          passedThrough: false,
+        },
+        deps.now(),
+        deps.random,
+      );
+      return JSON.stringify(decision.refuse);
+    }
     writeStat(
       target,
       {

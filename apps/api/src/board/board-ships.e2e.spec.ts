@@ -490,6 +490,40 @@ describe('a card ships itself (e2e, #359)', () => {
       expect(started_.after).toMatchObject({ trigger: 'ci_fix', ciFix: 'red' });
     });
 
+    it('#663: a ci_fix round runs sonnet at low effort unless the card overrides it', async () => {
+      await w.advertiseCardEffort();
+      checksAnswer(RED);
+      await started();
+      await ended();
+      const runs = w.sent('card.run');
+      expect(runs).toHaveLength(2);
+      expect(runs[0].effort).toBeUndefined();
+      expect(runs[1]).toMatchObject({ model: 'sonnet', effort: 'low' });
+      const card = await w.card(1);
+      // The defaults are not overrides: nothing is remembered.
+      expect(card).toMatchObject({ model: null, effort: null });
+      const run = await w.ctx.prisma.run.findUniqueOrThrow({
+        where: { id: card.rounds[1].runId },
+      });
+      expect(run.model).toBe('sonnet');
+      expect(run.args).toMatchObject({ effort: 'low' });
+    });
+
+    it('#663: a ci_fix round keeps the card’s own model and effort', async () => {
+      await w.advertiseCardEffort();
+      checksAnswer(RED);
+      await started();
+      await w.ctx.prisma.boardCard.updateMany({
+        where: { projectId: w.a },
+        data: { model: 'opus', effort: 'high' },
+      });
+      await ended();
+      expect(w.sent('card.run')[1]).toMatchObject({
+        model: 'opus',
+        effort: 'high',
+      });
+    });
+
     it('names the project checks in the fix prompt', async () => {
       await w.ctx.prisma.project.update({
         where: { id: w.a },

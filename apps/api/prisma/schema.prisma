@@ -2939,6 +2939,14 @@ enum CardCiState {
   red
 }
 
+/// Shared `CARD_EFFORTS` (#663, ADR-0068 §5): the Claude CLI's `--effort` of a
+/// card's work rounds.
+enum CardEffort {
+  low
+  medium
+  high
+}
+
 /// A work item AgentDock owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
@@ -2978,6 +2986,12 @@ model BoardCard {
   /// #322 D6: the recommended design model (`opus | sonnet`) and its reason.
   recommendedDesignModel  String?
   recommendedDesignReason String?
+  /// #663: the recommended work effort, from the same `card.assess` answer as
+  /// `recommendedModel`.
+  recommendedEffort       CardEffort?
+  /// #663: the work effort override, stored only when it differs from the
+  /// default (the #322 D3 rule); `null` follows the default.
+  effort                  CardEffort?
   /// #322 D6: the hash of the assessed input; an answer applies only while
   /// the card still hashes to it (ADR-0027 D4).
   assessmentHash          String?

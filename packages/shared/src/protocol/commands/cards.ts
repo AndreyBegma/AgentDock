@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CARD_EFFORTS } from '../../assess/limits';
 import {
   ATTACHMENTS_PER_CARD_MAX,
   attachmentRefSchema,
@@ -200,6 +201,11 @@ export const cardRunArgsSchema = z
       .optional(),
     profileKey: profileKeySchema,
     model: orchestratorModelSchema,
+    /**
+     * #663: the CLI's `--effort`; absent is the CLI's own default. Sent only
+     * to a runner that advertises `cardEffort` (a strict older one refuses it).
+     */
+    effort: z.enum(CARD_EFFORTS).optional(),
     permissionMode: orchestratorPermissionModeSchema,
     /** #359 D1: push during the round and open this draft PR. */
     pullRequest: cardDraftPullRequestSchema.optional(),

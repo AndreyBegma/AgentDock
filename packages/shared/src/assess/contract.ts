@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   CARD_ASSESS_REASON_MAX,
   CARD_DESIGN_RECOMMENDABLE_MODELS,
+  CARD_EFFORTS,
   CARD_RECOMMENDABLE_MODELS,
 } from './limits';
 
@@ -10,7 +11,7 @@ import {
  * strict JSON:
  *
  * ```json
- * {"work": {"model": "sonnet", "reason": "Executes a clear, single-module change."},
+ * {"work": {"model": "sonnet", "effort": "low", "reason": "Executes a clear, single-module change."},
  *  "design": {"model": "opus", "reason": "The layout is still undecided."}}
  * ```
  *
@@ -29,6 +30,8 @@ const reasonSchema = z
 
 export const cardAssessWorkAnswerSchema = z.strictObject({
   model: z.enum(CARD_RECOMMENDABLE_MODELS),
+  /** #663 (ADR-0068 §5): the effort the work runs at, next to its model. */
+  effort: z.enum(CARD_EFFORTS),
   reason: reasonSchema,
 });
 

@@ -131,7 +131,7 @@ const helmWords = (argv: readonly string[]) =>
 
 /** Drops the NOTES block, which `helm install` prints at the end. */
 const withoutNotes = (lines: readonly string[]): string[] | null => {
-  const at = lines.findIndex((l) => l === 'NOTES:');
+  const at = lines.indexOf('NOTES:');
   if (at < 0) return null;
   const notes = lines.slice(at + 1);
   const important = notes.filter((l) => isProtectedLine(l));
