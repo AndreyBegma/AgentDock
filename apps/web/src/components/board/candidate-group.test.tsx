@@ -84,4 +84,15 @@ describe('CandidateGroup (#592)', () => {
     expect(html).toContain('Rejected · no card made');
     expect(html).toContain('title="Stage 2"');
   });
+
+  test('a long group is height-bounded with its list scrolling under a fixed header (#642)', () => {
+    const html = render(
+      Array.from({ length: 8 }, (_, i) => candidate(String(i))),
+    );
+    expect(html).toContain('max-h-[max(40vh,20rem)]');
+    expect(html).toMatch(
+      /<ul aria-label="Candidates" class="[^"]*min-h-0[^"]*overflow-y-auto/,
+    );
+    expect(html).toContain('Card 7');
+  });
 });
