@@ -581,6 +581,32 @@ describe('card stacks (e2e, #480)', () => {
       expect(refused.body.error).toBe(BOARD_ERROR.stackDesignNotApproved);
     });
 
+    it('#604: the stack design follows the project default until it is edited by hand', async () => {
+      const setDefault = (defaultSkills: string[]) =>
+        h.admin.send('put', `/projects/${h.projectId}/design-settings`, {
+          viewports: [{ name: 'Desktop', width: 1440, height: 900 }],
+          defaultSkills,
+        });
+      await setDefault(['kit:a']);
+      await confirmedStack();
+      const view = async () =>
+        (await h.author.get(`${stackPath()}/design`)).body as TaskDesignView;
+      expect(await view()).toMatchObject({
+        skills: ['kit:a'],
+        skillsEdited: false,
+      });
+      await setDefault(['kit:b']);
+      expect((await view()).skills).toEqual(['kit:b']);
+      await h.author.send('patch', `${stackPath()}/design`, {
+        skills: ['kit:c'],
+      });
+      await setDefault(['kit:d']);
+      expect(await view()).toMatchObject({
+        skills: ['kit:c'],
+        skillsEdited: true,
+      });
+    });
+
     it('#502: a viewer cannot switch the stack design', async () => {
       await confirmedStack();
       const denied = await h.viewer.send('patch', `${stackPath()}/design`, {

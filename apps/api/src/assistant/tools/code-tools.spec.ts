@@ -288,7 +288,7 @@ describe('assistant code tools (#622)', () => {
     });
     expect(openai).not.toContain('search_code');
     expect(openai).toContain(
-      'Delegate every code question with ask_code_agent',
+      'Code questions: ask_code_agent with a self-contained question.',
     );
   });
 });

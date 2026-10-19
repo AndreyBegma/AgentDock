@@ -310,6 +310,53 @@ describe('plan turn launch (#445)', () => {
   });
 });
 
+/**
+ * #628: a design turn — a card's, a stack's or a plan task's — is a
+ * `plan.turn`; a revise starts a session of its own. Both go through the
+ * one wiring helper: strict MCP list, the scout, compaction.
+ */
+describe('design turn launch (#628)', () => {
+  const S2 = '22222222-2222-4222-8222-222222222222';
+  const turns = [
+    ['a generate resuming the design session', { id: S1, resume: true }],
+    ['a revise in a session of its own', { id: S2, resume: false }],
+  ] as const;
+
+  it.each(turns)('wires %s when the project setting is on', (_, session) => {
+    const args = { session, model: 'opus', projectId: 'prj_a', runId: 'r1' };
+    const ts = planTurnTokenSaver(
+      profile,
+      { ...args, tokenSaver: ON },
+      home,
+      dir,
+      SELF,
+    );
+    if (!ts) throw new Error('expected a launch');
+    const spec = planTurnLaunchSpec(profile, args, '/w', '/r/p.md', null, ts);
+    expectWired(spec.args, ts);
+    expect(spec.args).toContain('--strict-mcp-config');
+    expect(spec.args[spec.args.indexOf('--agents') + 1]).toContain('"scout"');
+    expect(spec.args).toContain(session.resume ? '--resume' : '--session-id');
+    expect(spec.args[spec.args.indexOf('-p') + 2]).toBe(session.id);
+    expectEcoEnv(spec.env);
+  });
+
+  it.each(turns)('launches %s as before when it is off', (_, session) => {
+    const args = { session, model: 'opus', projectId: 'prj_a', runId: 'r1' };
+    const ts = planTurnTokenSaver(
+      profile,
+      { ...args, tokenSaver: OFF },
+      home,
+      dir,
+      SELF,
+    );
+    expect(ts).toBeNull();
+    const spec = planTurnLaunchSpec(profile, args, '/w', '/r/p.md', null, ts);
+    expect(spec.args).not.toContain('--strict-mcp-config');
+    expectEcoEnv(spec.env, false);
+  });
+});
+
 describe('design build launch (#445)', () => {
   const build = { model: 'opus' as const, projectId: 'prj_a', runId: 'run_1' };
 

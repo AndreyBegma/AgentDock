@@ -7,7 +7,7 @@ import {
   type UiProfileSnippet,
   uiProfileSnippetSchema,
 } from '@agentdock/shared';
-import type { Prisma, UiProfile } from '@prisma/client';
+import type { Prisma, TaskDesignStatus, UiProfile } from '@prisma/client';
 import { z } from 'zod';
 import type { PrismaService } from '../database/prisma.service';
 import {
@@ -98,6 +98,31 @@ export const defaultSkillsOf = async (
   });
   return settings?.defaultSkills ?? [];
 };
+
+/** #604: the fields of a design that decide where its skills come from. */
+export interface DesignSkillsSource {
+  skills: string[];
+  skillsEdited: boolean;
+  status: TaskDesignStatus;
+}
+
+/**
+ * #604: a design follows the project's default skills until they are edited
+ * by hand on its panel, and until it is first generated — Generate copies the
+ * default in, and that batch and every later turn keep the copy.
+ */
+export const followsDefaultSkills = (
+  design: Omit<DesignSkillsSource, 'skills'>,
+  drawn: boolean,
+): boolean => !design.skillsEdited && !drawn && design.status === 'idle';
+
+/** #604: the skills the next turn of `design` applies, before the installed check. */
+export const designSkillsOf = (
+  design: DesignSkillsSource,
+  drawn: boolean,
+  defaults: readonly string[],
+): string[] =>
+  followsDefaultSkills(design, drawn) ? [...defaults] : design.skills;
 
 /**
  * D15: the skills of `invocations` installed where the project's runs see
@@ -268,6 +293,29 @@ export const revisionFrames = async (
   return [{ ...LEGACY_FRAME, html: revision.html ?? '' }];
 };
 
+/**
+ * #628: a revise's previous revision of `variant` — the frames its `kept`
+ * may name, with their HTML. Empty on a generate, or with no revision.
+ */
+export const previousFramesOf = async (
+  db: Db,
+  owner: DesignKey,
+  plan: { mode: 'generate' | 'revise'; variant: number },
+): Promise<FrameFile[]> => {
+  if (plan.mode !== 'revise') return [];
+  const design = await db.taskDesign.findUnique({
+    where: designWhere(owner),
+    select: { id: true },
+  });
+  if (!design) return [];
+  const last = await db.designRevision.findFirst({
+    where: { designId: design.id, variant: plan.variant },
+    orderBy: { revision: 'desc' },
+    select: { id: true },
+  });
+  return last ? revisionFrames(db, last.id) : [];
+};
+
 /** The frame's name at `position` of a revision, for a comment's anchor. */
 const frameNameAt = (frames: readonly FrameName[], position: number): string =>
   frameNamesOf(frames)[position]?.name ?? DESIGN_LEGACY_FRAME_NAME;
@@ -298,10 +346,10 @@ export const loadDesignPrompt = async (
           where: { designId: design.id, variant: plan.variant },
           orderBy: { revision: 'desc' },
           select: {
+            id: true,
             revision: true,
             title: true,
             rationale: true,
-            frames: frameNameSelect,
           },
         })
       : Promise.resolve(null),
@@ -323,7 +371,10 @@ export const loadDesignPrompt = async (
           revision: previous.revision,
           title: previous.title,
           rationale: previous.rationale,
-          frames: frameNamesOf(previous.frames).map((f) => f.name),
+          // #628: the prompt picks which of them it sends in full.
+          frames: (await revisionFrames(db, previous.id)).map(
+            ({ name, html }) => ({ name, html }),
+          ),
         }
       : null,
     profile: profile

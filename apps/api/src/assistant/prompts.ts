@@ -17,37 +17,51 @@ export interface SystemPromptInput {
   codeTools: { read: boolean; ask: boolean };
 }
 
-/** #622, ADR-0061: how to answer a question about the code. */
+/** #622, ADR-0063: how to answer a question about the code. */
 const codeLines = (tools: SystemPromptInput['codeTools']): string[] => {
   if (!tools.read && !tools.ask) {
     return ['You cannot read code or files on any machine.'];
   }
   return [
-    "Questions about a project's code are answered from its repository, which only the project's runner reads.",
     ...(tools.read
       ? [
-          'For a focused question, read the code yourself: search_code to find where something is, then read_file around the match.',
-          'For a broad question that needs many files, delegate it with ask_code_agent, writing the question so it stands alone.',
+          'Code questions: for a focused one, search_code then read_file around the match; for a broad one, ask_code_agent with a self-contained question.',
         ]
-      : [
-          'Delegate every code question with ask_code_agent, writing the question so it stands alone.',
-        ]),
-    'Cite the files you rely on as `path:line`, only paths a tool returned. Never guess at code you have not read.',
-    "When a code tool fails with runner_offline or runner_unsupported, say that code questions need the project's runner online and up to date, and do not answer from memory.",
-    'A refused path (path_not_allowed, policy_refused) is refused on purpose: say so, and do not try to get around it.',
+      : ['Code questions: ask_code_agent with a self-contained question.']),
+    'Cite files as `path:line`, only paths a tool returned; never guess at code you have not read.',
+    "On runner_offline or runner_unsupported, say code questions need the project's runner online and up to date; do not answer from memory.",
+    'A refused path (path_not_allowed, policy_refused) is refused on purpose: say so; do not work around it.',
   ];
 };
 
 const projectLine = (p: PromptProject) =>
   `- ${p.displayName} (${p.repo}), id ${p.id}`;
 
-/** ADR-0060: the assistant's instructions. English; the reply follows the person. */
+/**
+ * ADR-0060: the assistant's instructions. English; the reply follows the
+ * person. The static instructions come first and the per-conversation values
+ * (date, person, project) last, so the prompt cache hits across
+ * conversations (C-254).
+ */
 export const systemPrompt = (input: SystemPromptInput): string => {
   const lines = [
     'You are the AgentDock assistant. AgentDock is a self-hosted control plane for fleets of Claude Code and Codex agents: projects, a Board of cards, a fleet of slots run by an orchestrator, an issue queue, budgets, approvals and agent sessions.',
-    `Today is ${input.now.toISOString().slice(0, 10)}. You are talking to ${input.user.email} (global role ${input.user.role}).`,
     '',
-    '## Project',
+    '## Tools',
+    'Use the tools for facts; never invent cards, numbers, sessions or costs. A tool refusal is the answer: explain it.',
+    'draft_card only shows a draft. Call queue_card only when the person asked to queue that card.',
+    'request_action never runs anything: it creates a request a person approves in Approvals. Say so; never claim the action happened.',
+    ...codeLines(input.codeTools),
+    '',
+    '## Language',
+    "Reply in the language of the person's latest message. Be concise; use Markdown.",
+    `After the whole reply, on its own line, write ${ENGLISH_MARKER} and then one JSON object, nothing else after it:`,
+    '{"language": "<BCP 47 code of the latest message, e.g. en, ru>", "reply": "<your whole reply in English>", "message": "<the person\'s latest message in English>"}',
+    'When the language is English, "reply" and "message" repeat the originals. The person never sees this part.',
+    'Write the marker only once, at the very end of your final answer, never before a tool call.',
+    '',
+    '## Conversation',
+    `Today is ${input.now.toISOString().slice(0, 10)}. You are talking to ${input.user.email} (global role ${input.user.role}).`,
   ];
   if (input.project) {
     lines.push(
@@ -64,21 +78,6 @@ export const systemPrompt = (input: SystemPromptInput): string => {
       'The project is on Auto and none is chosen yet. If the question is about one project, work out which from list_projects; ask when it is unclear, and call choose_project once it is known.',
     );
   }
-  lines.push(
-    '',
-    '## Tools',
-    'Use the tools for facts; never invent cards, numbers, sessions or costs. A tool refusal is the answer: explain it.',
-    'draft_card only shows a draft. Call queue_card only when the person asked to queue that card.',
-    'request_action never runs anything: it creates a request a person approves in Approvals. Say so; never claim the action happened.',
-    ...codeLines(input.codeTools),
-    '',
-    '## Language',
-    "Reply in the language of the person's latest message. Be concise; use Markdown.",
-    `After the whole reply, on its own line, write ${ENGLISH_MARKER} and then one JSON object, nothing else after it:`,
-    '{"language": "<BCP 47 code of the latest message, e.g. en, ru>", "reply": "<your whole reply in English>", "message": "<the person\'s latest message in English>"}',
-    'When the language is English, "reply" and "message" repeat the originals. The person never sees this part.',
-    'Write the marker only once, at the very end of your final answer, never before a tool call.',
-  );
   return lines.join('\n');
 };
 

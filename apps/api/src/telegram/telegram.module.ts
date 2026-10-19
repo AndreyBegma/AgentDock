@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApprovalsModule } from '../approvals';
+import { AssistantModule } from '../assistant';
 import { AuthModule } from '../auth';
 import { BoardModule } from '../board';
 import { ControlModule } from '../control';
@@ -20,6 +21,7 @@ import {
 } from './telegram.controller';
 import { TelegramActionRequestService } from './telegram-action-request.service';
 import { TelegramApprovalService } from './telegram-approval.service';
+import { TelegramAssistantService } from './telegram-assistant.service';
 import { TelegramBoardService } from './telegram-board.service';
 import { TelegramCardService } from './telegram-card.service';
 import { TelegramClient } from './telegram-client';
@@ -48,7 +50,8 @@ import { TelegramWebAppService } from './telegram-web-app.service';
  * #580: the Mini App signs in with its `initData` (`TelegramWebAppService`)
  * and gets the web session `AuthModule` issues. #594: `/new` takes photos,
  * stored through the global `AttachmentsService`, and voice messages,
- * transcribed by `SpeechToText`.
+ * transcribed by `SpeechToText`. #620: any other text goes to the AI
+ * assistant as the linked user (`TelegramAssistantService`, ADR-0061).
  */
 @Module({
   imports: [
@@ -65,6 +68,8 @@ import { TelegramWebAppService } from './telegram-web-app.service';
     ControlModule,
     // #580: the Mini App's sign-in issues the ordinary web session.
     AuthModule,
+    // #620: free text runs an assistant turn as the chat's linked user.
+    AssistantModule,
   ],
   controllers: [
     TelegramLinkController,
@@ -88,6 +93,7 @@ import { TelegramWebAppService } from './telegram-web-app.service';
     TelegramBoardService,
     TelegramIntakeService,
     TelegramCardService,
+    TelegramAssistantService,
     TelegramWebAppService,
     TelegramRoutes,
     TelegramDeliveryService,

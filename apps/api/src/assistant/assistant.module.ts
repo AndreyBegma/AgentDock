@@ -28,7 +28,7 @@ import { AssistantToolRegistry } from './tools/registry';
 /**
  * The assistant (ADR-0060): personal conversations streamed through the LLM
  * gateway (ADR-0059), with Board tools that act as the person and code tools
- * that ask the project's runner (ADR-0061). A module that
+ * that ask the project's runner (ADR-0063). A module that
  * adds tools imports this one and registers them with `AssistantToolRegistry`.
  */
 @Module({
@@ -63,6 +63,12 @@ import { AssistantToolRegistry } from './tools/registry';
     AssistantConversations,
     AssistantChat,
   ],
-  exports: [AssistantToolRegistry],
+  // #620: the Telegram bot runs a chat's turns as its linked user.
+  exports: [
+    AssistantToolRegistry,
+    AssistantConversations,
+    AssistantAttachments,
+    AssistantChat,
+  ],
 })
 export class AssistantModule {}

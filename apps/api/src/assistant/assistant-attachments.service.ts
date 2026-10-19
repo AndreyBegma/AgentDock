@@ -8,6 +8,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { AttachmentStore } from '../attachments/attachment-store';
 import {
+  type AttachmentActor,
   AttachmentsService,
   type UploadedAttachment,
 } from '../attachments/attachments.service';
@@ -113,37 +114,28 @@ export class AssistantAttachments {
   }
 
   /** ADR-0031: stored on the conversation's project, as a Board upload is. */
-  async addFile(
+  addFile(
     user: AuthUser,
     conversation: { id: string; projectId: string | null },
     file: UploadedAttachment | undefined,
     ctx: AuditContext,
   ): Promise<AssistantAttachmentView> {
-    if (!conversation.projectId) {
-      throw assistantError(
-        409,
-        'project_required',
-        "A file is stored against a project's attachment quota: pick the conversation's project first",
-      );
-    }
-    await this.assertRoom(conversation.id);
-    const role = await this.role(user, conversation.projectId, 'operator');
-    const stored = await this.files.upload(conversation.projectId, file, {
-      userId: user.id,
-      role,
-      ctx,
-    });
-    // Claimed by the assistant: the pending-upload sweep leaves it alone.
-    await this.prisma.attachment.update({
-      where: { id: stored.id },
-      data: { expiresAt: null },
-    });
-    return this.create({
-      conversationId: conversation.id,
-      kind: 'file',
-      attachmentId: stored.id,
-      label: stored.name,
-    });
+    return this.claim(user, conversation, ctx, (projectId, actor) =>
+      this.files.upload(projectId, file, actor),
+    );
+  }
+
+  /** #620: a file that arrived as bytes — a Telegram photo — stored the same way. */
+  addBytes(
+    user: AuthUser,
+    conversation: { id: string; projectId: string | null },
+    name: string,
+    bytes: Uint8Array,
+    ctx: AuditContext,
+  ): Promise<AssistantAttachmentView> {
+    return this.claim(user, conversation, ctx, (projectId, actor) =>
+      this.files.uploadBytes(projectId, name, bytes, actor),
+    );
   }
 
   async remove(conversationId: string, id: string): Promise<void> {
@@ -346,6 +338,42 @@ export class AssistantAttachments {
       include: ATTACHMENT_INCLUDE,
     });
     return toAttachmentView(row);
+  }
+
+  private async claim(
+    user: AuthUser,
+    conversation: { id: string; projectId: string | null },
+    ctx: AuditContext,
+    upload: (
+      projectId: string,
+      actor: AttachmentActor,
+    ) => Promise<{ id: string; name: string }>,
+  ): Promise<AssistantAttachmentView> {
+    if (!conversation.projectId) {
+      throw assistantError(
+        409,
+        'project_required',
+        "A file is stored against a project's attachment quota: pick the conversation's project first",
+      );
+    }
+    await this.assertRoom(conversation.id);
+    const role = await this.role(user, conversation.projectId, 'operator');
+    const stored = await upload(conversation.projectId, {
+      userId: user.id,
+      role,
+      ctx,
+    });
+    // Claimed by the assistant: the pending-upload sweep leaves it alone.
+    await this.prisma.attachment.update({
+      where: { id: stored.id },
+      data: { expiresAt: null },
+    });
+    return this.create({
+      conversationId: conversation.id,
+      kind: 'file',
+      attachmentId: stored.id,
+      label: stored.name,
+    });
   }
 
   private async dropFile(projectId: string, id: string): Promise<void> {

@@ -61,7 +61,7 @@ const readBody = (req: IncomingMessage): Promise<Record<string, unknown>> =>
  * A stand-in for the Bot API on 127.0.0.1 (spec 22: "Telegram is tested only
  * against the mock base URL"). It records every call, answers `getMe`,
  * `getUpdates`, `sendMessage` (each with a new `message_id`),
- * `editMessageText`, `answerCallbackQuery`, `setMyCommands`,
+ * `editMessageText`, `answerCallbackQuery`, `sendChatAction`, `setMyCommands`,
  * `setChatMenuButton` and `getFile` like Telegram does, serves the files it
  * was given at `/file/bot<token>/<path>` (#594), refuses unknown tokens with 401,
  * and plays scripted replies per method first.
@@ -240,6 +240,7 @@ export class FakeTelegram {
         };
       }
       case 'answerCallbackQuery':
+      case 'sendChatAction':
       case 'setMyCommands':
       case 'setChatMenuButton':
         return { status: 200, body: { ok: true, result: true } };

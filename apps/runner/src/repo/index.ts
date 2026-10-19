@@ -10,7 +10,7 @@ import type { RepoDeps } from './types';
 
 export { CodeAsker } from './ask';
 
-/** `repo.search`, `repo.read` and `code.ask` (#622, ADR-0061). */
+/** `repo.search`, `repo.read` and `code.ask` (#622, ADR-0063). */
 export type RepoHandlers = {
   [N in RepoCommandName]: (args: CommandArgs<N>) => Promise<CommandResult<N>>;
 };

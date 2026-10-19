@@ -1,6 +1,6 @@
 # ADR-0047: A runner-local security policy the server cannot change
 
-Status: accepted · Date: 2026-10-16 · Amended by [ADR-0061](0061-the-assistant-reads-code-only-through-the-project-runner.md) (a `code.deny` rule for the assistant's code commands) ·
+Status: accepted · Date: 2026-10-16 · Amended by [ADR-0063](0063-the-assistant-reads-code-only-through-the-project-runner.md) (a `code.deny` rule for the assistant's code commands) ·
 Card: C-107 (security audit 2026-10-16, WI-05, finding F-06, decision D-01) ·
 Spec: [`docs/specs/card-107-security-high-add-a-runner-local-securit.md`](../specs/card-107-security-high-add-a-runner-local-securit.md) ·
 Amends [ADR-0010](0010-typed-command-allowlist-on-the-runner.md) · Scopes [ADR-0045](0045-a-person-may-message-a-running-session-the-orchestrator-is-told.md) §1

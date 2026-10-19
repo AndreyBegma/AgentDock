@@ -1,4 +1,4 @@
-# ADR-0061: The assistant reads code only through the project's runner
+# ADR-0063: The assistant reads code only through the project's runner
 
 Status: accepted · Date: 2026-10-17 ·
 Card: C-241 (stack S-3, stage 3) ·

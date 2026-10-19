@@ -78,7 +78,7 @@ interface CodeProject extends ToolProject {
 }
 
 /**
- * #622, ADR-0061: the assistant reads code through the project's runner,
+ * #622, ADR-0063: the assistant reads code through the project's runner,
  * never itself (ADR-0001).
  * - `search_code` and `read_file` send `repo.search` and `repo.read`. They
  *   put code in the model's context, so they are offered with Anthropic

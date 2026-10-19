@@ -471,11 +471,13 @@ export class PlanTurnExecutor {
       }
       // #337 D10: the files the person attached, in the worktree before the
       // session starts; one that cannot be had fails the turn.
+      // #628: scaled to the size the model reads; a turn never commits one.
       await syncAttachments(
         deps,
         plan.worktree,
         turn.attachments ?? [],
         this.options.attachmentSource,
+        { forModel: true },
       );
       const profile = profileOf(deps, turn.profileKey);
       writeJsonAtomic(

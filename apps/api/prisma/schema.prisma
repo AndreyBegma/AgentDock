@@ -1446,12 +1446,17 @@ model TelegramLink {
   /// #500: the project the chat's Board commands act on (`/project`). Null
   /// until chosen; a deleted project clears it.
   currentProjectId String?
+  /// #620: the assistant conversation the chat's free text continues. Null
+  /// until the chat's first message, after `/newchat`, and once it is deleted.
+  assistantConversationId String?
 
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currentProject Project?        @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
-  intake         TelegramIntake?
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentProject        Project?               @relation(fields: [currentProjectId], references: [id], onDelete: SetNull)
+  assistantConversation AssistantConversation? @relation(fields: [assistantConversationId], references: [id], onDelete: SetNull)
+  intake                TelegramIntake?
 
   @@index([currentProjectId])
+  @@index([assistantConversationId])
   @@map("telegram_links")
 }
 
@@ -2717,7 +2722,13 @@ model TaskDesign {
   suggestionWhy      String?
   /// 1–3 (D4), checked by the DTO and the contract.
   variantCount       Int              @default(1)
+  /// What the latest turns applied, or the project default when it was
+  /// copied. While `skillsEdited` is false and nothing is drawn, the design
+  /// follows `design_settings.defaultSkills` instead (#604).
   skills             String[]         @default([])
+  /// #604: the skills were chosen by hand on this design's panel; a change of
+  /// the project default no longer reaches it.
+  skillsEdited       Boolean          @default(false)
   /// The profile version the latest revisions were drawn from.
   profileId          String?
   status             TaskDesignStatus @default(idle)
@@ -3908,8 +3919,9 @@ model AssistantConversation {
 
   user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   project     Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  messages    AssistantMessage[]
-  attachments AssistantAttachment[]
+  messages      AssistantMessage[]
+  attachments   AssistantAttachment[]
+  telegramLinks TelegramLink[]
 
   @@index([userId, updatedAt])
   @@map("assistant_conversations")

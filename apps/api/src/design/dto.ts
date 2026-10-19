@@ -104,6 +104,10 @@ export class TaskDesignPatchDto implements TaskDesignPatchRequest {
     message: 'each skill must be an installed skill invocation',
   })
   skills?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  useDefaultSkills?: boolean;
 }
 
 /** `POST …/design/comments`. */

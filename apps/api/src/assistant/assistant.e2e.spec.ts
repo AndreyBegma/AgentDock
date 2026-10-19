@@ -8,7 +8,7 @@ import type { Prisma } from '@prisma/client';
 import type request from 'supertest';
 import { ControlService } from '../control/control.service';
 import { LLM_SECRETS_KEY_ENV } from '../llm/llm-secrets';
-import { requestOf, sseResponse } from '../llm/providers/testing';
+import { requestOf } from '../llm/providers/testing';
 import { createLlmE2eApp, type LlmE2eContext } from '../llm/testing/llm-e2e';
 import { RunnerCommandService } from '../runners/runner-command.service';
 import { RunnerPresence } from '../runners/runner-presence';
@@ -18,118 +18,12 @@ import {
   resetDatabase,
   type Session,
 } from '../test/e2e-app';
-import { ENGLISH_MARKER } from './bilingual';
+import { answer, english, OPUS, trailer } from './testing/scripted-answers';
 
 const MASTER_KEY = randomBytes(32).toString('base64');
 /** Not a real key: every provider call goes to the mocked fetch. */
 const ANTHROPIC_KEY = 'sk-ant-api03-e2e-assistant-value-Qq7-9c1e';
-const OPUS = 'claude-opus-5-5';
 const HAIKU = 'claude-haiku-5-5';
-
-type Block =
-  | { text: string[] }
-  | { tool: { id: string; name: string; input: object } };
-
-/** One Anthropic answer: text blocks streamed piece by piece, tool calls whole. */
-const answer = (blocks: Block[], usage = { input: 1_000, output: 200 }) => {
-  const frames: { event: string; data: unknown }[] = [
-    {
-      event: 'message_start',
-      data: {
-        type: 'message_start',
-        message: {
-          id: 'msg_1',
-          type: 'message',
-          role: 'assistant',
-          model: OPUS,
-          content: [],
-          stop_reason: null,
-          stop_sequence: null,
-          usage: { input_tokens: usage.input, output_tokens: 1 },
-        },
-      },
-    },
-  ];
-  blocks.forEach((block, index) => {
-    if ('text' in block) {
-      frames.push({
-        event: 'content_block_start',
-        data: {
-          type: 'content_block_start',
-          index,
-          content_block: { type: 'text', text: '' },
-        },
-      });
-      for (const text of block.text) {
-        frames.push({
-          event: 'content_block_delta',
-          data: {
-            type: 'content_block_delta',
-            index,
-            delta: { type: 'text_delta', text },
-          },
-        });
-      }
-    } else {
-      frames.push(
-        {
-          event: 'content_block_start',
-          data: {
-            type: 'content_block_start',
-            index,
-            content_block: {
-              type: 'tool_use',
-              id: block.tool.id,
-              name: block.tool.name,
-              input: {},
-            },
-          },
-        },
-        {
-          event: 'content_block_delta',
-          data: {
-            type: 'content_block_delta',
-            index,
-            delta: {
-              type: 'input_json_delta',
-              partial_json: JSON.stringify(block.tool.input),
-            },
-          },
-        },
-      );
-    }
-    frames.push({
-      event: 'content_block_stop',
-      data: { type: 'content_block_stop', index },
-    });
-  });
-  const tools = blocks.some((b) => 'tool' in b);
-  frames.push(
-    {
-      event: 'message_delta',
-      data: {
-        type: 'message_delta',
-        delta: {
-          stop_reason: tools ? 'tool_use' : 'end_turn',
-          stop_sequence: null,
-        },
-        usage: { output_tokens: usage.output },
-      },
-    },
-    { event: 'message_stop', data: { type: 'message_stop' } },
-  );
-  return sseResponse(frames);
-};
-
-const trailer = (language: string, reply: string, message: string) =>
-  `\n${ENGLISH_MARKER}\n${JSON.stringify({ language, reply, message })}`;
-
-/** A reply in English, in three streamed pieces. */
-const english = (reply: string, message: string) => [
-  reply.slice(0, 5),
-  reply.slice(5),
-  trailer('en', reply, message),
-];
 
 interface ProviderCall {
   model: string;
