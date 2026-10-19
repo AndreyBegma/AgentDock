@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<title>Header controls</title>
+<style>
+:root{--font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--size-control:28px}
+:root,:root[data-theme='dark']{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-ink-4:rgb(242 242 246 / 0.38);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-danger:#ff6b60;--hue-2:#2fbf94;--hue-6:#f0606e;--hue-7-soft:rgb(166 139 250 / 0.18);--hue-7-ink:#cbbcff}
+:root[data-theme='light']{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-ink-4:rgb(24 24 27 / 0.48);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-danger:#dc2626;--hue-2:#00805e;--hue-6:#d02a3e;--hue-7-soft:rgb(114 68 224 / 0.12);--hue-7-ink:#5b30c4}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;padding:32px;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+h2{margin:0 0 4px;font-size:15px;line-height:22px;font-weight:600}
+p{margin:0}
+.ink-3{color:var(--color-ink-3)}
+.icon{width:14px;height:14px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon.s16{width:16px;height:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:1100px}
+.panel{padding:20px;border-radius:var(--radius-surface);background:var(--color-content);border:1px solid var(--color-line)}
+.panel .head{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.tag{font:600 10px/1 var(--font-sans);text-transform:uppercase;letter-spacing:.1em;padding:4px 6px;border-radius:4px;background:var(--color-hover);color:var(--color-ink-3)}
+.tag.after{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.stage{position:relative;display:flex;align-items:center;gap:8px;padding:24px 16px;border-radius:var(--radius-control);background:var(--color-surface);border:1px dashed var(--color-line)}
+.guide{position:absolute;left:0;right:0;height:28px;top:50%;transform:translateY(-50%);border-top:1px dashed var(--hue-2);border-bottom:1px dashed var(--hue-2);pointer-events:none;opacity:.6}
+.guide.bad{border-color:var(--hue-6)}
+.guide span{position:absolute;right:6px;top:-18px;font:500 10px/1 var(--font-mono);color:var(--hue-2)}
+.guide.bad span{color:var(--hue-6)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:var(--size-control);padding:0 12px;border-radius:var(--radius-control);font:600 13px/1 var(--font-sans);white-space:nowrap;border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);cursor:pointer}
+.btn--solid{background:var(--color-accent);border-color:transparent;color:var(--color-on-accent)}
+.btn--ghost{background:transparent;border-color:transparent;color:var(--color-ink-2)}
+.btn--icon{padding:0;width:28px;justify-content:center;position:relative}
+.segmented{display:inline-flex;align-items:center;gap:2px;height:28px;padding:2px;border:1px solid var(--color-line);border-radius:var(--radius-control);background:var(--color-surface)}
+.segmented button{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 10px;border:0;background:transparent;color:var(--color-ink-2);font:500 13px/1 var(--font-sans);border-radius:4px}
+.segmented button[aria-pressed='true']{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+/* the old tall pill */
+.old-seg{display:inline-flex;align-items:center;gap:4px;height:44px;padding:5px;border:1.5px solid var(--color-line-strong);border-radius:999px}
+.old-seg button{height:32px;padding:0 18px;border:0;border-radius:999px;background:transparent;color:var(--color-ink-2);font:500 14px/1 var(--font-sans)}
+.old-seg button[aria-pressed='true']{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.old-btn{height:36px;padding:0 16px;font-size:14px}
+.tb-search{display:inline-flex;align-items:center;gap:8px;width:200px;height:28px;padding:0 6px 0 8px;border-radius:var(--radius-control);border:1px solid var(--color-line);background:var(--color-hover);color:var(--color-ink-3);font:13px/1 var(--font-sans)}
+.tb-search .grow{flex:1}
+.kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font:500 11px/1 var(--font-mono);color:var(--color-ink-3)}
+.count{position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:999px;background:var(--color-danger);box-shadow:0 0 0 2px var(--color-surface)}
+.avatar{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:999px;background:var(--hue-7-soft);color:var(--hue-7-ink);font-size:11px;font-weight:600}
+.div{width:1px;height:16px;background:var(--color-line);margin:0 4px}
+.spec{margin-top:16px;display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:12px}
+.spec dt{color:var(--color-ink-3)}
+.spec dd{margin:0;font-family:var(--font-mono);color:var(--color-ink-2)}
+.wide{grid-column:1/-1}
+</style>
+</head>
+<body>
+<div class="grid">
+  <section class="panel">
+    <div class="head"><span class="tag">Before</span><h2>Work action row</h2></div>
+    <div class="stage">
+      <div class="guide bad"><span>36–44px · mixed</span></div>
+      <div class="old-seg"><button aria-pressed="true">List</button><button aria-pressed="false">Board</button></div>
+      <button class="btn btn--solid old-btn">+ New work</button>
+    </div>
+    <p class="ink-3" style="margin-top:12px;font-size:13px">The tall outlined pill sits next to a shorter button. The Board view builds its own switch with different padding, so the header jumps when you switch views.</p>
+  </section>
+
+  <section class="panel">
+    <div class="head"><span class="tag after">After</span><h2>Work action row</h2></div>
+    <div class="stage">
+      <div class="guide"><span>28px</span></div>
+      <div class="segmented" role="group" aria-label="Work view">
+        <button aria-pressed="true"><svg class="icon" viewBox="0 0 24 24"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg>List</button>
+        <button aria-pressed="false"><svg class="icon" viewBox="0 0 24 24"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/></svg>Board</button>
+      </div>
+      <button class="btn btn--solid"><svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New work</button>
+    </div>
+    <dl class="spec">
+      <dt>View switch</dt><dd>SegmentedControl size="sm" · Segment ×2 · one shared component</dd>
+      <dt>New work</dt><dd>Button variant="solid" size="md" (28px) · the one solid button</dd>
+      <dt>Gap</dt><dd>8px · bottom-aligned with the stats line</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <div class="head"><span class="tag">Before</span><h2>Top bar, right side</h2></div>
+    <div class="stage" style="gap:12px">
+      <span style="width:8px;height:8px;border-radius:999px;background:var(--hue-2)"></span>
+      <span class="ink-3" style="font-size:12px">Live</span>
+      <span class="kbd" style="height:22px">⌘K</span>
+      <span style="position:relative;display:inline-flex;color:var(--color-ink-2)"><svg class="icon s16" viewBox="0 0 24 24"><path d="M10.27 21a2 2 0 0 0 3.46 0"/><path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"/></svg><span style="position:absolute;top:-8px;right:-10px;height:16px;min-width:16px;padding:0 4px;border-radius:999px;background:var(--color-danger);color:var(--color-ground);font:600 10px/16px var(--font-sans)">12</span></span>
+      <span class="avatar" style="width:32px;height:32px">AB</span>
+    </div>
+    <p class="ink-3" style="margin-top:12px;font-size:13px">Five loose items in different sizes, with no grouping.</p>
+  </section>
+
+  <section class="panel">
+    <div class="head"><span class="tag after">After</span><h2>Top bar, right side</h2></div>
+    <div class="stage" style="gap:4px">
+      <div class="guide"><span>28px</span></div>
+      <span class="tb-search"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="grow">Search…</span><span class="kbd">⌘K</span></span>
+      <button class="btn btn--ghost btn--icon" aria-label="Notifications, 12 unread"><svg class="icon s16" viewBox="0 0 24 24"><path d="M10.27 21a2 2 0 0 0 3.46 0"/><path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"/></svg><span class="count"></span></button>
+      <span class="div"></span>
+      <span class="avatar">AB</span>
+    </div>
+    <dl class="spec">
+      <dt>Live dot</dt><dd>moves next to the current page in the breadcrumbs</dd>
+      <dt>⌘K</dt><dd>becomes a 28px search trigger that opens the CommandPalette</dd>
+      <dt>Bell</dt><dd>ghost icon Button 28px · unread = 8px dot; the number moves to aria-label + the popover</dd>
+      <dt>Avatar</dt><dd>Avatar size="sm" 28px, set apart by a 1px line divider</dd>
+    </dl>
+  </section>
+
+  <section class="panel wide">
+    <div class="head"><span class="tag after">After</span><h2>Title and stats line</h2></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:12px;font-weight:500;color:var(--color-ink-3)">AgentDock</span>
+      <span style="font-size:28px;line-height:32px;font-weight:600;letter-spacing:-0.02em">Work</span>
+      <span style="display:flex;align-items:center;gap:12px;font-size:13px;color:var(--color-ink-3)"><span><b style="color:var(--color-ink)">2</b> of 3 workers</span><span class="div"></span><span><b style="color:var(--color-ink)">125</b> cards</span><span class="div"></span><span><b style="color:var(--color-ink)">2</b> running</span><span class="div"></span><span><b style="color:var(--color-ink)">0</b> waiting on you</span></span>
+    </div>
+    <dl class="spec">
+      <dt>Eyebrow</dt><dd>12/16 500 ink-3 · project name on the Board, "All projects" on the List</dd>
+      <dt>Title</dt><dd>display 28/32 600 −0.02em</dd>
+      <dt>Stats</dt><dd>13px ink-3 labels, numbers in ink 600 with tabular figures · 1px line dividers replace the "·" separators · status dots on running / waiting · 3-pip worker meter</dd>
+    </dl>
+  </section>
+</div>
+</body>
+</html>
