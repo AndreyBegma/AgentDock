@@ -1,6 +1,6 @@
 # ADR-0032: A card's model is recommended by a runner-side assessment
 
-Status: accepted · Date: 2026-10-15 · Extends [ADR-0027](0027-stored-text-is-normalized-to-english-on-the-runner.md) ·
+Status: accepted, amended by [ADR-0068](0068-the-token-saver-targets-context-residency-and-is-judged-by-cost-per-round.md) · Date: 2026-10-15 · Extends [ADR-0027](0027-stored-text-is-normalized-to-english-on-the-runner.md) ·
 Issue: [#322](https://github.com/AndreyBegma/AgentDock/issues/322)
 
 ## Context
