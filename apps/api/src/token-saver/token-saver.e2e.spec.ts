@@ -424,6 +424,114 @@ describe('token saver (e2e)', () => {
       ]);
     });
 
+    it('stores a row’s program and accepts one without it (#648)', async () => {
+      await stats([
+        row({
+          filter: 'none:uncovered',
+          program: 'git log',
+          keptBytes: 4_000,
+          passedThrough: true,
+        }),
+        row(),
+      ]);
+      const stored = await w.ctx.prisma.tokenSaverStat.findMany({
+        orderBy: { id: 'asc' },
+      });
+      expect(stored.map((s) => s.program)).toEqual(['git log', null]);
+      // An argument in the program fails the batch's schema: nothing stored.
+      await stats([row({ program: 'cat /etc/passwd' })]);
+      expect(await w.ctx.prisma.tokenSaverStat.count()).toBe(2);
+    });
+
+    it('lists the most frequent unfiltered programs, top 10 (#648)', async () => {
+      const unfiltered = (
+        program: string | undefined,
+        filter = 'none:uncovered',
+      ) =>
+        row({
+          filter,
+          program,
+          rawBytes: 100,
+          keptBytes: 100,
+          passedThrough: true,
+        });
+      await stats([
+        ...Array.from({ length: 3 }, () => unfiltered('git log')),
+        unfiltered('git log', 'none:compound'),
+        unfiltered('ls', 'none'),
+        unfiltered('ls', 'none:mode'),
+        unfiltered(undefined, 'none'),
+        // A filtered command never counts as unfiltered.
+        row({ program: 'bun test' }),
+        ...Array.from({ length: 10 }, (_, i) => unfiltered(`tool${i}`)),
+      ]);
+      const body = (await w.viewer.get(summary())).body as TokenSaverSummary;
+      expect(body.unfilteredPrograms).toHaveLength(10);
+      expect(body.unfilteredPrograms.slice(0, 3)).toEqual([
+        { program: 'git log', commands: 4 },
+        { program: 'ls', commands: 2 },
+        { program: 'tool0', commands: 1 },
+      ]);
+      expect(body.unfilteredPrograms.map((p) => p.program)).not.toContain(
+        'bun test',
+      );
+    });
+
+    it('measures the prompt cache per run kind from usage, and names the runner version (#648)', async () => {
+      const minute = (n: number) => new Date(Date.UTC(2026, 9, 14, 10, n));
+      await w.ctx.prisma.runner.update({
+        where: { id: w.runnerId },
+        data: { version: '0.12.2' },
+      });
+      const runId = await ranCard();
+      await w.ctx.prisma.run.update({
+        where: { id: runId },
+        data: { startedAt: minute(0), endedAt: minute(10) },
+      });
+      const card = await w.card(1);
+      const session = await w.ctx.prisma.agentSession.create({
+        data: {
+          runnerId: w.runnerId,
+          runtime: 'claude',
+          externalId: card.sessionId as string,
+          cwd: '/srv/dev/.wt-widget-card-x',
+          origin: 'run',
+          startedAt: minute(0),
+          lastEventAt: minute(9),
+        },
+      });
+      const request = (id: string, at: number) =>
+        w.ctx.prisma.llmRequest.create({
+          data: {
+            sessionId: session.id,
+            requestId: id,
+            ts: minute(at),
+            model: 'claude-opus-5-5',
+            querySource: 'main',
+            input: 100,
+            output: 10,
+            cacheRead: 700,
+            cacheWrite5m: 150,
+            cacheWrite1h: 50,
+          },
+        });
+      await request('q1', 2);
+      await request('q2', 8);
+      await request('q3', 30); // after the run ended: not its own
+
+      const body = (await w.viewer.get(summary())).body as TokenSaverSummary;
+      expect(body.promptCache).toEqual([
+        {
+          runKind: 'card',
+          runs: 1,
+          input: 200,
+          cacheRead: 1_400,
+          cacheWrite: 400,
+        },
+      ]);
+      expect(body.runnerVersion).toBe('0.12.2');
+    });
+
     it('refuses a reversed or too long range', async () => {
       expect(
         (

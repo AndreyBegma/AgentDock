@@ -8,8 +8,11 @@ import {
   emptySummary,
   mergeSummaries,
   mostPassedThrough,
+  promptCacheTotals,
+  runnerTooOldForReasons,
   savingsChartSeries,
   topFilters,
+  unfilteredReasons,
 } from './summary';
 
 const FROM = '2026-10-01T00:00:00.000Z';
@@ -148,6 +151,105 @@ describe('mergeSummaries', () => {
     );
     expect(merged.beforeAfter[0]?.beforeAvgUsd).toBeNull();
     expect(merged.beforeAfter[0]?.afterAvgUsd).toBeNull();
+  });
+});
+
+describe('mergeSummaries (#648)', () => {
+  test('adds programs and the prompt cache; the runner version is dropped', () => {
+    const a = summary({
+      unfilteredPrograms: [
+        { program: 'git log', commands: 3 },
+        { program: 'ls', commands: 1 },
+      ],
+      promptCache: [
+        { runKind: 'card', runs: 2, input: 10, cacheRead: 80, cacheWrite: 10 },
+      ],
+      runnerVersion: '0.12.2',
+    });
+    const b = summary({
+      unfilteredPrograms: [
+        { program: 'ls', commands: 4 },
+        ...Array.from({ length: 10 }, (_, i) => ({
+          program: `tool${i}`,
+          commands: 1,
+        })),
+      ],
+      promptCache: [
+        { runKind: 'card', runs: 1, input: 5, cacheRead: 5, cacheWrite: 0 },
+        { runKind: 'skill', runs: 1, input: 1, cacheRead: 0, cacheWrite: 0 },
+      ],
+    });
+    const merged = mergeSummaries([a, b], FROM, TO);
+    expect(merged.unfilteredPrograms).toHaveLength(10);
+    expect(merged.unfilteredPrograms.slice(0, 3)).toEqual([
+      { program: 'ls', commands: 5 },
+      { program: 'git log', commands: 3 },
+      { program: 'tool0', commands: 1 },
+    ]);
+    expect(merged.promptCache).toEqual([
+      { runKind: 'card', runs: 3, input: 15, cacheRead: 85, cacheWrite: 10 },
+      { runKind: 'skill', runs: 1, input: 1, cacheRead: 0, cacheWrite: 0 },
+    ]);
+    expect(merged.runnerVersion).toBeNull();
+  });
+});
+
+describe('unfilteredReasons (#648)', () => {
+  test('one row per reason, legacy `none` last, with its share', () => {
+    expect(
+      unfilteredReasons([
+        filter('js/jest', 1),
+        filter('none', 0, 2),
+        filter('none:uncovered', 0, 6),
+      ]),
+    ).toEqual([
+      { filter: 'none:compound', commands: 0, share: 0 },
+      { filter: 'none:uncovered', commands: 6, share: 0.75 },
+      { filter: 'none:mode', commands: 0, share: 0 },
+      { filter: 'none', commands: 2, share: 0.25 },
+    ]);
+  });
+
+  test('all four rows at zero with nothing unfiltered', () => {
+    expect(unfilteredReasons([]).map((r) => r.commands)).toEqual([0, 0, 0, 0]);
+  });
+});
+
+describe('runnerTooOldForReasons (#648)', () => {
+  test('an old runner whose rows carry no reason', () => {
+    expect(
+      runnerTooOldForReasons(
+        summary({ runnerVersion: '0.12.2', byFilter: [filter('none', 0)] }),
+      ),
+    ).toBe(true);
+  });
+
+  test('not for a newer or unknown runner, nor one that already sends reasons', () => {
+    expect(runnerTooOldForReasons(summary({ runnerVersion: '0.13.0' }))).toBe(
+      false,
+    );
+    expect(runnerTooOldForReasons(summary({ runnerVersion: null }))).toBe(
+      false,
+    );
+    expect(
+      runnerTooOldForReasons(
+        summary({
+          runnerVersion: '0.12.2',
+          byFilter: [filter('none:compound', 0)],
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('promptCacheTotals (#648)', () => {
+  test('sums every run kind', () => {
+    expect(
+      promptCacheTotals([
+        { runKind: 'card', runs: 2, input: 10, cacheRead: 80, cacheWrite: 10 },
+        { runKind: 'plan', runs: 1, input: 5, cacheRead: 5, cacheWrite: 0 },
+      ]),
+    ).toEqual({ runs: 3, input: 15, cacheRead: 85, cacheWrite: 10 });
   });
 });
 

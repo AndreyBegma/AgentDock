@@ -63,6 +63,8 @@ export const statRowId = (now: number, random: () => number): string =>
 
 export interface StatsCounts {
   filter: string;
+  /** #648: the program the command ran (`git log`); absent for a read. */
+  program?: string;
   rawBytes: number;
   keptBytes: number;
   bypassed: boolean;
