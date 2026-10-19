@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import type {
+  TokenSaverCostPerRound,
   TokenSaverFilterSavings,
   TokenSaverSummary,
 } from '@agentdock/shared';
 import {
   costChange,
+  costPerRoundTrends,
   emptySummary,
   mergeSummaries,
   mostPassedThrough,
@@ -200,18 +202,70 @@ describe('unfilteredReasons (#648)', () => {
       unfilteredReasons([
         filter('js/jest', 1),
         filter('none', 0, 2),
-        filter('none:uncovered', 0, 6),
+        filter('none:uncovered', 0, 4),
+        filter('none:off', 0, 2),
       ]),
     ).toEqual([
       { filter: 'none:compound', commands: 0, share: 0 },
-      { filter: 'none:uncovered', commands: 6, share: 0.75 },
+      { filter: 'none:uncovered', commands: 4, share: 0.5 },
       { filter: 'none:mode', commands: 0, share: 0 },
+      { filter: 'none:off', commands: 2, share: 0.25 },
       { filter: 'none', commands: 2, share: 0.25 },
     ]);
   });
 
-  test('all four rows at zero with nothing unfiltered', () => {
-    expect(unfilteredReasons([]).map((r) => r.commands)).toEqual([0, 0, 0, 0]);
+  test('all five rows at zero with nothing unfiltered', () => {
+    expect(unfilteredReasons([]).map((r) => r.commands)).toEqual([
+      0, 0, 0, 0, 0,
+    ]);
+  });
+});
+
+const week = (
+  sessionKind: TokenSaverCostPerRound['sessionKind'],
+  weekOf: string,
+  medianUsd: string | null,
+): TokenSaverCostPerRound => ({
+  sessionKind,
+  week: weekOf,
+  rounds: 3,
+  pricedRounds: medianUsd === null ? 0 : 3,
+  medianUsd,
+  p90Usd: medianUsd,
+  cacheReadShare: 0.9,
+  medianPeakContext: 120_000,
+  medianTurns: 14,
+});
+
+describe('costPerRoundTrends (#663 D5)', () => {
+  test('per kind, the newest week against the oldest, in the summary’s kind order', () => {
+    const trends = costPerRoundTrends([
+      week('card', '2026-10-05', '2.000000'),
+      week('card', '2026-10-12', '1.800000'),
+      week('card', '2026-10-19', '1.300000'),
+      week('ci_fix', '2026-10-19', '0.500000'),
+    ]);
+    expect(trends.map((t) => t.sessionKind)).toEqual(['card', 'ci_fix']);
+    expect(trends[0]?.latest.week).toBe('2026-10-19');
+    expect(trends[0]?.earliest?.week).toBe('2026-10-05');
+    expect(trends[0]?.change).toBeCloseTo(-0.35);
+    // One week: nothing to compare against.
+    expect(trends[1]).toMatchObject({ earliest: null, change: null });
+  });
+
+  test('no change when either median is unpriced', () => {
+    const [trend] = costPerRoundTrends([
+      week('design', '2026-10-05', null),
+      week('design', '2026-10-12', '1.000000'),
+    ]);
+    expect(trend?.change).toBeNull();
+  });
+
+  test('a sum of projects has no cost per round — medians do not add', () => {
+    const one = summary({
+      costPerRound: [week('card', '2026-10-12', '1.000000')],
+    });
+    expect(mergeSummaries([one, one], FROM, TO).costPerRound).toEqual([]);
   });
 });
 
