@@ -64,6 +64,16 @@ describe('shippingBadge (#359 D6–D8)', () => {
       shippingBadge({ ...c, needsPersonReason: 'round_failed' })?.label,
     ).toBe('Last round failed; not merged');
   });
+  test('needsPerson on a diverged branch says nothing was pushed and how to fix it (#630)', () => {
+    const c = card(1, 'finished', {
+      needsPerson: true,
+      needsPersonReason: 'branch_diverged',
+    });
+    expect(shippingBadge(c)?.label).toBe(
+      'Branch diverged on origin; not pushed',
+    );
+    expect(ciBanner(c)?.hint).toContain('Merge them into the branch');
+  });
   test('a plain card has no badge', () => {
     expect(shippingBadge(card(1, 'in_progress'))).toBeNull();
   });

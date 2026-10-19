@@ -12,6 +12,7 @@ export * from './commands/handoff';
 export * from './commands/planner';
 export * from './commands/project-rules';
 export * from './commands/queue';
+export * from './commands/repo';
 export * from './commands/session-message';
 export * from './commands/skills';
 export * from './commands/steward';

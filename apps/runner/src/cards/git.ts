@@ -16,6 +16,7 @@ import {
   CARD_PR_DESCRIPTION_FILE,
   CARD_PR_MARKER,
   cardWipCommitMessage,
+  divergedBranchMessage,
 } from '@agentdock/shared';
 import type {
   CardCollectArgs,
@@ -33,7 +34,7 @@ import {
   type SkillsDeps,
   stderrLine,
 } from '../skills/deps';
-import { createPullRequest, githubOf, pushBranch } from '../skills/run/collect';
+import { createPullRequest, githubOf } from '../skills/run/collect';
 import type { CardRecord } from './record';
 import { commitsWithTrailer, TrailerHeld } from './trailer-guard';
 
@@ -88,6 +89,102 @@ export const fetchRef = (deps: GitDeps, root: string, ref: string) =>
   deps.exec('git', ['-C', root, 'fetch', '--quiet', 'origin', ref], {
     timeoutMs: NETWORK_TIMEOUT_MS,
   });
+
+/** #630: git's refusal of a push that is not a fast-forward of the remote. */
+const NON_FAST_FORWARD =
+  /non-fast-forward|fetch first|\[rejected\]|Note about fast-forwards/;
+
+/** Whether `commit` is the tip of `branch` at some point in its reflog. */
+const inReflog = async (
+  deps: GitDeps,
+  wt: string,
+  branch: string,
+  commit: string,
+): Promise<boolean> => {
+  const log = await deps.exec('git', [
+    '-C',
+    wt,
+    'log',
+    '--walk-reflogs',
+    '--format=%H',
+    `refs/heads/${branch}`,
+  ]);
+  return (
+    log?.code === 0 && log.stdout.split('\n').some((sha) => sha === commit)
+  );
+};
+
+/**
+ * #359 D1, #630: pushes the worktree's HEAD to `origin/<branch>`, never
+ * forced. A push refused as a non-fast-forward fetches the remote branch:
+ * when it is already in HEAD (a race), the push is tried again; when its tip
+ * is one the card's branch itself had — the runner pushed it (`pushedHead`),
+ * or it is in the branch's reflog — the worker rewrote it locally, so it is
+ * superseded: `git merge -s ours` records it, keeping HEAD's tree, and the
+ * merge is pushed. Anything else on the remote is somebody else's work: it
+ * throws `divergedBranchMessage`, and nothing is pushed. Returns the head
+ * pushed — the merge, when there was one.
+ */
+export const pushCardBranch = async (
+  deps: GitDeps,
+  wt: string,
+  branch: string,
+  pushedHead?: string,
+): Promise<string> => {
+  const push = () =>
+    deps.exec(
+      'git',
+      ['-C', wt, 'push', '--quiet', 'origin', `HEAD:refs/heads/${branch}`],
+      { timeoutMs: NETWORK_TIMEOUT_MS },
+    );
+  const pushedNow = async () =>
+    (await gitOk(deps.exec, ['-C', wt, 'rev-parse', 'HEAD'])).trim();
+  const first = await push();
+  if (first?.code === 0) return pushedNow();
+  if (!first || !NON_FAST_FORWARD.test(first.stderr)) {
+    throw new Error(`git push --quiet failed: ${stderrLine(first)}`);
+  }
+  const fetched = await fetchRef(deps, wt, branch);
+  const remote = await commitOf(deps, wt, `refs/remotes/origin/${branch}`);
+  if (fetched?.code !== 0 || remote === null) {
+    throw new Error(
+      `git push was refused as a non-fast-forward, and fetching origin/${branch} failed: ${stderrLine(fetched)}`,
+    );
+  }
+  const contained = await gitSucceeds(deps.exec, [
+    '-C',
+    wt,
+    'merge-base',
+    '--is-ancestor',
+    remote,
+    'HEAD',
+  ]);
+  if (!contained) {
+    const superseded =
+      remote === pushedHead || (await inReflog(deps, wt, branch, remote));
+    if (!superseded) {
+      throw new Error(divergedBranchMessage(branch, remote.slice(0, 8)));
+    }
+    await gitOk(deps.exec, [
+      '-C',
+      wt,
+      'merge',
+      '--quiet',
+      '--no-verify',
+      '--no-edit',
+      '-s',
+      'ours',
+      '-m',
+      `Merge origin/${branch}, superseded by the rewritten local commits`,
+      remote,
+    ]);
+  }
+  const second = await push();
+  if (second?.code !== 0) {
+    throw new Error(`git push --quiet failed: ${stderrLine(second)}`);
+  }
+  return pushedNow();
+};
 
 /**
  * D5: the card's worktree, created when it is missing — on round 1, and on a
@@ -456,7 +553,7 @@ const stagedFiles = async (deps: GitDeps, wt: string): Promise<string[]> =>
 export const collectCard = async (
   deps: GitDeps,
   record: Pick<CardRecord, 'projectId' | 'root' | 'worktree' | 'branch'> &
-    Partial<Pick<CardRecord, 'specFiles' | 'pushPr'>>,
+    Partial<Pick<CardRecord, 'specFiles' | 'pushPr' | 'pushedHead'>>,
   args: CardCollectArgs,
   options: { trailerGuard?: boolean; trackedOnly?: boolean } = {},
 ): Promise<CardCollectResult> => {
@@ -530,7 +627,7 @@ export const collectCard = async (
     id: record.projectId,
     root: record.root,
   });
-  await pushBranch(deps, wt, record.branch);
+  await pushCardBranch(deps, wt, record.branch, record.pushedHead);
   // #359 D3: the worker's description is the body — of a new PR, and of an
   // open one, edited. Without it, a new PR gets the API's body with the spec
   // link, and an open one keeps its body.

@@ -1641,6 +1641,8 @@ enum RunKind {
   /// Steward's local haiku: a stall's classification or the digest prose
   /// (issue #447 D3, D16).
   steward
+  /// The assistant's read-only code question on the runner (issue #622).
+  code_ask
 }
 
 enum RunStatus {
@@ -3086,7 +3088,7 @@ model BoardCard {
   planId                  String?
   /// #480 (ADR-0044): the stage of the stack the card belongs to; at most one.
   stageId                 String?
-  /// #636 (ADR-0063): the branch the card's PR targets and its worktree was
+  /// #636 (ADR-0064): the branch the card's PR targets and its worktree was
   /// cut from, when it is not the project base — the branch of the one
   /// unmerged dependency it is stacked on. `null` is the project base.
   prBase                  String?

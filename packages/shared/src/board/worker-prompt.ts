@@ -29,9 +29,10 @@ import type { BoardCardKind } from './types';
  * (C-131): card-supplied text — title, body, feedback, design text, the
  * project's checks — sits in a `<card>` data fence. Version 16 (C-227): the
  * project's `## Project coding rules` section. Version 17 (C-254): the
- * stable text trimmed, no rule dropped.
+ * stable text trimmed, no rule dropped. Version 18 (#630): never rewrite a
+ * commit AgentDock pushed.
  */
-export const CARD_WORKER_PROMPT_VERSION = 17;
+export const CARD_WORKER_PROMPT_VERSION = 18;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -64,6 +65,14 @@ const E2E_SCOPE_LINE =
  */
 const COMMIT_TRAILER_LINE =
   '- Never add a Claude attribution trailer or footer to a commit message (`Co-Authored-By: Claude …`, `Claude-Session: …`, "Generated with Claude Code"); AgentDock does not push one; reword any it names (do not push).';
+
+/**
+ * #630: a worker amended a pushed commit, and every later push was refused as
+ * a non-fast-forward. The runner reconciles a rewrite it can prove is the
+ * worker's own; the brief keeps it from happening.
+ */
+const PUSHED_HISTORY_LINE =
+  '- Never amend, rebase or reset a pushed commit; add a new one.';
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
@@ -483,6 +492,7 @@ const assemblePrompt = (
     ...(card.tokenSaver ? [ONE_COMMAND_LINE] : []),
     ...LOCAL_ENVIRONMENT_LINES,
     '- Do not push and do not open a pull request: AgentDock pushes your commits.',
+    PUSHED_HISTORY_LINE,
     '- If anything is unclear, ask and wait.',
     '',
     ...REGISTER_LINES,

@@ -8,7 +8,7 @@ import { BoardWorld, HEAD_SHA, ok } from './testing/board-e2e';
 
 /**
  * #636 (docs/specs/636-branch-a-dependent-card-from-its-depende.md,
- * ADR-0063): a card with one unmerged dependency that has an open PR is cut
+ * ADR-0064): a card with one unmerged dependency that has an open PR is cut
  * from that dependency's branch and opens a stacked PR into it; merging the
  * dependency retargets the stacked PR onto the project base through
  * `card.prRetarget`.

@@ -48,6 +48,9 @@ export const NEEDS_PERSON_ROUND_TEXT: Record<
   round_ended_at_once: 'Last round ended at once; not merged',
 };
 
+/** #630: the runner pushed nothing — `origin/<branch>` has somebody else's commits. */
+export const BRANCH_DIVERGED_TEXT = 'Branch diverged on origin; not pushed';
+
 /**
  * Why automation stopped: the stored reason, else — a card marked before
  * #542 — no checks at all (#484), or red ones (#359 D6).
@@ -64,6 +67,8 @@ const needsPersonText = (
     case 'round_pushed_nothing':
     case 'round_ended_at_once':
       return NEEDS_PERSON_ROUND_TEXT[card.needsPersonReason];
+    case 'branch_diverged':
+      return BRANCH_DIVERGED_TEXT;
     case null:
       return card.ciState === 'none'
         ? CI_NOT_REPORTED_TEXT
@@ -114,7 +119,8 @@ export function shippingBadge(
 /**
  * The sheet's banner when automation stopped on a red CI (#359 D6), on a
  * head CI never reported on, even after a retrigger (#484), or on a head
- * the latest round did not work on (#542); `null` otherwise.
+ * the latest round did not work on (#542), or on a branch whose remote
+ * diverged (#630); `null` otherwise.
  */
 export function ciBanner(
   card: Pick<
@@ -126,7 +132,10 @@ export function ciBanner(
   return {
     title: needsPersonText(card),
     checks: card.ciChecks,
-    hint: 'Nothing runs on its own now. Send feedback, Run again, or Accept.',
+    hint:
+      card.needsPersonReason === 'branch_diverged'
+        ? 'Nothing was pushed: the remote branch has commits the card’s branch never had. Merge them into the branch — yourself, or by Send feedback — then Create pull request.'
+        : 'Nothing runs on its own now. Send feedback, Run again, or Accept.',
   };
 }
 

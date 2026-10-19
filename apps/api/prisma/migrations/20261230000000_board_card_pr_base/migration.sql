@@ -1,4 +1,4 @@
--- #636 (ADR-0063): a card stacked on its one unmerged dependency's branch.
+-- #636 (ADR-0064): a card stacked on its one unmerged dependency's branch.
 -- AlterTable
 ALTER TABLE "board_cards" ADD COLUMN     "prBase" TEXT,
 ADD COLUMN     "prBaseCardId" TEXT;

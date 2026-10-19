@@ -21,7 +21,7 @@ const prViewSchema = z.looseObject({
 });
 
 /**
- * #636 (ADR-0063, ADR-0010): moves a stacked card PR onto `base` once the
+ * #636 (ADR-0064, ADR-0010): moves a stacked card PR onto `base` once the
  * dependency it was stacked on has merged — `gh pr view`, then `gh pr edit
  * --base`, argument arrays only. Only an open PR is edited; one already on
  * `base` is left alone. A refusal is a result, never a thrown command error,

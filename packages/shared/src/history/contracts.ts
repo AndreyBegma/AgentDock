@@ -31,6 +31,8 @@ export const RUN_KINDS = [
    * classification or the digest prose, priced so it counts in the budget.
    */
   'steward',
+  /** The assistant's read-only code question on the runner (issue #622). */
+  'code_ask',
 ] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 

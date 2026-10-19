@@ -689,7 +689,7 @@ export type CardCiRetriggerCommandName = keyof typeof cardCiRetriggerCommands;
 // card.prRetarget
 
 /**
- * #636 (ADR-0063, ADR-0010, advertised per ADR-0023): moves a stacked card
+ * #636 (ADR-0064, ADR-0010, advertised per ADR-0023): moves a stacked card
  * PR onto another base once the dependency it was stacked on has merged —
  * `gh pr view <pr> --json state,baseRefName`, then `gh pr edit <pr> --base
  * <base>`, argument arrays only, in the project root. The control plane never

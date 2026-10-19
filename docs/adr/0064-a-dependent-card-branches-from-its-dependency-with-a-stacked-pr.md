@@ -1,4 +1,4 @@
-# ADR-0063: A dependent card branches from its dependency's branch with a stacked pull request
+# ADR-0064: A dependent card branches from its dependency's branch with a stacked pull request
 
 Status: accepted · Date: 2026-10-19 · Amends [ADR-0029](0029-accepting-a-board-card-may-merge-its-pull-request-through-the-runner.md) ·
 Card: C-268 · Issue: #636 ·
