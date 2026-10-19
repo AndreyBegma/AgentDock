@@ -1,4 +1,4 @@
-# ADR-0066: Run stack queues a stack's cards and starts them within the agent limit
+# ADR-0067: Run stack queues a stack's cards and starts them within the agent limit
 
 Status: accepted · Date: 2026-10-19 · Amends [ADR-0044](0044-stacks-staged-cards-under-one-shared-design.md) ·
 Card: C-269 · Issue: #652 ·
