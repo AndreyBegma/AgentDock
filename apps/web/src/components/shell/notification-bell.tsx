@@ -10,7 +10,11 @@ import {
 import { Bell } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { BELL_LIMIT } from '../../lib/notifications/format';
+import {
+  BELL_LIMIT,
+  bellLabel,
+  unreadCountText,
+} from '../../lib/notifications/format';
 import { useNotifications } from '../../lib/notifications/use-notifications';
 import { NotificationItem } from './notification-item';
 import { useCurrentUser } from './user-context';
@@ -29,21 +33,20 @@ export function NotificationBell() {
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
+          size="md"
           icon
           className="relative"
-          aria-label={
-            feed.unreadCount > 0
-              ? `Notifications, ${feed.unreadCount} unread`
-              : 'Notifications'
-          }
+          aria-label={bellLabel(feed.unreadCount)}
         >
           <Bell size={16} aria-hidden="true" />
           {feed.unreadCount > 0 ? (
+            // A dot, not a number: a count would cover the bell (#654). The
+            // number is in the name and on the popover's heading row.
             <Badge
+              dot
               tone="danger"
-              count={feed.unreadCount}
-              className="absolute -top-1 -right-1"
+              aria-hidden="true"
+              className="absolute top-1 right-1 size-2 ring-2 ring-surface"
               data-testid="bell-count"
             />
           ) : null}
@@ -54,14 +57,23 @@ export function NotificationBell() {
         align="end"
         className="w-[min(26rem,calc(100vw-2rem))]"
         headerAction={
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={feed.unreadCount === 0}
-            onClick={() => void feed.markAllRead()}
-          >
-            Mark all read
-          </Button>
+          <span className="flex items-center gap-2">
+            {feed.unreadCount > 0 ? (
+              <Badge
+                tone="danger"
+                count={feed.unreadCount}
+                aria-label={`${unreadCountText(feed.unreadCount)} unread`}
+              />
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={feed.unreadCount === 0}
+              onClick={() => void feed.markAllRead()}
+            >
+              Mark all read
+            </Button>
+          </span>
         }
         footer={
           <Link
