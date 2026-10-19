@@ -13,6 +13,18 @@ import { formatRelative } from '../format';
 
 export const BELL_LIMIT = 20;
 
+/** Past two digits a count is a glance, not a readout: 100 reads as "99+". */
+export function unreadCountText(count: number): string {
+  return count > 99 ? '99+' : String(count);
+}
+
+/** The bell carries a dot, not a number, so its name says how many. */
+export function bellLabel(unreadCount: number): string {
+  return unreadCount > 0
+    ? `Notifications, ${unreadCountText(unreadCount)} unread`
+    : 'Notifications';
+}
+
 export const KIND_LABEL: Record<NotificationKind, string> = {
   'person.needed': 'A person is needed',
   'slot.blocked': 'Slot blocked',
