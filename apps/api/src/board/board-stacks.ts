@@ -28,7 +28,7 @@ import {
 } from '../design/design-store';
 import { usageByRun } from '../history/run-usage';
 import { boardError } from './board-error';
-import { cardDesignSelect } from './board-mapper';
+import { cardDesignSelect, prTargetOf } from './board-mapper';
 import { type BoardActor, BoardWork } from './board-work';
 
 type Tx = Prisma.TransactionClient;
@@ -335,6 +335,7 @@ export class BoardStacks {
         include: {
           rounds: { orderBy: { round: 'desc' }, take: 1 },
           design: cardDesignSelect,
+          prBaseCard: { select: { number: true } },
         },
       }),
       this.prisma.boardCardDependency.findMany({
@@ -347,6 +348,7 @@ export class BoardStacks {
     ]);
     const byId = new Map(cards.map((c) => [c.id, c]));
     const view = this.viewOf(row, costs);
+    const { base } = await this.work.project(projectId);
     const started = await this.prisma.boardCardRound.count({
       where: { cardId: { in: cardIds } },
     });
@@ -382,6 +384,11 @@ export class BoardStacks {
                 }
               : null,
             design: designSummary(card?.design ?? null),
+            prNumber: card?.prNumber ?? null,
+            prUrl: card?.prUrl ?? null,
+            prTarget: card
+              ? prTargetOf(card, card.prBaseCard?.number ?? null, base)
+              : null,
             after: deps
               .filter((d) => d.cardId === c.id)
               .map((d) => d.dependsOn.number)
