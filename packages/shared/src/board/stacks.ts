@@ -1,5 +1,5 @@
 import type { TaskDesignSummary } from '../design/contracts';
-import type { BoardCardView, CardRoundBrief } from './contracts';
+import type { BoardCardView, CardPrTarget, CardRoundBrief } from './contracts';
 import { BOARD_COLUMNS, type BoardColumn } from './types';
 
 /**
@@ -74,6 +74,11 @@ export interface StackCardView {
   round: CardRoundBrief | null;
   /** The card's own design, kept apart from the stack's. */
   design: TaskDesignSummary | null;
+  /** #636: the card's latest PR; `null` before it has one. */
+  prNumber: number | null;
+  prUrl: string | null;
+  /** #636: where the card's PR goes — "into C-1's branch" or the base. */
+  prTarget: CardPrTarget | null;
   /** The cards of the stage before, by number: "after C-88, C-89". */
   after: number[];
   costUsd: string | null;

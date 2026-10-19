@@ -69,7 +69,11 @@ import {
   trackedStatusText,
 } from '../../lib/board/format';
 import { boardCardPageHref, boardStackPageHref } from '../../lib/board/href';
-import { canCreatePr, prChipText } from '../../lib/board/pull-request';
+import {
+  canCreatePr,
+  prChipText,
+  prTargetText,
+} from '../../lib/board/pull-request';
 import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
@@ -595,7 +599,19 @@ export function CardDetailBody({
         </div>
       ) : null}
       {card.branch ? (
-        <p className="break-all font-mono text-xs text-ink-2">{card.branch}</p>
+        <p className="break-all text-xs text-ink-2">
+          <span className="font-mono">{card.branch}</span>
+          {card.prTarget ? (
+            // #636: the PR's actual target — a stacked card's dependency.
+            <span title={`The pull request goes into ${card.prTarget.branch}`}>
+              {' '}
+              → {prTargetText(card.prTarget)}
+              {card.prTarget.stackedOn ? (
+                <span className="font-mono"> ({card.prTarget.branch})</span>
+              ) : null}
+            </span>
+          ) : null}
+        </p>
       ) : null}
       {card.round?.hooksMissing
         ? (() => {

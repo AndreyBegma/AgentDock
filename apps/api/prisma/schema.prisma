@@ -410,57 +410,57 @@ model Project {
   createdAt                   DateTime   @default(now())
   updatedAt                   DateTime   @updatedAt
 
-  runner                 Runner                       @relation(fields: [runnerId], references: [id], onDelete: Restrict)
-  defaultProfile         RuntimeProfile?              @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
-  createdBy              User?                        @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  members                ProjectMember[]
-  docsSource             DocsSource?
-  rounds                 Round[]
-  slots                  Slot[]
-  orchestrator           FleetOrchestrator?
-  sessions               AgentSession[]
-  workflows              SessionWorkflow[]
-  issues                 IssueCache[]
-  queueStates            QueueStateRow[]
-  issueFeed              IssueFeed?
-  commandRuns            CommandRun[]
-  orchestratorSettings   ProjectOrchestratorSettings?
-  activityItems          ActivityItem[]
-  runs                   Run[]
-  mergeApprovals         MergeApproval[]
-  notifications          Notification[]
-  notificationMutes      NotificationMute[]
-  installedSkills        InstalledSkill[]
-  skillInstallPreviews   SkillInstallPreview[]
-  schedules              Schedule[]
-  budgets                Budget[]
-  inboundTriggers        InboundTrigger[]
-  githubAppHealth        GitHubProjectHealth?
-  plannerInstructions    PlannerInstructions[]
-  plannerSettings        PlannerSettings?
-  plans                  Plan[]
-  sessionContents        SessionContent[]
-  actionRequests         ActionRequest[]
-  uiProfiles             UiProfile[]
-  designSettings         DesignSettings?
-  boardCards             BoardCard[]
-  boardStacks            BoardStack[]
-  boardSettings          BoardSettings?
-  cardCaptures           CardCapture[]
-  cardDismissals         CardDismissal[]
-  textNormalizations     TextNormalization[]
-  textSettings           TextSettings?
-  attachments            Attachment[]
+  runner               Runner                       @relation(fields: [runnerId], references: [id], onDelete: Restrict)
+  defaultProfile       RuntimeProfile?              @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
+  createdBy            User?                        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  members              ProjectMember[]
+  docsSource           DocsSource?
+  rounds               Round[]
+  slots                Slot[]
+  orchestrator         FleetOrchestrator?
+  sessions             AgentSession[]
+  workflows            SessionWorkflow[]
+  issues               IssueCache[]
+  queueStates          QueueStateRow[]
+  issueFeed            IssueFeed?
+  commandRuns          CommandRun[]
+  orchestratorSettings ProjectOrchestratorSettings?
+  activityItems        ActivityItem[]
+  runs                 Run[]
+  mergeApprovals       MergeApproval[]
+  notifications        Notification[]
+  notificationMutes    NotificationMute[]
+  installedSkills      InstalledSkill[]
+  skillInstallPreviews SkillInstallPreview[]
+  schedules            Schedule[]
+  budgets              Budget[]
+  inboundTriggers      InboundTrigger[]
+  githubAppHealth      GitHubProjectHealth?
+  plannerInstructions  PlannerInstructions[]
+  plannerSettings      PlannerSettings?
+  plans                Plan[]
+  sessionContents      SessionContent[]
+  actionRequests       ActionRequest[]
+  uiProfiles           UiProfile[]
+  designSettings       DesignSettings?
+  boardCards           BoardCard[]
+  boardStacks          BoardStack[]
+  boardSettings        BoardSettings?
+  cardCaptures         CardCapture[]
+  cardDismissals       CardDismissal[]
+  textNormalizations   TextNormalization[]
+  textSettings         TextSettings?
+  attachments          Attachment[]
   assistantConversations AssistantConversation[]
-  tokenSaverSettings     TokenSaverSettings?
-  tokenSaverStats        TokenSaverStat[]
-  stewardSettings        StewardSettings?
-  stewardIncidents       StewardIncident[]
-  stewardDigests         StewardDigest[]
-  handoffNotes           HandoffNote[]
-  rules                  ProjectRule[]
-  telegramLinks          TelegramLink[]
-  telegramIntakes        TelegramIntake[]
+  tokenSaverSettings   TokenSaverSettings?
+  tokenSaverStats      TokenSaverStat[]
+  stewardSettings      StewardSettings?
+  stewardIncidents     StewardIncident[]
+  stewardDigests       StewardDigest[]
+  handoffNotes         HandoffNote[]
+  rules                ProjectRule[]
+  telegramLinks        TelegramLink[]
+  telegramIntakes      TelegramIntake[]
 
   @@unique([runnerId, rootPath])
   @@map("projects")
@@ -739,25 +739,25 @@ model AgentSession {
   /// `agentdock-manual-*` tmux session from `agentdock-runner claude` (D23).
   tmuxSession     String?
 
-  runner               Runner                @relation(fields: [runnerId], references: [id], onDelete: Cascade)
-  owner                User?                 @relation("SessionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  project              Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  parent               AgentSession?         @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
-  children             AgentSession[]        @relation("SessionParent")
-  turns                Turn[]
-  llmRequests          LlmRequest[]
-  toolCalls            ToolCall[]
-  spawnedBy            ToolCall[]            @relation("ToolCallChild")
-  compactions          SessionCompaction[]
-  errors               SessionError[]
-  workflow             SessionWorkflow?
-  workflowMark         SessionWorkflowMark?
-  contents             SessionContent[]
-  actionRequests       ActionRequest[]
+  runner         Runner               @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  owner          User?                @relation("SessionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  project        Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent         AgentSession?        @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
+  children       AgentSession[]       @relation("SessionParent")
+  turns          Turn[]
+  llmRequests    LlmRequest[]
+  toolCalls      ToolCall[]
+  spawnedBy      ToolCall[]           @relation("ToolCallChild")
+  compactions    SessionCompaction[]
+  errors         SessionError[]
+  workflow       SessionWorkflow?
+  workflowMark   SessionWorkflowMark?
+  contents       SessionContent[]
+  actionRequests ActionRequest[]
   assistantAttachments AssistantAttachment[]
-  cardCaptures         CardCapture[]
-  capturedCards        BoardCard[]           @relation("BoardCardSourceSession")
-  trackedCard          BoardCard?            @relation("BoardCardTrackedSession")
+  cardCaptures   CardCapture[]
+  capturedCards  BoardCard[]          @relation("BoardCardSourceSession")
+  trackedCard    BoardCard?           @relation("BoardCardTrackedSession")
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
@@ -1439,13 +1439,13 @@ model NotificationDelivery {
 
 /// The Telegram private chat a user linked (D9). One chat per user, one user per chat.
 model TelegramLink {
-  userId                  String   @id
-  chatId                  BigInt   @unique
-  username                String?
-  linkedAt                DateTime @default(now())
+  userId           String   @id
+  chatId           BigInt   @unique
+  username         String?
+  linkedAt         DateTime @default(now())
   /// #500: the project the chat's Board commands act on (`/project`). Null
   /// until chosen; a deleted project clears it.
-  currentProjectId        String?
+  currentProjectId String?
   /// #620: the assistant conversation the chat's free text continues. Null
   /// until the chat's first message, after `/newchat`, and once it is deleted.
   assistantConversationId String?
@@ -3088,34 +3088,44 @@ model BoardCard {
   planId                  String?
   /// #480 (ADR-0044): the stage of the stack the card belongs to; at most one.
   stageId                 String?
+  /// #636 (ADR-0064): the branch the card's PR targets and its worktree was
+  /// cut from, when it is not the project base — the branch of the one
+  /// unmerged dependency it is stacked on. `null` is the project base.
+  prBase                  String?
+  /// #636: the dependency `prBase` belongs to; both are cleared once that
+  /// dependency merges and the card's PR is retargeted onto the base.
+  prBaseCardId            String?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
-  project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  plan                 Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
-  stage                BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
-  trackedSession       AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
-  createdBy            User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  movedBy              User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
-  completedBy          User?                  @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  capture              CardCapture?           @relation(fields: [captureId], references: [id], onDelete: SetNull)
-  sourceSession        AgentSession?          @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
-  rounds               BoardCardRound[]
-  design               TaskDesign?
-  designTurns          PlanTurn[]
-  textNormalizations   TextNormalization[]
-  attachments          Attachment[]
+  project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  prBaseCard         BoardCard?             @relation("BoardCardPrBase", fields: [prBaseCardId], references: [id], onDelete: SetNull)
+  /// #636: the cards stacked on this one's branch.
+  stackedOn          BoardCard[]            @relation("BoardCardPrBase")
+  plan               Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
+  stage              BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  trackedSession     AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
+  createdBy          User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  movedBy            User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
+  completedBy        User?                  @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  capture            CardCapture?           @relation(fields: [captureId], references: [id], onDelete: SetNull)
+  sourceSession      AgentSession?          @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
+  rounds             BoardCardRound[]
+  design             TaskDesign?
+  designTurns        PlanTurn[]
+  textNormalizations TextNormalization[]
+  attachments        Attachment[]
   assistantAttachments AssistantAttachment[]
   /// #337 D7: the plan task Create cards made this card from.
-  planTasks            PlanTask[]             @relation("PlanTaskCard")
+  planTasks          PlanTask[]             @relation("PlanTaskCard")
   /// #337 D8: the cards this one runs after.
-  dependsOn            BoardCardDependency[]  @relation("BoardCardDependsOn")
+  dependsOn          BoardCardDependency[]  @relation("BoardCardDependsOn")
   /// #337 D8: the cards that run after this one.
-  dependants           BoardCardDependency[]  @relation("BoardCardDependant")
+  dependants         BoardCardDependency[]  @relation("BoardCardDependant")
   /// #359 D8: every PR the card opened; `prUrl` is the latest.
-  pullRequests         BoardCardPullRequest[]
+  pullRequests       BoardCardPullRequest[]
   /// #592: the intake candidate accepted as this card.
-  candidate            PlanCandidate?
+  candidate          PlanCandidate?
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3124,6 +3134,7 @@ model BoardCard {
   @@index([projectId, fingerprint])
   @@index([planId])
   @@index([stageId])
+  @@index([prBaseCardId])
   @@map("board_cards")
 }
 
@@ -3332,11 +3343,11 @@ model Attachment {
   expiresAt  DateTime?
   createdAt  DateTime  @default(now())
 
-  project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  card      BoardCard?           @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  round     BoardCardRound?      @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  plan      Plan?                @relation(fields: [planId], references: [id], onDelete: SetNull)
-  uploader  User?                @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  card     BoardCard?      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  round    BoardCardRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  plan     Plan?           @relation(fields: [planId], references: [id], onDelete: SetNull)
+  uploader User?           @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
   assistant AssistantAttachment?
 
   @@index([cardId, createdAt])
@@ -3920,8 +3931,8 @@ model AssistantConversation {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project       Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
   messages      AssistantMessage[]
   attachments   AssistantAttachment[]
   telegramLinks TelegramLink[]

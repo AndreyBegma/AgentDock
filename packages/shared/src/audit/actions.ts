@@ -164,6 +164,12 @@ export const AUDIT_ACTIONS = [
    * again — closed and reopened (`after: { number, pr, headSha, error? }`).
    */
   'card.ci_retriggered',
+  /**
+   * #636: the dependency a card's PR was stacked on merged, and the PR was
+   * moved onto the project base (`after: { number, pr, from, base,
+   * dependency }`).
+   */
+  'card.pr_retargeted',
   /** #443: the card's Auto-run when ready switch (`after: { autoRunWhenReady }`). */
   'card.auto_run_toggled',
   /**

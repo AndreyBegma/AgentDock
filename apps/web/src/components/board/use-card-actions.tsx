@@ -24,8 +24,9 @@ import {
   stopCard,
 } from '../../lib/board/actions';
 import {
+  blockedRunText,
   openDependenciesOf,
-  openDependencyText,
+  unmergedDependenciesOf,
 } from '../../lib/board/dependencies';
 import { describeBoardError } from '../../lib/board/format';
 import { collectMessage } from '../../lib/board/pull-request';
@@ -65,11 +66,15 @@ type Pending =
   | { kind: 'stop' | 'delete'; card: BoardCardView }
   | { kind: 'dismiss-all'; count: number };
 
-/** #337 D8: a Run the API refused with `dependency_open`, waiting on the person. */
+/**
+ * #337 D8: a Run the API refused with `dependency_open` — #636: or
+ * `dependencies_unmerged` (`unmerged`) — waiting on the person.
+ */
 interface BlockedRun {
   card: BoardCardView;
   request: RunBoardCardRequest | undefined;
   open: CardDependencyRef[];
+  unmerged: boolean;
   resolve: (started: boolean) => void;
 }
 
@@ -197,10 +202,17 @@ export function useCardActions({
       toast.success(`Started a worker on ${card.label}.`);
       return true;
     } catch (err) {
-      const open = openDependenciesOf(err);
+      const unmerged = unmergedDependenciesOf(err);
+      const open = unmerged ?? openDependenciesOf(err);
       if (open) {
         return new Promise<boolean>((resolve) =>
-          setBlocked({ card, request, open, resolve }),
+          setBlocked({
+            card,
+            request,
+            open,
+            unmerged: unmerged !== null,
+            resolve,
+          }),
         );
       }
       toast.error(describeBoardError(err, runnerName));
@@ -297,7 +309,11 @@ export function useCardActions({
             if (!open) void answerBlocked(false);
           }}
           title={`Run ${blocked?.card.label ?? 'the card'} anyway?`}
-          consequence={`${openDependencyText(blocked?.open ?? [])} ${blocked?.card.label ?? 'This card'} was meant to run after it, so its worker may miss that work.`}
+          consequence={blockedRunText(
+            blocked?.card.label ?? 'This card',
+            blocked?.open ?? [],
+            blocked?.unmerged ?? false,
+          )}
           verb="Run anyway"
           busy={busy}
           onConfirm={() => void answerBlocked(true)}

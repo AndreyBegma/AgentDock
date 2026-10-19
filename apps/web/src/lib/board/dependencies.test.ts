@@ -3,11 +3,13 @@ import type { CardDependencyRef } from '@agentdock/shared';
 import { ApiError } from '../api';
 import {
   autoRunNote,
+  blockedRunText,
   dependencyChip,
   openDependenciesOf,
   openDependencyText,
   parseCardNumber,
   readinessChip,
+  unmergedDependenciesOf,
 } from './dependencies';
 
 const ref = (
@@ -63,6 +65,33 @@ describe('card dependencies (#337 D8)', () => {
     });
     expect(openDependenciesOf(other)).toBeNull();
     expect(openDependenciesOf(new Error('x'))).toBeNull();
+  });
+
+  test('reads the dependencies of a 409 dependencies_unmerged (#636)', () => {
+    const refused = new ApiError(409, undefined, 'unmerged', undefined, {
+      error: 'dependencies_unmerged',
+      dependencies: [ref(3, 'finished'), ref(5, 'finished')],
+    });
+    expect(unmergedDependenciesOf(refused)).toEqual([
+      ref(3, 'finished'),
+      ref(5, 'finished'),
+    ]);
+    expect(openDependenciesOf(refused)).toBeNull();
+    const open = new ApiError(409, undefined, 'open', undefined, {
+      error: 'dependency_open',
+    });
+    expect(unmergedDependenciesOf(open)).toBeNull();
+  });
+
+  test('says what Run anyway means for an open or an unmerged dependency', () => {
+    expect(blockedRunText('C-7', [ref(3, 'todo')], false)).toBe(
+      'C-3 is not completed yet. C-7 was meant to run after it, so its worker may miss that work.',
+    );
+    expect(
+      blockedRunText('C-7', [ref(3, 'finished'), ref(5, 'finished')], true),
+    ).toBe(
+      'C-3 and C-5 are not merged yet, and a card branches from one dependency only. C-7 would start from the project base without their work.',
+    );
   });
 
   test('the add field takes 12 or C-12', () => {
