@@ -3,11 +3,12 @@ import {
   TOKEN_SAVER_RUN_KINDS,
   TOKEN_SAVER_SUMMARY_MAX_DAYS,
   type TokenSaverBeforeAfter,
+  type TokenSaverPromptCache,
   type TokenSaverSummary,
 } from '@agentdock/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { runCostsByKind } from '../history/run-usage';
+import { runCostsByKind, runPromptCacheByKind } from '../history/run-usage';
 import {
   byFilterOf,
   inputPricesOfRuns,
@@ -15,6 +16,7 @@ import {
   savedOf,
   statGroupsOfProject,
   sum,
+  unfilteredProgramsOfProject,
 } from './token-saver-facts';
 
 const DAY_MS = 86_400_000;
@@ -55,13 +57,19 @@ export class TokenSaverSummaryService {
         `The range may span at most ${TOKEN_SAVER_SUMMARY_MAX_DAYS} days`,
       );
     }
-    const [groups, costs, first] = await Promise.all([
+    const [groups, costs, first, programs, cache, project] = await Promise.all([
       statGroupsOfProject(this.prisma, projectId, from, to),
       runCostsByKind(this.prisma, projectId, RUN_KINDS, from, to),
       this.prisma.tokenSaverStat.findFirst({
         where: { projectId },
         orderBy: { createdAt: 'asc' },
         select: { createdAt: true },
+      }),
+      unfilteredProgramsOfProject(this.prisma, projectId, from, to),
+      runPromptCacheByKind(this.prisma, projectId, RUN_KINDS, from, to),
+      this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { runner: { select: { version: true } } },
       }),
     ]);
     const runIds = [
@@ -114,6 +122,23 @@ export class TokenSaverSummaryService {
             b.estimateTokens - a.estimateTokens ||
             a.runKind.localeCompare(b.runKind),
         ),
+      unfilteredPrograms: programs,
+      // RUN_KINDS' order, so the table reads the same on every load.
+      promptCache: RUN_KINDS.flatMap((runKind): TokenSaverPromptCache[] => {
+        const of = cache.find((c) => c.kind === runKind);
+        return of && of.runs > 0
+          ? [
+              {
+                runKind,
+                runs: of.runs,
+                input: of.input,
+                cacheRead: of.cacheRead,
+                cacheWrite: of.cacheWrite,
+              },
+            ]
+          : [];
+      }),
+      runnerVersion: project?.runner.version ?? null,
     };
   }
 }

@@ -2,10 +2,16 @@ import type {
   TokenSavedView,
   TokenSaverFilterSavings,
   TokenSaverRunKind,
+  TokenSaverUnfilteredProgram,
 } from '@agentdock/shared';
 import {
   estimateUsdSaved,
+  FILTER_ID_NONE,
+  FILTER_ID_NONE_COMPOUND,
+  FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE_UNCOVERED,
   TOKEN_SAVER_BYTES_PER_TOKEN,
+  TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX,
 } from '@agentdock/shared';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
@@ -90,6 +96,40 @@ export const statGroupsOfProject = async (
       AND s."createdAt" >= ${from} AND s."createdAt" < ${to}
     GROUP BY 1, 2, 3, 4`;
   return rows.map(toGroup);
+};
+
+/**
+ * #648: the programs of a project's unfiltered commands in `[from, to)` — the
+ * `none` and `none:*` rows that name one — most commands first.
+ */
+export const unfilteredProgramsOfProject = async (
+  prisma: PrismaService,
+  projectId: string,
+  from: Date,
+  to: Date,
+): Promise<TokenSaverUnfilteredProgram[]> => {
+  const rows = await prisma.tokenSaverStat.groupBy({
+    by: ['program'],
+    where: {
+      projectId,
+      createdAt: { gte: from, lt: to },
+      program: { not: null },
+      filter: {
+        in: [
+          FILTER_ID_NONE,
+          FILTER_ID_NONE_COMPOUND,
+          FILTER_ID_NONE_UNCOVERED,
+          FILTER_ID_NONE_MODE,
+        ],
+      },
+    },
+    _count: { _all: true },
+    orderBy: [{ _count: { program: 'desc' } }, { program: 'asc' }],
+    take: TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX,
+  });
+  return rows.flatMap((r) =>
+    r.program === null ? [] : [{ program: r.program, commands: r._count._all }],
+  );
 };
 
 /**
