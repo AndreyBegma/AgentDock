@@ -410,6 +410,17 @@ export class BoardWorld {
     });
   }
 
+  /**
+   * #640: the runner advertises `cardStartFrom`; without a call it stores
+   * none, as a runner older than the feature.
+   */
+  async advertiseCardStartFrom(cardStartFrom = true): Promise<void> {
+    await this.ctx.prisma.runner.update({
+      where: { id: this.runnerId },
+      data: { capabilities: { ...capabilities, cardStartFrom } },
+    });
+  }
+
   /** Delivers runner events to the sinks, as ingest does. */
   async deliver(
     type: string,

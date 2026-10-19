@@ -3086,6 +3086,18 @@ model BoardCard {
   planId                  String?
   /// #480 (ADR-0044): the stage of the stack the card belongs to; at most one.
   stageId                 String?
+  /// #640 (ADR-0063): the branch round 1 created `branch` from — the
+  /// project's base, or the one dependency's unmerged branch. Fixed at the
+  /// first Run; later rounds reuse it. `null` before it, and for a card
+  /// started before #640.
+  startBase               String?
+  /// #640: the dependency card (`C-<number>`) whose branch `startBase` is;
+  /// `null` when it is the project's base. A number, so it survives the
+  /// dependency's deletion.
+  startCardNumber         Int?
+  /// #640: the dependencies whose pull requests were not merged when round 1
+  /// started and whose code `branch` does not have (`C-<number>`s).
+  startMissing            Int[]            @default([])
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 

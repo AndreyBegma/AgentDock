@@ -29,9 +29,11 @@ import type { BoardCardKind } from './types';
  * (C-131): card-supplied text — title, body, feedback, design text, the
  * project's checks — sits in a `<card>` data fence. Version 16 (C-227): the
  * project's `## Project coding rules` section. Version 17 (C-254): the
- * stable text trimmed, no rule dropped.
+ * stable text trimmed, no rule dropped. Version 18 (#640): the branch a
+ * card started from when a dependency is not merged, and the unmerged
+ * dependencies whose code the branch does not have.
  */
-export const CARD_WORKER_PROMPT_VERSION = 17;
+export const CARD_WORKER_PROMPT_VERSION = 18;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -154,6 +156,24 @@ export interface CardWorkerPromptInput {
    * `projectRulesBlock`; absent or `null` is none.
    */
   projectRules?: string | null;
+  /**
+   * #640 (ADR-0063): the one unmerged dependency whose branch `branch` was
+   * created from; the pull request still targets `base`. Absent or `null`:
+   * `branch` was created from `base`.
+   */
+  startedFrom?: CardWorkerDependency | null;
+  /**
+   * #640: the dependencies whose pull requests are not merged and whose code
+   * `branch` does not have. Absent is none.
+   */
+  missingDependencies?: readonly CardWorkerDependency[];
+}
+
+/** #640: a dependency card as the prompt names it. */
+export interface CardWorkerDependency {
+  /** `C-<number>`. */
+  label: string;
+  branch: string;
 }
 
 const utf8Bytes = (text: string): number =>
@@ -499,8 +519,16 @@ const assemblePrompt = (
     `## Card ${label}`,
     '',
     `Kind: ${card.kind === 'bug' ? 'bug fix' : 'feature'}`,
-    `Branch: ${card.branch} (based on ${card.base})`,
+    card.startedFrom
+      ? `Branch: ${card.branch} (created from ${card.startedFrom.label}'s branch ${card.startedFrom.branch}, which is not merged yet; the pull request targets ${card.base})`
+      : `Branch: ${card.branch} (based on ${card.base})`,
   ];
+  const missing = card.missingDependencies ?? [];
+  if (missing.length > 0) {
+    lines.push(
+      `Not merged yet, so not on this branch: ${missing.map((d) => `${d.label} (${d.branch})`).join(', ')}. This card depends on them; do not redo their work — if you need their code, say so in your summary.`,
+    );
+  }
   if (card.issueNumber !== null) {
     lines.push(`GitHub issue: #${card.issueNumber}`);
   }

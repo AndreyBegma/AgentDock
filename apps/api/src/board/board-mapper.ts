@@ -16,6 +16,7 @@ import {
   type CardRoundBrief,
   type CardRoundView,
   type CardStackRef,
+  type CardStartView,
   type CardTrackingView,
   cardAutoMergeDefault,
   cardCiChecksOf,
@@ -479,6 +480,24 @@ const toRoundView = (
 });
 
 /** `attachments`: the card's and its rounds', oldest first (#309). */
+/** #640: what round 1 started from; `null` until it is stored. */
+export const cardStartOf = (
+  card: Pick<BoardCard, 'startBase' | 'startCardNumber' | 'startMissing'>,
+): CardStartView | null =>
+  card.startBase === null
+    ? null
+    : {
+        base: card.startBase,
+        card:
+          card.startCardNumber === null
+            ? null
+            : {
+                number: card.startCardNumber,
+                label: cardLabel(card.startCardNumber),
+              },
+        missing: [...card.startMissing].sort((a, b) => a - b).map(cardLabel),
+      };
+
 export const toCardDetail = (
   card: CardWithPeople,
   facts: CardFacts,
@@ -493,6 +512,7 @@ export const toCardDetail = (
   designModel: card.designModel,
   recommendation: cardRecommendationOf(card),
   branch: card.branch,
+  start: cardStartOf(card),
   worktree: card.worktree,
   specPath: card.specPath,
   specPr:

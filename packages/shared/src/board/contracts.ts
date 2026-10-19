@@ -472,6 +472,11 @@ export interface BoardCardDetail extends BoardCardView {
   recommendation: CardRecommendationView;
   /** Fixed at the first Run (D5). */
   branch: string | null;
+  /**
+   * #640 (ADR-0063): what round 1 created `branch` from, fixed with it;
+   * `null` before the first Run and for a card started before #640.
+   */
+  start: CardStartView | null;
   /** Display only: the runner owns the path. */
   worktree: string | null;
   /**
@@ -504,6 +509,19 @@ export interface BoardCardDetail extends BoardCardView {
    * own carry its `roundId`.
    */
   attachments: AttachmentView[];
+}
+
+/** #640 (ADR-0063): the branch a card's round 1 started from. */
+export interface CardStartView {
+  /** The project's base, or the one unmerged dependency's branch. */
+  base: string;
+  /** The dependency whose branch `base` is; `null` for the project's base. */
+  card: { number: number; label: string } | null;
+  /**
+   * The dependencies (`C-<number>`) whose pull requests were not merged when
+   * round 1 started and whose code the branch does not have; ascending.
+   */
+  missing: string[];
 }
 
 /** #359 D8: one PR of a card, as the card sheet lists it. */
