@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>New work intake — phone</title>
+<style>
+:root{--font-sans:'SF Pro Text',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;--radius-control:6px;--radius-surface:8px;--size-tap:44px;--dur-fast:100ms;--ease-sheet:cubic-bezier(.32,.72,0,1)}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--hue-1:#5b9cf6;--hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/.06);--glass-scrim-strong:rgb(9 9 12/.64);--glass-brightness-strong:.7;--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-rim-strong:rgb(242 242 246/.22);--glass-rim-shade-strong:rgb(9 9 12/.2);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#fff;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--hue-1:#1f64d6;--hue-7:#7244e0;--glass-sheen:rgb(0 0 0/.06);--glass-scrim-strong:rgb(255 255 255/.64);--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);--glass-rim-strong:rgb(255 255 255/.3);--glass-rim-shade-strong:rgb(24 24 27/.08);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);--glass-shadow-strong:rgb(0 0 0/.16);--glass-shadow-clear:rgb(0 0 0/.08);--canvas-glow:10%}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font:14px/20px var(--font-sans);-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));-webkit-backdrop-filter:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.mono{font-family:var(--font-mono)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:28px;padding:0 12px;border-radius:var(--radius-control);font:600 13px/1 var(--font-sans);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);cursor:pointer}
+.theme{position:fixed;top:16px;right:16px;z-index:100}
+.page{max-width:1240px;margin:0 auto;padding:32px 24px 48px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.desc{max-width:72ch;color:var(--color-ink-2);margin-top:6px}
+.stage{display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start;margin-top:28px}
+figure{margin:0;display:flex;flex-direction:column;gap:12px;width:360px}
+figcaption{font-size:12px;line-height:17px;color:var(--color-ink-3)}
+figcaption b{display:block;font-size:13px;color:var(--color-ink);font-weight:600;margin-bottom:2px}
+.phone{position:relative;width:360px;height:740px;border-radius:40px;overflow:hidden;background:var(--color-surface);border:1px solid var(--color-line-strong);box-shadow:0 30px 60px -20px var(--glass-shadow-strong)}
+.sb{display:flex;justify-content:space-between;align-items:center;height:44px;padding:0 26px;font:600 14px/1 var(--font-sans)}
+.home{position:absolute;left:50%;bottom:8px;width:120px;height:5px;margin-left:-60px;border-radius:99px;background:var(--color-ink);opacity:.8;z-index:70}
+.bb{position:absolute;left:10px;right:10px;bottom:calc(22px + var(--kb,0px));z-index:60;display:flex;align-items:center;gap:6px;height:60px;padding:7px;border-radius:22px}
+.bb-back{display:inline-flex;align-items:center;gap:4px;height:44px;min-width:44px;padding:0 16px 0 10px;border-radius:15px;border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:600 15px/1 var(--font-sans);cursor:pointer;transition:transform var(--dur-fast) var(--ease-sheet)}
+.bb-back:active{transform:scale(.97)}
+.bb-back .icon{width:22px;height:22px}
+.bb-title{flex:1;min-width:0;padding:0 4px;text-align:center;font-size:12px;line-height:16px;color:var(--color-ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bb-title b{display:block;color:var(--color-ink);font-weight:600;font-size:14px;line-height:18px}
+.spacer{width:44px;flex-shrink:0}
+/* intake */
+.body{padding:8px 16px 0;display:flex;flex-direction:column;gap:12px}
+.ttl{font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.01em}
+.bubble{max-width:88%;padding:10px 12px;border-radius:14px;font-size:14px;line-height:20px}
+.bubble.ai{background:var(--color-content);border:1px solid var(--color-line);border-bottom-left-radius:4px}
+.bubble.me{align-self:flex-end;background:var(--color-accent-soft);color:var(--color-ink);border-bottom-right-radius:4px}
+.who{font-size:11px;color:var(--color-ink-3);margin-bottom:2px}
+.composer{position:absolute;left:12px;right:12px;bottom:calc(94px + var(--kb,0px));z-index:55;display:flex;align-items:flex-end;gap:8px;padding:8px;border-radius:16px;background:var(--color-content);border:1px solid var(--color-line-strong)}
+.composer .ta{flex:1;min-height:40px;padding:10px 6px;font-size:14px;color:var(--color-ink-3)}
+.composer .ta.typed{color:var(--color-ink)}
+.send{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;border:0;background:var(--color-accent);color:var(--color-on-accent);cursor:pointer}
+.send .icon{width:18px;height:18px}
+.attach{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;border:0;background:transparent;color:var(--color-ink-2)}
+.kb{position:absolute;left:0;right:0;bottom:0;height:282px;padding:8px 4px 40px;background:var(--color-raised);border-top:1px solid var(--color-line);display:flex;flex-direction:column;gap:10px;z-index:50}
+.kb div{display:flex;gap:5px;justify-content:center}
+.kb span{width:30px;height:42px;border-radius:6px;background:var(--color-content);border:1px solid var(--color-line)}
+.kb .wide{width:180px}
+.caret{display:inline-block;width:2px;height:16px;background:var(--color-accent);vertical-align:-3px;margin-left:1px}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<button class="btn theme" type="button" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Toggle theme</button>
+<main class="page">
+<div class="eyebrow">S-6 · C-278</div>
+<h1>New work intake, full screen</h1>
+<p class="desc">The intake has no parent screen, so the bar shows <b>Close</b>. The draft is kept, so closing never loses typing. With the keyboard up, the bar sits on top of it and the composer sits on top of the bar.</p>
+<div class="stage">
+  <figure>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="mono" style="font-size:12px">5G ▮▮▮</span></div>
+      <div class="body">
+        <h2 class="ttl">What should the fleet build?</h2>
+        <div class="bubble ai"><div class="who">Planner</div>Describe the change. I'll ask about anything the repository can't tell me.</div>
+        <div class="bubble me">Closing full-screen modes on phones is fiddly. The X is tiny.</div>
+        <div class="bubble ai"><div class="who">Planner</div>Which surfaces? I found the design viewer, the intake, the terminal sheet and the card preview.</div>
+      </div>
+      <div class="composer">
+        <button class="attach" type="button" aria-label="Attach a photo"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+        <div class="ta">Reply…</div>
+        <button class="send" type="button" aria-label="Send"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
+      </div>
+      <div class="bb glass-strong">
+        <button class="bb-back" type="button" aria-label="Close New work, draft is saved"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg><span>Close</span></button>
+        <div class="bb-title"><b>New work</b>Draft saved</div>
+        <span class="spacer"></span>
+      </div>
+      <div class="home"></div>
+    </div>
+    <figcaption><b>Keyboard closed</b>Close sits at the bottom left, where the thumb is. Send sits in the composer on the right: two separate hit areas, kept apart.</figcaption>
+  </figure>
+  <figure>
+    <div class="phone" style="--kb:268px">
+      <div class="sb"><span>9:41</span><span class="mono" style="font-size:12px">5G ▮▮▮</span></div>
+      <div class="body">
+        <h2 class="ttl">What should the fleet build?</h2>
+        <div class="bubble ai"><div class="who">Planner</div>Which surfaces? I found the design viewer, the intake, the terminal sheet and the card preview.</div>
+      </div>
+      <div class="composer">
+        <button class="attach" type="button" aria-label="Attach a photo"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+        <div class="ta typed">All four, same control<span class="caret"></span></div>
+        <button class="send" type="button" aria-label="Send"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
+      </div>
+      <div class="bb glass-strong" style="bottom:278px">
+        <button class="bb-back" type="button" aria-label="Close New work, draft is saved"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg><span>Close</span></button>
+        <div class="bb-title"><b>New work</b>Saving…</div>
+        <span class="spacer"></span>
+      </div>
+      <div class="kb" aria-hidden="true">
+        <div><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div><span></span><span></span><span class="wide"></span><span></span></div>
+      </div>
+    </div>
+    <figcaption><b>Keyboard open</b>The bar follows <span class="mono">--keyboard-inset</span>, so one tap closes the intake without dismissing the keyboard first. Close blurs the field, saves the draft and returns to the page underneath.</figcaption>
+  </figure>
+</div>
+</main>
+</body>
+</html>
