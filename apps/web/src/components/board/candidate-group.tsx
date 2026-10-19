@@ -23,7 +23,9 @@ import { KindChip } from './split-review';
  * on a line; a proposed split or stack has **Accept all** (Accept rest once
  * a row is decided). Decided rows stay — the card an accepted one became,
  * where the attachments went, "no card made" for a rejected one — until
- * every row is decided and the intake leaves Drafts.
+ * every row is decided and the intake leaves Drafts. The group is capped at
+ * about 40% of the viewport (the Board page does not scroll): the header stays
+ * and the candidate list scrolls inside it.
  */
 export function CandidateGroup({
   plan,
@@ -53,8 +55,12 @@ export function CandidateGroup({
   const attachments = plan.intake?.attachmentsLeft ?? 0;
 
   return (
-    <Card variant="content" pad="none" className="flex h-full min-w-0 flex-col">
-      <div className="flex flex-col gap-1 border-b border-line px-3 pt-3 pb-2.5">
+    <Card
+      variant="content"
+      pad="none"
+      className="flex h-full max-h-[max(40vh,20rem)] min-w-0 flex-col"
+    >
+      <div className="flex shrink-0 flex-col gap-1 border-b border-line px-3 pt-3 pb-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <Chip size="sm">New work</Chip>
           <span className="truncate text-sm font-semibold text-ink">
@@ -80,7 +86,10 @@ export function CandidateGroup({
           ) : null}
         </div>
       </div>
-      <ul aria-label="Candidates" className="flex flex-col p-1">
+      <ul
+        aria-label="Candidates"
+        className="flex min-h-0 flex-col overflow-y-auto p-1"
+      >
         {candidates.map((candidate, i) => (
           <CandidateRow
             key={candidate.id}
