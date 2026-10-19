@@ -87,6 +87,7 @@ model User {
   attachmentsUploaded         Attachment[]
   tokenSaverSettingsUpdated   TokenSaverSettings[]
   stewardSettingsUpdated      StewardSettings[]
+  aiDigestSettingsUpdated     AiDigestSettings[]
   settings                    UserSettings?
   planCandidatesDecided       PlanCandidate[]               @relation("PlanCandidateDecidedBy")
 
@@ -457,6 +458,9 @@ model Project {
   stewardSettings      StewardSettings?
   stewardIncidents     StewardIncident[]
   stewardDigests       StewardDigest[]
+  aiDigestSettings     AiDigestSettings?
+  aiDigests            AiDigest[]
+  aiSummaries          AiSummary[]
   handoffNotes         HandoffNote[]
   rules                ProjectRule[]
   telegramLinks        TelegramLink[]
@@ -4038,4 +4042,91 @@ model AssistantAttachment {
   @@index([conversationId, createdAt])
   @@index([messageId])
   @@map("assistant_attachments")
+}
+
+// ─── AI digest and summaries (#658) ─────────────────────────────────────────
+
+/// A project's daily AI digest setting. A missing row means `AI_DIGEST_DEFAULTS`:
+/// off, 09:00 UTC.
+model AiDigestSettings {
+  projectId   String   @id
+  enabled     Boolean  @default(false)
+  /// `HH:MM` in `timezone`.
+  time        String   @default("09:00")
+  /// IANA zone the time is read in — the project's.
+  timezone    String   @default("UTC")
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("ai_digest_settings")
+}
+
+/// Mirrors `AI_DIGEST_STATUSES`. `pending` claims the occurrence while it is
+/// made, so two instances ticking together make one digest.
+enum AiDigestStatus {
+  pending
+  sent
+  skipped
+}
+
+/// One daily occurrence of a project's AI digest: the digest made, or why it
+/// was skipped. `(projectId, dueAt)` makes a repeated tick a no-op.
+model AiDigest {
+  id         String         @id @default(cuid())
+  projectId  String
+  /// The occurrence: the configured time on its day, in UTC.
+  dueAt      DateTime
+  status     AiDigestStatus
+  /// The period covered.
+  from       DateTime
+  to         DateTime
+  /// `{ done, stuck, waiting }` of `AiDigestView`; null when skipped.
+  content    Json?
+  /// The model's overview, in English; null when skipped.
+  overview   String?
+  provider   LlmProvider?
+  model      String?
+  /// An `LlmErrorCode`, or `no_model`, when skipped.
+  skipReason String?
+  createdAt  DateTime       @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, dueAt])
+  @@index([projectId, createdAt])
+  @@map("ai_digests")
+}
+
+/// Mirrors `AI_SUMMARY_SUBJECTS`.
+enum AiSummarySubject {
+  card
+  session
+}
+
+/// The cached summary of a card (with its PR) or a session, one per reader
+/// language. `sourceHash` fingerprints what it was made from: a summary whose
+/// source changed is made again, an unchanged one is served without a call.
+model AiSummary {
+  id          String           @id @default(cuid())
+  projectId   String
+  subject     AiSummarySubject
+  /// `board_cards.id` or `sessions.id`; no foreign key, like incidents.
+  subjectId   String
+  /// BCP 47 primary language the text is written in, e.g. `en`, `ru`.
+  language    String
+  sourceHash  String
+  text        String
+  provider    LlmProvider
+  model       String
+  costUsd     Decimal          @db.Decimal(14, 6)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([subject, subjectId, language])
+  @@map("ai_summaries")
 }

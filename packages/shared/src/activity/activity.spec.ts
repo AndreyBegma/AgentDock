@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { AI_DIGEST_ACTIVITY_TYPES } from '../ai';
 import { AUDIT_ACTIONS } from '../audit';
 import {
   API_EVENT_SOURCE,
@@ -59,6 +60,7 @@ const API_ONLY = new Set<string>([
   'manual.handoff',
   'card.background_stalled',
   ...STEWARD_ACTIVITY_TYPES,
+  ...AI_DIGEST_ACTIVITY_TYPES,
 ]);
 
 describe('the curated event map (spec 21 D3)', () => {
@@ -109,6 +111,8 @@ describe('the curated event map (spec 21 D3)', () => {
         'steward_incident.acted',
         'steward_incident.escalated',
         'steward_incident.resolved',
+        'ai_digest.sent',
+        'ai_digest.skipped',
       ].sort(),
     );
   });

@@ -479,6 +479,19 @@ describe('card stacks (e2e, #480)', () => {
   });
 
   describe('design-first gate', () => {
+    it('refuses a later stage for its design before its dependencies (#638)', async () => {
+      await confirmedStack();
+      const refused = await run(3);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toBe(BOARD_ERROR.stackDesignNotApproved);
+
+      await approveStackDesign();
+      const waiting = await run(3);
+      expect(waiting.status).toBe(409);
+      expect(waiting.body.error).toBe(BOARD_ERROR.dependencyOpen);
+      expect(h.cardSentOf('card.run')).toHaveLength(0);
+    });
+
     it('refuses Run on every card of the stack while its design is not approved, then lets it run with the design as reference', async () => {
       await confirmedStack();
       const refused = await run(1);
@@ -735,11 +748,7 @@ describe('card stacks (e2e, #480)', () => {
       ]);
       for (const [number, stage] of stages) {
         const before = h.cardSentOf('card.run').length;
-        const started = await h.author.send(
-          'post',
-          `${h.cardPath(number)}/run`,
-          { ignoreDependencies: true },
-        );
+        const started = await run(number);
         expect(started.status).toBe(200);
         const sent = h.cardSentOf('card.run');
         expect(sent).toHaveLength(before + 1);
@@ -752,6 +761,12 @@ describe('card stacks (e2e, #480)', () => {
         const section = prompt.slice(prompt.indexOf('## Stack'));
         expect(section).toContain(`S-1 "Redesign the Settings page", ${stage}`);
         expect(section).toContain(path);
+        // #638: the next stage runs once this one is done; with two cards
+        // per stage, #636 (ADR-0064) wants them landed — accepted, no PR.
+        await h.ctx.prisma.boardCard.update({
+          where: { projectId_number: { projectId: h.projectId, number } },
+          data: { column: 'completed', completedAt: new Date() },
+        });
       }
     });
 

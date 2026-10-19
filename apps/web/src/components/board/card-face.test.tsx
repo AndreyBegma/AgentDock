@@ -277,7 +277,7 @@ describe('CardFace readiness and Auto-run (#443)', () => {
   test('a ready card shows Ready', () => {
     const status = row(
       render('todo', {
-        readiness: { state: 'ready', accepted: 2, total: 2, open: [] },
+        readiness: { state: 'ready', satisfied: 2, total: 2, open: [] },
       }),
       'status',
     );
@@ -290,7 +290,7 @@ describe('CardFace readiness and Auto-run (#443)', () => {
       render('todo', {
         readiness: {
           state: 'waiting',
-          accepted: 1,
+          satisfied: 1,
           total: 2,
           open: [dep(84, 'in_progress')],
         },
@@ -299,6 +299,13 @@ describe('CardFace readiness and Auto-run (#443)', () => {
     );
     expect(status).toContain('Waiting · 1 of 2');
     expect(status).toContain('Waits for C-84');
+  });
+
+  test('the dependency chip reads a Finished dependency as satisfied (#638)', () => {
+    const header = (column: BoardColumn) =>
+      row(render('todo', { dependsOn: [dep(3, column)] }), 'header') ?? '';
+    expect(header('finished')).toContain('Runs after C-3, all ready.');
+    expect(header('in_progress')).toContain('No ready pull request yet: C-3.');
   });
 
   test('the Auto-run marker shows only with the switch on', () => {

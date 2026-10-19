@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ActivityModule } from './activity';
 import { AdminModule } from './admin/admin.module';
+import { AiDigestModule } from './ai-digest';
 import { ApprovalsModule } from './approvals';
 import { AssessModule } from './assess/assess.module';
 import { AssistantModule } from './assistant';
@@ -38,6 +39,7 @@ import { SessionsModule } from './sessions/sessions.module';
 import { SkillsModule } from './skills';
 import { StewardModule } from './steward';
 import { StewardDigestModule } from './steward-digest';
+import { SummariesModule } from './summaries';
 import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { TerminalSetupModule } from './terminal-setup';
@@ -114,12 +116,16 @@ import { WorkflowsModule } from './workflows';
     // Issue #447: the Steward digest. Global, and here alone: its conditional
     // queue must not be registered while the graph loads.
     StewardDigestModule,
+    // Issue #658: the daily AI digest. Global and here alone, for the same reason.
+    AiDigestModule,
     // Before WebhooksModule: its `POST /hooks/:publicId` would otherwise
     // claim `/hooks/github` (spec 27 notes; pinned by an e2e test).
     GitHubAppModule,
     WebhooksModule,
     // Issue #608: the assistant, on the LLM gateway (ADR-0060).
     AssistantModule,
+    // Issue #658: one-click card and session summaries.
+    SummariesModule,
     // #660: Ask the Board and triage hints.
     BoardAiModule,
   ],

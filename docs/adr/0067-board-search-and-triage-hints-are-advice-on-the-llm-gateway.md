@@ -1,4 +1,4 @@
-# ADR-0065: Board search and triage hints are advice on the LLM gateway
+# ADR-0067: Board search and triage hints are advice on the LLM gateway
 
 Status: accepted · Date: 2026-10-19 ·
 Card: C-243 (stack S-3, stage 4) ·
