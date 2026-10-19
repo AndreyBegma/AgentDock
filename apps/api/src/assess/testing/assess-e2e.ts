@@ -14,9 +14,10 @@ export const assessAnswer = (
   work = 'sonnet',
   design = 'opus',
   extra: Record<string, unknown> = {},
+  effort = 'medium',
 ): string =>
   JSON.stringify({
-    work: { model: work, reason: `Work fits ${work}.` },
+    work: { model: work, effort, reason: `Work fits ${work}.` },
     design: { model: design, reason: `Design fits ${design}.` },
     ...extra,
   });

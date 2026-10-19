@@ -74,7 +74,8 @@ export const cardSessionFlags = (session: CardSession): string[] =>
  */
 export const cardArgv = (
   profile: ConfigProfile,
-  args: Pick<CardRunArgs, 'session' | 'model' | 'permissionMode' | 'prompt'>,
+  args: Pick<CardRunArgs, 'session' | 'model' | 'permissionMode' | 'prompt'> &
+    Partial<Pick<CardRunArgs, 'effort'>>,
   wiring?: CardWiringFiles,
   tokenSaver?: TokenSaverLaunch | null,
 ): { binary: string; args: string[] } => ({
@@ -93,6 +94,8 @@ export const cardArgv = (
         : []),
     '--model',
     args.model,
+    // #663: checked against Claude Code's `--help`: `--effort <level>`.
+    ...(args.effort ? ['--effort', args.effort] : []),
     '--permission-mode',
     CLI_PERMISSION_MODE[args.permissionMode],
     '--',
@@ -118,7 +121,8 @@ export const cardLaunchSpec = (
     | 'projectId'
     | 'runId'
     | 'shortId'
-  >,
+  > &
+    Partial<Pick<CardRunArgs, 'effort'>>,
   worktree: string,
   otlpPort: number | null,
   wiring?: CardWiringFiles,

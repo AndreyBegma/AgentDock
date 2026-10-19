@@ -5,6 +5,7 @@ import {
   launchBaseline,
   launchChanges,
   launchDefaults,
+  launchEffortOptions,
   launchModelOptions,
   launchRequest,
   launchSavedNote,
@@ -20,7 +21,11 @@ const launchCard = (extra: Partial<LaunchCard> = {}): LaunchCard => ({
   model: null,
   designModel: null,
   recommendation: {
-    work: { model: 'sonnet', reason: 'A clear change to one module.' },
+    work: {
+      model: 'sonnet',
+      effort: 'low',
+      reason: 'A clear change to one module.',
+    },
     design: { model: 'opus', reason: 'The layout is still open.' },
     assessedAt: '2026-10-15T10:00:00.000Z',
   },
@@ -32,15 +37,21 @@ describe('launchDefaults (D2)', () => {
     expect(launchDefaults(launchCard(), 'work')).toEqual({
       profileKey: '',
       model: 'sonnet',
+      effort: 'low',
     });
     expect(launchDefaults(launchCard(), 'design').model).toBe('opus');
   });
 
   test('the card’s override wins, and work and design keep their own', () => {
-    const card = launchCard({ model: 'haiku', profileKey: 'work-max' });
+    const card = launchCard({
+      model: 'haiku',
+      effort: 'high',
+      profileKey: 'work-max',
+    });
     expect(launchDefaults(card, 'work')).toEqual({
       profileKey: 'work-max',
       model: 'haiku',
+      effort: 'high',
     });
     // The profile is shared; the design model is its own override.
     expect(launchDefaults(card, 'design')).toEqual({
@@ -127,6 +138,42 @@ describe('launchModelOptions', () => {
   });
 });
 
+describe('launchEffortOptions (#663)', () => {
+  test('marks the recommended effort, "Low (recommended)", with no default', () => {
+    const options = launchEffortOptions(launchCard());
+    expect(options.map((o) => o.label)).toEqual([
+      'Low (recommended)',
+      'Medium',
+      'High',
+    ]);
+  });
+
+  test('offers "Claude default" first when there is nothing to follow', () => {
+    const options = launchEffortOptions(launchCard({ recommendation: NONE }));
+    expect(options[0]).toEqual({
+      value: '',
+      label: 'Claude default',
+      recommended: false,
+    });
+    expect(
+      launchDefaults(launchCard({ recommendation: NONE }), 'work').effort,
+    ).toBe('');
+  });
+
+  test('a card assessed before effort follows its override, else the default', () => {
+    const before = launchCard({
+      recommendation: {
+        ...launchCard().recommendation,
+        work: { model: 'opus', effort: null, reason: 'x' },
+      },
+    });
+    expect(launchDefaults(before, 'work').effort).toBe('');
+    expect(launchDefaults({ ...before, effort: 'medium' }, 'work').effort).toBe(
+      'medium',
+    );
+  });
+});
+
 describe('recommendationNote', () => {
   test('names the model and the reason, or that there is none', () => {
     expect(recommendationNote(launchCard(), 'work')).toBe(
@@ -145,6 +192,16 @@ describe('launchRequest', () => {
       profileKey: 'work-max',
       model: 'opus',
     });
+  });
+
+  test('#663: sends a chosen effort; the default or a design form sends none', () => {
+    expect(launchRequest({ profileKey: '', model: '', effort: 'low' })).toEqual(
+      { effort: 'low' },
+    );
+    expect(launchRequest({ profileKey: '', model: '', effort: '' })).toEqual(
+      {},
+    );
+    expect(launchDefaults(launchCard(), 'design').effort).toBeUndefined();
   });
 });
 

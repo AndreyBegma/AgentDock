@@ -233,6 +233,12 @@ export const capabilitiesSchema = z.object({
    */
   sessionMessage: z.boolean().optional(),
   /**
+   * #663: the runner takes `effort` on `card.run` and starts the round with
+   * `--effort`. `card.run` args are strict, so the API sends the field only
+   * when this is `true`. Absent means `false` — a runner older than it.
+   */
+  cardEffort: z.boolean().optional(),
+  /**
    * ADR-0047: the runner's local security policy as it is now — values only,
    * no path beyond `allowedRoots`. The server cannot change it; the UI reads
    * it to explain a `policy_refused` before the person asks. Absent means
@@ -268,6 +274,10 @@ export const handoffAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `session.message` (#489); absent is `false`. */
 export const sessionMessageAvailable = (capabilities: Capabilities): boolean =>
   capabilities.sessionMessage === true;
+
+/** Whether the API may send `card.run`'s `effort` (#663); absent is `false`. */
+export const cardEffortAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardEffort === true;
 
 /** The runner's policy (ADR-0047); null for a runner older than it. */
 export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {

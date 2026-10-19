@@ -1,5 +1,6 @@
 import type {
   CardDesignRecommendableModel,
+  CardEffort,
   CardRecommendableModel,
 } from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
@@ -452,13 +453,21 @@ export interface CardModelRecommendation<
 }
 
 /**
+ * #663 (ADR-0068 §5): the work recommendation names an effort next to its
+ * model; `null` on a card assessed before the effort was asked for.
+ */
+export interface CardWorkRecommendation extends CardModelRecommendation {
+  effort: CardEffort | null;
+}
+
+/**
  * #322 D6, D7: a card's recommendations for its work and its design. Each is
  * `null` until an assessment applied — runner offline or too old, no Claude
  * profile, a budget stop, an answer out of contract: the popover shows "No
  * recommendation yet" and launch does not wait.
  */
 export interface CardRecommendationView {
-  work: CardModelRecommendation | null;
+  work: CardWorkRecommendation | null;
   design: CardModelRecommendation<CardDesignRecommendableModel> | null;
   /** When the last assessment applied (ISO); `null` before the first. */
   assessedAt: string | null;
@@ -475,6 +484,11 @@ export interface BoardCardDetail extends BoardCardView {
    * work model the person chose, kept only when it differed from the default.
    */
   model: string | null;
+  /**
+   * #663: the work effort the person chose, kept only when it differed from
+   * the default (the #322 D3 rule); `null` follows the default.
+   */
+  effort: CardEffort | null;
   /**
    * #322 D3: the Claude profile the person chose for the card's work and
    * design, kept only when it differed from the resolver's pick; `null`
@@ -671,6 +685,12 @@ export interface BulkBoardCardsResponse {
  */
 export interface RunBoardCardRequest {
   model?: string;
+  /**
+   * #663: the work effort, remembered like `model`. A `ci_fix` round
+   * defaults to `low`, any other to the recommendation's, else none (the
+   * CLI's own).
+   */
+  effort?: CardEffort;
   /**
    * #322 D9: a Claude profile of the project's runner (`profileKeySchema`); an
    * unknown or non-Claude key is 422 `no_profile`.

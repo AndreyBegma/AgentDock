@@ -71,6 +71,29 @@ describe('card worker launch (#242 D5)', () => {
     });
   });
 
+  it('#663: passes the effort after the model, and none when absent', () => {
+    const { args: argv } = cardArgv(profile, {
+      ...args(false),
+      effort: 'low',
+    });
+    const at = argv.indexOf('--model');
+    expect(argv.slice(at, at + 4)).toEqual([
+      '--model',
+      'opus',
+      '--effort',
+      'low',
+    ]);
+    expect(cardArgv(profile, args(false)).args).not.toContain('--effort');
+    expect(
+      cardLaunchSpec(
+        profile,
+        { ...args(true), effort: 'high' },
+        '/srv/dev/wt',
+        null,
+      ).args,
+    ).toContain('high');
+  });
+
   it('a later round: --resume <uuid> with the round prompt', () => {
     const { args: argv } = cardArgv(profile, args(true));
     expect(argv.slice(1, 3)).toEqual(['--resume', SESSION]);

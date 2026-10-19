@@ -3,7 +3,11 @@ import { cardAssessAnswerSchema } from './contract';
 import { CARD_ASSESS_REASON_MAX, cardAssessJobId } from './limits';
 
 const answer = {
-  work: { model: 'sonnet', reason: 'Executes a clear, single-module change.' },
+  work: {
+    model: 'sonnet',
+    effort: 'low',
+    reason: 'Executes a clear, single-module change.',
+  },
   design: { model: 'opus', reason: 'The layout is still undecided.' },
 } as const;
 
@@ -27,6 +31,24 @@ describe('cardAssessAnswerSchema (D6)', () => {
         parse({ ...answer, work: { ...answer.work, model } }).success,
       ).toBe(false);
     }
+  });
+
+  it('recommends a low, medium or high effort for work only (#663)', () => {
+    for (const effort of ['low', 'medium', 'high']) {
+      expect(
+        parse({ ...answer, work: { ...answer.work, effort } }).success,
+      ).toBe(true);
+    }
+    for (const effort of ['xhigh', 'max', 'Low', '']) {
+      expect(
+        parse({ ...answer, work: { ...answer.work, effort } }).success,
+      ).toBe(false);
+    }
+    const { effort: _, ...noEffort } = answer.work;
+    expect(parse({ ...answer, work: noEffort }).success).toBe(false);
+    expect(
+      parse({ ...answer, design: { ...answer.design, effort: 'low' } }).success,
+    ).toBe(false);
   });
 
   it('chooses between opus and sonnet only for design', () => {

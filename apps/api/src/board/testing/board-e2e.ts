@@ -438,6 +438,17 @@ export class BoardWorld {
     });
   }
 
+  /**
+   * #663: the runner advertises `cardEffort`; without a call it stores none,
+   * as a runner older than the feature.
+   */
+  async advertiseCardEffort(cardEffort = true): Promise<void> {
+    await this.ctx.prisma.runner.update({
+      where: { id: this.runnerId },
+      data: { capabilities: { ...capabilities, cardEffort } },
+    });
+  }
+
   /** Delivers runner events to the sinks, as ingest does. */
   async deliver(
     type: string,
