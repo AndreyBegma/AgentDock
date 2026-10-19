@@ -25,6 +25,7 @@ import { ArrowDown, ArrowLeft, Layers, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { GenerateDesignLink } from '../../../../../../../components/design/generate-design-link';
 import { MockupFrame } from '../../../../../../../components/design/mockup-frame';
 import { ScaledPreview } from '../../../../../../../components/design/scaled-preview';
 import { Markdown } from '../../../../../../../components/markdown/markdown';
@@ -231,23 +232,7 @@ function StackDetail({
       Pick and approve
     </Link>
   );
-  const generate = (
-    <Button
-      variant="solid"
-      disabled={busy}
-      onClick={() =>
-        run(
-          () =>
-            api(`${stackDesignApi(projectId, stack.number)}/generate`, {
-              method: 'POST',
-            }),
-          true,
-        )
-      }
-    >
-      Generate design
-    </Button>
-  );
+  const generate = <GenerateDesignLink href={viewer} />;
 
   const actions = canOperate ? (
     stack.design === null ? null : stack.design.status === 'idle' ? (
