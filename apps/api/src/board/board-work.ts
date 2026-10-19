@@ -114,6 +114,13 @@ export type CardSatisfiedHook = (
   actor: BoardActor,
 ) => Promise<void>;
 
+/**
+ * #652: what follows any change of a card — Run stack re-evaluates its
+ * queue. `BoardStackRuns` registers it; `BoardWork` cannot depend on it (it
+ * starts rounds, which move cards through here). It must not throw.
+ */
+export type CardChangedHook = (projectId: string, cardId: string) => void;
+
 export const ACTIVE_PHASES = [...ACTIVE_CARD_ROUND_PHASES];
 
 const SHORT_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -243,6 +250,7 @@ export class BoardWork implements OnModuleInit {
   private readonly pending = new Set<Promise<void>>();
   private roundCollected: RoundCollectedHook | null = null;
   private cardSatisfied: CardSatisfiedHook | null = null;
+  private cardChanged: CardChangedHook | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -563,6 +571,11 @@ export class BoardWork implements OnModuleInit {
   /** #443, #638: `BoardAutoRun` registers what follows Finished or Accept. */
   onSatisfied(hook: CardSatisfiedHook): void {
     this.cardSatisfied = hook;
+  }
+
+  /** #652: `BoardStackRuns` registers what follows any change of a card. */
+  onChanged(hook: CardChangedHook): void {
+    this.cardChanged = hook;
   }
 
   /** #359: `BoardShipping` registers what follows a round's collect. */
@@ -1139,6 +1152,11 @@ export class BoardWork implements OnModuleInit {
     }
   }
 
+  /** #652: background work `settled` waits for, like a collect. */
+  background(work: Promise<void>): void {
+    this.track(work);
+  }
+
   private track(work: Promise<void>): void {
     this.pending.add(work);
     void work.finally(() => this.pending.delete(work));
@@ -1468,6 +1486,7 @@ export class BoardWork implements OnModuleInit {
         `board.changed ${cardId} not published: ${(error as Error).message}`,
       );
     }
+    this.cardChanged?.(projectId, cardId);
   }
 
   /** #480: `board.changed` for a stack — its face, its page and its design. */

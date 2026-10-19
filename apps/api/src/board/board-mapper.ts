@@ -426,6 +426,7 @@ export const toCardView = (
           message: card.autoRunMessage ?? '',
           at: card.autoRunFailedAt.toISOString(),
           after: card.autoRunAfter,
+          stack: card.autoRunStack,
         }
       : null,
   autoRunWhenReady: card.autoRunWhenReady,

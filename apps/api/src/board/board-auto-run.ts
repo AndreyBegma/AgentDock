@@ -101,6 +101,7 @@ export class BoardAutoRun implements OnModuleInit {
           autoRunMessage: message,
           autoRunFailedAt: new Date(),
           autoRunAfter: after,
+          autoRunStack: null,
         },
       });
       await this.audit.record({

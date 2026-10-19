@@ -9,8 +9,12 @@ import {
   cardLabel,
   currentStage,
   findDependencyCycle,
+  isActiveRoundPhase,
   isStackGated,
   STACK_GATE_REASON,
+  type StackCardRunState,
+  type StackRunPause,
+  type StackRunView,
   stackColumn,
   stackLabel,
   stageLinks,
@@ -97,14 +101,77 @@ const STACK_INCLUDE = {
           number: true,
           title: true,
           column: true,
-          rounds: { select: { runId: true } },
+          rounds: { select: { id: true, runId: true, phase: true } },
         },
       },
+    },
+  },
+  run: {
+    include: {
+      cards: { select: { cardId: true, status: true, roundId: true } },
     },
   },
 } as const satisfies Prisma.BoardStackInclude;
 
 type StackRow = Prisma.BoardStackGetPayload<{ include: typeof STACK_INCLUDE }>;
+
+/** #652: the round ids of the stack's cards that are still active. */
+const activeRoundsOf = (row: StackRow): Set<string> =>
+  new Set(
+    row.stages.flatMap((s) =>
+      s.cards.flatMap((c) =>
+        c.rounds.filter((r) => isActiveRoundPhase(r.phase)).map((r) => r.id),
+      ),
+    ),
+  );
+
+/** #652: Run stack's state, as the face and the page show it. */
+const stackRunOf = (row: StackRow): StackRunView | null => {
+  const run = row.run;
+  if (!run) return null;
+  const active = activeRoundsOf(row);
+  const numbers = new Map(
+    row.stages.flatMap((s) => s.cards.map((c) => [c.id, c.number] as const)),
+  );
+  return {
+    state: run.state,
+    pause:
+      run.state === 'paused' && run.pausedCode !== null && run.pausedAt
+        ? {
+            code: run.pausedCode as StackRunPause['code'],
+            message: run.pausedMessage ?? '',
+            card:
+              run.pausedCardId !== null
+                ? (numbers.get(run.pausedCardId) ?? null)
+                : null,
+            at: run.pausedAt.toISOString(),
+          }
+        : null,
+    queued: run.cards.filter((c) => c.status === 'queued').length,
+    waiting: run.cards.filter((c) => c.status === 'waiting').length,
+    running: run.cards.filter(
+      (c) => c.status === 'started' && c.roundId && active.has(c.roundId),
+    ).length,
+    startedAt: run.startedAt.toISOString(),
+  };
+};
+
+/** #652: one card in the stack run; `null` when the run holds it no more. */
+const cardRunOf = (
+  row: StackRow,
+  cardId: string,
+  active: ReadonlySet<string>,
+): StackCardRunState | null => {
+  const run = row.run;
+  if (!run) return null;
+  if (run.state === 'paused' && run.pausedCardId === cardId) return 'paused';
+  const entry = run.cards.find((c) => c.cardId === cardId);
+  if (!entry) return null;
+  if (entry.status === 'started') {
+    return entry.roundId && active.has(entry.roundId) ? 'running' : null;
+  }
+  return entry.status;
+};
 
 /**
  * Stacks (#480, ADR-0044): a group of cards that make one larger piece of
@@ -348,6 +415,7 @@ export class BoardStacks {
     ]);
     const byId = new Map(cards.map((c) => [c.id, c]));
     const view = this.viewOf(row, costs);
+    const active = activeRoundsOf(row);
     const { base } = await this.work.project(projectId);
     const started = await this.prisma.boardCardRound.count({
       where: { cardId: { in: cardIds } },
@@ -394,6 +462,7 @@ export class BoardStacks {
               .map((d) => d.dependsOn.number)
               .sort((a, b) => a - b),
             costUsd: sumCosts(c.rounds.map((r) => costs.get(r.runId))),
+            run: cardRunOf(row, c.id, active),
           };
         }),
       })),
@@ -696,6 +765,7 @@ export class BoardStacks {
           s.cards.flatMap((c) => c.rounds.map((r) => costs.get(r.runId))),
         ),
       ),
+      run: stackRunOf(row),
     };
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import type { BoardCardView } from '@agentdock/shared';
+import { type BoardCardView, stackRunText } from '@agentdock/shared';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { Progress } from '@andrewbehma/glass-ui/progress';
@@ -17,6 +17,7 @@ import {
   roundPill,
 } from '../../lib/board/format';
 import { boardStackPageHref } from '../../lib/board/href';
+import { pauseText, stackFaceRunPill } from '../../lib/board/stack-page';
 import {
   type StackItem,
   stackCost,
@@ -64,6 +65,10 @@ export function StackFace({
   const bodyId = useId();
   const cost = stackCost(stack);
   const designChip = stackDesignChip(stack);
+  const runPill = stackFaceRunPill(stack);
+  const runTip = stack.run
+    ? (pauseText(stack.run) ?? stackRunText(stack.run))
+    : null;
   const href = boardStackPageHref(projectId, stack.number);
   return (
     <div
@@ -103,6 +108,18 @@ export function StackFace({
             <TriangleAlert aria-hidden="true" className="size-3" />
             {designChip}
           </Chip>
+        ) : null}
+        {runPill && runTip ? (
+          // #652: Run stack's state; a pause says why.
+          <Tooltip content={runTip}>
+            <span>
+              <StatusPill
+                size="sm"
+                status={runPill.status}
+                label={runPill.label}
+              />
+            </span>
+          </Tooltip>
         ) : null}
       </div>
       <div className={`flex items-center gap-1.5 ${TAP_ROW}`}>

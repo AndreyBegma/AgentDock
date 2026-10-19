@@ -72,6 +72,7 @@ describe('stacks (#480, ADR-0044)', () => {
         ],
         design: null,
         costUsd: null,
+        run: null,
       }),
     ).toBe('Stage 1 of 2 · Components');
     expect(

@@ -1025,6 +1025,7 @@ export class DesignService implements OnModuleInit {
           autoRunFailedAt: at,
           // #443: this failure is the design's, not Auto-run when ready's.
           autoRunAfter: null,
+          autoRunStack: null,
         },
       });
       await this.audit.record({
