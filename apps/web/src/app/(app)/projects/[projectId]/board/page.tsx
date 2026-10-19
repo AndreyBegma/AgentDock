@@ -11,10 +11,6 @@ import {
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { MessagesSquare, SquarePen } from 'lucide-react';
@@ -48,7 +44,6 @@ import { NewCardDialog } from '../../../../../components/board/new-card-dialog';
 import { PlanPanel } from '../../../../../components/board/plan-panel';
 import { PlanTaskSheet } from '../../../../../components/board/plan-task-sheet';
 import { useCardActions } from '../../../../../components/board/use-card-actions';
-import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { ReadinessBanner } from '../../../../../components/readiness/readiness-banner';
@@ -57,6 +52,7 @@ import { LiveStatusBadge } from '../../../../../components/shell/live-status-bad
 import { usePageActions } from '../../../../../components/shell/use-page-actions';
 import { useCurrentUser } from '../../../../../components/shell/user-context';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
+import { WorkHeader } from '../../../../../components/work/work-header';
 import { fetchBoard } from '../../../../../lib/board/actions';
 import {
   boardFilterCodec,
@@ -320,61 +316,46 @@ function BoardScreen() {
     // The shell gives the page the screen's height; the board takes what the header and toolbar leave.
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-3">
-        <PageHeader
-          className="mb-0"
-          title="Work"
-          description={
+        <WorkHeader
+          view="board"
+          eyebrow={project?.displayName ?? 'Project'}
+          stats={
             view && meta
-              ? `${view.running} of ${view.settings.maxRunning} workers running · ${meta.shown} ${meta.shown === 1 ? 'card' : 'cards'}${isFiltering(url.filters) ? ' shown' : ''} · ${meta.running} running · ${meta.waiting} waiting on you`
+              ? {
+                  workers: view.running,
+                  maxWorkers: view.settings.maxRunning,
+                  cards: meta.shown,
+                  filtering: isFiltering(url.filters),
+                  running: meta.running,
+                  waiting: meta.waiting,
+                }
               : undefined
           }
-          actions={
-            <>
-              {live.status !== 'connected' ? <LiveStatusBadge /> : null}
-              <SegmentedControl
-                role="group"
-                aria-label="View"
-                className="max-sm:basis-full"
-              >
-                <SegmentedControlItem active={false} layoutId="work-view">
-                  <Link
-                    href={`/work?projectId=${encodeURIComponent(projectId)}`}
-                    className="block w-full min-w-16 px-3 py-1.5 text-center text-sm whitespace-nowrap"
-                  >
-                    List
-                  </Link>
-                </SegmentedControlItem>
-                <SegmentedControlItem active layoutId="work-view">
-                  <button
-                    type="button"
-                    aria-pressed
-                    className="w-full min-w-16 px-3 py-1.5 text-sm whitespace-nowrap"
-                  >
-                    Board
-                  </button>
-                </SegmentedControlItem>
-              </SegmentedControl>
-              {canOperate ? (
-                <>
-                  <Button
-                    variant="glass"
-                    className="max-sm:flex-1"
-                    onClick={() => setDiscussing(true)}
-                  >
-                    Discuss
-                  </Button>
-                  <Button
-                    variant="solid"
-                    className="max-sm:flex-1"
-                    onClick={() => setCreating(true)}
-                  >
-                    New work
-                  </Button>
-                </>
-              ) : null}
-            </>
+          status={live.status !== 'connected' ? <LiveStatusBadge /> : null}
+          onSelectList={() =>
+            router.push(`/work?projectId=${encodeURIComponent(projectId)}`)
           }
-        />
+          onSelectBoard={() => {}}
+        >
+          {canOperate ? (
+            <>
+              <Button
+                variant="glass"
+                className="max-sm:flex-1"
+                onClick={() => setDiscussing(true)}
+              >
+                Discuss
+              </Button>
+              <Button
+                variant="solid"
+                className="max-sm:flex-1"
+                onClick={() => setCreating(true)}
+              >
+                New work
+              </Button>
+            </>
+          ) : null}
+        </WorkHeader>
         {project ? <RunnerOfflineBanner project={project} /> : null}
         <ReadinessBanner
           projectId={projectId}
