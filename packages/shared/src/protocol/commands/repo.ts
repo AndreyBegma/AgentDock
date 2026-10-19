@@ -5,7 +5,7 @@ import { orchestratorModelSchema } from './control';
 import { profileKeySchema, skillRunIdSchema } from './skills';
 
 /**
- * Code commands for the assistant (#622, ADR-0061). The API never reads a
+ * Code commands for the assistant (#622, ADR-0063). The API never reads a
  * project's files (ADR-0001): it asks the project's runner, which reads its
  * own checkout. All three are read-only.
  *
