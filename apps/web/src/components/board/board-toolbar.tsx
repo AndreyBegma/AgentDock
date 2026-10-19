@@ -2,10 +2,6 @@
 
 import { BOARD_CARD_KINDS } from '@agentdock/shared';
 import { Input, Select } from '@andrewbehma/glass-ui/field';
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from '@andrewbehma/glass-ui/segmented-control';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import { Search } from 'lucide-react';
 import {
@@ -18,29 +14,14 @@ import {
   useSearchDraft,
 } from '../../lib/filters/use-url-filters';
 
-export type Density = 'comfortable' | 'compact';
-
-const DENSITIES: readonly { id: Density; label: string }[] = [
-  { id: 'comfortable', label: 'Comfortable' },
-  { id: 'compact', label: 'Compact' },
-];
-
 const capitalize = (text: string) =>
   text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
  * The board's filter bar (C-29): search over title, C-number and PR, Kind and
- * State as instant selects, and the card density. The filters live in the URL.
+ * State as instant selects. The filters live in the URL.
  */
-export function BoardToolbar({
-  url,
-  density,
-  onDensityChange,
-}: {
-  url: UrlFilters<BoardFilter>;
-  density: Density;
-  onDensityChange: (density: Density) => void;
-}) {
+export function BoardToolbar({ url }: { url: UrlFilters<BoardFilter> }) {
   const { filters, set } = url;
   const text = useSearchDraft(filters.text, (value) => set({ text: value }));
   return (
@@ -99,26 +80,6 @@ export function BoardToolbar({
             ))}
           </Select>
         </>
-      }
-      actions={
-        <SegmentedControl role="group" aria-label="Density">
-          {DENSITIES.map(({ id, label }) => (
-            <SegmentedControlItem
-              key={id}
-              active={density === id}
-              layoutId="board-density"
-            >
-              <button
-                type="button"
-                aria-pressed={density === id}
-                className="px-2.5 py-1 text-xs whitespace-nowrap"
-                onClick={() => onDensityChange(id)}
-              >
-                {label}
-              </button>
-            </SegmentedControlItem>
-          ))}
-        </SegmentedControl>
       }
     />
   );
