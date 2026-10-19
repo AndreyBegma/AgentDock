@@ -13,6 +13,7 @@ import { formatCost, formatNumber, formatTokens } from '../../lib/format';
 import {
   cacheReadShare,
   filterLabel,
+  formatChange,
   formatRate,
   formatSavedUsd,
   inputTokensPerRun,
@@ -126,12 +127,7 @@ export function BeforeAfterTable({
       id: 'change',
       header: 'Change',
       align: 'end' as const,
-      cell: (r: TokenSaverBeforeAfter) => {
-        const change = costChange(r);
-        if (change === null) return num('');
-        const percent = formatRate(Math.abs(change));
-        return num(change === 0 ? '0%' : `${change < 0 ? '−' : '+'}${percent}`);
-      },
+      cell: (r: TokenSaverBeforeAfter) => num(formatChange(costChange(r))),
     },
   ];
   return (

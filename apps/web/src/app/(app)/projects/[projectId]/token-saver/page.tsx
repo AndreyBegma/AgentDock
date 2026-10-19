@@ -13,6 +13,11 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
+import {
+  CostPerRoundTable,
+  CostPerRoundWeeksTable,
+  UnmeasuredKindsNote,
+} from '../../../../../components/token-saver/cost-per-round';
 import { SavingsChart } from '../../../../../components/token-saver/savings-chart';
 import {
   FilterTable,
@@ -43,7 +48,8 @@ const TOP = 10;
  * filter, by run kind, the bypass rate, and the filters that most often
  * returned the original (where a filter gets in the way or does not reach).
  * #648: why commands went unfiltered, which programs, and the prompt cache
- * as usage measured it.
+ * as usage measured it. #663 D5: led by cost per round by session kind —
+ * the fact the token saver is judged by (ADR-0068); saved bytes follow.
  */
 export default function TokenSaverPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -71,7 +77,7 @@ export default function TokenSaverPage() {
     <>
       <PageHeader
         title="Token saver"
-        description="What the runner's filter kept out of what this project's agents read. Figures marked ≈ are estimates (bytes ÷ 4, priced at the model's input price); the fact — cost per run before and after — is on Usage."
+        description="What this project's rounds cost, measured from usage, and what the runner's filter kept out of what its agents read. Figures marked ≈ are estimates (bytes ÷ 4, priced at the model's input price)."
         actions={
           <SegmentedControl size="sm" aria-label="Range">
             {PRESETS.map((p) => (
@@ -90,7 +96,10 @@ export default function TokenSaverPage() {
       />
       <AsyncSection
         section={section}
-        isEmpty={(data) => data === null || data.totals.commands === 0}
+        isEmpty={(data) =>
+          data === null ||
+          (data.totals.commands === 0 && data.costPerRound.length === 0)
+        }
         unavailable={{
           title: 'Token saver is not answering',
           stillWorks: describeTokenSaverError(section.error),
@@ -100,6 +109,38 @@ export default function TokenSaverPage() {
         {(summary) =>
           summary ? (
             <div className="flex flex-col gap-6">
+              <section aria-labelledby="ts-cost-per-round">
+                <SectionHeader
+                  className="mb-2"
+                  headingId="ts-cost-per-round"
+                  title="Cost per round"
+                  description="What a round of each session kind really cost, measured from its requests: the newest week in the range, and how the median moved since the oldest. Peak context is a round's largest request; turns and peak are medians."
+                />
+                <div className="flex flex-col gap-3">
+                  <CostPerRoundTable
+                    rows={summary.costPerRound}
+                    empty={
+                      <p className="text-ink-3 text-sm">
+                        No ended round has usage in this range.
+                      </p>
+                    }
+                  />
+                  <UnmeasuredKindsNote />
+                </div>
+              </section>
+
+              {summary.costPerRound.length > 0 ? (
+                <section aria-labelledby="ts-cost-by-week">
+                  <SectionHeader
+                    className="mb-2"
+                    headingId="ts-cost-by-week"
+                    title="Cost per round by week"
+                    description="Each session kind week by week (ISO weeks, UTC), so a release shows as the week its cost changed."
+                  />
+                  <CostPerRoundWeeksTable rows={summary.costPerRound} />
+                </section>
+              ) : null}
+
               <SummaryTiles summary={summary} />
               {runnerTooOldForReasons(summary) ? (
                 <Banner
