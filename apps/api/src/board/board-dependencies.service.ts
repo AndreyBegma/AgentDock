@@ -5,6 +5,7 @@ import {
   cardLabel,
   findDependencyCycle,
   isActiveRoundPhase,
+  openDependencies,
   type Role,
 } from '@agentdock/shared';
 import { roleAtLeast } from '@agentdock/shared/protocol';
@@ -87,9 +88,10 @@ export interface StackedBase {
 
 /**
  * Card dependencies (#337 D8): `cardId` runs after `dependsOnId`, both of one
- * project, the graph acyclic. Run warns about an open one (`dependency_open`)
- * unless told to go on; moving and Accept never look. #636: a card with one
- * unmerged dependency that has an open PR is stacked on its branch.
+ * project, the graph acyclic. Run refuses while one is open — not in
+ * Finished or Completed — with no override (`dependency_open`, #638);
+ * moving and Accept never look. #636: a card with one unmerged dependency
+ * that has an open PR is stacked on its branch.
  */
 @Injectable()
 export class BoardDependencies {
@@ -202,25 +204,34 @@ export class BoardDependencies {
   }
 
   /**
-   * Run's check (D8, #636) and the base it chooses. With `ignore`, nothing
-   * is checked and the card starts from the project base (`null`). Else,
-   * among the dependencies not landed in the base:
-   * - none: the project base;
+   * Run's check (D8, #638 ADR-0065, #636 ADR-0064) and the base it
+   * chooses. There is no override. First, a dependency not in Finished or
+   * Completed refuses the Run with `dependency_open`, naming the open ones.
+   * Then, among the dependencies not landed in the base:
+   * - none: the project base (`null`);
    * - one with a pushed branch and an open PR from a finished round: that
    *   branch — the card is stacked on it;
-   * - one without: `dependency_open`, as before;
+   * - one without: `dependency_open`;
    * - two or more: `dependencies_unmerged` — a card branches from one
    *   dependency only, so it waits until they are merged.
    */
-  async assertRunnable(
-    cardId: string,
-    ignore: boolean,
-  ): Promise<StackedBase | null> {
-    if (ignore) return null;
+  async assertRunnable(cardId: string): Promise<StackedBase | null> {
     const rows = await this.prisma.boardCardDependency.findMany({
       where: { cardId },
       include: STACK_FACTS,
     });
+    const open = openDependencies(
+      rows.map((r) => refOf(r.dependsOn)).sort(byNumber),
+    );
+    if (open.length > 0) {
+      const names = open.map((d) => d.label).join(', ');
+      throw boardError(
+        409,
+        BOARD_ERROR.dependencyOpen,
+        `Waits for ${names}: no ready pull request yet`,
+        { dependencies: open },
+      );
+    }
     const pending = rows
       .map((r) => r.dependsOn)
       .filter((d) => !landed(d))

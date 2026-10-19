@@ -12,6 +12,7 @@ import {
   type SettingsSources,
   settingsFiles,
 } from './permissions';
+import { programOfLine } from './program';
 import {
   type HookCommand,
   parseHookCommand,
@@ -99,7 +100,7 @@ export const isLongRunning = (
 
 export type HookDecision =
   | { rewrite: HookOutput }
-  | { passThrough: string; filter: string };
+  | { passThrough: string; filter: string; program?: string };
 
 /** What the hook does with one PreToolUse input. Never throws. */
 export const decideHook = (
@@ -145,9 +146,11 @@ export const decideHook = (
       : parsed
         ? FILTER_NONE_UNCOVERED
         : FILTER_NONE_COMPOUND);
+  const program = programOfLine(command, parsed);
   const leave = (reason: string): HookDecision => ({
     passThrough: reason,
     filter: id,
+    ...(program === undefined ? {} : { program }),
   });
 
   if (!parsed) return leave('not a simple command');
@@ -271,6 +274,7 @@ export const runFilterHook = (stdin: string, deps: HookDeps): string => {
       target,
       {
         filter: decision.filter,
+        program: decision.program,
         rawBytes: 0,
         keptBytes: 0,
         bypassed: false,

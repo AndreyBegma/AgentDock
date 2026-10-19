@@ -18,13 +18,12 @@ const MENU = <button type="button" data-menu-trigger aria-label="Actions" />;
 const render = (
   column: BoardColumn,
   extra: Partial<BoardCardView> = {},
-  options: { compact?: boolean; menu?: boolean } = {},
+  options: { menu?: boolean } = {},
 ) =>
   renderToStaticMarkup(
     <CardFace
       projectId="p1"
       canOperate
-      compact={options.compact}
       menu={options.menu === false ? undefined : MENU}
       onOpen={() => undefined}
       card={fixtureCard(7, column, {
@@ -158,7 +157,7 @@ describe('CardFace rows (C-35, #423)', () => {
     expect(header).not.toContain('ms-auto');
   });
 
-  test('the footer carries PR and Issue above a hairline; compact leaves it to the sheet', () => {
+  test('the footer carries PR and Issue above a hairline', () => {
     const extra = {
       issueNumber: 3,
       issueUrl: 'https://github.com/o/r/issues/3',
@@ -167,10 +166,7 @@ describe('CardFace rows (C-35, #423)', () => {
     expect(footer).toContain('border-t');
     expect(footer).toContain('PR #7 · Open');
     expect(footer).toContain('Issue #3');
-    const compact = render('in_progress', extra, { compact: true });
-    expect(row(compact, 'footer')).toBeNull();
-    expect(compact).not.toContain('Issue #3');
-    expect(compact).toContain('line-clamp-2');
+    expect(render('in_progress')).not.toContain('Issue #3');
   });
 
   test('round, design, hooks, auto-run failure and shipping share the status row', () => {
@@ -281,7 +277,7 @@ describe('CardFace readiness and Auto-run (#443)', () => {
   test('a ready card shows Ready', () => {
     const status = row(
       render('todo', {
-        readiness: { state: 'ready', accepted: 2, total: 2, open: [] },
+        readiness: { state: 'ready', satisfied: 2, total: 2, open: [] },
       }),
       'status',
     );
@@ -294,7 +290,7 @@ describe('CardFace readiness and Auto-run (#443)', () => {
       render('todo', {
         readiness: {
           state: 'waiting',
-          accepted: 1,
+          satisfied: 1,
           total: 2,
           open: [dep(84, 'in_progress')],
         },
@@ -303,6 +299,13 @@ describe('CardFace readiness and Auto-run (#443)', () => {
     );
     expect(status).toContain('Waiting · 1 of 2');
     expect(status).toContain('Waits for C-84');
+  });
+
+  test('the dependency chip reads a Finished dependency as satisfied (#638)', () => {
+    const header = (column: BoardColumn) =>
+      row(render('todo', { dependsOn: [dep(3, column)] }), 'header') ?? '';
+    expect(header('finished')).toContain('Runs after C-3, all ready.');
+    expect(header('in_progress')).toContain('No ready pull request yet: C-3.');
   });
 
   test('the Auto-run marker shows only with the switch on', () => {

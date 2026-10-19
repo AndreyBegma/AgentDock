@@ -210,12 +210,10 @@ export class BoardRoundsService {
     }
     // #480 (ADR-0044): no card of a stack runs before its design is approved.
     await this.stacks.assertStackApproved(card.id);
-    // #337 D8: an open dependency warns; the person may run anyway. #636:
-    // one unmerged dependency with an open PR stacks the card on its branch.
-    const stacked = await this.dependencies.assertRunnable(
-      card.id,
-      dto.ignoreDependencies === true,
-    );
+    // #638 (ADR-0065): an open dependency refuses the Run; nothing overrides
+    // it. #636: one unmerged dependency with an open PR stacks the card on
+    // its branch.
+    const stacked = await this.dependencies.assertRunnable(card.id);
     await this.start(
       card,
       'run',

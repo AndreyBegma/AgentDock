@@ -3,6 +3,7 @@ import {
   BOARD_ERROR,
   cardReadiness,
   findDependencyCycle,
+  isDependencySatisfied,
   openDependencies,
 } from '../index';
 
@@ -31,26 +32,38 @@ describe('findDependencyCycle', () => {
   });
 });
 
+describe('isDependencySatisfied', () => {
+  it('is Finished (a ready PR) or Completed (#638)', () => {
+    expect(isDependencySatisfied('finished')).toBe(true);
+    expect(isDependencySatisfied('completed')).toBe(true);
+    expect(isDependencySatisfied('todo')).toBe(false);
+    expect(isDependencySatisfied('in_progress')).toBe(false);
+    expect(isDependencySatisfied('inbox')).toBe(false);
+  });
+});
+
 describe('openDependencies', () => {
-  it('is every dependency not in Completed', () => {
+  it('is every dependency not in Finished or Completed', () => {
     const deps = [
       { number: 12, label: 'C-12', column: 'todo' as const },
       { number: 13, label: 'C-13', column: 'completed' as const },
       { number: 14, label: 'C-14', column: 'finished' as const },
+      { number: 15, label: 'C-15', column: 'in_progress' as const },
     ];
-    expect(openDependencies(deps).map((d) => d.number)).toEqual([12, 14]);
+    expect(openDependencies(deps).map((d) => d.number)).toEqual([12, 15]);
   });
 });
 
 describe('cardReadiness', () => {
   const accepted = { number: 83, label: 'C-83', column: 'completed' as const };
   const open = { number: 84, label: 'C-84', column: 'in_progress' as const };
+  const finished = { number: 85, label: 'C-85', column: 'finished' as const };
 
-  it('is ready when every dependency is accepted', () => {
-    expect(cardReadiness('todo', [accepted])).toEqual({
+  it('is ready when every dependency is in Finished or Completed', () => {
+    expect(cardReadiness('todo', [accepted, finished])).toEqual({
       state: 'ready',
-      accepted: 1,
-      total: 1,
+      satisfied: 2,
+      total: 2,
       open: [],
     });
   });
@@ -58,7 +71,7 @@ describe('cardReadiness', () => {
   it('is waiting while one is open, naming the open ones', () => {
     expect(cardReadiness('todo', [accepted, open])).toEqual({
       state: 'waiting',
-      accepted: 1,
+      satisfied: 1,
       total: 2,
       open: [open],
     });

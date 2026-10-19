@@ -23,6 +23,7 @@ import {
   filterStatRowSchema,
   filterStatsDataSchema,
   isUnfilteredId,
+  runnerPredatesFilterReasons,
   TOKEN_SAVER_DEFAULT,
   TOKEN_SAVER_MCP_ALLOW_MAX,
   tokenSaverConfigSchema,
@@ -315,6 +316,62 @@ describe('filter.stats rows (#445 D12)', () => {
         })),
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('filter.stats program (#648)', () => {
+  const unfiltered = {
+    ...row,
+    filter: FILTER_ID_NONE_UNCOVERED,
+    keptBytes: 40_000,
+    passedThrough: true,
+  };
+
+  it('is optional — a row of an older runner still parses', () => {
+    expect(filterStatRowSchema.safeParse(unfiltered).success).toBe(true);
+  });
+
+  it('takes a program and its subcommand', () => {
+    for (const program of [
+      'git log',
+      'bun run',
+      'ls',
+      'python3',
+      'npm run-script',
+    ]) {
+      expect(
+        filterStatRowSchema.safeParse({ ...unfiltered, program }).success,
+      ).toBe(true);
+    }
+  });
+
+  it('rejects arguments, paths and anything past 64 characters', () => {
+    for (const program of [
+      '',
+      'git log --oneline',
+      'cat /etc/passwd',
+      '/usr/bin/git',
+      'git log -5',
+      'echo "hi"',
+      `x${'a'.repeat(64)}`,
+    ]) {
+      expect(
+        filterStatRowSchema.safeParse({ ...unfiltered, program }).success,
+      ).toBe(false);
+    }
+  });
+});
+
+describe('runnerPredatesFilterReasons (#648)', () => {
+  it('is true up to 0.12.2, false after it and for an unknown version', () => {
+    expect(runnerPredatesFilterReasons('0.9.2')).toBe(true);
+    expect(runnerPredatesFilterReasons('0.12.2')).toBe(true);
+    expect(runnerPredatesFilterReasons('v0.12.2')).toBe(true);
+    expect(runnerPredatesFilterReasons('0.12.3')).toBe(false);
+    expect(runnerPredatesFilterReasons('0.13.0')).toBe(false);
+    expect(runnerPredatesFilterReasons('1.0.0')).toBe(false);
+    expect(runnerPredatesFilterReasons(null)).toBe(false);
+    expect(runnerPredatesFilterReasons('dev')).toBe(false);
   });
 });
 

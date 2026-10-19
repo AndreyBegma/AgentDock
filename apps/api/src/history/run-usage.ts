@@ -211,3 +211,55 @@ export const runCostsByKind = async (
       row.avgUsd === null ? null : new Prisma.Decimal(row.avgUsd).toFixed(6),
   }));
 };
+
+/** #648: the prompt cache of the ended runs of one kind. */
+export interface RunPromptCacheGroup {
+  kind: string;
+  /** Runs with at least one request. */
+  runs: number;
+  input: number;
+  cacheRead: number;
+  /** 5-minute and 1-hour writes together. */
+  cacheWrite: number;
+}
+
+/**
+ * #648: what the prompt cache did for the ended runs of a project started in
+ * `[from, to)`, by kind — summed from their requests (ADR-0003), the same
+ * requests `usageByRun` counts.
+ */
+export const runPromptCacheByKind = async (
+  prisma: PrismaService,
+  projectId: string,
+  kinds: readonly string[],
+  from: Date,
+  to: Date,
+): Promise<RunPromptCacheGroup[]> => {
+  if (kinds.length === 0) return [];
+  const rows = await prisma.$queryRaw<
+    {
+      kind: string;
+      runs: number;
+      input: bigint;
+      cacheRead: bigint;
+      cacheWrite: bigint;
+    }[]
+  >`
+    SELECT r.kind::text AS kind, COUNT(DISTINCT r.id)::int AS runs,
+      COALESCE(SUM(l.input), 0)::bigint AS input,
+      COALESCE(SUM(l."cacheRead"), 0)::bigint AS "cacheRead",
+      COALESCE(SUM(l."cacheWrite5m" + l."cacheWrite1h"), 0)::bigint AS "cacheWrite"
+    ${RUN_REQUESTS}
+    WHERE r."projectId" = ${projectId}
+      AND r."startedAt" >= ${from} AND r."startedAt" < ${to}
+      AND r."endedAt" IS NOT NULL
+      AND r.kind::text IN (${Prisma.join([...kinds])})
+    GROUP BY r.kind`;
+  return rows.map((row) => ({
+    kind: row.kind,
+    runs: row.runs,
+    input: Number(row.input),
+    cacheRead: Number(row.cacheRead),
+    cacheWrite: Number(row.cacheWrite),
+  }));
+};

@@ -62,7 +62,6 @@ export function CardFace({
   projectId,
   card,
   canOperate,
-  compact = false,
   menu,
   selection,
   onOpen,
@@ -70,8 +69,6 @@ export function CardFace({
   projectId: string;
   card: BoardCardView;
   canOperate: boolean;
-  /** C-29 Compact density: the issue and PR links are left to the sheet. */
-  compact?: boolean;
   /** The Board's card menu (`slots.menu`), placed at the end of the header. */
   menu?: ReactNode;
   /** #452: set for an operator; a suggestion shows why it has no box instead. */
@@ -89,7 +86,7 @@ export function CardFace({
   // #443: Ready / Waiting of a To Do card with dependencies.
   const ready = readinessChip(card.readiness);
   const suggestion = isSuggestion(card);
-  const note = `break-words text-xs text-ink-2${compact ? ' line-clamp-1' : ''}`;
+  const note = 'break-words text-xs text-ink-2';
   return (
     <SelectionFrame>
       {selection?.selected ? <SelectedTint /> : null}
@@ -98,7 +95,7 @@ export function CardFace({
         data-select-column={card.column}
         data-selected={selection ? selection.selected : undefined}
         onClickCapture={(event) => toggleOnClick(event, selection)}
-        className={`relative flex min-w-0 flex-col text-sm ${compact ? 'gap-1' : 'gap-1.5'}`}
+        className="relative flex min-w-0 flex-col gap-1.5 text-sm"
       >
         <div
           data-card-row="header"
@@ -163,12 +160,10 @@ export function CardFace({
         </div>
         <button
           type="button"
-          className={`${TAP} break-words text-left font-medium underline-offset-2 hover:underline${compact ? ' text-[13px] leading-[18px]' : ''}`}
+          className={`${TAP} break-words text-left font-medium underline-offset-2 hover:underline`}
           onClick={() => onOpen(card)}
         >
-          <span className={compact ? 'line-clamp-2' : undefined}>
-            {card.title}
-          </span>
+          {card.title}
         </button>
         <div
           data-card-row="status"
@@ -279,7 +274,7 @@ export function CardFace({
           <p className={note}>{card.captureWhy}</p>
         ) : null}
         <FaceLinks projectId={projectId} card={card} suggestion={suggestion} />
-        {!compact && (card.prNumber !== null || card.issueNumber !== null) ? (
+        {card.prNumber !== null || card.issueNumber !== null ? (
           <CardFooter card={card} />
         ) : null}
       </div>

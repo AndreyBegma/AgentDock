@@ -3,6 +3,7 @@ import { basename, dirname } from 'node:path';
 import { redact } from '../pane/redact';
 import { type LinePart, missingProtectedLines } from './classify';
 import { RAW_ENV } from './env';
+import { programOf } from './program';
 import { RAW_CAP_BYTES, RawFile } from './raw-store';
 import {
   type StatsCounts,
@@ -170,6 +171,7 @@ export const runFilter = async (
   }
   const target = safe(() => statsTarget(deps.env));
   const bypass = deps.env[RAW_ENV] === '1';
+  const program = programOf(argv);
 
   let child: ReturnType<typeof Bun.spawn<'inherit', 'pipe', 'pipe'>>;
   try {
@@ -184,6 +186,7 @@ export const runFilter = async (
     if (target) {
       record(deps, target, {
         filter: FILTER_NONE,
+        program,
         rawBytes: 0,
         keptBytes: 0,
         bypassed: bypass,
@@ -244,6 +247,7 @@ export const runFilter = async (
     for (const held of chunks.splice(0)) forward(held);
     counts = {
       filter: filter?.id ?? FILTER_NONE_UNCOVERED,
+      program,
       rawBytes: total,
       keptBytes: total,
       bypassed: bypass,
@@ -261,6 +265,7 @@ export const runFilter = async (
       const kept = Buffer.byteLength(shown);
       counts = {
         filter: filter.id,
+        program,
         rawBytes: total,
         keptBytes: Math.min(kept, total),
         bypassed: false,
@@ -270,6 +275,7 @@ export const runFilter = async (
       for (const held of chunks) forward(held);
       counts = {
         filter: filter.id,
+        program,
         rawBytes: total,
         keptBytes: total,
         bypassed: false,

@@ -27,14 +27,25 @@ export const runKindLabel = (kind: TokenSaverRunKind): string =>
   RUN_KIND_LABEL[kind] ?? kind;
 
 /**
- * Amendment 12: why no filter ran, as a person reads it. `none` is a row from
- * before the reasons were recorded.
+ * Amendment 12: why no filter ran, as a person reads it. `none` is a row of a
+ * runner from before the reasons were recorded (≤ 0.12.2, #648).
  */
 const UNFILTERED_LABEL: Record<string, string> = {
-  [FILTER_ID_NONE]: 'No filter (uncovered command)',
+  [FILTER_ID_NONE]: 'No filter (runner too old to say why)',
   [FILTER_ID_NONE_COMPOUND]: 'Compound command (not filtered)',
   [FILTER_ID_NONE_UNCOVERED]: 'No filter for this command',
   [FILTER_ID_NONE_MODE]: 'Not filtered in this permission mode',
+};
+
+/** #648: what each `none:*` reason means, for the reason table. */
+export const UNFILTERED_HINT: Record<string, string> = {
+  [FILTER_ID_NONE]:
+    'The runner predates the reasons; update it to see which one applies.',
+  [FILTER_ID_NONE_COMPOUND]:
+    'A line with redirects, substitutions, loops or a trailing & — the hook only rewrites simple commands joined by |, &&, || or ;.',
+  [FILTER_ID_NONE_UNCOVERED]: 'No filter family covers the program.',
+  [FILTER_ID_NONE_MODE]:
+    'The session ran in a permission mode where the hook never rewrites (only bypass, auto and plan do).',
 };
 
 /** A filter id as a person reads it. */
@@ -68,6 +79,30 @@ export function formatRate(rate: number): string {
   if (!Number.isFinite(rate) || rate <= 0) return '0%';
   const percent = rate * 100;
   return percent < 1 ? '<1%' : `${formatNumber(percent, 0)}%`;
+}
+
+/**
+ * #648: the share of a prompt's tokens read from the prompt cache, 0–1 —
+ * cache reads over everything sent as input (uncached, cache reads and cache
+ * writes); `0` for nothing.
+ */
+export function cacheReadShare(c: {
+  input: number;
+  cacheRead: number;
+  cacheWrite: number;
+}): number {
+  const total = c.input + c.cacheRead + c.cacheWrite;
+  return total > 0 ? c.cacheRead / total : 0;
+}
+
+/** #648: input tokens per run, cache reads and writes included; `0` for no runs. */
+export function inputTokensPerRun(c: {
+  runs: number;
+  input: number;
+  cacheRead: number;
+  cacheWrite: number;
+}): number {
+  return c.runs > 0 ? (c.input + c.cacheRead + c.cacheWrite) / c.runs : 0;
 }
 
 /** Share of a filter's commands that returned the original, 0–1. */

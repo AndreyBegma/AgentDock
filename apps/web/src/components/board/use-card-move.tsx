@@ -14,6 +14,7 @@ import {
   MOVE_TO_END,
   moveRequest,
 } from '../../lib/board/board-state';
+import { runWaitsFor } from '../../lib/board/dependencies';
 import { describeBoardError } from '../../lib/board/format';
 import type { CardActions } from './use-card-actions';
 
@@ -113,7 +114,7 @@ export function useCardMove({
     if (asking?.kind !== 'offer-run') return;
     const { move, card } = asking;
     setAsking(undefined);
-    // Run goes through the card actions, so an open dependency asks first (#337 D8).
+    // Run goes through the card actions, which hold it for an open dependency (#638).
     void send(move, card.number).then((moved) => {
       if (moved && run) void actions.run(card);
     });
@@ -125,6 +126,10 @@ export function useCardMove({
     setAsking(undefined);
     void send(move, card.number, { stopWorker: true });
   };
+
+  // #638: an open dependency holds the dialog's Run too; the move is free.
+  const waits =
+    asking?.kind === 'offer-run' ? runWaitsFor(asking.card.dependsOn) : null;
 
   const dialogs = (
     <>
@@ -145,7 +150,13 @@ export function useCardMove({
               <Button variant="glass" onClick={() => answerRun(false)}>
                 Just move
               </Button>
-              <Button onClick={() => answerRun(true)}>Run</Button>
+              <Button
+                disabled={waits !== null}
+                aria-describedby={waits ? 'board-move-run-waits' : undefined}
+                onClick={() => answerRun(true)}
+              >
+                Run
+              </Button>
             </>
           }
         >
@@ -153,6 +164,11 @@ export function useCardMove({
             Run starts a dedicated Claude Code worker in its own worktree. “Just
             move” only changes the column.
           </p>
+          {waits ? (
+            <p id="board-move-run-waits" className="text-sm text-ink-3">
+              {waits}: Run opens once they have a ready pull request.
+            </p>
+          ) : null}
         </DialogContent>
       </DialogRoot>
 

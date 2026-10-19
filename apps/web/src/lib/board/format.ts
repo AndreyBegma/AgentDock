@@ -15,6 +15,7 @@ import {
   type CaptureSkipReason,
   type CaptureStatus,
   type CardCaptureView,
+  type CardDependencyRef,
   type CardRoundBrief,
   type CardRoundPhase,
   COLUMN_TITLE,
@@ -46,6 +47,7 @@ import {
   RUNNER_STATUS_COMMAND,
   SETUP_CLAUDE_COMMAND,
 } from '../runners/install';
+import { labelList } from './dependencies';
 import { noPrText } from './pull-request';
 
 // #624: the dialog that blocks a waiting round, as notifications say it too.
@@ -390,16 +392,27 @@ export function autoRunReason(
 
 /**
  * #273 D9, #443: what the face's "Didn’t start" says — the design approval's
- * start, or Auto-run when ready's after a dependency was accepted.
+ * start, or Auto-run when ready's after a dependency was ready (#638).
  */
 export function autoRunFailureText(
   failure: NonNullable<BoardCardView['autoRunFailure']>,
 ): string {
   const reason = autoRunReason(failure);
   return failure.after != null
-    ? `Auto-run after C-${failure.after} was accepted could not start: ${reason}`
+    ? `Auto-run after C-${failure.after} was ready could not start: ${reason}`
     : `Design approved — the worker did not start: ${reason}`;
 }
+
+const dependencyRefsOf = (value: unknown): CardDependencyRef[] =>
+  Array.isArray(value)
+    ? value.filter(
+        (d): d is CardDependencyRef =>
+          typeof d === 'object' &&
+          d !== null &&
+          typeof d.label === 'string' &&
+          typeof d.column === 'string',
+      )
+    : [];
 
 /** Every board error as a sentence for the person; the server's text last. */
 export function describeBoardError(
@@ -407,6 +420,19 @@ export function describeBoardError(
   runnerName?: string | null,
 ): string {
   const code = errorCode(error);
+  // #638, #636: a dependency refusal names the cards it is about.
+  if (
+    (code === BOARD_ERROR.dependencyOpen ||
+      code === BOARD_ERROR.dependenciesUnmerged) &&
+    error instanceof ApiError
+  ) {
+    const names = labelList(dependencyRefsOf(error.body?.dependencies));
+    if (names) {
+      return code === BOARD_ERROR.dependencyOpen
+        ? `Waits for ${names}: no ready pull request to build on yet.`
+        : `${names} are not merged yet; a card branches from one dependency only.`;
+    }
+  }
   const shared = code
     ? BOARD_ACTION_ERROR_TEXT[code as BoardErrorCode]
     : undefined;

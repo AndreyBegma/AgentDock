@@ -180,7 +180,7 @@ export function AutoRunSection({
         checked={on}
         disabled={!canOperate || busy}
         label="Auto-run when ready"
-        hint="Starts the Run when the last open dependency is accepted. It follows the same slot and budget rules as pressing Run."
+        hint="Starts the Run when the last open dependency has a ready pull request (Finished) or is accepted. It follows the same slot and budget rules as pressing Run."
         onChange={(next) => void change(next)}
       />
       <Banner tone="info">{autoRunNote(on, card.readiness)}</Banner>

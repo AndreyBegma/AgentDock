@@ -2,7 +2,8 @@
 
 Status: accepted · Date: 2026-10-19 · Amends [ADR-0029](0029-accepting-a-board-card-may-merge-its-pull-request-through-the-runner.md) ·
 Card: C-268 · Issue: #636 ·
-Spec: [`docs/specs/636-branch-a-dependent-card-from-its-depende.md`](../specs/636-branch-a-dependent-card-from-its-depende.md)
+Spec: [`docs/specs/636-branch-a-dependent-card-from-its-depende.md`](../specs/636-branch-a-dependent-card-from-its-depende.md) ·
+Amended by [ADR-0065](0065-run-waits-for-every-dependency-to-have-a-ready-pull-request.md) (§1: no `ignoreDependencies`; an open dependency is refused first)
 
 ## Context
 

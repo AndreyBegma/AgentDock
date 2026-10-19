@@ -1,4 +1,4 @@
-# ADR-0065: The daily AI digest and one-click summaries are gateway calls, the digest skipped and summaries cached by their source
+# ADR-0066: The daily AI digest and one-click summaries are gateway calls, the digest skipped and summaries cached by their source
 
 Status: accepted · Date: 2026-10-19 ·
 Card: C-242 (stack S-3, stage 4) · Issue: [#658](https://github.com/AndreyBegma/AgentDock/issues/658) ·

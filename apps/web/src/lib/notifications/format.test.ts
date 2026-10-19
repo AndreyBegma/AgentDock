@@ -3,6 +3,7 @@ import type { NotificationRuleView, NotificationView } from '@agentdock/shared';
 import {
   applyNew,
   applyRead,
+  bellLabel,
   fromDateInput,
   isFutureDay,
   KIND_LABEL,
@@ -14,6 +15,7 @@ import {
   ruleUpdate,
   safeLink,
   toDateInput,
+  unreadCountText,
 } from './format';
 
 const view = (patch: Partial<NotificationView> = {}): NotificationView => ({
@@ -271,5 +273,21 @@ describe('ruleUpdate', () => {
         false,
       ),
     ).toEqual({ rules: [{ kind: 'quota.hit', inApp: true, telegram: false }] });
+  });
+});
+
+describe('unread count', () => {
+  test('one and two digits read as given; past 99 it caps', () => {
+    expect(unreadCountText(1)).toBe('1');
+    expect(unreadCountText(96)).toBe('96');
+    expect(unreadCountText(99)).toBe('99');
+    expect(unreadCountText(100)).toBe('99+');
+    expect(unreadCountText(1234)).toBe('99+');
+  });
+
+  test('the bell names the count, capped, and nothing when all is read', () => {
+    expect(bellLabel(0)).toBe('Notifications');
+    expect(bellLabel(4)).toBe('Notifications, 4 unread');
+    expect(bellLabel(250)).toBe('Notifications, 99+ unread');
   });
 });

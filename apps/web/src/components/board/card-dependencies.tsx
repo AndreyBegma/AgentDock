@@ -22,10 +22,12 @@ import { COLUMN_TITLE, describeBoardError } from '../../lib/board/format';
 import { useSection } from '../../lib/section/use-section';
 
 /**
- * The cards this one runs after (#337 D8), each accepted (in Completed) or
- * open with its column (#443) — the header counts the open ones. An operator adds one by its number and removes one; a cycle or a
- * card of another project is refused by the API and said here. Dependencies
- * warn on Run; they never block a move or Accept.
+ * The cards this one runs after (#337 D8), each ready (Finished: its pull
+ * request is ready), accepted (Completed) or open with its column (#443,
+ * #638) — the header counts the open ones. An operator adds one by its
+ * number and removes one; a cycle or a card of another project is refused
+ * by the API and said here. An open dependency holds Run (ADR-0065); it
+ * never blocks a move or Accept.
  */
 export function CardDependenciesSection({
   projectId,
@@ -95,7 +97,7 @@ export function CardDependenciesSection({
           list.length === 0 ? undefined : open > 0 ? (
             <Badge size="md" tone="warn" label={`${open} open`} />
           ) : (
-            <Badge size="md" tone="ok" label="All accepted" />
+            <Badge size="md" tone="ok" label="All ready" />
           )
         }
       />
@@ -137,7 +139,11 @@ export function CardDependenciesSection({
                   label={COLUMN_TITLE[d.column]}
                 />
               ) : (
-                <StatusPill size="sm" status="done" label="Accepted" />
+                <StatusPill
+                  size="sm"
+                  status="done"
+                  label={d.column === 'finished' ? 'PR ready' : 'Accepted'}
+                />
               )}
               {canOperate ? (
                 <Button
@@ -160,7 +166,9 @@ export function CardDependenciesSection({
       )}
       {list.length > 0 ? (
         <p className="text-xs text-ink-3">
-          Accepted means the card is in {COLUMN_TITLE.completed}.
+          PR ready means the card is in {COLUMN_TITLE.finished}, Accepted that
+          it is in {COLUMN_TITLE.completed}. Run waits until every one is
+          either.
         </p>
       ) : null}
       {canOperate ? (
