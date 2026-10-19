@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Design viewer — phone</title>
+<style>
+:root{--font-sans:'SF Pro Text',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;--radius-control:6px;--radius-surface:8px;--size-tap:44px;--dur-fast:100ms;--ease-sheet:cubic-bezier(.32,.72,0,1)}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--hue-1:#5b9cf6;--hue-1-soft:rgb(91 156 246/.18);--hue-2:#2fbf94;--hue-2-soft:rgb(47 191 148/.18);--hue-2-ink:#7ee0c0;--hue-4:#e69f00;--hue-7:#a68bfa;--glass-sheen:rgb(255 255 255/.06);--glass-scrim-strong:rgb(9 9 12/.64);--glass-brightness-strong:.7;--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-rim-strong:rgb(242 242 246/.22);--glass-rim-shade-strong:rgb(9 9 12/.2);--glass-meniscus:rgb(9 9 12/.55);--glass-refract:rgb(242 242 246/.35);--glass-shadow-strong:rgb(0 0 0/.45);--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#fff;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--hue-1:#1f64d6;--hue-1-soft:rgb(31 100 214/.12);--hue-2:#00805e;--hue-2-soft:rgb(0 128 94/.12);--hue-2-ink:#006a4e;--hue-4:#b36b00;--hue-7:#7244e0;--glass-sheen:rgb(0 0 0/.06);--glass-scrim-strong:rgb(255 255 255/.64);--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);--glass-rim-strong:rgb(255 255 255/.3);--glass-rim-shade-strong:rgb(24 24 27/.08);--glass-meniscus:rgb(24 24 27/.12);--glass-refract:rgb(255 255 255/.5);--glass-shadow-strong:rgb(0 0 0/.16);--glass-shadow-clear:rgb(0 0 0/.08);--canvas-glow:10%}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font:14px/20px var(--font-sans);-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));-webkit-backdrop-filter:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.mono{font-family:var(--font-mono)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:28px;padding:0 12px;border-radius:var(--radius-control);font:600 13px/1 var(--font-sans);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);cursor:pointer}
+.theme{position:fixed;top:16px;right:16px;z-index:100}
+.page{max-width:1240px;margin:0 auto;padding:32px 24px 48px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.desc{max-width:72ch;color:var(--color-ink-2);margin-top:6px}
+.stage{display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start;margin-top:28px}
+figure{margin:0;display:flex;flex-direction:column;gap:12px;width:360px}
+figcaption{font-size:12px;line-height:17px;color:var(--color-ink-3)}
+figcaption b{display:block;font-size:13px;color:var(--color-ink);font-weight:600;margin-bottom:2px}
+.phone{position:relative;width:360px;height:740px;border-radius:40px;overflow:hidden;background:var(--color-surface);border:1px solid var(--color-line-strong);box-shadow:0 30px 60px -20px var(--glass-shadow-strong)}
+.sb{display:flex;justify-content:space-between;align-items:center;height:44px;padding:0 26px;font:600 14px/1 var(--font-sans)}
+.home{position:absolute;left:50%;bottom:8px;width:120px;height:5px;margin-left:-60px;border-radius:99px;background:var(--color-ink);opacity:.8;z-index:70}
+.bb{position:absolute;left:10px;right:10px;bottom:calc(22px + var(--kb,0px));z-index:60;display:flex;align-items:center;gap:6px;height:60px;padding:7px;border-radius:22px}
+.bb-back{display:inline-flex;align-items:center;gap:4px;height:44px;min-width:44px;padding:0 16px 0 10px;border-radius:15px;border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:600 15px/1 var(--font-sans);cursor:pointer;transition:transform var(--dur-fast) var(--ease-sheet)}
+.bb-back:active{transform:scale(.97)}
+.bb-back .icon{width:22px;height:22px}
+.bb-title{flex:1;min-width:0;padding:0 4px;text-align:center;font-size:12px;line-height:16px;color:var(--color-ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bb-title b{display:block;color:var(--color-ink);font-weight:600;font-size:14px;line-height:18px}
+.bb-act{position:relative;display:inline-grid;place-items:center;width:44px;height:44px;border-radius:15px;border:0;background:transparent;color:var(--color-ink-2);cursor:pointer}
+.bb-act .icon{width:20px;height:20px}
+.cnt{position:absolute;top:6px;right:5px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--color-accent);color:var(--color-on-accent);font:600 10px/16px var(--font-sans)}
+/* viewer */
+.frames{display:flex;gap:6px;padding:4px 12px 10px;overflow-x:auto}
+.frames button{height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--color-line);background:transparent;color:var(--color-ink-2);font:500 13px/1 var(--font-sans);white-space:nowrap;cursor:pointer}
+.frames button[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink);border-color:transparent}
+.render{position:absolute;top:90px;left:12px;right:12px;bottom:0;border-radius:16px 16px 0 0;overflow:hidden;background:var(--color-ground);border:1px solid var(--color-line);border-bottom:0;padding:14px 14px 120px}
+.m-h{height:14px;width:55%;border-radius:4px;background:var(--color-ink);opacity:.85}
+.m-s{height:8px;width:80%;border-radius:4px;background:var(--color-hover);margin-top:8px}
+.m-col{margin-top:16px;padding:8px;border-radius:8px;background:var(--color-hover);display:flex;flex-direction:column;gap:8px}
+.m-card{padding:10px;border-radius:6px;background:var(--color-content);border:1px solid var(--color-line)}
+.m-card i{display:block;height:8px;border-radius:3px;background:var(--color-ink-3);opacity:.6;width:70%}
+.m-card i+i{margin-top:6px;width:40%;background:var(--hue-2);opacity:.6}
+.old{position:absolute;top:96px;right:20px;width:28px;height:28px;border-radius:6px;border:1px dashed var(--color-ink-3);display:grid;place-items:center;color:var(--color-ink-3);opacity:.6}
+.note{display:flex;flex-direction:column;gap:8px;max-width:340px}
+.note li{font-size:13px;color:var(--color-ink-2)}
+.note ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px}
+.note h2{font-size:16px;line-height:24px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<button class="btn theme" type="button" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Toggle theme</button>
+<main class="page">
+<div class="eyebrow">S-6 · C-277</div>
+<h1>Design viewer on a phone</h1>
+<p class="desc">The viewer fills the screen. You get back to the card with one tap at the bottom edge instead of reaching for a small X in the top corner.</p>
+<div class="stage">
+  <figure>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="mono" style="font-size:12px">5G ▮▮▮</span></div>
+      <div class="frames" role="group" aria-label="Frames"><button type="button" aria-pressed="true">Board page</button><button type="button" aria-pressed="false">Card tile</button><button type="button" aria-pressed="false">Phone back bar</button></div>
+      <div class="render" aria-label="Mockup preview">
+        <div class="m-h"></div><div class="m-s"></div><div class="m-s" style="width:60%"></div>
+        <div class="m-col"><div class="m-card"><i></i><i></i></div><div class="m-card"><i></i><i></i></div><div class="m-card"><i></i><i style="background:var(--hue-4)"></i></div></div>
+        <div class="m-col"><div class="m-card"><i></i><i style="background:var(--hue-1)"></i></div><div class="m-card"><i></i><i></i></div></div>
+      </div>
+      <div class="bb glass-strong">
+        <button class="bb-back" type="button" aria-label="Back to card #612"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Card</span></button>
+        <div class="bb-title"><b>Design</b>Variant 1 of 3</div>
+        <button class="bb-act" type="button" aria-label="Comments, 2 open"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="cnt">2</span></button>
+      </div>
+      <div class="home"></div>
+    </div>
+    <figcaption><b>After</b>The frame chips stay at the top, where you read. The exit and the comments move to the bar at the bottom, where you tap.</figcaption>
+  </figure>
+  <figure>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="mono" style="font-size:12px">5G ▮▮▮</span></div>
+      <div class="frames"><button type="button" aria-pressed="true">Board page</button><button type="button" aria-pressed="false">Card tile</button></div>
+      <div class="render" style="opacity:.55"><div class="m-h"></div><div class="m-s"></div><div class="m-col"><div class="m-card"><i></i><i></i></div><div class="m-card"><i></i><i></i></div></div></div>
+      <div class="old" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></div>
+      <div class="home"></div>
+    </div>
+    <figcaption><b>Before (for reference)</b>A 28&thinsp;px close icon in the top-right corner: out of thumb reach and below the 44&thinsp;px tap size. It is hidden below <span class="mono">lg</span> once the bar ships.</figcaption>
+  </figure>
+  <div class="note">
+    <h2>Behaviour</h2>
+    <ul>
+      <li>One tap on <b>Card</b> closes the viewer and returns to the card it was opened from, with its scroll position kept.</li>
+      <li>Escape and the system back gesture call the same exit. The viewer adds a history entry, so browser back does not leave the board.</li>
+      <li>The comments button opens the existing comment panel and shows the open count.</li>
+      <li>The preview's scroll area ends 96&thinsp;px above the bottom, so the last row of a mockup can scroll clear of the bar.</li>
+    </ul>
+  </div>
+</div>
+</main>
+</body>
+</html>

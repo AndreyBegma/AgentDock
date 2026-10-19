@@ -91,6 +91,8 @@ import { useRemoveAttachment } from '../attachments/use-remove-attachment';
 import { PageHeader } from '../page-header/page-header';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { SessionMessageLine } from '../session/session-message-line';
+import { useNarrow } from '../shell/narrow';
+import { PhoneBackBar } from '../shell/phone-back-bar';
 import { useCurrentUser } from '../shell/user-context';
 import { CardStewardSection } from '../steward/card-steward-section';
 import { NormalizedNote } from '../text/normalized-note';
@@ -360,6 +362,60 @@ function InitialFocus() {
 const FORM_ID = 'board-card-form';
 
 /**
+ * #680 (stack S-6): on a phone the preview is a bottom sheet, so it closes in
+ * one movement three ways (the bar's Close, the scrim, the grabber); from `lg`
+ * up it stays on the right edge.
+ */
+export function cardSheetSide(narrow: boolean): 'bottom' | 'right' {
+  return narrow ? 'bottom' : 'right';
+}
+
+/**
+ * The sheet's footer: the card's actions, and on a phone the shared back bar
+ * under them, Close opposite Open card. From `lg` up it is the actions alone,
+ * or nothing.
+ */
+export function cardSheetFooter({
+  narrow,
+  actions,
+  pageHref,
+  onClose,
+}: {
+  narrow: boolean;
+  actions?: ReactNode;
+  pageHref?: string;
+  onClose?: () => void;
+}): ReactNode {
+  const row = actions ? (
+    <div className="flex items-center justify-end gap-2">{actions}</div>
+  ) : undefined;
+  if (!narrow || !onClose) return row;
+  return (
+    <div className="flex flex-col gap-3">
+      {row}
+      <PhoneBackBar
+        kind="close"
+        placement="inline"
+        onExit={onClose}
+        action={
+          pageHref ? (
+            <NextLink
+              href={pageHref}
+              className={buttonClassName({
+                variant: 'solid',
+                className: 'h-(--size-tap) shrink-0 rounded-[15px] px-4',
+              })}
+            >
+              Open card
+            </NextLink>
+          ) : undefined
+        }
+      />
+    </div>
+  );
+}
+
+/**
  * One card's detail (#273 D17, #431): Run, Design, Rounds, then the Card form.
  * `sheet` is the side sheet's one column with Save pinned; `page` is the full
  * page, two columns at full width with Save in the header. Same sections.
@@ -374,6 +430,7 @@ export function CardDetailBody({
   terminal,
   runnerName,
   onSaved,
+  onClose,
 }: {
   layout?: 'sheet' | 'page';
   sheetTitle: string;
@@ -384,7 +441,10 @@ export function CardDetailBody({
   terminal: TerminalAccess;
   runnerName?: string | null;
   onSaved: () => void;
+  /** The sheet's way out, for the phone back bar. */
+  onClose?: () => void;
 }) {
+  const narrow = useNarrow();
   const [picking, setPicking] = useState(false);
   // #515: the same move a drag makes; the sheet has no board, so no optimistic drop.
   const move = useCardMove({
@@ -1134,28 +1194,29 @@ export function CardDetailBody({
 
   return (
     <SheetContent
-      side="right"
+      side={cardSheetSide(narrow)}
       title={sheetTitle}
       description="Board card"
-      footer={
-        canOperate ? (
-          <div className="flex items-center justify-end gap-2">
-            {actionButtons}
-          </div>
-        ) : undefined
-      }
+      footer={cardSheetFooter({
+        narrow,
+        actions: actionButtons,
+        pageHref,
+        onClose,
+      })}
     >
       <InitialFocus />
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between gap-2">
           {moveButton}
-          <NextLink
-            href={pageHref}
-            className={buttonClassName({ variant: 'ghost', size: 'sm' })}
-          >
-            Open as page
-            <ExternalLink aria-hidden="true" className="size-4" />
-          </NextLink>
+          {narrow ? null : (
+            <NextLink
+              href={pageHref}
+              className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+            >
+              Open as page
+              <ExternalLink aria-hidden="true" className="size-4" />
+            </NextLink>
+          )}
         </div>
         {triageSection}
         {runSection}
@@ -1197,6 +1258,7 @@ export function CardSheet({
   onChanged: () => void;
   onClose: () => void;
 }) {
+  const narrow = useNarrow();
   const [card, setCard] = useState<BoardCardDetail>();
   const [error, setError] = useState<string>();
 
@@ -1246,12 +1308,14 @@ export function CardSheet({
             terminal={terminal}
             runnerName={runnerName}
             onSaved={onChanged}
+            onClose={close}
           />
         ) : (
           <SheetContent
-            side="right"
+            side={cardSheetSide(narrow)}
             title={sheetTitle}
             description="Board card"
+            footer={cardSheetFooter({ narrow, onClose: close })}
           >
             {error ? (
               <p role="alert" className="text-sm text-danger">
