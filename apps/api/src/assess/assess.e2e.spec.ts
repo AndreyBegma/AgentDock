@@ -70,11 +70,12 @@ describe('card model assessment (e2e, #322 D5–D8)', () => {
     expect(sent.prompt).toContain('"title": "Add login"');
     expect((await w.card(number)).assessRunId).toBe(runId);
 
-    await w.finishAssess(runId, assessAnswer('sonnet', 'opus'));
+    await w.finishAssess(runId, assessAnswer('sonnet', 'opus', {}, 'low'));
     const card = await w.card(number);
     expect(card).toMatchObject({
       id,
       recommendedModel: 'sonnet',
+      recommendedEffort: 'low',
       recommendedReason: 'Work fits sonnet.',
       recommendedDesignModel: 'opus',
       recommendedDesignReason: 'Design fits opus.',
@@ -85,10 +86,10 @@ describe('card model assessment (e2e, #322 D5–D8)', () => {
       await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: runId } }),
     ).toMatchObject({
       status: 'succeeded',
-      outcome: 'work sonnet · design opus',
+      outcome: 'work sonnet low · design opus',
     });
     expect((await detail(number)).recommendation).toEqual({
-      work: { model: 'sonnet', reason: 'Work fits sonnet.' },
+      work: { model: 'sonnet', effort: 'low', reason: 'Work fits sonnet.' },
       design: { model: 'opus', reason: 'Design fits opus.' },
       assessedAt: expect.any(String),
     });

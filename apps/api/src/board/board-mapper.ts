@@ -515,6 +515,7 @@ export const toCardDetail = (
   issueOnRun: card.issueOnRun,
   specOnRun: card.specOnRun,
   model: card.model,
+  effort: card.effort,
   profileKey: card.profileKey,
   designModel: card.designModel,
   recommendation: cardRecommendationOf(card),

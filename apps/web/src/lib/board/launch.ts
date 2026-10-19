@@ -1,10 +1,13 @@
 import {
   type BoardCardDetail,
+  CARD_EFFORTS,
+  type CardEffort,
   type CardRecommendationView,
   type ClaudeModelOption,
   claudeModelLabel,
   claudeModelOptions,
   type ProjectRuntimeProfile,
+  RECOMMENDED_SUFFIX,
 } from '@agentdock/shared';
 
 /**
@@ -20,7 +23,8 @@ export type LaunchKind = 'work' | 'design';
 export type LaunchCard = Pick<
   BoardCardDetail,
   'profileKey' | 'model' | 'designModel' | 'recommendation'
->;
+> &
+  Partial<Pick<BoardCardDetail, 'effort'>>;
 
 /** The empty `<option>`: the API's own fall-through (D2), shown honestly. */
 export const DEFAULT_VALUE = '';
@@ -32,7 +36,16 @@ export interface LaunchForm {
   profileKey: string;
   /** `''` follows the project's model. */
   model: string;
+  /**
+   * #663: the work's effort; `''` follows the API's default. Absent on a
+   * design launch, which has no effort.
+   */
+  effort?: string;
 }
+
+/** #663: the work's effort the card runs at, else the recommended one. */
+const workEffort = (card: LaunchCard): string =>
+  card.effort ?? card.recommendation.work?.effort ?? DEFAULT_VALUE;
 
 /** The recommendation for this action, `null` without one (D7). */
 export const recommendationFor = (
@@ -58,6 +71,7 @@ export function launchDefaults(card: LaunchCard, kind: LaunchKind): LaunchForm {
       modelOverrideOf(card, kind) ??
       recommendationFor(card.recommendation, kind)?.model ??
       DEFAULT_VALUE,
+    ...(kind === 'work' ? { effort: workEffort(card) } : {}),
   };
 }
 
@@ -126,6 +140,32 @@ export function launchModelOptions(
       ];
 }
 
+/** #663: an effort's label, `Low`. */
+export const effortLabel = (effort: CardEffort): string =>
+  `${effort[0].toUpperCase()}${effort.slice(1)}`;
+
+/**
+ * #663: the effort select's options, by the model rule (D2, D4): the
+ * recommended one suffixed, and "Claude default" first while the form follows
+ * neither an override nor a recommendation.
+ */
+export function launchEffortOptions(
+  card: LaunchCard,
+): { value: string; label: string; recommended: boolean }[] {
+  const recommended = card.recommendation.work?.effort ?? null;
+  const options = CARD_EFFORTS.map((effort) => ({
+    value: effort,
+    label: `${effortLabel(effort)}${effort === recommended ? RECOMMENDED_SUFFIX : ''}`,
+    recommended: effort === recommended,
+  }));
+  return recommended || card.effort
+    ? options
+    : [
+        { value: DEFAULT_VALUE, label: 'Claude default', recommended: false },
+        ...options,
+      ];
+}
+
 /** The line under the model select: the reason, or that there is none (D7). */
 export function recommendationNote(
   card: Pick<LaunchCard, 'recommendation'>,
@@ -140,10 +180,14 @@ export function recommendationNote(
 /** The body of Run / Generate / Revise: only what the person has set. */
 export const launchRequest = (
   form: LaunchForm,
-): { profileKey?: string; model?: string } => ({
+): { profileKey?: string; model?: string; effort?: CardEffort } => ({
   ...(form.profileKey !== DEFAULT_VALUE ? { profileKey: form.profileKey } : {}),
   ...(form.model !== DEFAULT_VALUE ? { model: form.model } : {}),
+  ...(isCardEffort(form.effort) ? { effort: form.effort } : {}),
 });
+
+const isCardEffort = (value: string | undefined): value is CardEffort =>
+  (CARD_EFFORTS as readonly string[]).includes(value ?? '');
 
 /**
  * The profile select's options. A key the runner no longer lists stays as its

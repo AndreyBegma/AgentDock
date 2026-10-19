@@ -109,6 +109,76 @@ describe('board launch overrides (e2e, #322)', () => {
     expect((await roundRun(number)).model).toBe('sonnet');
   });
 
+  describe('#663: effort beside the model', () => {
+    const withEffort = async (effort: 'low' | 'medium' | 'high') => {
+      const card = await recommended('sonnet');
+      await w.ctx.prisma.boardCard.update({
+        where: { id: card.id },
+        data: { recommendedEffort: effort },
+      });
+      return card;
+    };
+
+    it('starts on the recommended effort and stores no override', async () => {
+      await w.advertiseCardEffort();
+      const { number } = await withEffort('medium');
+      expect((await w.runCard(number)).status).toBe(200);
+      expect(w.sent('card.run')[0]).toMatchObject({
+        model: 'sonnet',
+        effort: 'medium',
+      });
+      expect((await roundRun(number)).args).toMatchObject({
+        effort: 'medium',
+      });
+      expect((await w.card(number)).effort).toBeNull();
+    });
+
+    it('remembers a different effort; choosing the default again clears it', async () => {
+      await w.advertiseCardEffort();
+      const { number } = await withEffort('medium');
+      w.handlers['card.run'] = () => failed('internal');
+      expect((await w.runCard(number, { effort: 'high' })).status).toBe(502);
+      expect((await w.card(number)).effort).toBe('high');
+      expect(w.sent('card.run')[0]).toMatchObject({ effort: 'high' });
+
+      expect((await w.runCard(number, { effort: 'medium' })).status).toBe(502);
+      expect((await w.card(number)).effort).toBeNull();
+    });
+
+    it('sends no effort without a recommendation or a choice', async () => {
+      await w.advertiseCardEffort();
+      const { number } = await recommended('sonnet');
+      expect((await w.runCard(number)).status).toBe(200);
+      expect(w.sent('card.run')[0].effort).toBeUndefined();
+    });
+
+    it('sends no effort to a runner that does not advertise it', async () => {
+      const { number } = await withEffort('low');
+      expect((await w.runCard(number, { effort: 'high' })).status).toBe(200);
+      expect(w.sent('card.run')[0].effort).toBeUndefined();
+      expect((await roundRun(number)).args).toMatchObject({ effort: null });
+    });
+
+    it('refuses an effort outside the list with 400', async () => {
+      const { number } = await recommended('sonnet');
+      expect((await w.runCard(number, { effort: 'max' })).status).toBe(400);
+    });
+
+    it('shows the effort and the recommended one on the card', async () => {
+      const { number } = await withEffort('low');
+      const detail = await w.operator.send(
+        'get',
+        `${w.path()}/board/cards/${number}`,
+      );
+      expect(detail.body).toMatchObject({
+        effort: null,
+        recommendation: {
+          work: { model: 'sonnet', effort: 'low', reason: 'Fits sonnet.' },
+        },
+      });
+    });
+  });
+
   it('starts on a chosen Claude profile and remembers it', async () => {
     const { number } = await recommended('sonnet');
     const response = await w.runCard(number, { profileKey: 'claude-alt' });

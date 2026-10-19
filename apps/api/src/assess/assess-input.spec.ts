@@ -16,7 +16,11 @@ const input: CardAssessInput = {
 };
 
 const answer = {
-  work: { model: 'sonnet', reason: 'Executes a clear, single-module change.' },
+  work: {
+    model: 'sonnet',
+    effort: 'low',
+    reason: 'Executes a clear, single-module change.',
+  },
   design: { model: 'opus', reason: 'The layout is still undecided.' },
 };
 

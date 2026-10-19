@@ -306,5 +306,7 @@ export const detectCapabilities = async (
     handoff: true,
     // #489: this runner takes `session.message` and reports question screens.
     sessionMessage: true,
+    // #663: this runner takes `effort` on `card.run`.
+    cardEffort: true,
   };
 };

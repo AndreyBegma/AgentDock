@@ -19,6 +19,18 @@ export const CARD_DESIGN_RECOMMENDABLE_MODELS = ['opus', 'sonnet'] as const;
 export type CardDesignRecommendableModel =
   (typeof CARD_DESIGN_RECOMMENDABLE_MODELS)[number];
 
+/**
+ * #663 (ADR-0068 §5): the Claude CLI's `--effort` a card's work may run at,
+ * recommended next to the model. The CLI knows `xhigh` and `max` too; a card
+ * never needs them.
+ */
+export const CARD_EFFORTS = ['low', 'medium', 'high'] as const;
+export type CardEffort = (typeof CARD_EFFORTS)[number];
+
+/** #663 (ADR-0068 §5): a `ci_fix` round's model and effort unless the card overrides them. */
+export const CARD_CI_FIX_MODEL = 'sonnet';
+export const CARD_CI_FIX_EFFORT: CardEffort = 'low';
+
 /** A recommendation's one-line reason, in English (D6). */
 export const CARD_ASSESS_REASON_MAX = 160;
 
