@@ -70,6 +70,7 @@ import { nodeRealpath, type Realpath } from './policy/roots';
 import { reportedPolicy } from './policy/schema';
 import { PolicyStore } from './policy/store';
 import { WatchList } from './projects/watch-list';
+import { CodeAsker, createRepoHandlers } from './repo';
 import { SessionMessenger } from './session';
 import {
   createSkillHandlers,
@@ -543,6 +544,24 @@ export const runDaemon = async (
       docs: createDocsHandlers(skillsDeps),
       steward: { ...stewardActions.handlers(), ...stewardDigest.handlers() },
       handoff: createHandoffHandlers(handoff),
+      // #622: the assistant reads the checkout; `code.ask` is read-only.
+      repo: createRepoHandlers(
+        {
+          exec,
+          watchedProjects: () => watchList.current,
+          policy: () => policy.current(),
+        },
+        new CodeAsker({
+          dir: join(dirname(options.spoolDir), 'code-ask'),
+          env: process.env,
+          clock,
+          log,
+          profiles: () => config.profiles,
+          watchedProjects: () => watchList.current,
+          policy: () => policy.current(),
+          otlpPort: () => otlp?.port ?? null,
+        }),
+      ),
       sessionMessage: new SessionMessenger({
         cards: {
           record: (cardId) => cards.store.load(cardId),

@@ -1,5 +1,10 @@
 import type { TaskDesignSummary } from '../design/contracts';
-import type { BoardCardView, CardRoundBrief } from './contracts';
+import type {
+  BoardCardView,
+  BoardErrorCode,
+  CardPrTarget,
+  CardRoundBrief,
+} from './contracts';
 import { BOARD_COLUMNS, type BoardColumn } from './types';
 
 /**
@@ -44,6 +49,51 @@ export interface BoardStackStageView {
   cards: number[];
 }
 
+/**
+ * #652: Run stack. `running` starts the queued cards as they become ready,
+ * within the project's `maxRunning`; `paused` waits for a person after a
+ * refused start or a failed round; `stopped` had its queue removed; `done`
+ * started every card it queued.
+ */
+export const STACK_RUN_STATES = [
+  'running',
+  'paused',
+  'stopped',
+  'done',
+] as const;
+export type StackRunState = (typeof STACK_RUN_STATES)[number];
+
+/**
+ * #652: a card of a stack run — `queued` ready to start when a slot frees,
+ * `waiting` for a dependency, `running` started by the run and still active,
+ * `paused` the card whose refused start or failed round paused the run.
+ */
+export type StackCardRunState = 'queued' | 'waiting' | 'running' | 'paused';
+
+/** #652: why a stack run paused. */
+export interface StackRunPause {
+  /** A refused start's `BoardErrorCode`, `round_failed`, or `unknown`. */
+  code: BoardErrorCode | 'round_failed' | 'unknown';
+  /** At most 500 characters. */
+  message: string;
+  /** The card that paused it; `null` once that card is gone. */
+  card: number | null;
+  at: string;
+}
+
+/** #652: a stack's run, as its face and its page show it. */
+export interface StackRunView {
+  state: StackRunState;
+  pause: StackRunPause | null;
+  /** Cards ready to start, in the queue. */
+  queued: number;
+  /** Queued cards that wait for a dependency. */
+  waiting: number;
+  /** Cards the run started whose round is still active. */
+  running: number;
+  startedAt: string;
+}
+
 /** One stack on the board (`BoardView.stacks`). */
 export interface BoardStackView {
   id: string;
@@ -63,6 +113,8 @@ export interface BoardStackView {
   design: TaskDesignSummary | null;
   /** Sum over its cards, a decimal string; null when nothing is priced. */
   costUsd: string | null;
+  /** #652: Run stack's state; `null` before the stack has been run. */
+  run: StackRunView | null;
 }
 
 /** One card of a stack, as the stack page lists it. */
@@ -74,9 +126,16 @@ export interface StackCardView {
   round: CardRoundBrief | null;
   /** The card's own design, kept apart from the stack's. */
   design: TaskDesignSummary | null;
+  /** #636: the card's latest PR; `null` before it has one. */
+  prNumber: number | null;
+  prUrl: string | null;
+  /** #636: where the card's PR goes — "into C-1's branch" or the base. */
+  prTarget: CardPrTarget | null;
   /** The cards of the stage before, by number: "after C-88, C-89". */
   after: number[];
   costUsd: string | null;
+  /** #652: the card in the stack run; `null` when the run holds it no more. */
+  run: StackCardRunState | null;
 }
 
 /** `GET /projects/:projectId/board/stacks/:number`. */
@@ -128,6 +187,24 @@ export interface CreateBoardStackRequest {
   /** Card numbers, at least `MANUAL_STACK_CARDS_MIN`. */
   cards: number[];
 }
+
+/** #652: what a stack run says of itself — "Running · 2 queued". */
+export const stackRunText = (run: StackRunView): string => {
+  const parts = [
+    run.running > 0 ? `${run.running} running` : null,
+    run.queued > 0 ? `${run.queued} queued` : null,
+    run.waiting > 0 ? `${run.waiting} waiting for a dependency` : null,
+  ].filter((p) => p !== null);
+  const head =
+    run.state === 'running'
+      ? 'Running'
+      : run.state === 'paused'
+        ? 'Paused'
+        : run.state === 'stopped'
+          ? 'Stopped'
+          : 'Done';
+  return parts.length > 0 ? `${head} · ${parts.join(' · ')}` : head;
+};
 
 /** A stack made by hand groups two cards or more. */
 export const MANUAL_STACK_CARDS_MIN = 2;

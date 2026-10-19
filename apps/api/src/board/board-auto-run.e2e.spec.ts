@@ -26,6 +26,12 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       column: 'completed',
       index: 0,
     });
+  const finish = async (number: number) => {
+    expect((await w.runCard(number)).status).toBe(200);
+    expect(
+      (await w.operator.send('post', `${cardPath(number)}/finish`)).status,
+    ).toBe(200);
+  };
   const autoRun = (number: number, on = true) =>
     w.operator.send('patch', cardPath(number), { autoRunWhenReady: on });
   const face = async (number: number): Promise<BoardCardView | undefined> => {
@@ -36,6 +42,12 @@ describe('card readiness and auto-run (e2e, #443)', () => {
   };
   const detail = async (number: number) =>
     (await w.viewer.get(cardPath(number))).body as BoardCardDetail;
+
+  const operator = () => ({
+    userId: w.operatorId,
+    role: 'operator' as const,
+    ctx: { actor: userActor(w.operatorId) },
+  });
 
   /** Cards A and B, and C that runs after both. */
   const world = async () => {
@@ -52,7 +64,7 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       const { a, b, c } = await world();
       expect((await face(c.number))?.readiness).toEqual({
         state: 'waiting',
-        accepted: 0,
+        satisfied: 0,
         total: 2,
         open: [
           { number: a.number, label: `C-${a.number}`, column: 'todo' },
@@ -63,14 +75,14 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       await accept(a.number);
       expect((await face(c.number))?.readiness).toMatchObject({
         state: 'waiting',
-        accepted: 1,
+        satisfied: 1,
         open: [expect.objectContaining({ number: b.number })],
       });
 
       await accept(b.number);
       expect((await detail(c.number)).readiness).toEqual({
         state: 'ready',
-        accepted: 2,
+        satisfied: 2,
         total: 2,
         open: [],
       });
@@ -82,7 +94,8 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       const lone = await w.createCard({ specOnRun: false });
       const dependant = await w.createCard({ specOnRun: false });
       await link(dependant.number, lone.number);
-      await w.runCard(dependant.number, { ignoreDependencies: true });
+      await finish(lone.number);
+      await w.runCard(dependant.number);
       expect((await face(dependant.number))?.readiness).toBeNull();
     });
 
@@ -168,6 +181,71 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       expect(shown.autoRunFailure).toBeNull();
     });
 
+    it('starts the Run when the last open dependency reaches Finished, and not again on its Accept (#638)', async () => {
+      const { a, b, c } = await world();
+      await autoRun(c.number);
+
+      // A is accepted with no PR (landed, #636); C still waits for B.
+      await accept(a.number);
+      await w.work.settled();
+      expect((await w.card(c.number)).column).toBe('todo');
+
+      await finish(b.number);
+      await w.work.settled();
+      // B's own Run, then C's — after B's collect opened its PR, stacked on
+      // B's branch (ADR-0064).
+      expect(w.sent('card.run')).toHaveLength(2);
+      expect(w.sent('card.run')[1]).toMatchObject({
+        base: (await w.card(b.number)).branch,
+      });
+      const card = await w.card(c.number);
+      expect(card.column).toBe('in_progress');
+      expect(card.autoRunWhenReady).toBe(false);
+      expect(card.rounds).toEqual([
+        expect.objectContaining({ round: 1, autoRunAfter: b.number }),
+      ]);
+
+      expect((await accept(b.number)).status).toBe(200);
+      await w.work.settled();
+      expect(w.sent('card.run')).toHaveLength(2);
+      expect((await w.card(c.number)).rounds).toHaveLength(1);
+      expect(await w.audit('card.auto_run_failed')).toEqual([]);
+    });
+
+    it('starts nothing while a Finished dependency goes back In progress (#638)', async () => {
+      const { a, b, c } = await world();
+      await autoRun(c.number);
+      await finish(a.number);
+      await w.operator.send('post', `${cardPath(a.number)}/feedback`, {
+        text: 'Rename the button.',
+      });
+      await finish(b.number);
+      await w.work.settled();
+      expect((await w.card(c.number)).column).toBe('todo');
+      expect((await w.card(c.number)).autoRunWhenReady).toBe(true);
+      expect((await face(c.number))?.readiness).toMatchObject({
+        state: 'waiting',
+        open: [expect.objectContaining({ number: a.number })],
+      });
+    });
+
+    it('publishes board.changed for the dependants when a card reaches or leaves Finished (#638)', async () => {
+      const { a, c } = await world();
+      expect((await w.runCard(a.number)).status).toBe(200);
+      const publish = jest.spyOn(w.work, 'publish');
+      try {
+        await w.operator.send('post', `${cardPath(a.number)}/finish`);
+        expect(publish).toHaveBeenCalledWith(w.a, c.id);
+        publish.mockClear();
+        await w.operator.send('post', `${cardPath(a.number)}/feedback`, {
+          text: 'Rename the button.',
+        });
+        expect(publish).toHaveBeenCalledWith(w.a, c.id);
+      } finally {
+        publish.mockRestore();
+      }
+    });
+
     it('starts nothing with the switch off, and the manual Run behaves as before', async () => {
       const { a, b, c } = await world();
       await accept(a.number);
@@ -205,14 +283,10 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       });
 
       const auto = w.ctx.app.get(BoardAutoRun);
-      const actor = {
-        userId: w.operatorId,
-        role: 'operator' as const,
-        ctx: { actor: userActor(w.operatorId) },
-      };
+      const actor = operator();
       await Promise.all(
         Array.from({ length: 5 }, (_, i) =>
-          auto.afterAccepted(w.a, i % 2 === 0 ? a : b, actor),
+          auto.afterSatisfied(w.a, i % 2 === 0 ? a : b, actor),
         ),
       );
 
@@ -224,10 +298,12 @@ describe('card readiness and auto-run (e2e, #443)', () => {
     it('leaves a card that is not in To Do alone', async () => {
       const { a, b, c } = await world();
       await autoRun(c.number);
-      await w.runCard(c.number, { ignoreDependencies: true });
-      await accept(a.number);
-      await accept(b.number);
-      await w.work.settled();
+      await w.ctx.prisma.boardCard.updateMany({
+        where: { id: { in: [a.id, b.id] } },
+        data: { column: 'completed', completedAt: new Date() },
+      });
+      expect((await w.runCard(c.number)).status).toBe(200);
+      await w.ctx.app.get(BoardAutoRun).afterSatisfied(w.a, b, operator());
       expect(w.sent('card.run')).toHaveLength(1);
       expect((await w.card(c.number)).rounds).toHaveLength(1);
     });

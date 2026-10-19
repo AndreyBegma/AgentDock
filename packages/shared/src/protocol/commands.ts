@@ -8,6 +8,7 @@ import {
   cardCiRetriggerCommands,
   cardCommands,
   cardPrCloseCommands,
+  cardPrRetargetCommands,
 } from './commands/cards';
 import { controlCommands } from './commands/control';
 import { docsCommands } from './commands/docs';
@@ -16,6 +17,7 @@ import { handoffCommands } from './commands/handoff';
 import { plannerCommands } from './commands/planner';
 import { projectRuleCommands } from './commands/project-rules';
 import { queueCommands } from './commands/queue';
+import { repoCommands } from './commands/repo';
 import { sessionMessageCommands } from './commands/session-message';
 import { skillCommands } from './commands/skills';
 import { stewardCommands } from './commands/steward';
@@ -167,6 +169,7 @@ export const commands = {
   ...cardPrCloseCommands,
   ...cardChecksCommands,
   ...cardCiRetriggerCommands,
+  ...cardPrRetargetCommands,
   ...captureCommands,
   ...textCommands,
   ...assessCommands,
@@ -175,6 +178,7 @@ export const commands = {
   ...handoffCommands,
   ...sessionMessageCommands,
   ...projectRuleCommands,
+  ...repoCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

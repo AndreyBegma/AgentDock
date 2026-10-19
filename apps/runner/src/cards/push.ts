@@ -3,12 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CardDraftPullRequest } from '@agentdock/shared/protocol';
 import { GH_TIMEOUT_MS, gitOk, parsePrUrl, stderrLine } from '../skills/deps';
-import { githubOf, pushBranch } from '../skills/run/collect';
+import { githubOf } from '../skills/run/collect';
 import {
   fallbackPullRequestBody,
   type GitDeps,
   type OpenPr,
   openPullRequest,
+  pushCardBranch,
 } from './git';
 import type { CardRecord } from './record';
 import { commitsWithTrailer, type TrailerCommit } from './trailer-guard';
@@ -158,7 +159,15 @@ export const pushCardHead = async (
     id: record.projectId,
     root: record.root,
   });
-  if (pending.push) await pushBranch(deps, record.worktree, record.branch);
+  // #630: a reconciled push adds a merge, so the head pushed is its own.
+  const headSha = pending.push
+    ? await pushCardBranch(
+        deps,
+        record.worktree,
+        record.branch,
+        record.pushedHead,
+      )
+    : pending.headSha;
   try {
     const open = await openPullRequest(deps, github, record.branch);
     const pr = open
@@ -182,10 +191,10 @@ export const pushCardHead = async (
           state: 'draft' as const,
           opened: true,
         };
-    return { headSha: pending.headSha, pushed: pending.push, pr };
+    return { headSha, pushed: pending.push, pr };
   } catch (error) {
     return {
-      headSha: pending.headSha,
+      headSha,
       pushed: pending.push,
       pr: null,
       prError: oneLine(error),

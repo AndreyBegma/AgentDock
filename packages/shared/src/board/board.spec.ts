@@ -60,7 +60,7 @@ describe('naming', () => {
     expect(cardSlug('Add login — with OAuth!')).toBe('add-login-with-oauth');
     expect(cardSlug('Café über')).toBe('cafe-uber');
     expect(cardSlug('日本語')).toBe('card');
-    expect(cardSlug('a'.repeat(39) + ' b')).toBe('a'.repeat(39));
+    expect(cardSlug(`${'a'.repeat(39)} b`)).toBe('a'.repeat(39));
   });
 
   it('names an issue branch so #201 D14 links it, and a card branch so it does not', () => {
@@ -243,7 +243,7 @@ describe('worker prompt', () => {
   };
 
   it('is versioned', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(17);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(19);
   });
 
   it('names the card, branch, base and spec, and how to finish', () => {

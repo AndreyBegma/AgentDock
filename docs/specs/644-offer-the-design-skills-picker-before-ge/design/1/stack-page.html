@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C-262 · Stack page — Generate design opens the choice</title>
+<style>
+:root{--font-sans:'SF Pro Text','SF Pro Display',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--size-field:28px;--dur-fast:100ms;--dur-base:150ms;--ease-sheet:cubic-bezier(.32,.72,0,1);--press-scale:.97;--glass-blur:26px;--glass-blur-strong:40px}
+:root,:root[data-theme='dark']{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / .96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / .62);--color-ink-3:rgb(242 242 246 / .53);--color-ink-4:rgb(242 242 246 / .38);--color-line:rgb(255 255 255 / .1);--color-line-strong:rgb(255 255 255 / .18);--color-hover:rgb(255 255 255 / .06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246 / .2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--hue-1:#5b9cf6;--hue-1-soft:rgb(91 156 246 / .18);--hue-1-ink:#a4c8ff;--hue-2:#2fbf94;--hue-2-soft:rgb(47 191 148 / .18);--hue-2-ink:#7ee0c0;--hue-3:#7cc95a;--hue-3-soft:rgb(124 201 90 / .18);--hue-3-ink:#ade58f;--hue-4:#e69f00;--hue-4-soft:rgb(230 159 0 / .18);--hue-4-ink:#f5c25c;--hue-7:#a68bfa;--hue-7-soft:rgb(166 139 250 / .18);--hue-7-ink:#cbbcff;--glass-sheen:rgb(255 255 255 / .06);--glass-scrim:rgb(9 9 12 / .55);--glass-scrim-strong:rgb(9 9 12 / .64);--glass-brightness:.85;--glass-brightness-strong:.7;--glass-edge:rgb(255 255 255 / .14);--glass-spec:rgb(255 255 255 / .2);--glass-rim:rgb(242 242 246 / .8);--glass-rim-shade:rgb(9 9 12 / .5);--glass-rim-strong:rgb(242 242 246 / .22);--glass-rim-shade-strong:rgb(9 9 12 / .2);--glass-meniscus:rgb(9 9 12 / .55);--glass-refract:rgb(242 242 246 / .35);--glass-shadow:rgb(0 0 0 / .35);--glass-shadow-strong:rgb(0 0 0 / .45);--glass-shadow-clear:rgb(0 0 0 / .15);--canvas-glow:18%}
+:root[data-theme='light']{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#fff;--color-content:rgb(255 255 255 / .96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / .72);--color-ink-3:rgb(24 24 27 / .64);--color-ink-4:rgb(24 24 27 / .48);--color-line:rgb(0 0 0 / .1);--color-line-strong:rgb(0 0 0 / .23);--color-hover:rgb(0 0 0 / .06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229 / .12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--hue-1:#1f64d6;--hue-1-soft:rgb(31 100 214 / .12);--hue-1-ink:#1550b0;--hue-2:#00805e;--hue-2-soft:rgb(0 128 94 / .12);--hue-2-ink:#006a4e;--hue-3:#3a7d1c;--hue-3-soft:rgb(58 125 28 / .12);--hue-3-ink:#2f6617;--hue-4:#b36b00;--hue-4-soft:rgb(179 107 0 / .12);--hue-4-ink:#8a5200;--hue-7:#7244e0;--hue-7-soft:rgb(114 68 224 / .12);--hue-7-ink:#5b30c4;--glass-sheen:rgb(0 0 0 / .06);--glass-scrim:rgb(255 255 255 / .52);--glass-scrim-strong:rgb(255 255 255 / .64);--glass-brightness:1.15;--glass-brightness-strong:1.3;--glass-edge:rgb(0 0 0 / .18);--glass-spec:rgb(0 0 0 / .2);--glass-rim:rgb(255 255 255 / .9);--glass-rim-shade:rgb(24 24 27 / .18);--glass-rim-strong:rgb(255 255 255 / .3);--glass-rim-shade-strong:rgb(24 24 27 / .08);--glass-meniscus:rgb(24 24 27 / .12);--glass-refract:rgb(255 255 255 / .5);--glass-shadow:rgb(0 0 0 / .12);--glass-shadow-strong:rgb(0 0 0 / .16);--glass-shadow-clear:rgb(0 0 0 / .08);--canvas-glow:10%}
+:root{--status-waiting:var(--hue-1);--status-waiting-soft:var(--hue-1-soft);--status-waiting-ink:var(--hue-1-ink);--status-running:var(--hue-2);--status-done:var(--hue-3);--status-done-soft:var(--hue-3-soft);--status-done-ink:var(--hue-3-ink);--status-paused:var(--hue-4)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em}
+.mono{font-family:var(--font-mono)}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim),inset -1px -1px 0 var(--glass-rim-shade),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));-webkit-backdrop-filter:blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),inset 1px 1px 0 var(--glass-rim-strong),inset -1px -1px 0 var(--glass-rim-shade-strong),inset 0 -3px 3px -1px var(--glass-meniscus),inset 0 0 18px -4px var(--glass-refract),0 20px 48px var(--glass-shadow-strong)}
+.row{display:flex;align-items:center;gap:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:var(--size-control);padding:0 16px;border-radius:var(--radius-control);font:600 14px/1 var(--font-sans);white-space:nowrap;cursor:pointer;border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);text-decoration:none;transition:background-color var(--dur-fast),transform 100ms var(--ease-sheet)}
+.btn:hover{background:linear-gradient(var(--color-hover),var(--color-hover)),var(--color-raised)}
+.btn:active{transform:scale(var(--press-scale))}
+.btn--solid{background:var(--color-accent);border-color:transparent;color:var(--color-on-accent)}
+.btn--solid:hover{background:color-mix(in oklab,var(--color-accent) 88%,var(--color-on-accent))}
+.btn--ghost{background:transparent;border-color:transparent;color:var(--color-ink-2)}
+.btn--ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn--sm{height:32px;padding:0 12px;font-size:12px}
+.btn--icon{padding:0;aspect-ratio:1}
+.pill{display:inline-flex;align-items:center;gap:8px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;background:var(--color-hover);color:var(--color-ink-2);white-space:nowrap}
+.pill .dot{width:8px;height:8px;border-radius:999px;background:var(--dot,var(--color-ink-3))}
+.pill[data-status='done']{background:var(--status-done-soft);color:var(--status-done-ink)}[data-status='done']{--dot:var(--status-done)}
+.pill[data-status='waiting']{background:var(--status-waiting-soft);color:var(--status-waiting-ink)}[data-status='waiting']{--dot:var(--status-waiting)}
+.chip{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;border-radius:4px;font-size:10px;font-weight:500;background:var(--color-hover);color:var(--color-ink-2)}
+.card{border-radius:var(--radius-surface);padding:16px;background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.topbar{display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;border-radius:var(--radius-surface)}
+.crumbs{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--color-ink-3)}
+.crumbs a{color:var(--color-ink-2);text-decoration:none}
+.avatar{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:999px;background:var(--hue-7-soft);color:var(--hue-7-ink);font-size:11px;font-weight:600}
+.section-h{font-size:16px;line-height:24px;font-weight:600}
+.stage{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--color-line)}
+.stage:first-of-type{border-top:0}
+.num{font-variant-numeric:tabular-nums}
+
+/* frame layout */
+.frame{max-width:1240px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:20px}
+.frame-bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.frame-bar h2{font-size:15px;line-height:22px;font-weight:600}
+.label-tag{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--color-ink-3)}
+.viewport{border-radius:var(--radius-sheet);border:1px solid var(--color-line);overflow:hidden;position:relative;background:color-mix(in oklab,var(--color-ground) 70%,transparent)}
+.viewport-inner{padding:12px;display:flex;flex-direction:column;gap:12px}
+.desk{display:grid;grid-template-columns:minmax(0,1fr) 22rem;gap:24px}
+.note{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--radius-surface);border:1px dashed color-mix(in oklab,var(--color-accent) 55%,transparent);background:var(--color-accent-soft);color:var(--color-ink);font-size:13px;line-height:18px}
+.note .icon{color:var(--color-accent-ink);margin-top:1px}
+.note b{color:var(--color-accent-ink);font-weight:600}
+.callout-target{position:relative}
+.callout-target::after{content:'';position:absolute;inset:-5px;border-radius:9px;border:2px solid var(--color-accent);opacity:.55;pointer-events:none;animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.15}}
+@media (prefers-reduced-motion:reduce){.callout-target::after{animation:none}}
+.phone-row{display:grid;grid-template-columns:390px 1fr;gap:24px;align-items:start}
+.phone{width:390px;height:620px;border-radius:28px;border:1px solid var(--color-line-strong);position:relative;overflow:hidden;background:color-mix(in oklab,var(--color-ground) 85%,transparent)}
+.phone-body{padding:12px 16px;display:flex;flex-direction:column;gap:12px}
+.dock{position:absolute;left:16px;right:16px;bottom:96px;display:flex;gap:8px;padding:8px;border-radius:var(--radius-sheet)}
+.dock .btn{height:44px;flex:1}
+.capsule{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:4px;padding:6px;border-radius:999px}
+.capsule span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 14px;border-radius:999px;font-size:11px;font-weight:500;color:var(--color-ink-2)}
+.capsule span[aria-current]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.flow{display:flex;flex-direction:column;gap:10px}
+.step{display:grid;grid-template-columns:24px 1fr;gap:10px;align-items:start;font-size:13px;line-height:18px}
+.step i{font-style:normal;display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-2);font-size:12px;font-weight:600}
+.step code{font-family:var(--font-mono);font-size:12px;color:var(--color-accent-ink)}
+.toast{position:fixed;right:16px;bottom:16px;display:none;align-items:flex-start;gap:10px;width:340px;padding:12px 14px;border-radius:var(--radius-surface);z-index:80}
+.toast.show{display:flex}
+</style>
+</head>
+<body>
+<div class="canvas"></div>
+<div class="frame">
+  <div class="frame-bar">
+    <div><div class="label-tag">C-262 · Frame 1 of 2</div><h2>Stack page: Generate design opens the stack design viewer</h2></div>
+    <button class="btn btn--sm" id="theme" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/></svg>Theme</button>
+  </div>
+
+  <div class="label-tag">Desktop · ≥ lg</div>
+  <div class="viewport">
+    <div class="viewport-inner">
+      <header class="topbar glass">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="#">Projects</a><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><a href="#">AgentDock</a><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><a href="#">Board</a><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></nav>
+        <span style="flex:1;font-size:15px;font-weight:600">S-14 · Intake attachments</span>
+        <span class="avatar">AB</span>
+      </header>
+
+      <main style="padding:8px 16px 16px;display:flex;flex-direction:column;gap:16px">
+        <a href="#" class="btn btn--ghost btn--sm" style="align-self:flex-start;padding-left:6px"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Board</a>
+        <header style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px">
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+            <div class="row" style="gap:6px;font-size:12px;font-weight:500;color:var(--color-ink-3)"><span class="chip mono"><svg class="icon" style="width:12px;height:12px" viewBox="0 0 24 24" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>S-14</span>Stack</div>
+            <div class="row" style="gap:12px;flex-wrap:wrap"><h1>Intake attachments</h1><span class="pill"><span class="dot"></span>Design idle</span></div>
+            <div class="row ink-2" style="gap:16px;flex-wrap:wrap;font-size:14px"><span><b class="num" style="color:var(--color-ink)">0</b> of <b class="num" style="color:var(--color-ink)">4</b> accepted</span><span>Current stage <b style="color:var(--color-ink)">Design</b></span><span>Created <time>2026-10-15</time></span></div>
+          </div>
+          <div class="row" style="flex-shrink:0">
+            <a href="#viewer" class="btn btn--solid callout-target" id="gen-desk"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.94 14.06 4 20"/><path d="m14.5 4.5 5 5"/><path d="M12 7 7 2 2 7l5 5"/><path d="m17 12 5 5-5 5-5-5"/></svg>Generate design</a>
+          </div>
+        </header>
+
+        <div class="note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><div><b>Changed:</b> Generate design is a link styled as the solid button (<span class="mono">buttonClassName({ variant: 'solid' })</span>) to <span class="mono">stackDesignHref(projectId, number)</span>. It no longer sends <span class="mono">POST …/design/generate</span>. The viewer shows <span class="mono">GeneratePanel</span> (frame 2), so the person picks the skills and variant count before anything runs.</div></div>
+
+        <div class="desk">
+          <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
+            <section>
+              <div class="section-h" style="margin-bottom:8px">Description</div>
+              <div class="card ink-2">Accept photos and voice messages in the Telegram <span class="mono">/new</span> intake, keep them with the intake, and show them on the card. Voice is transcribed before the planner reads it.</div>
+            </section>
+            <section>
+              <div class="section-h" style="margin-bottom:8px">Stages</div>
+              <div class="card" style="padding:0">
+                <div class="stage"><span class="pill" data-status="waiting" style="height:20px;font-size:11px"><span class="dot"></span>Design</span><span style="flex:1">Shared design for the stack</span><span class="ink-3" style="font-size:12px">waiting for a design</span></div>
+                <div class="stage"><span class="pill" style="height:20px;font-size:11px"><span class="dot"></span>Build</span><span style="flex:1">4 cards</span><span class="ink-3" style="font-size:12px">after design approval</span></div>
+                <div class="stage"><span class="pill" style="height:20px;font-size:11px"><span class="dot"></span>Review</span><span style="flex:1">Merge into develop</span><span class="ink-3" style="font-size:12px">—</span></div>
+              </div>
+            </section>
+          </div>
+          <aside>
+            <div class="section-h" style="margin-bottom:8px">Stack design</div>
+            <div class="card" style="display:flex;flex-direction:column;gap:12px">
+              <p class="ink-2">No revision yet. The stack's cards wait for an approved design.</p>
+              <dl style="display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0;font-size:13px">
+                <dt class="ink-3">Variants</dt><dd style="margin:0" class="num">2</dd>
+                <dt class="ink-3">Skills</dt><dd style="margin:0;display:flex;flex-wrap:wrap;gap:4px"><span class="chip mono">frontend-design</span><span class="chip mono">ui-ux-pro-max</span></dd>
+              </dl>
+              <a href="#viewer" class="btn btn--sm" style="align-self:flex-start">Open viewer</a>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="label-tag">Phone · below lg (#526 dock)</div>
+  <div class="phone-row">
+    <div class="phone">
+      <div class="phone-body">
+        <a href="#" class="btn btn--ghost btn--sm" style="align-self:flex-start;padding-left:6px"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Board</a>
+        <div class="row" style="gap:6px;font-size:12px;color:var(--color-ink-3)"><span class="chip mono">S-14</span>Stack</div>
+        <h1 style="font-size:24px;line-height:28px">Intake attachments</h1>
+        <span class="pill" style="align-self:flex-start"><span class="dot"></span>Design idle</span>
+        <div class="card ink-2" style="font-size:13px">Accept photos and voice messages in the Telegram <span class="mono">/new</span> intake…</div>
+        <div class="card" style="font-size:13px"><div style="font-weight:600;margin-bottom:4px">Stages</div><span class="ink-2">Design · Build · Review</span></div>
+      </div>
+      <section class="dock glass-strong" aria-label="Design actions">
+        <a href="#viewer" class="btn btn--solid callout-target" id="gen-phone"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.94 14.06 4 20"/><path d="m14.5 4.5 5 5"/><path d="M12 7 7 2 2 7l5 5"/><path d="m17 12 5 5-5 5-5-5"/></svg>Generate design</a>
+      </section>
+      <nav class="capsule glass" aria-label="Main"><span aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v11"/><path d="M12 5v6"/><path d="M18 5v14"/></svg>Work</span><span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4H8"/></svg>Fleet</span><span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>Approvals</span><span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</span></nav>
+    </div>
+
+    <div class="flow">
+      <div class="label-tag">What happens on click (desktop and dock)</div>
+      <div class="card flow">
+        <div class="step"><i>1</i><div>Generate design goes to <code>/projects/:id/board/stacks/14/design</code>. <b>No request is sent.</b></div></div>
+        <div class="step"><i>2</i><div>The viewer shows <code>GeneratePanel</code>, unchanged, with the skills and variant count from the stack design (frame 2).</div></div>
+        <div class="step"><i>3</i><div>Generate there sends <code>PATCH …/stacks/14/design</code> when something changed, then <code>POST …/design/generate</code>.</div></div>
+        <div class="step"><i>4</i><div>A viewer-role user still sees no Generate design here, and the panel's controls are disabled (frame 2).</div></div>
+      </div>
+      <div class="label-tag">Unchanged states</div>
+      <div class="card" style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+        <div class="row" style="justify-content:space-between"><span class="ink-2">Design reviewing · desktop header</span><span class="row"><span class="btn btn--sm">Revise design</span><span class="btn btn--sm btn--solid">Approve design</span></span></div>
+        <div class="row" style="justify-content:space-between"><span class="ink-2">Design reviewing · phone dock</span><span class="row"><span class="btn btn--sm btn--solid">Approve design</span><span class="btn btn--sm">Open viewer</span></span></div>
+        <div class="row" style="justify-content:space-between"><span class="ink-2">Viewer role</span><span class="ink-3">no design actions</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast glass-strong" id="toast" role="status"><svg class="icon" style="color:var(--color-accent-ink)" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><div><div style="font-weight:600">Opens the stack design viewer</div><div class="ink-2">Choose skills and variants, then Generate (frame 2).</div></div></div>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  document.getElementById('theme').addEventListener('click',function(){root.setAttribute('data-theme',root.getAttribute('data-theme')==='dark'?'light':'dark');});
+  var t=document.getElementById('toast'),h;
+  document.querySelectorAll('a[href="#viewer"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();t.classList.add('show');clearTimeout(h);h=setTimeout(function(){t.classList.remove('show');},2600);});});
+  document.querySelectorAll('a[href="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();});});
+})();
+</script>
+</body>
+</html>

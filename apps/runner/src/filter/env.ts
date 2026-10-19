@@ -35,6 +35,28 @@ export const LAUNCH_SETTINGS_ENV = 'AGENTDOCK_LAUNCH_SETTINGS';
  */
 export const RAW_ENV = 'AGENTDOCK_RAW';
 
+/**
+ * #663 D9: the filter families switched off for this launch, comma-separated
+ * (`js,ops`; `tool` is the Bash read refusal). The launch sets it from the
+ * project's setting. A command of a switched-off family passes through.
+ */
+export const FILTER_OFF_ENV = 'AGENTDOCK_FILTER_OFF';
+
+/** The families named in `AGENTDOCK_FILTER_OFF`. */
+export const switchedOffFamilies = (
+  env: Readonly<Record<string, string | undefined>>,
+): ReadonlySet<string> =>
+  new Set(
+    (env[FILTER_OFF_ENV] ?? '')
+      .split(',')
+      .map((family) => family.trim())
+      .filter(Boolean),
+  );
+
+/** `family/command` → `family`. */
+export const familyOf = (filterId: string): string =>
+  filterId.split('/')[0] ?? filterId;
+
 /** The stats file's name inside a run dir. */
 export const FILTER_STATS_FILE = 'filter-stats.jsonl';
 /**

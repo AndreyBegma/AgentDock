@@ -301,7 +301,9 @@ export class CardAssessor {
         tx,
         run.id,
         'succeeded',
-        current ? `work ${work.model} · design ${design.model}` : 'superseded',
+        current
+          ? `work ${work.model} ${work.effort} · design ${design.model}`
+          : 'superseded',
       );
       if (!closed) return null;
       if (current) {
@@ -309,6 +311,7 @@ export class CardAssessor {
           where: { id: cardId },
           data: {
             recommendedModel: work.model,
+            recommendedEffort: work.effort,
             recommendedReason: work.reason,
             recommendedDesignModel: design.model,
             recommendedDesignReason: design.reason,

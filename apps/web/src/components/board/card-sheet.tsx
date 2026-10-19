@@ -27,6 +27,7 @@ import { ExternalLink, Move, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { PolicyRefusalText } from '@/components/runners/policy-refusal';
+import { summarizeCard } from '../../lib/ai/actions';
 import { ApiError } from '../../lib/api';
 import {
   describeUploadFailure,
@@ -34,6 +35,7 @@ import {
 } from '../../lib/attachments/format';
 import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
+import { runWaitsFor } from '../../lib/board/dependencies';
 import {
   AUTO_COLLECT_HINT,
   AUTO_COLLECT_LABEL,
@@ -69,7 +71,11 @@ import {
   trackedStatusText,
 } from '../../lib/board/format';
 import { boardCardPageHref, boardStackPageHref } from '../../lib/board/href';
-import { canCreatePr, prChipText } from '../../lib/board/pull-request';
+import {
+  canCreatePr,
+  prChipText,
+  prTargetText,
+} from '../../lib/board/pull-request';
 import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
@@ -77,6 +83,7 @@ import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { cardSessionMessenger } from '../../lib/session-message/actions';
 import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
+import { SummaryPanel } from '../ai/summary-panel';
 import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
 import { CardAttachmentsSection } from '../attachments/card-attachments-section';
@@ -101,6 +108,7 @@ import { CardHandoffSection } from './handoff/card-handoff-section';
 import { LaunchPopover } from './launch-popover';
 import { MovePicker } from './move-picker';
 import { SuggestionSheetBody } from './suggestion-sheet';
+import { TriageHints } from './triage-hints';
 import type { CardActions } from './use-card-actions';
 import { useCardMove } from './use-card-move';
 
@@ -165,7 +173,7 @@ function roundItems(
             <span>
               Started after{' '}
               <span className="font-mono">C-{round.autoRunAfter}</span> was
-              accepted
+              ready
             </span>
           ) : null}
           {round.feedback ? (
@@ -390,6 +398,8 @@ export function CardDetailBody({
   const runBlocked = readiness.blockers('run').length > 0;
   // #480: the card's stack holds Run until its design is approved.
   const stackGate = card.stack?.gate ?? null;
+  // #638: so does a dependency without a ready pull request — no override.
+  const waitsFor = runWaitsFor(card.dependsOn);
   const [title, setTitle] = useState(card.title);
   const [body, setBody] = useState(card.body);
   const [kind, setKind] = useState(card.kind);
@@ -595,7 +605,19 @@ export function CardDetailBody({
         </div>
       ) : null}
       {card.branch ? (
-        <p className="break-all font-mono text-xs text-ink-2">{card.branch}</p>
+        <p className="break-all text-xs text-ink-2">
+          <span className="font-mono">{card.branch}</span>
+          {card.prTarget ? (
+            // #636: the PR's actual target — a stacked card's dependency.
+            <span title={`The pull request goes into ${card.prTarget.branch}`}>
+              {' '}
+              → {prTargetText(card.prTarget)}
+              {card.prTarget.stackedOn ? (
+                <span className="font-mono"> ({card.prTarget.branch})</span>
+              ) : null}
+            </span>
+          ) : null}
+        </p>
       ) : null}
       {card.round?.hooksMissing
         ? (() => {
@@ -625,9 +647,9 @@ export function CardDetailBody({
       {failure && failure.after != null ? (
         // #443: the reason a manual Run in the same state gets.
         <Banner tone="warn" title="Auto-run could not start">
-          After <span className="font-mono">C-{failure.after}</span> was
-          accepted: {autoRunReason(failure)} — the same reason a manual Run
-          would give. Press Run once that is fixed.
+          After <span className="font-mono">C-{failure.after}</span> was ready:{' '}
+          {autoRunReason(failure)} — the same reason a manual Run would give.
+          Press Run once that is fixed.
         </Banner>
       ) : failure ? (
         <Banner tone="warn">
@@ -653,13 +675,20 @@ export function CardDetailBody({
               kind="work"
               label={canRetry(card) ? 'Run again' : 'Run'}
               variant={card.column === 'todo' ? 'solid' : 'glass'}
-              disabled={actions.busy || runBlocked || stackGate !== null}
+              disabled={
+                actions.busy ||
+                runBlocked ||
+                stackGate !== null ||
+                waitsFor !== null
+              }
               describedBy={
                 stackGate
                   ? 'board-stack-gate'
-                  : runBlocked
-                    ? 'board-run-reason'
-                    : undefined
+                  : waitsFor
+                    ? 'board-run-waits'
+                    : runBlocked
+                      ? 'board-run-reason'
+                      : undefined
               }
               onLaunch={async (request) => {
                 // The toast says why; a refusal keeps the popover open.
@@ -725,9 +754,10 @@ export function CardDetailBody({
           project code before it is.
         </p>
       ) : null}
-      {canOperate && canRun(card) && card.readiness?.state === 'waiting' ? (
-        <p className="-mt-3 text-xs text-ink-3">
-          Run still works while waiting; it only warns.
+      {canOperate && waitsFor && (canRun(card) || canRetry(card)) ? (
+        <p id="board-run-waits" className="-mt-3 text-xs text-ink-3">
+          {waitsFor}. Run opens once every card it depends on has a ready pull
+          request (Finished) or is accepted.
         </p>
       ) : null}
       {canOperate && offer?.reason ? (
@@ -799,6 +829,17 @@ export function CardDetailBody({
     />
   );
 
+  // #660: hints on a card the intake or the assistant made; none on others.
+  const triageSection = (
+    <TriageHints
+      projectId={projectId}
+      number={card.number}
+      refresh={card}
+      canOperate={canOperate}
+      onChanged={onSaved}
+    />
+  );
+
   const dependenciesSection = (
     <CardDependenciesSection
       projectId={projectId}
@@ -831,6 +872,18 @@ export function CardDetailBody({
         empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
       />
     </section>
+  );
+  // #658: the card and its PR in a few sentences, in the reader's language.
+  const summarySection = (
+    <SummaryPanel
+      key={card.id}
+      title="Summary"
+      headingId="card-summary"
+      hint="The card and its pull request in a few sentences: what changed, CI, the review state and what remains."
+      summarize={(regenerate) =>
+        summarizeCard(projectId, card.number, regenerate)
+      }
+    />
   );
   // #447 D15: fleet cards are observed, not run by the board — no Issue link there.
   const stewardSection = fleet ? null : (
@@ -1057,6 +1110,7 @@ export function CardDetailBody({
         />
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <div className="flex min-w-0 flex-col gap-6">
+            {triageSection}
             {panel(cardForm)}
             {panel(roundsSection)}
           </div>
@@ -1065,6 +1119,7 @@ export function CardDetailBody({
             className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4"
           >
             {panel(runSection)}
+            {panel(summarySection)}
             {panel(designSection)}
             {panel(dependenciesSection)}
             {panel(autoRunSection)}
@@ -1102,7 +1157,9 @@ export function CardDetailBody({
             <ExternalLink aria-hidden="true" className="size-4" />
           </NextLink>
         </div>
+        {triageSection}
         {runSection}
+        {summarySection}
         {designSection}
         {dependenciesSection}
         {autoRunSection}

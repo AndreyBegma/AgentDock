@@ -3,19 +3,25 @@
 import type {
   TokenSaverBeforeAfter,
   TokenSaverFilterSavings,
+  TokenSaverPromptCache,
   TokenSaverSummary,
+  TokenSaverUnfilteredProgram,
 } from '@agentdock/shared';
 import { DataTable } from '@andrewbehma/glass-ui/data-table';
 import type { ReactNode } from 'react';
-import { formatCost, formatNumber } from '../../lib/format';
+import { formatCost, formatNumber, formatTokens } from '../../lib/format';
 import {
+  cacheReadShare,
   filterLabel,
+  formatChange,
   formatRate,
   formatSavedUsd,
+  inputTokensPerRun,
   passThroughShare,
   runKindLabel,
+  UNFILTERED_HINT,
 } from '../../lib/token-saver/format';
-import { costChange } from '../../lib/token-saver/summary';
+import { costChange, unfilteredReasons } from '../../lib/token-saver/summary';
 import { ScrollX } from '../scroll-x/scroll-x';
 
 const num = (text: string) => <span className="num">{text || '—'}</span>;
@@ -121,12 +127,7 @@ export function BeforeAfterTable({
       id: 'change',
       header: 'Change',
       align: 'end' as const,
-      cell: (r: TokenSaverBeforeAfter) => {
-        const change = costChange(r);
-        if (change === null) return num('');
-        const percent = formatRate(Math.abs(change));
-        return num(change === 0 ? '0%' : `${change < 0 ? '−' : '+'}${percent}`);
-      },
+      cell: (r: TokenSaverBeforeAfter) => num(formatChange(costChange(r))),
     },
   ];
   return (
@@ -179,6 +180,136 @@ export function RunKindTable({
         getRowId={(r) => r.runKind}
         columns={columns}
         className="min-w-[24rem]"
+      />
+    </ScrollX>
+  );
+}
+
+type ReasonRow = ReturnType<typeof unfilteredReasons>[number];
+
+/** #648: "No filter" split by reason — compound, uncovered, mode and the legacy `none`. */
+export function UnfilteredReasonTable({
+  filters,
+}: {
+  filters: readonly TokenSaverFilterSavings[];
+}) {
+  const columns = [
+    {
+      id: 'reason',
+      header: 'Reason',
+      cell: (r: ReasonRow) => (
+        <span className="flex flex-col">
+          <span>{filterLabel(r.filter)}</span>
+          <span className="text-ink-3 text-xs">
+            {UNFILTERED_HINT[r.filter]}
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: 'commands',
+      header: 'Commands',
+      align: 'end' as const,
+      cell: (r: ReasonRow) => num(formatNumber(r.commands, 0)),
+    },
+    {
+      id: 'share',
+      header: 'Share of unfiltered',
+      align: 'end' as const,
+      cell: (r: ReasonRow) => num(formatRate(r.share)),
+    },
+  ];
+  return (
+    <ScrollX label="Why commands went unfiltered">
+      <DataTable
+        rows={unfilteredReasons(filters)}
+        getRowId={(r) => r.filter}
+        columns={columns}
+        className="min-w-[30rem]"
+      />
+    </ScrollX>
+  );
+}
+
+/** #648: the programs no filter ran on, most commands first. */
+export function UnfilteredProgramTable({
+  programs,
+  empty,
+}: {
+  programs: readonly TokenSaverUnfilteredProgram[];
+  empty: ReactNode;
+}) {
+  if (programs.length === 0) return empty;
+  const columns = [
+    {
+      id: 'program',
+      header: 'Program',
+      cell: (p: TokenSaverUnfilteredProgram) => (
+        <code className="font-mono text-xs">{p.program}</code>
+      ),
+    },
+    {
+      id: 'commands',
+      header: 'Commands',
+      align: 'end' as const,
+      cell: (p: TokenSaverUnfilteredProgram) =>
+        num(formatNumber(p.commands, 0)),
+    },
+  ];
+  return (
+    <ScrollX label="Most frequent unfiltered programs">
+      <DataTable
+        rows={[...programs]}
+        getRowId={(p) => p.program}
+        columns={columns}
+        className="min-w-[20rem]"
+      />
+    </ScrollX>
+  );
+}
+
+/** #648: the measured prompt cache of each run kind, from usage. */
+export function PromptCacheTable({
+  rows,
+  empty,
+}: {
+  rows: readonly TokenSaverPromptCache[];
+  empty: ReactNode;
+}) {
+  if (rows.length === 0) return empty;
+  const columns = [
+    {
+      id: 'kind',
+      header: 'Run kind',
+      cell: (r: TokenSaverPromptCache) => runKindLabel(r.runKind),
+    },
+    {
+      id: 'runs',
+      header: 'Runs',
+      align: 'end' as const,
+      cell: (r: TokenSaverPromptCache) => num(formatNumber(r.runs, 0)),
+    },
+    {
+      id: 'share',
+      header: 'Cache read share',
+      align: 'end' as const,
+      cell: (r: TokenSaverPromptCache) => num(formatRate(cacheReadShare(r))),
+    },
+    {
+      id: 'perRun',
+      header: 'Input tokens per run',
+      align: 'end' as const,
+      cell: (r: TokenSaverPromptCache) =>
+        num(formatTokens(inputTokensPerRun(r))),
+    },
+  ];
+  return (
+    <ScrollX label="Prompt cache by run kind">
+      <DataTable
+        rows={[...rows]}
+        getRowId={(r) => r.runKind}
+        columns={columns}
+        className="min-w-[28rem]"
       />
     </ScrollX>
   );

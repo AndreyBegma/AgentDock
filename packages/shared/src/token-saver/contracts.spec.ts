@@ -16,16 +16,20 @@ import {
   FILTER_ID_NONE,
   FILTER_ID_NONE_COMPOUND,
   FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE_OFF,
   FILTER_ID_NONE_UNCOVERED,
+  FILTER_ID_READ_REFUSED,
   FILTER_STATS_EVENT,
   FILTER_STATS_MAX_ROWS,
   type FilterStatRow,
   filterStatRowSchema,
   filterStatsDataSchema,
   isUnfilteredId,
+  runnerPredatesFilterReasons,
   TOKEN_SAVER_DEFAULT,
   TOKEN_SAVER_MCP_ALLOW_MAX,
   tokenSaverConfigSchema,
+  UNFILTERED_FILTER_IDS,
 } from './contracts';
 import { estimateTokensSaved, estimateUsdSaved } from './estimate';
 
@@ -242,6 +246,22 @@ describe('filter.stats rows (#445 D12)', () => {
     expect(isUnfilteredId('js/jest')).toBe(false);
   });
 
+  it('accepts a switched-off family and the read refusal (#663 D8, D9)', () => {
+    const passed = { ...row, rawBytes: 0, keptBytes: 0, passedThrough: true };
+    expect(
+      filterStatRowSchema.safeParse({ ...passed, filter: FILTER_ID_NONE_OFF })
+        .success,
+    ).toBe(true);
+    expect(isUnfilteredId(FILTER_ID_NONE_OFF)).toBe(true);
+    expect(UNFILTERED_FILTER_IDS).toContain(FILTER_ID_NONE_OFF);
+    expect(
+      filterStatRowSchema.safeParse({ ...row, filter: FILTER_ID_READ_REFUSED })
+        .success,
+    ).toBe(true);
+    // A refusal is its own filter, not a pass-through reason.
+    expect(isUnfilteredId(FILTER_ID_READ_REFUSED)).toBe(false);
+  });
+
   it('accepts the orchestrator and manual sessions without a run', () => {
     for (const runKind of ['orchestrator', 'manual']) {
       expect(
@@ -315,6 +335,62 @@ describe('filter.stats rows (#445 D12)', () => {
         })),
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('filter.stats program (#648)', () => {
+  const unfiltered = {
+    ...row,
+    filter: FILTER_ID_NONE_UNCOVERED,
+    keptBytes: 40_000,
+    passedThrough: true,
+  };
+
+  it('is optional — a row of an older runner still parses', () => {
+    expect(filterStatRowSchema.safeParse(unfiltered).success).toBe(true);
+  });
+
+  it('takes a program and its subcommand', () => {
+    for (const program of [
+      'git log',
+      'bun run',
+      'ls',
+      'python3',
+      'npm run-script',
+    ]) {
+      expect(
+        filterStatRowSchema.safeParse({ ...unfiltered, program }).success,
+      ).toBe(true);
+    }
+  });
+
+  it('rejects arguments, paths and anything past 64 characters', () => {
+    for (const program of [
+      '',
+      'git log --oneline',
+      'cat /etc/passwd',
+      '/usr/bin/git',
+      'git log -5',
+      'echo "hi"',
+      `x${'a'.repeat(64)}`,
+    ]) {
+      expect(
+        filterStatRowSchema.safeParse({ ...unfiltered, program }).success,
+      ).toBe(false);
+    }
+  });
+});
+
+describe('runnerPredatesFilterReasons (#648)', () => {
+  it('is true up to 0.12.2, false after it and for an unknown version', () => {
+    expect(runnerPredatesFilterReasons('0.9.2')).toBe(true);
+    expect(runnerPredatesFilterReasons('0.12.2')).toBe(true);
+    expect(runnerPredatesFilterReasons('v0.12.2')).toBe(true);
+    expect(runnerPredatesFilterReasons('0.12.3')).toBe(false);
+    expect(runnerPredatesFilterReasons('0.13.0')).toBe(false);
+    expect(runnerPredatesFilterReasons('1.0.0')).toBe(false);
+    expect(runnerPredatesFilterReasons(null)).toBe(false);
+    expect(runnerPredatesFilterReasons('dev')).toBe(false);
   });
 });
 

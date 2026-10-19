@@ -110,17 +110,79 @@ export const FILTER_ID_NONE = 'none';
 export const FILTER_ID_NONE_COMPOUND = 'none:compound';
 export const FILTER_ID_NONE_UNCOVERED = 'none:uncovered';
 export const FILTER_ID_NONE_MODE = 'none:mode';
+/**
+ * #663 D9: a filter family covers the command, but the launch switched that
+ * family off (`AGENTDOCK_FILTER_OFF`), so it passed through.
+ */
+export const FILTER_ID_NONE_OFF = 'none:off';
 
-const UNFILTERED_IDS: ReadonlySet<string> = new Set([
+/**
+ * #663 D8: the Bash read refusal — a plain whole-file `cat`, `head`, `tail`
+ * or `sed -n` the hook refused with a hint to use `Read`. A filter id of its
+ * own (family `tool`), not a pass-through.
+ */
+export const FILTER_ID_READ_REFUSED = 'tool/read-refused';
+
+/** Every reason a command went unfiltered, the legacy plain `none` included. */
+export const UNFILTERED_FILTER_IDS = [
   FILTER_ID_NONE,
   FILTER_ID_NONE_COMPOUND,
   FILTER_ID_NONE_UNCOVERED,
   FILTER_ID_NONE_MODE,
-]);
+  FILTER_ID_NONE_OFF,
+] as const;
+
+const UNFILTERED_IDS: ReadonlySet<string> = new Set(UNFILTERED_FILTER_IDS);
 
 /** Whether a row's filter id means no filter ran: `none` or a `none:*`. */
 export const isUnfilteredId = (filter: string): boolean =>
   UNFILTERED_IDS.has(filter);
+
+/** At most this many characters in a row's `program`. */
+export const FILTER_PROGRAM_MAX = 64;
+
+/**
+ * #648: the program a command ran — `argv[0]`'s bare name, plus its
+ * subcommand for a tool that has them (`git log`, `bun run`), never any
+ * other argument. Lowercase words of a command name only, so a path or a
+ * value can never slip in.
+ */
+export const filterProgramSchema = z
+  .string()
+  .min(1)
+  .max(FILTER_PROGRAM_MAX)
+  .regex(/^[A-Za-z0-9_.+-]+( [a-z0-9][a-z0-9_:.-]*)?$/);
+
+/**
+ * #648: the last released runner (≤ 0.12.2) that writes a plain `none`;
+ * runners after it say why with amendment 12's `none:*` reasons.
+ */
+export const LAST_RUNNER_WITHOUT_FILTER_REASONS = '0.12.2';
+
+/** `a.b.c` compared by its leading numbers; `null` when either does not parse. */
+const compareVersions = (a: string, b: string): number | null => {
+  const parse = (v: string) => /^v?(\d+)\.(\d+)\.(\d+)/.exec(v.trim());
+  const x = parse(a);
+  const y = parse(b);
+  if (!x || !y) return null;
+  for (let i = 1; i <= 3; i++) {
+    const d = Number(x[i]) - Number(y[i]);
+    if (d !== 0) return d;
+  }
+  return 0;
+};
+
+/**
+ * Whether a runner of this version is too old to say why a command went
+ * unfiltered; `false` when the version is unknown.
+ */
+export const runnerPredatesFilterReasons = (
+  version: string | null | undefined,
+): boolean => {
+  if (!version) return false;
+  const c = compareVersions(version, LAST_RUNNER_WITHOUT_FILTER_REASONS);
+  return c !== null && c <= 0;
+};
 
 /**
  * A filter's id: `<family>/<command>` such as `js/jest`, `none` when no
@@ -149,6 +211,8 @@ export const filterStatRowSchema = z
     runId: z.string().min(1).max(64).nullable(),
     runKind: tokenSaverRunKindSchema,
     filter: filterIdSchema,
+    /** #648: the program the command ran; absent on rows of older runners and reads. */
+    program: filterProgramSchema.optional(),
     rawBytes: byteCount,
     keptBytes: byteCount,
     /** Ran with `AGENTDOCK_RAW=1` (D4c). */
@@ -215,6 +279,92 @@ export interface TokenSaverBeforeAfter {
   afterAvgUsd: string | null;
 }
 
+/** #648: one program among the commands no filter ran on. */
+export interface TokenSaverUnfilteredProgram {
+  program: string;
+  commands: number;
+}
+
+/** #648: at most this many programs in `unfilteredPrograms`. */
+export const TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX = 10;
+
+/**
+ * #648: what the prompt cache did for the ended runs of one kind started in
+ * the range, measured from their requests (ADR-0003, ADR-0009) — not the
+ * filter's estimate. Token counts are sums over `runs`, the runs with at
+ * least one request.
+ */
+export interface TokenSaverPromptCache {
+  runKind: TokenSaverRunKind;
+  runs: number;
+  /** Uncached input tokens. */
+  input: number;
+  cacheRead: number;
+  /** Cache writes, 5-minute and 1-hour together. */
+  cacheWrite: number;
+}
+
+/**
+ * #663 D5: the session kinds cost per round is measured for. A round is one
+ * run, except for the assistant chat, where it is one reply.
+ * - `card`: a board card round started by a person (run or feedback);
+ * - `ci_fix`: a card round AgentDock started for a red check or a conflict;
+ * - `design`: a card's or a stack's design turn;
+ * - `plan`: a Planner turn;
+ * - `worker`: a cs-orchestrator worker slot;
+ * - `card_capture`, `text_normalize`: the API's own short launches;
+ * - `assistant`: a reply of the AI assistant chat.
+ */
+export const TOKEN_SAVER_SESSION_KINDS = [
+  'card',
+  'ci_fix',
+  'design',
+  'plan',
+  'worker',
+  'card_capture',
+  'text_normalize',
+  'assistant',
+] as const;
+export type TokenSaverSessionKind = (typeof TOKEN_SAVER_SESSION_KINDS)[number];
+
+/**
+ * #663: the launches whose usage cannot be tied to a round yet, so cost per
+ * round leaves them out — a skill run, a schedule and a UI profile build
+ * record no session id, and an assessment does not keep the one it sends.
+ */
+export const TOKEN_SAVER_UNMEASURED_KINDS = [
+  'skill',
+  'schedule',
+  'ui_profile',
+  'card_assess',
+] as const;
+export type TokenSaverUnmeasuredKind =
+  (typeof TOKEN_SAVER_UNMEASURED_KINDS)[number];
+
+/**
+ * #663 D5: the cost of one session kind's rounds in one ISO week, measured
+ * from their requests — the fact the token saver is judged by (ADR-0068).
+ * A round counts when it ended inside the range's runs and made at least one
+ * request; the assistant's rounds are its replies. Costs are decimal strings,
+ * as every `costUsd`, over the priced rounds; `null` when none is priced.
+ */
+export interface TokenSaverCostPerRound {
+  sessionKind: TokenSaverSessionKind;
+  /** The Monday that starts the UTC ISO week, `YYYY-MM-DD`. */
+  week: string;
+  rounds: number;
+  /** Rounds with at least one priced request. */
+  pricedRounds: number;
+  medianUsd: string | null;
+  p90Usd: string | null;
+  /** Cache reads over every input token (uncached, read, written), 0–1. */
+  cacheReadShare: number;
+  /** The median of each round's largest request: input + cache read + cache write. */
+  medianPeakContext: number;
+  /** The median of each round's turns (requests, for the assistant). */
+  medianTurns: number;
+}
+
 /** The longest range `GET …/token-saver/summary` accepts, in days. */
 export const TOKEN_SAVER_SUMMARY_MAX_DAYS = 366;
 
@@ -247,4 +397,19 @@ export interface TokenSaverSummary {
     runKind: TokenSaverRunKind;
     commands: number;
   })[];
+  /**
+   * #648: the programs no filter ran on (every `none` and `none:*` row with
+   * a `program`), most commands first, at most
+   * `TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX`.
+   */
+  unfilteredPrograms: TokenSaverUnfilteredProgram[];
+  /** #648: the prompt cache per run kind, from usage; kinds without a run are absent. */
+  promptCache: TokenSaverPromptCache[];
+  /** #648: the version of the project's runner; `null` when it never said. */
+  runnerVersion: string | null;
+  /**
+   * #663 D5: cost per round, one entry per session kind and ISO week with a
+   * round, in `TOKEN_SAVER_SESSION_KINDS` order, oldest week first.
+   */
+  costPerRound: TokenSaverCostPerRound[];
 }

@@ -2,9 +2,11 @@ import {
   absolutePathSchema,
   orchestratorPermissionModeSchema,
   POLICY_ALLOWED_ROOTS_MAX,
+  POLICY_CODE_DENY_MAX,
   POLICY_DEFAULT_MAX_PERMISSION_MODE,
   POLICY_GATED_COMMANDS,
   type PolicyGatedCommand,
+  policyCodeDenySchema,
   type RunnerPolicy,
 } from '@agentdock/shared/protocol';
 import { z } from 'zod';
@@ -16,7 +18,8 @@ const gatedCommandsShape = Object.fromEntries(
 /**
  * The `policy` block of `runner.json` (ADR-0047). Every field defaults to the
  * safe value: no allowed root, nothing above `auto`, no terminal write, no
- * profile skill install, no gated command. Only `agentdock-runner policy …`
+ * profile skill install, no gated command, no `code.deny` pattern beyond the
+ * secrets every runner refuses. Only `agentdock-runner policy …`
  * and `pair --allow-root` write it; the daemon only reads it.
  */
 export const policyConfigSchema = z
@@ -33,6 +36,15 @@ export const policyConfigSchema = z
       .object({ profileInstall: z.boolean().default(false) })
       .prefault({}),
     commands: z.strictObject(gatedCommandsShape).prefault({}),
+    /** #622: paths the code commands never return; `policy deny-path` adds. */
+    code: z
+      .object({
+        deny: z
+          .array(policyCodeDenySchema)
+          .max(POLICY_CODE_DENY_MAX)
+          .default([]),
+      })
+      .prefault({}),
   })
   .prefault({});
 export type PolicyConfig = z.infer<typeof policyConfigSchema>;
@@ -47,4 +59,5 @@ export const reportedPolicy = (policy: PolicyConfig): RunnerPolicy => ({
   terminal: { write: policy.terminal.write },
   skills: { profileInstall: policy.skills.profileInstall },
   commands: { ...policy.commands },
+  code: { deny: [...policy.code.deny] },
 });

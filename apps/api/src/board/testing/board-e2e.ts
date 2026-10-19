@@ -31,6 +31,7 @@ type WorldCommand =
   | 'card.checks'
   | 'card.ciRetrigger'
   | 'card.prClose'
+  | 'card.prRetarget'
   | 'issue.create'
   | 'pr.inspect'
   | 'docs.publish_specs';
@@ -80,8 +81,11 @@ export const ok = <T>(output: T): BoardSendResult<T> => ({
   status: 'ok',
   output,
 });
-export const failed = (code: 'internal' | 'not_found') =>
-  ({ status: 'error', error: { code } }) as const;
+export const failed = (code: 'internal' | 'not_found', message?: string) =>
+  ({
+    status: 'error',
+    error: { code, ...(message === undefined ? {} : { message }) },
+  }) as const;
 
 /**
  * The board's e2e world: two projects on one runner, a Claude profile, an
@@ -118,6 +122,8 @@ export class BoardWorld {
   checksServed = false;
   /** #484: whether the runner advertises `card.ciRetrigger`. */
   ciRetriggerServed = true;
+  /** #636: whether the runner advertises `card.prRetarget`. */
+  prRetargetServed = true;
   /** #329 D4: the delayed collect retries scheduled so far, oldest first. */
   retries: ScheduledRetry[] = [];
   connectHooks!: RunnerConnectHooks;
@@ -164,6 +170,9 @@ export class BoardWorld {
       .spyOn(this.commands, 'advertisesPrClose')
       .mockImplementation(() => this.prCloseAdvertised);
     jest
+      .spyOn(this.commands, 'isConnected')
+      .mockImplementation(() => !this.offline);
+    jest
       .spyOn(this.commands, 'servesChecks')
       .mockImplementation(() => this.checksServed);
     jest
@@ -180,6 +189,15 @@ export class BoardWorld {
       .mockImplementation(async (runnerId, args) => {
         this.commands.assertReady(runnerId, 'card.ciRetrigger');
         return this.answer('card.ciRetrigger', { ...args });
+      });
+    jest
+      .spyOn(this.commands, 'servesPrRetarget')
+      .mockImplementation(() => this.prRetargetServed);
+    jest
+      .spyOn(this.commands, 'retargetPr')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.prRetarget');
+        return this.answer('card.prRetarget', { ...args });
       });
     this.connectHooks = this.ctx.app.get(RunnerConnectHooks);
     const timer = this.ctx.app.get(CollectRetryTimer);
@@ -209,6 +227,7 @@ export class BoardWorld {
       'pr.inspect': prInspection(),
       'card.checks': cardChecks(),
       'card.ciRetrigger': { retriggered: true },
+      'card.prRetarget': { retargeted: true, alreadyThere: false },
       'card.run': {
         phase: 'starting',
         tmuxSession: `agentdock-card-${String(args.shortId)}`,
@@ -262,12 +281,14 @@ export class BoardWorld {
     jest.mocked(this.commands.publishDocsSpecs).mockClear();
     jest.mocked(this.commands.checks).mockClear();
     jest.mocked(this.commands.ciRetrigger).mockClear();
+    jest.mocked(this.commands.retargetPr).mockClear();
     this.handlers = {};
     this.offline = false;
     this.unserved = new Set();
     this.prCloseAdvertised = true;
     this.checksServed = false;
     this.ciRetriggerServed = true;
+    this.prRetargetServed = true;
     this.retries = [];
     await resetDatabase(this.ctx.prisma);
     ({ runnerId: this.runnerId, projectId: this.a } = await seedProject(
@@ -352,6 +373,13 @@ export class BoardWorld {
       .mock.calls.map(([, args]) => args as unknown as Record<string, unknown>);
   }
 
+  /** #636: the `card.prRetarget` commands sent, oldest first. */
+  prRetargets(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.retargetPr)
+      .mock.calls.map(([, args]) => ({ ...args }));
+  }
+
   /** #329 D8: the `card.prClose` commands sent, oldest first. */
   prCloses(): Record<string, unknown>[] {
     return jest
@@ -407,6 +435,17 @@ export class BoardWorld {
     await this.ctx.prisma.runner.update({
       where: { id: this.runnerId },
       data: { capabilities: { ...capabilities, tokenSaver } },
+    });
+  }
+
+  /**
+   * #663: the runner advertises `cardEffort`; without a call it stores none,
+   * as a runner older than the feature.
+   */
+  async advertiseCardEffort(cardEffort = true): Promise<void> {
+    await this.ctx.prisma.runner.update({
+      where: { id: this.runnerId },
+      data: { capabilities: { ...capabilities, cardEffort } },
     });
   }
 

@@ -12,6 +12,7 @@ import {
   cardChecks,
   closeCardPr,
   mergeCard,
+  retargetCardPr,
   retriggerCardCi,
 } from '../cards';
 import { type Clock, isoNow } from '../clock';
@@ -33,6 +34,7 @@ import type { PolicyConfig } from '../policy/schema';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import { scanProjectRules } from '../projects/rule-scan';
+import type { RepoHandlers } from '../repo';
 import type { SessionMessenger } from '../session';
 import type { SkillHandlers } from '../skills';
 import type { StewardHandlers } from '../steward';
@@ -101,7 +103,16 @@ export interface HandlerContext {
   handoff?: HandoffHandlers;
   /** A person's messages to sessions (#489); absent means this runner does not serve them. */
   sessionMessage?: SessionMessenger;
+  /** The assistant's code commands (#622); absent means this runner does not serve them. */
+  repo?: RepoHandlers;
 }
+
+const noRepo = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not serve code questions',
+  );
+};
 
 const noHandoff = (): never => {
   throw new CommandFailure(
@@ -289,6 +300,13 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
+    'card.prRetarget': (args) =>
+      context.cards
+        ? retargetCardPr(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
     'cards.extract': (args) =>
       context.capture?.['cards.extract'](args) ?? noCapture(),
     'text.normalize': (args) =>
@@ -318,5 +336,8 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       }
       return context.sessionMessage.message(args);
     },
+    'repo.search': (args) => context.repo?.['repo.search'](args) ?? noRepo(),
+    'repo.read': (args) => context.repo?.['repo.read'](args) ?? noRepo(),
+    'code.ask': (args) => context.repo?.['code.ask'](args) ?? noRepo(),
   };
 };

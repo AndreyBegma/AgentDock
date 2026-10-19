@@ -92,7 +92,7 @@ export class StackDesignTurnService {
           where: { projectId: stack.projectId },
           select: { model: true },
         }),
-        this.session(stack),
+        this.session(stack, batch),
         this.prisma.boardStackStage.findMany({
           where: { stackId: stack.id },
           orderBy: { position: 'asc' },
@@ -272,8 +272,15 @@ export class StackDesignTurnService {
     }
   }
 
-  private async session(stack: BoardStack): Promise<PlanTurnSession> {
-    if (stack.designSessionId === null) {
+  /**
+   * `--session-id` until the stack's design session exists, then `--resume`.
+   * #628: a revise runs in a session of its own, as a card's does.
+   */
+  private async session(
+    stack: BoardStack,
+    batch: DesignTurnPlan,
+  ): Promise<PlanTurnSession> {
+    if (stack.designSessionId === null || batch.mode === 'revise') {
       return { id: randomUUID(), resume: false };
     }
     const started = await this.prisma.planTurn.count({

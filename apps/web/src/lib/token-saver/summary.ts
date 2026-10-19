@@ -1,10 +1,21 @@
 import {
+  FILTER_ID_NONE,
+  FILTER_ID_NONE_COMPOUND,
+  FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE_OFF,
+  FILTER_ID_NONE_UNCOVERED,
   isUnfilteredId,
+  runnerPredatesFilterReasons,
+  TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX,
   type TokenSavedView,
   type TokenSaverBeforeAfter,
+  type TokenSaverCostPerRound,
   type TokenSaverFilterSavings,
+  type TokenSaverPromptCache,
   type TokenSaverRunKind,
+  type TokenSaverSessionKind,
   type TokenSaverSummary,
+  type TokenSaverUnfilteredProgram,
 } from '@agentdock/shared';
 import type { ChartSeries } from '@andrewbehma/glass-ui/chart';
 import { passThroughShare } from './format';
@@ -32,6 +43,10 @@ export const emptySummary = (from: string, to: string): TokenSaverSummary => ({
   byDay: [],
   byFilter: [],
   byRunKind: [],
+  unfilteredPrograms: [],
+  promptCache: [],
+  runnerVersion: null,
+  costPerRound: [],
 });
 
 /** Merges two sides of one run kind: the average is weighted by its runs. */
@@ -73,10 +88,50 @@ function mergeBeforeAfter(
   }));
 }
 
+const byCommands = (
+  a: TokenSaverUnfilteredProgram,
+  b: TokenSaverUnfilteredProgram,
+) => b.commands - a.commands || a.program.localeCompare(b.program);
+
+/** Programs summed across projects, most commands first, the top ten. */
+function mergePrograms(
+  rows: readonly TokenSaverUnfilteredProgram[],
+): TokenSaverUnfilteredProgram[] {
+  const byProgram = new Map<string, number>();
+  for (const r of rows) {
+    byProgram.set(r.program, (byProgram.get(r.program) ?? 0) + r.commands);
+  }
+  return [...byProgram]
+    .map(([program, commands]) => ({ program, commands }))
+    .sort(byCommands)
+    .slice(0, TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX);
+}
+
+/** The prompt cache summed per run kind across projects. */
+function mergePromptCache(
+  rows: readonly TokenSaverPromptCache[],
+): TokenSaverPromptCache[] {
+  const byKind = new Map<TokenSaverRunKind, TokenSaverPromptCache>();
+  for (const r of rows) {
+    const prev = byKind.get(r.runKind);
+    byKind.set(r.runKind, {
+      runKind: r.runKind,
+      runs: (prev?.runs ?? 0) + r.runs,
+      input: (prev?.input ?? 0) + r.input,
+      cacheRead: (prev?.cacheRead ?? 0) + r.cacheRead,
+      cacheWrite: (prev?.cacheWrite ?? 0) + r.cacheWrite,
+    });
+  }
+  return [...byKind.values()];
+}
+
 /**
  * Usage on "all projects" asks every project for its summary and shows their
  * sum: totals and per-bucket savings add, the rates are re-derived from the
- * summed commands, before/after averages are weighted by their runs.
+ * summed commands, before/after averages are weighted by their runs. Programs
+ * and the prompt cache add; the runner version is one project's, so the sum
+ * has none. Cost per round is medians and percentiles, which do not add, so
+ * the sum leaves it empty (#663).
  */
 export function mergeSummaries(
   summaries: readonly TokenSaverSummary[],
@@ -139,7 +194,106 @@ export function mergeSummaries(
   merged.byRunKind = [...kinds.entries()]
     .map(([runKind, v]) => ({ runKind, ...v }))
     .sort((a, b) => b.estimateUsd - a.estimateUsd);
+  merged.unfilteredPrograms = mergePrograms(
+    summaries.flatMap((s) => s.unfilteredPrograms),
+  );
+  merged.promptCache = mergePromptCache(
+    summaries.flatMap((s) => s.promptCache),
+  );
   return merged;
+}
+
+/**
+ * #648: the reasons in the order the dashboard lists them, the legacy `none`
+ * last; #663 D9 adds a switched-off family.
+ */
+export const UNFILTERED_REASONS = [
+  FILTER_ID_NONE_COMPOUND,
+  FILTER_ID_NONE_UNCOVERED,
+  FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE_OFF,
+  FILTER_ID_NONE,
+] as const;
+
+/** #663 D5: one session kind's cost per round, its newest week against its oldest. */
+export interface CostPerRoundTrend {
+  sessionKind: TokenSaverSessionKind;
+  latest: TokenSaverCostPerRound;
+  /** The oldest week in the range; `null` when the kind has only one. */
+  earliest: TokenSaverCostPerRound | null;
+  /** Median cost, latest against earliest, as a fraction; `null` when either is unknown or the earliest is 0. */
+  change: number | null;
+}
+
+/**
+ * #663 D5: the lead table — per session kind, the newest week with rounds and
+ * how its median cost moved from the oldest week in the range. Kinds keep the
+ * summary's order (`TOKEN_SAVER_SESSION_KINDS`).
+ */
+export function costPerRoundTrends(
+  rows: readonly TokenSaverCostPerRound[],
+): CostPerRoundTrend[] {
+  const byKind = new Map<TokenSaverSessionKind, TokenSaverCostPerRound[]>();
+  for (const r of rows) {
+    byKind.set(r.sessionKind, [...(byKind.get(r.sessionKind) ?? []), r]);
+  }
+  return [...byKind].flatMap(([sessionKind, weeks]): CostPerRoundTrend[] => {
+    const sorted = [...weeks].sort((a, b) => a.week.localeCompare(b.week));
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    if (!first || !last) return [];
+    const earliest = sorted.length > 1 ? first : null;
+    const change = earliest
+      ? usdChange(earliest.medianUsd, last.medianUsd)
+      : null;
+    return [{ sessionKind, latest: last, earliest, change }];
+  });
+}
+
+/**
+ * #648: "No filter" split by reason — one row per reason, always all five,
+ * with its commands and its share of the unfiltered ones (0–1).
+ */
+export function unfilteredReasons(
+  filters: readonly TokenSaverFilterSavings[],
+): { filter: string; commands: number; share: number }[] {
+  const count = (id: string) =>
+    filters.find((f) => f.filter === id)?.commands ?? 0;
+  const total = UNFILTERED_REASONS.reduce((n, id) => n + count(id), 0);
+  return UNFILTERED_REASONS.map((filter) => ({
+    filter,
+    commands: count(filter),
+    share: total > 0 ? count(filter) / total : 0,
+  }));
+}
+
+/**
+ * #648: whether to say the runner is too old to give reasons — its version
+ * predates them and none of the range's rows carries one (a build from the
+ * main branch still says 0.12.2 but sends them).
+ */
+export function runnerTooOldForReasons(summary: TokenSaverSummary): boolean {
+  return (
+    runnerPredatesFilterReasons(summary.runnerVersion) &&
+    !summary.byFilter.some(
+      (f) => isUnfilteredId(f.filter) && f.filter !== FILTER_ID_NONE,
+    )
+  );
+}
+
+/** #648: the prompt cache of every run kind together, for the tile. */
+export function promptCacheTotals(
+  rows: readonly TokenSaverPromptCache[],
+): Omit<TokenSaverPromptCache, 'runKind'> {
+  return rows.reduce(
+    (t, r) => ({
+      runs: t.runs + r.runs,
+      input: t.input + r.input,
+      cacheRead: t.cacheRead + r.cacheRead,
+      cacheWrite: t.cacheWrite + r.cacheWrite,
+    }),
+    { runs: 0, input: 0, cacheRead: 0, cacheWrite: 0 },
+  );
 }
 
 const zero: TokenSavedView = { estimateUsd: 0, estimateTokens: 0 };
@@ -203,11 +357,14 @@ export function savingsChartSeries(
 
 /** The change between the two sides of a run kind, as a fraction; null when either is unknown or "before" is 0. */
 export function costChange(row: TokenSaverBeforeAfter): number | null {
-  if (row.beforeAvgUsd === null || row.afterAvgUsd === null) return null;
-  const before = Number(row.beforeAvgUsd);
-  const after = Number(row.afterAvgUsd);
-  if (!Number.isFinite(before) || !Number.isFinite(after) || before <= 0) {
-    return null;
-  }
-  return (after - before) / before;
+  return usdChange(row.beforeAvgUsd, row.afterAvgUsd);
+}
+
+/** The change from one decimal cost to another, as a fraction; null when either is unknown or `before` is 0. */
+function usdChange(before: string | null, after: string | null): number | null {
+  if (before === null || after === null) return null;
+  const b = Number(before);
+  const a = Number(after);
+  if (!Number.isFinite(b) || !Number.isFinite(a) || b <= 0) return null;
+  return (a - b) / b;
 }

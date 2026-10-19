@@ -3,11 +3,13 @@ import {
   TOKEN_SAVER_RUN_KINDS,
   TOKEN_SAVER_SUMMARY_MAX_DAYS,
   type TokenSaverBeforeAfter,
+  type TokenSaverPromptCache,
   type TokenSaverSummary,
 } from '@agentdock/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { runCostsByKind } from '../history/run-usage';
+import { runCostsByKind, runPromptCacheByKind } from '../history/run-usage';
+import { costPerRoundOfProject } from './cost-per-round';
 import {
   byFilterOf,
   inputPricesOfRuns,
@@ -15,6 +17,7 @@ import {
   savedOf,
   statGroupsOfProject,
   sum,
+  unfilteredProgramsOfProject,
 } from './token-saver-facts';
 
 const DAY_MS = 86_400_000;
@@ -35,6 +38,8 @@ const groupBy = <K>(
  * `GET /projects/:id/token-saver/summary` (#445 D12, D13): the filter's
  * estimate over a range, and the fact from usage — the average cost of a run
  * launched without the token saver against one launched with it, by kind.
+ * #663 D5: and cost per round by session kind and week, the metric the token
+ * saver is judged by (ADR-0068).
  */
 @Injectable()
 export class TokenSaverSummaryService {
@@ -55,15 +60,23 @@ export class TokenSaverSummaryService {
         `The range may span at most ${TOKEN_SAVER_SUMMARY_MAX_DAYS} days`,
       );
     }
-    const [groups, costs, first] = await Promise.all([
-      statGroupsOfProject(this.prisma, projectId, from, to),
-      runCostsByKind(this.prisma, projectId, RUN_KINDS, from, to),
-      this.prisma.tokenSaverStat.findFirst({
-        where: { projectId },
-        orderBy: { createdAt: 'asc' },
-        select: { createdAt: true },
-      }),
-    ]);
+    const [groups, costs, first, programs, cache, project, perRound] =
+      await Promise.all([
+        statGroupsOfProject(this.prisma, projectId, from, to),
+        runCostsByKind(this.prisma, projectId, RUN_KINDS, from, to),
+        this.prisma.tokenSaverStat.findFirst({
+          where: { projectId },
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        }),
+        unfilteredProgramsOfProject(this.prisma, projectId, from, to),
+        runPromptCacheByKind(this.prisma, projectId, RUN_KINDS, from, to),
+        this.prisma.project.findUnique({
+          where: { id: projectId },
+          select: { runner: { select: { version: true } } },
+        }),
+        costPerRoundOfProject(this.prisma, projectId, from, to),
+      ]);
     const runIds = [
       ...new Set(groups.flatMap((g) => (g.runId === null ? [] : [g.runId]))),
     ];
@@ -114,6 +127,24 @@ export class TokenSaverSummaryService {
             b.estimateTokens - a.estimateTokens ||
             a.runKind.localeCompare(b.runKind),
         ),
+      unfilteredPrograms: programs,
+      // RUN_KINDS' order, so the table reads the same on every load.
+      promptCache: RUN_KINDS.flatMap((runKind): TokenSaverPromptCache[] => {
+        const of = cache.find((c) => c.kind === runKind);
+        return of && of.runs > 0
+          ? [
+              {
+                runKind,
+                runs: of.runs,
+                input: of.input,
+                cacheRead: of.cacheRead,
+                cacheWrite: of.cacheWrite,
+              },
+            ]
+          : [];
+      }),
+      runnerVersion: project?.runner.version ?? null,
+      costPerRound: perRound,
     };
   }
 }

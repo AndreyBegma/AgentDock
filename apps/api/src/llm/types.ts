@@ -34,9 +34,19 @@ export interface LlmTool {
 export interface LlmRequest {
   model: string;
   system?: string;
+  /**
+   * Instructions that change between calls (date, person, summary). Sent after
+   * `system`, outside the cached prefix.
+   */
+  systemTail?: string;
   messages: LlmMessage[];
   tools?: LlmTool[];
   maxTokens?: number;
+  /**
+   * Cache the stable prefix: tools and `system`. Honoured by Anthropic; the
+   * OpenAI-compatible providers cache a shared prefix on their own.
+   */
+  cachePrefix?: boolean;
 }
 
 export type LlmStopReason =
@@ -98,6 +108,8 @@ export interface LlmCompletion {
   stopReason: LlmStopReason;
   /** Decimal string, USD. */
   costUsd: string;
+  /** The call's `llm_calls` row. */
+  callId?: string;
 }
 
 export const emptyUsage = (): TokenBuckets => ({

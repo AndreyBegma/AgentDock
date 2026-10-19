@@ -19,10 +19,13 @@ import {
   type CardFinishedBy,
   type CardFinishedEventData,
   type CardMergeOutcome,
+  type CardNeedsPersonReason,
   type CardPrState,
   cardLabel,
   cardPullRequestBody,
   isActiveRoundPhase,
+  isDependencySatisfied,
+  isDivergedBranchError,
   positionForIndex,
   type Role,
   RUN_UPDATED_LIVE_EVENT,
@@ -100,15 +103,23 @@ export type RoundCollectedHook = (
 ) => Promise<void>;
 
 /**
- * #443: what follows a card's acceptance — Auto-run when ready of the cards
- * that depend on it. `BoardAutoRun` registers it; `BoardWork` cannot depend
- * on it (it starts rounds, which move cards through here).
+ * #443, #638: what follows a card entering Finished or Completed — Auto-run
+ * when ready of the cards that depend on it. `BoardAutoRun` registers it;
+ * `BoardWork` cannot depend on it (it starts rounds, which move cards
+ * through here).
  */
-export type CardAcceptedHook = (
+export type CardSatisfiedHook = (
   projectId: string,
   card: Pick<BoardCard, 'id' | 'number'>,
   actor: BoardActor,
 ) => Promise<void>;
+
+/**
+ * #652: what follows any change of a card — Run stack re-evaluates its
+ * queue. `BoardStackRuns` registers it; `BoardWork` cannot depend on it (it
+ * starts rounds, which move cards through here). It must not throw.
+ */
+export type CardChangedHook = (projectId: string, cardId: string) => void;
 
 export const ACTIVE_PHASES = [...ACTIVE_CARD_ROUND_PHASES];
 
@@ -145,6 +156,13 @@ const RETRYABLE = {
 /** #329 D2: the runner pushed commits yet reported no open PR. */
 export const PUSHED_WITHOUT_PR =
   'The branch has commits ahead of the base, but the runner reported no open pull request';
+
+/**
+ * #630: the reason `needsPerson` is set with when the runner refused to push
+ * a branch whose remote holds commits the card's branch never had.
+ */
+export const BRANCH_DIVERGED =
+  'branch_diverged' satisfies CardNeedsPersonReason;
 
 const failedCollect = (error: string): CardCollectOutcome => ({
   state: 'failed',
@@ -231,7 +249,8 @@ export class BoardWork implements OnModuleInit {
   private readonly logger = new Logger(BoardWork.name);
   private readonly pending = new Set<Promise<void>>();
   private roundCollected: RoundCollectedHook | null = null;
-  private cardAccepted: CardAcceptedHook | null = null;
+  private cardSatisfied: CardSatisfiedHook | null = null;
+  private cardChanged: CardChangedHook | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -477,23 +496,35 @@ export class BoardWork implements OnModuleInit {
     }
     for (const run of ended) this.publishRun(project.id, run.runId, run.status);
     this.publish(project.id, fresh.id);
-    // #443: the cards that wait for this one change Ready / Waiting.
-    if (effects.includes('accept') || effects.includes('reopen')) {
+    // #443, #638: entering or leaving Finished / Completed changes Ready /
+    // Waiting — and whether Run is open — of the cards that wait for it.
+    const entered = fresh.column !== request.to;
+    if (
+      entered &&
+      (isDependencySatisfied(fresh.column) || isDependencySatisfied(request.to))
+    ) {
       await this.publishDependants(project.id, fresh.id);
     }
-    if (effects.includes('accept') && this.cardAccepted) {
-      const hook = this.cardAccepted;
-      this.track(
-        hook(project.id, fresh, actor).catch((error: unknown) => {
-          this.logger.error(
-            `the auto-run after ${cardLabel(fresh.number)} failed`,
-            error instanceof Error ? error.stack : String(error),
-          );
-        }),
-      );
-    }
+    // #638: reaching Finished satisfies a dependency, and so does Accept; the
+    // auto-run's claim lets a dependant start once, whichever comes first.
+    const hook = this.cardSatisfied;
+    const satisfied =
+      hook &&
+      (effects.includes('accept') || (entered && request.to === 'finished'))
+        ? () =>
+            hook(project.id, fresh, actor).catch((error: unknown) => {
+              this.logger.error(
+                `the auto-run after ${cardLabel(fresh.number)} failed`,
+                error instanceof Error ? error.stack : String(error),
+              );
+            })
+        : null;
     if (effects.includes('collect') && request.collect !== false) {
-      this.collect(fresh.id);
+      // #636: a dependant is stacked on this card's PR, which the collect
+      // opens — so the auto-run waits for it.
+      this.collect(fresh.id, 'move', satisfied);
+    } else if (satisfied) {
+      this.track(satisfied());
     }
     if (effects.includes('accept') && fresh.branch !== null) {
       this.close(project, fresh.id, actor);
@@ -537,9 +568,14 @@ export class BoardWork implements OnModuleInit {
     );
   }
 
-  /** #443: `BoardAutoRun` registers what follows a card's acceptance. */
-  onAccepted(hook: CardAcceptedHook): void {
-    this.cardAccepted = hook;
+  /** #443, #638: `BoardAutoRun` registers what follows Finished or Accept. */
+  onSatisfied(hook: CardSatisfiedHook): void {
+    this.cardSatisfied = hook;
+  }
+
+  /** #652: `BoardStackRuns` registers what follows any change of a card. */
+  onChanged(hook: CardChangedHook): void {
+    this.cardChanged = hook;
   }
 
   /** #359: `BoardShipping` registers what follows a round's collect. */
@@ -745,6 +781,131 @@ export class BoardWork implements OnModuleInit {
         data: { state: 'merged' },
       }),
     ]);
+    await this.restack(cardId);
+  }
+
+  /**
+   * #636 (ADR-0064): the card merged — every card stacked on its branch goes
+   * onto the project base: an open PR through `card.prRetarget`, then the
+   * stored base is cleared. Never throws; what it could not do the PR poll
+   * tries again (`retargetIfDue`).
+   */
+  async restack(mergedCardId: string): Promise<void> {
+    const stacked = await this.prisma.boardCard.findMany({
+      where: { prBaseCardId: mergedCardId },
+      include: { rounds: { orderBy: { round: 'desc' } } },
+    });
+    if (stacked.length === 0) return;
+    const project = await this.project(stacked[0].projectId);
+    for (const card of stacked) {
+      try {
+        await this.retarget(project, card);
+      } catch (error) {
+        if (!(error instanceof BoardFailure)) throw error;
+        this.logger.warn(
+          `${cardLabel(card.number)} not retargeted onto ${project.base}: ${error.message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * #636: the PR poll's retry — a card stacked on a dependency that has
+   * merged since goes onto the base. Returns whether it is still stacked.
+   */
+  async retargetIfDue(
+    project: BoardProject,
+    card: CardWithRounds,
+  ): Promise<boolean> {
+    if (card.prBaseCardId === null) return card.prBase !== null;
+    const base = await this.prisma.boardCard.findUnique({
+      where: { id: card.prBaseCardId },
+      select: { mergedAt: true },
+    });
+    if (base?.mergedAt === null) return true;
+    try {
+      return !(await this.retarget(project, card));
+    } catch (error) {
+      if (!(error instanceof BoardFailure)) throw error;
+      this.logger.warn(
+        `${cardLabel(card.number)} not retargeted onto ${project.base}: ${error.message}`,
+      );
+      return true;
+    }
+  }
+
+  /**
+   * #636: one stacked card onto the base. A card with an open PR is
+   * retargeted first; one whose round is still running without a PR keeps
+   * its base — the PR it opens is retargeted by the poll. Returns whether
+   * the card's base is the project base now.
+   */
+  private async retarget(
+    project: BoardProject,
+    card: CardWithRounds,
+  ): Promise<boolean> {
+    const from = card.prBase;
+    const openPr =
+      card.prNumber !== null &&
+      card.mergedAt === null &&
+      card.prState !== 'merged' &&
+      card.prState !== 'closed';
+    if (!openPr && isActiveRoundPhase(card.rounds[0]?.phase)) return false;
+    let notOpen = false;
+    if (openPr && card.prNumber !== null) {
+      if (!this.commands.servesPrRetarget(project.runnerId)) return false;
+      const result = boardOutput(
+        'card.prRetarget',
+        await this.commands.retargetPr(
+          project.runnerId,
+          {
+            cardId: card.id,
+            projectId: project.id,
+            root: project.rootPath,
+            pr: card.prNumber,
+            base: project.base,
+          },
+          { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
+        ),
+      );
+      // A PR that is no longer open has nothing to retarget; the card's next
+      // PR goes into the base. Any other refusal is tried again by the poll.
+      if (!result.retargeted && result.error !== 'not_open') {
+        this.logger.warn(
+          `${cardLabel(card.number)}: card.prRetarget ${result.error} — ${result.message}`,
+        );
+        return false;
+      }
+      if (!result.retargeted) notOpen = true;
+    }
+    const { count } = await this.prisma.boardCard.updateMany({
+      where: { id: card.id, prBaseCardId: card.prBaseCardId },
+      data: { prBase: null, prBaseCardId: null },
+    });
+    if (count > 0 && openPr && !notOpen) {
+      const dependency = card.prBaseCardId
+        ? await this.prisma.boardCard.findUnique({
+            where: { id: card.prBaseCardId },
+            select: { number: true },
+          })
+        : null;
+      await this.audit.record({
+        actor: SYSTEM_ACTOR,
+        action: 'card.pr_retargeted',
+        target: { type: 'board_card', id: card.id },
+        projectId: project.id,
+        after: {
+          number: card.number,
+          pr: card.prNumber,
+          from,
+          base: project.base,
+          dependency: dependency?.number ?? null,
+        },
+        result: 'ok',
+      });
+    }
+    this.publish(project.id, card.id);
+    return true;
   }
 
   /** The position for `index` in `column`, rebalancing it when it is too tight. */
@@ -897,19 +1058,27 @@ export class BoardWork implements OnModuleInit {
 
   /**
    * D8, in the background: the runner's push can take up to 180 s. `move`
-   * is the round's own collect; `retry` is #329 D4's automatic one.
+   * is the round's own collect; `retry` is #329 D4's automatic one. `then`
+   * runs once the collect settled, whatever its outcome (#638: the auto-run
+   * of the cards that wait for this one).
    */
-  collect(cardId: string, trigger: 'move' | 'retry' = 'move'): void {
+  collect(
+    cardId: string,
+    trigger: 'move' | 'retry' = 'move',
+    then: (() => Promise<void>) | null = null,
+  ): void {
     this.track(
-      this.collectNow(cardId, trigger).then(
-        () => undefined,
-        (error: unknown) => {
-          this.logger.error(
-            `card.collect of ${cardId} failed`,
-            error instanceof Error ? error.stack : String(error),
-          );
-        },
-      ),
+      this.collectNow(cardId, trigger)
+        .then(
+          () => undefined,
+          (error: unknown) => {
+            this.logger.error(
+              `card.collect of ${cardId} failed`,
+              error instanceof Error ? error.stack : String(error),
+            );
+          },
+        )
+        .then(() => then?.()),
     );
   }
 
@@ -981,6 +1150,11 @@ export class BoardWork implements OnModuleInit {
     while (this.pending.size > 0) {
       await Promise.allSettled([...this.pending]);
     }
+  }
+
+  /** #652: background work `settled` waits for, like a collect. */
+  background(work: Promise<void>): void {
+    this.track(work);
   }
 
   private track(work: Promise<void>): void {
@@ -1086,7 +1260,8 @@ export class BoardWork implements OnModuleInit {
             cardId: card.id,
             projectId: project.id,
             root: project.rootPath,
-            base: project.base,
+            // #636: a stacked card's PR goes into its dependency's branch.
+            base: card.prBase ?? project.base,
             branch: target.branch,
             ...(target.cwd === null ? {} : { cwd: target.cwd }),
             number: card.number,
@@ -1134,7 +1309,12 @@ export class BoardWork implements OnModuleInit {
       // A terminal card's earlier failure no longer holds once one succeeds.
       const cleared =
         terminal && card.autoRunError !== null && outcome.state !== 'failed';
+      // #630: a person merged the diverged branch; automation resumes.
+      const merged =
+        card.needsPersonReason === BRANCH_DIVERGED &&
+        outcome.state !== 'failed';
       await this.storeCollect(card, outcome, {
+        ...(merged ? { needsPerson: false, needsPersonReason: null } : {}),
         // An older runner reports no state: its PR is open (D6).
         ...(open ? { ...pr, prState: output.prState ?? 'open' } : {}),
         ...(cleared
@@ -1157,9 +1337,44 @@ export class BoardWork implements OnModuleInit {
           error instanceof BoardFailure ? error.code : 'unknown',
         );
       }
-      outcome = await this.storeCollect(card, failedCollect(message));
+      if (isDivergedBranchError(message)) {
+        outcome = await this.divergedCollect(card, message);
+      } else {
+        outcome = await this.storeCollect(card, failedCollect(message));
+      }
     }
     await this.finished(project, card, round, pr);
+    return outcome;
+  }
+
+  /**
+   * #630: the runner pushed nothing — `origin/<branch>` holds somebody
+   * else's commits. The card needs a person (`needsPerson`), with the
+   * runner's reason as its collect error; audited once per divergence.
+   */
+  private async divergedCollect(
+    card: CardForCollect,
+    message: string,
+  ): Promise<CardCollectOutcome> {
+    const known = card.needsPersonReason === BRANCH_DIVERGED;
+    const outcome = await this.storeCollect(card, failedCollect(message), {
+      needsPerson: true,
+      needsPersonReason: BRANCH_DIVERGED,
+    });
+    if (!known) {
+      await this.audit.record({
+        actor: SYSTEM_ACTOR,
+        action: 'card.auto_run_failed',
+        target: { type: 'board_card', id: card.id },
+        projectId: card.projectId,
+        after: {
+          number: card.number,
+          reason: BRANCH_DIVERGED,
+          branch: card.branch,
+        },
+        result: 'ok',
+      });
+    }
     return outcome;
   }
 
@@ -1271,6 +1486,7 @@ export class BoardWork implements OnModuleInit {
         `board.changed ${cardId} not published: ${(error as Error).message}`,
       );
     }
+    this.cardChanged?.(projectId, cardId);
   }
 
   /** #480: `board.changed` for a stack — its face, its page and its design. */

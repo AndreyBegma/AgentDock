@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BoardModule } from '../board/board.module';
+import { BoardAiModule } from '../board-ai/board-ai.module';
 import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { ReadinessModule } from '../readiness';
@@ -35,6 +36,7 @@ import { TasksQueryService } from './tasks-query.service';
   // plan's model defaults to its author's planning model (`SettingsModule`).
   imports: [
     BoardModule,
+    BoardAiModule,
     LiveModule,
     ProjectsModule,
     ReadinessModule,

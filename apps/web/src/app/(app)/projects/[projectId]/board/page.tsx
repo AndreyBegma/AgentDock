@@ -11,10 +11,6 @@ import {
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { MessagesSquare, SquarePen } from 'lucide-react';
@@ -33,10 +29,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import {
-  BoardToolbar,
-  type Density,
-} from '../../../../../components/board/board-toolbar';
+import { BoardToolbar } from '../../../../../components/board/board-toolbar';
 import { BoardColumns } from '../../../../../components/board/board-view';
 import {
   CardSheet,
@@ -48,7 +41,6 @@ import { NewCardDialog } from '../../../../../components/board/new-card-dialog';
 import { PlanPanel } from '../../../../../components/board/plan-panel';
 import { PlanTaskSheet } from '../../../../../components/board/plan-task-sheet';
 import { useCardActions } from '../../../../../components/board/use-card-actions';
-import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { ReadinessBanner } from '../../../../../components/readiness/readiness-banner';
@@ -57,6 +49,7 @@ import { LiveStatusBadge } from '../../../../../components/shell/live-status-bad
 import { usePageActions } from '../../../../../components/shell/use-page-actions';
 import { useCurrentUser } from '../../../../../components/shell/user-context';
 import { TerminalSheet } from '../../../../../components/terminal/terminal-sheet';
+import { WorkHeader } from '../../../../../components/work/work-header';
 import { fetchBoard } from '../../../../../lib/board/actions';
 import {
   boardFilterCodec,
@@ -76,6 +69,7 @@ import {
   findPlanTask,
   parsePlanTaskParam,
 } from '../../../../../lib/board/plan-tasks';
+import { fetchTriageCounts } from '../../../../../lib/board-ai/client';
 import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
 import { useLive } from '../../../../../lib/live/use-live';
 import { useReadiness } from '../../../../../lib/readiness/use-readiness';
@@ -126,7 +120,6 @@ function BoardScreen() {
   const [older, setOlder] = useState<BoardCardView[]>([]);
   const [olderHasMore, setOlderHasMore] = useState<boolean>();
   const [loadingOlder, setLoadingOlder] = useState(false);
-  const [density, setDensity] = useState<Density>('comfortable');
   const url = useUrlFilters(boardFilterCodec);
   const live = useLivePaused();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -178,6 +171,15 @@ function BoardScreen() {
   );
   const planTaskItems: readonly BoardPlanTaskView[] =
     planTasks.data?.items ?? [];
+  // #660: hints are advice — a failed read shows none.
+  const triage = useSection(
+    () => fetchTriageCounts(projectId).catch(() => ({ cards: [] })),
+    [projectId, version],
+  );
+  const hints = useMemo(
+    () => new Map((triage.data?.cards ?? []).map((c) => [c.number, c.hints])),
+    [triage.data],
+  );
   const readiness = useReadiness(projectId);
 
   // Older Completed pages are fetched by hand; a fresh first page resets them.
@@ -320,61 +322,46 @@ function BoardScreen() {
     // The shell gives the page the screen's height; the board takes what the header and toolbar leave.
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-3">
-        <PageHeader
-          className="mb-0"
-          title="Work"
-          description={
+        <WorkHeader
+          view="board"
+          eyebrow={project?.displayName ?? 'Project'}
+          stats={
             view && meta
-              ? `${view.running} of ${view.settings.maxRunning} workers running · ${meta.shown} ${meta.shown === 1 ? 'card' : 'cards'}${isFiltering(url.filters) ? ' shown' : ''} · ${meta.running} running · ${meta.waiting} waiting on you`
+              ? {
+                  workers: view.running,
+                  maxWorkers: view.settings.maxRunning,
+                  cards: meta.shown,
+                  filtering: isFiltering(url.filters),
+                  running: meta.running,
+                  waiting: meta.waiting,
+                }
               : undefined
           }
-          actions={
-            <>
-              {live.status !== 'connected' ? <LiveStatusBadge /> : null}
-              <SegmentedControl
-                role="group"
-                aria-label="View"
-                className="max-sm:basis-full"
-              >
-                <SegmentedControlItem active={false} layoutId="work-view">
-                  <Link
-                    href={`/work?projectId=${encodeURIComponent(projectId)}`}
-                    className="block w-full min-w-16 px-3 py-1.5 text-center text-sm whitespace-nowrap"
-                  >
-                    List
-                  </Link>
-                </SegmentedControlItem>
-                <SegmentedControlItem active layoutId="work-view">
-                  <button
-                    type="button"
-                    aria-pressed
-                    className="w-full min-w-16 px-3 py-1.5 text-sm whitespace-nowrap"
-                  >
-                    Board
-                  </button>
-                </SegmentedControlItem>
-              </SegmentedControl>
-              {canOperate ? (
-                <>
-                  <Button
-                    variant="glass"
-                    className="max-sm:flex-1"
-                    onClick={() => setDiscussing(true)}
-                  >
-                    Discuss
-                  </Button>
-                  <Button
-                    variant="solid"
-                    className="max-sm:flex-1"
-                    onClick={() => setCreating(true)}
-                  >
-                    New work
-                  </Button>
-                </>
-              ) : null}
-            </>
+          status={live.status !== 'connected' ? <LiveStatusBadge /> : null}
+          onSelectList={() =>
+            router.push(`/work?projectId=${encodeURIComponent(projectId)}`)
           }
-        />
+          onSelectBoard={() => {}}
+        >
+          {canOperate ? (
+            <>
+              <Button
+                variant="glass"
+                className="max-sm:flex-1"
+                onClick={() => setDiscussing(true)}
+              >
+                Discuss
+              </Button>
+              <Button
+                variant="solid"
+                className="max-sm:flex-1"
+                onClick={() => setCreating(true)}
+              >
+                New work
+              </Button>
+            </>
+          ) : null}
+        </WorkHeader>
         {project ? <RunnerOfflineBanner project={project} /> : null}
         <ReadinessBanner
           projectId={projectId}
@@ -403,7 +390,7 @@ function BoardScreen() {
         </div>
       ) : null}
 
-      <BoardToolbar url={url} density={density} onDensityChange={setDensity} />
+      <BoardToolbar url={url} />
 
       <AsyncSection
         section={board}
@@ -427,12 +414,12 @@ function BoardScreen() {
               canTerminal={canAttach}
               actions={actions}
               filter={url.filters}
-              compact={density === 'compact'}
               olderCompleted={
                 hasMoreOlder && lastCompleted?.completedAt
                   ? { loading: loadingOlder, onLoad: () => void loadOlder() }
                   : undefined
               }
+              hints={hints}
               onOpen={(card) => select(card.number)}
               onOpenPlanTask={selectPlanTask}
               onOpenTerminal={setAttaching}

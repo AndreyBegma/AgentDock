@@ -13,6 +13,7 @@ import {
   CARD_RUN_PROMPT_MAX_BYTES,
   cardPromptSchema,
 } from '../protocol';
+import { TERSE_REGISTER } from '../token-saver/register';
 import { cardDesignPath } from './naming';
 import {
   BOARD_CARD_BODY_MAX,
@@ -195,10 +196,9 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
   it('carries the working and the audience register', () => {
     const prompt = cardWorkerPrompt(plain);
     expect(prompt).toContain('## How to write');
-    expect(prompt).toContain('- Working register —');
-    expect(prompt).toContain('do not restate the plan');
-    expect(prompt).toContain('- Audience register —');
-    expect(prompt).toContain('every required section, and leave nothing out');
+    // #663 D3: the working register is the one shared text, verbatim.
+    expect(prompt).toContain(TERSE_REGISTER);
+    expect(prompt).toContain('Full sentences, every required section');
   });
 
   it('asks for offset/limit on big files and Grep/Glob first', () => {
@@ -240,6 +240,13 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
     ]) {
       expect(prompt).toContain(trailer);
     }
+  });
+
+  it('forbids rewriting a pushed commit in the stable part (#630)', () => {
+    const prompt = cardWorkerPrompt(card);
+    const rule = prompt.indexOf('Never amend, rebase or reset a pushed commit');
+    expect(rule).toBeGreaterThan(prompt.indexOf('## How to work'));
+    expect(rule).toBeLessThan(prompt.indexOf('## Card C-12'));
   });
 
   it('asks for one command per Bash call in How to work, with Token saver on (#445 amendment 11)', () => {
@@ -366,8 +373,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 16', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(17);
+  it('is version 19', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(19);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

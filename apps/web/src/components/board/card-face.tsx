@@ -3,7 +3,15 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { Check, Clock, GitMerge, Layers, Paperclip, Zap } from 'lucide-react';
+import {
+  Check,
+  Clock,
+  GitMerge,
+  Layers,
+  Paperclip,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
 import NextLink from 'next/link';
 import type { ReactNode } from 'react';
 import { attachmentCountLabel } from '../../lib/attachments/format';
@@ -12,6 +20,7 @@ import {
   approveRunOffer,
   autoRunFailureText,
   blockingDialogText,
+  collectFailedBadge,
   confidenceLabel,
   finishRefusedText,
   fleetHref,
@@ -29,6 +38,7 @@ import {
 } from '../../lib/board/format';
 import { prChipText } from '../../lib/board/pull-request';
 import { ciDot, shippingBadge } from '../../lib/board/shipping';
+import { hintsLabel } from '../../lib/board-ai/triage';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { StewardChip } from '../steward/steward-chip';
@@ -61,16 +71,16 @@ export function CardFace({
   projectId,
   card,
   canOperate,
-  compact = false,
   menu,
   selection,
+  hints,
   onOpen,
 }: {
   projectId: string;
   card: BoardCardView;
+  /** #660: triage hints waiting on the card; absent or 0 is none. */
+  hints?: number;
   canOperate: boolean;
-  /** C-29 Compact density: the issue and PR links are left to the sheet. */
-  compact?: boolean;
   /** The Board's card menu (`slots.menu`), placed at the end of the header. */
   menu?: ReactNode;
   /** #452: set for an operator; a suggestion shows why it has no box instead. */
@@ -80,13 +90,15 @@ export function CardFace({
   const offer = approveRunOffer(card);
   const pill = roundPill(card.round);
   const badge = shippingBadge(card);
+  // #630: a collect that failed is on the face, not only in the sheet.
+  const notPushed = collectFailedBadge(card);
   const cost = formatCost(card.costUsd);
   // #337 D8: "after C-12", warning while it is not completed.
   const after = dependencyChip(card.dependsOn);
   // #443: Ready / Waiting of a To Do card with dependencies.
   const ready = readinessChip(card.readiness);
   const suggestion = isSuggestion(card);
-  const note = `break-words text-xs text-ink-2${compact ? ' line-clamp-1' : ''}`;
+  const note = 'break-words text-xs text-ink-2';
   return (
     <SelectionFrame>
       {selection?.selected ? <SelectedTint /> : null}
@@ -95,7 +107,7 @@ export function CardFace({
         data-select-column={card.column}
         data-selected={selection ? selection.selected : undefined}
         onClickCapture={(event) => toggleOnClick(event, selection)}
-        className={`relative flex min-w-0 flex-col text-sm ${compact ? 'gap-1' : 'gap-1.5'}`}
+        className="relative flex min-w-0 flex-col gap-1.5 text-sm"
       >
         <div
           data-card-row="header"
@@ -126,6 +138,16 @@ export function CardFace({
           {card.kind === 'bug' ? (
             <Chip size="sm" tone="danger" className={HEAD_CHIP}>
               Bug
+            </Chip>
+          ) : null}
+          {hints ? (
+            <Chip
+              size="sm"
+              title="Triage hints: open the card to apply or dismiss them"
+              className={`${HEAD_CHIP} gap-1`}
+            >
+              <Sparkles aria-hidden="true" className="size-3" />
+              {hintsLabel(hints)}
             </Chip>
           ) : null}
           {card.attachmentCount > 0 ? (
@@ -160,12 +182,10 @@ export function CardFace({
         </div>
         <button
           type="button"
-          className={`${TAP} break-words text-left font-medium underline-offset-2 hover:underline${compact ? ' text-[13px] leading-[18px]' : ''}`}
+          className={`${TAP} break-words text-left font-medium underline-offset-2 hover:underline`}
           onClick={() => onOpen(card)}
         >
-          <span className={compact ? 'line-clamp-2' : undefined}>
-            {card.title}
-          </span>
+          {card.title}
         </button>
         <div
           data-card-row="status"
@@ -237,6 +257,13 @@ export function CardFace({
               </span>
             </Tooltip>
           ) : null}
+          {notPushed ? (
+            <Tooltip content={notPushed.text}>
+              <span>
+                <Badge tone="warn" size="md" label={notPushed.label} />
+              </span>
+            </Tooltip>
+          ) : null}
           {badge ? (
             <Tooltip content={badge.label}>
               <span>
@@ -269,7 +296,7 @@ export function CardFace({
           <p className={note}>{card.captureWhy}</p>
         ) : null}
         <FaceLinks projectId={projectId} card={card} suggestion={suggestion} />
-        {!compact && (card.prNumber !== null || card.issueNumber !== null) ? (
+        {card.prNumber !== null || card.issueNumber !== null ? (
           <CardFooter card={card} />
         ) : null}
       </div>

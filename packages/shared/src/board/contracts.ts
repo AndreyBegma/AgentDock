@@ -1,5 +1,6 @@
 import type {
   CardDesignRecommendableModel,
+  CardEffort,
   CardRecommendableModel,
 } from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
@@ -95,7 +96,7 @@ export interface CardRoundBrief {
   wiringReason?: CardRunWiringReason | null;
   /**
    * #443: Auto-run when ready started the round, after this dependency's
-   * number was accepted; `null` for a round a person or AgentDock started.
+   * number reached Finished (#638) or was accepted; `null` for a round a person or AgentDock started.
    * Optional so older fixtures stay valid.
    */
   autoRunAfter?: number | null;
@@ -145,6 +146,16 @@ export interface CardFleetView {
   slotGone: boolean;
 }
 
+/**
+ * #636: where a card's PR goes — the project base, or, for a card stacked on
+ * its one unmerged dependency, that dependency's branch ("into C-1's branch").
+ */
+export interface CardPrTarget {
+  branch: string;
+  /** The dependency whose branch it is; `null` for the project base. */
+  stackedOn: { number: number; label: string } | null;
+}
+
 /** One card on the board. */
 export interface BoardCardView {
   id: string;
@@ -192,6 +203,11 @@ export interface BoardCardView {
   needsPersonReason: CardNeedsPersonReason | null;
   /** #359 D8: the latest PR merged (ISO) — the Merged badge; `null` otherwise. */
   mergedAt: string | null;
+  /**
+   * #636: the branch the card's PR targets — its worktree's start. `null`
+   * before the card has a branch.
+   */
+  prTarget: CardPrTarget | null;
   /** The latest round; `null` before the first Run. */
   round: CardRoundBrief | null;
   /** #243: the Design chip; `null` when the card has no design (off). */
@@ -228,8 +244,8 @@ export interface BoardCardView {
    */
   autoRunFailure: CardAutoRunFailure | null;
   /**
-   * #443: Auto-run when ready — accepting the last open dependency starts
-   * the Run. Off by default; it turns itself off when it fires.
+   * #443, #638: Auto-run when ready — the last open dependency reaching
+   * Finished (or being accepted) starts the Run. Off by default; it turns itself off when it fires.
    */
   autoRunWhenReady: boolean;
   /**
@@ -294,18 +310,18 @@ export interface CardDependencyRef {
   number: number;
   /** `C-<number>`. */
   label: string;
-  /** Open while not `completed`. */
+  /** Open while not `finished` or `completed` (#638). */
   column: BoardColumn;
 }
 
 /**
- * #443: a To Do card with dependencies is `ready` once every one is accepted
- * (in Completed, whatever PRs it had), `waiting` while one is open.
+ * #443: a To Do card with dependencies is `ready` once every one is
+ * satisfied — in Finished or Completed (#638) — `waiting` while one is open.
  */
 export interface CardReadiness {
   state: 'ready' | 'waiting';
-  /** Dependencies in Completed. */
-  accepted: number;
+  /** Dependencies in Finished or Completed. */
+  satisfied: number;
   total: number;
   /** The open ones, in number order: "Waits for C-84". */
   open: CardDependencyRef[];
@@ -375,7 +391,7 @@ export interface CardRoundView {
   trigger: CardRoundTrigger;
   /**
    * #443: Auto-run when ready started the round, after this dependency's
-   * number was accepted; `null` otherwise. Optional so older fixtures stay valid.
+   * number reached Finished (#638) or was accepted; `null` otherwise. Optional so older fixtures stay valid.
    */
   autoRunAfter?: number | null;
   /**
@@ -437,13 +453,21 @@ export interface CardModelRecommendation<
 }
 
 /**
+ * #663 (ADR-0068 §5): the work recommendation names an effort next to its
+ * model; `null` on a card assessed before the effort was asked for.
+ */
+export interface CardWorkRecommendation extends CardModelRecommendation {
+  effort: CardEffort | null;
+}
+
+/**
  * #322 D6, D7: a card's recommendations for its work and its design. Each is
  * `null` until an assessment applied — runner offline or too old, no Claude
  * profile, a budget stop, an answer out of contract: the popover shows "No
  * recommendation yet" and launch does not wait.
  */
 export interface CardRecommendationView {
-  work: CardModelRecommendation | null;
+  work: CardWorkRecommendation | null;
   design: CardModelRecommendation<CardDesignRecommendableModel> | null;
   /** When the last assessment applied (ISO); `null` before the first. */
   assessedAt: string | null;
@@ -460,6 +484,11 @@ export interface BoardCardDetail extends BoardCardView {
    * work model the person chose, kept only when it differed from the default.
    */
   model: string | null;
+  /**
+   * #663: the work effort the person chose, kept only when it differed from
+   * the default (the #322 D3 rule); `null` follows the default.
+   */
+  effort: CardEffort | null;
   /**
    * #322 D3: the Claude profile the person chose for the card's work and
    * design, kept only when it differed from the resolver's pick; `null`
@@ -657,16 +686,17 @@ export interface BulkBoardCardsResponse {
 export interface RunBoardCardRequest {
   model?: string;
   /**
+   * #663: the work effort, remembered like `model`. A `ci_fix` round
+   * defaults to `low`, any other to the recommendation's, else none (the
+   * CLI's own).
+   */
+  effort?: CardEffort;
+  /**
    * #322 D9: a Claude profile of the project's runner (`profileKeySchema`); an
    * unknown or non-Claude key is 422 `no_profile`.
    */
   profileKey?: string;
   permissionMode?: OrchestratorPermissionMode;
-  /**
-   * #337 D8: run although a dependency is not in Completed. Without it, such
-   * a Run is 409 `dependency_open` naming the open ones.
-   */
-  ignoreDependencies?: boolean;
 }
 
 /** `POST /board/cards/:number/feedback` (D9). */
@@ -805,10 +835,17 @@ export const BOARD_ERROR = {
   /** 422 (#329 D7/D8): `deleteBranch: true` on a `terminal` card. */
   branchDeleteRefused: 'branch_delete_refused',
   /**
-   * 409 (#337 D8): Run on a card with a dependency not in Completed, without
-   * `ignoreDependencies`; `dependencies` names the open ones.
+   * 409 (#337 D8, #638): Run on a card with a dependency not in Finished or
+   * Completed — there is no override; `dependencies` names the open ones.
    */
   dependencyOpen: 'dependency_open',
+  /**
+   * 409 (#636): Run on a card with two or more dependencies whose pull
+   * requests are not merged into the project base; a card branches from one
+   * dependency only, and there is no override (#638).
+   * `dependencies` names them.
+   */
+  dependenciesUnmerged: 'dependencies_unmerged',
   /** 409 (#337 D8): the dependency would close a cycle. */
   dependencyCycle: 'dependency_cycle',
   /** 400 (#337 D8): the card itself, or a number that is no card of this project. */
@@ -839,7 +876,10 @@ export interface BoardErrorBody {
   profileKey?: string;
   /** `attachment_error`: why the attachment was refused (#309). */
   code?: AttachmentRefusal;
-  /** `dependency_open` (#337 D8): the open dependencies — "C-12 is not completed yet". */
+  /**
+   * `dependency_open` (#337 D8, #638): the open dependencies — "Waits for
+   * C-12"; `dependencies_unmerged` (#636): the unmerged ones.
+   */
   dependencies?: CardDependencyRef[];
   /** `stack_refused` of a grouping (#588): the cards that cannot join, by number. */
   cards?: number[];
@@ -856,11 +896,13 @@ export interface CardAutoRunFailure {
   message: string;
   at: string;
   /**
-   * #443: the accepted dependency's number when Auto-run when ready tried
-   * the start; `null` when approving the design did. Optional so older
-   * fixtures stay valid.
+   * #443, #638: the dependency's number whose Finished or Accept made
+   * Auto-run when ready try the start; `null` when approving the design did.
+   * Optional so older fixtures stay valid.
    */
   after?: number | null;
+  /** #652: the stack whose Run stack tried the start; absent or `null` otherwise. */
+  stack?: number | null;
 }
 
 const BOARD_ERROR_CODES: ReadonlySet<string> = new Set(

@@ -18,8 +18,10 @@ import {
   CAPTURE_MODELS,
   CARD_BACKGROUND_STALL_MINUTES_MAX,
   CARD_BACKGROUND_STALL_MINUTES_MIN,
+  CARD_EFFORTS,
   CARD_FEEDBACK_MAX,
   type CaptureModel,
+  type CardEffort,
   type CardFeedbackRequest,
   type CreateBoardCardRequest,
   type CreateBoardStackRequest,
@@ -226,14 +228,14 @@ export class RunBoardCardDto implements RunBoardCardRequest {
   @Matches(PROFILE_KEY_PATTERN, { message: 'profileKey must be a profile id' })
   profileKey?: string;
 
+  /** #663: the work effort, remembered like `model`. */
+  @IsOptional()
+  @IsIn(CARD_EFFORTS)
+  effort?: CardEffort;
+
   @IsOptional()
   @IsIn(orchestratorPermissionModeSchema.options)
   permissionMode?: OrchestratorPermissionMode;
-
-  /** #337 D8: run although a dependency is not in Completed. */
-  @IsOptional()
-  @IsBoolean()
-  ignoreDependencies?: boolean;
 }
 
 /** `POST /board/cards/:number/dependencies` (#337 D8). */

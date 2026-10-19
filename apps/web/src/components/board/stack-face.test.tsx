@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { type BoardStackView, STACK_GATE_REASON } from '@agentdock/shared';
+import {
+  type BoardColumn,
+  type BoardStackView,
+  STACK_GATE_REASON,
+} from '@agentdock/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { boardView, card } from '../../lib/board/fixtures';
 import { boardItems } from '../../lib/board/plan-tasks';
@@ -19,6 +23,7 @@ const ref = (stage: number) => ({
 });
 
 const stack: BoardStackView = {
+  run: null,
   id: 'stack-3',
   number: 3,
   label: 'S-3',
@@ -61,12 +66,12 @@ const actions = {
   run: async () => true,
 } as unknown as CardActions;
 
-const render = (defaultOpen: boolean) => {
+const render = (defaultOpen: boolean, over: Partial<BoardStackView> = {}) => {
   if (!isStackItem(face)) throw new Error('no stack face');
   return renderToStaticMarkup(
     <StackFace
       projectId="p1"
-      item={face}
+      item={{ ...face, stack: { ...face.stack, ...over } }}
       canOperate
       actions={actions}
       defaultOpen={defaultOpen}
@@ -100,6 +105,37 @@ describe('StackFace (#480)', () => {
     expect(html).toContain(`Run C-2: ${STACK_GATE_REASON}`);
   });
 
+  test('#652: shows the stack run — running, paused — and nothing before a run', () => {
+    expect(render(false)).not.toContain('data-status="paused"');
+    const running = render(false, {
+      run: {
+        state: 'running',
+        pause: null,
+        queued: 1,
+        waiting: 0,
+        running: 2,
+        startedAt: '2026-10-19T12:00:00.000Z',
+      },
+    });
+    expect(running).toContain('2 running');
+    const paused = render(false, {
+      run: {
+        state: 'paused',
+        pause: {
+          code: 'round_failed',
+          message: 'The round of C-2 failed',
+          card: 2,
+          at: '2026-10-19T12:00:00.000Z',
+        },
+        queued: 1,
+        waiting: 0,
+        running: 0,
+        startedAt: '2026-10-19T12:00:00.000Z',
+      },
+    });
+    expect(paused).toContain('Run paused');
+  });
+
   test('a card of a stack wears the stack label on its own face', () => {
     const html = renderToStaticMarkup(
       <CardFace
@@ -119,5 +155,60 @@ describe('StackFace (#480)', () => {
     expect(html.split(TAP).length - 1).toBe(4);
     // Expand / Open stack, and the Run row of each runnable stack card.
     expect(html).toContain(TAP_ROW);
+  });
+});
+
+describe('StackFace Run held by dependencies (#638)', () => {
+  const dep = (number: number, column: BoardColumn) => ({
+    number,
+    label: `C-${number}`,
+    column,
+  });
+  const approved = (stage: number) => ({ ...ref(stage), gate: null });
+
+  const renderWith = (stageTwoDeps: ReturnType<typeof dep>[]) => {
+    const held = [
+      card(1, 'completed', { stack: approved(0) }),
+      card(2, 'todo', { stack: approved(0) }),
+      card(4, 'todo', {
+        stack: approved(1),
+        title: 'Compose the Settings page',
+        dependsOn: stageTwoDeps,
+      }),
+    ];
+    const heldView = {
+      ...boardView(held),
+      stacks: [{ ...stack, design: { ...stack.design, status: 'approved' } }],
+    } as typeof view;
+    const [item] = foldStacks(
+      boardItems(heldView, []).get('todo') ?? [],
+      'todo',
+      heldView,
+      false,
+    );
+    if (!isStackItem(item)) throw new Error('no stack face');
+    return renderToStaticMarkup(
+      <StackFace
+        projectId="p1"
+        item={item}
+        canOperate
+        actions={actions}
+        defaultOpen
+        onOpenCard={() => undefined}
+      />,
+    );
+  };
+
+  test('a later stage whose dependency has no ready PR shows a disabled Run naming it', () => {
+    const html = renderWith([dep(1, 'completed'), dep(2, 'in_progress')]);
+    expect(html).toContain('Run C-4: Waits for C-2');
+    // C-2 has no dependency and stays runnable.
+    expect(html).not.toContain('Run C-2:');
+  });
+
+  test('every dependency Finished or Completed leaves Run enabled', () => {
+    const html = renderWith([dep(1, 'completed'), dep(2, 'finished')]);
+    expect(html).not.toContain('Run C-4:');
+    expect(html).not.toContain('Waits for');
   });
 });

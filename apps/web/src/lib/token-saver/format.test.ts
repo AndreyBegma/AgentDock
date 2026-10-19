@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { ApiError } from '../api';
 import {
+  cacheReadShare,
   describeTokenSaverError,
   filterLabel,
   formatRate,
   formatSavedUsd,
+  inputTokensPerRun,
   mcpChoices,
   passThroughShare,
   profilesReportServers,
@@ -42,10 +44,24 @@ describe('formatRate', () => {
   });
 });
 
+describe('the prompt cache (#648)', () => {
+  const c = { runs: 4, input: 100, cacheRead: 700, cacheWrite: 200 };
+
+  test('the read share is cache reads over all input', () => {
+    expect(cacheReadShare(c)).toBeCloseTo(0.7);
+    expect(cacheReadShare({ input: 0, cacheRead: 0, cacheWrite: 0 })).toBe(0);
+  });
+
+  test('input per run counts cache reads and writes', () => {
+    expect(inputTokensPerRun(c)).toBe(250);
+    expect(inputTokensPerRun({ ...c, runs: 0 })).toBe(0);
+  });
+});
+
 describe('labels', () => {
   test('a filter id, the legacy `none` and the amendment-12 reasons', () => {
     expect(filterLabel('js/jest')).toBe('js/jest');
-    expect(filterLabel('none')).toBe('No filter (uncovered command)');
+    expect(filterLabel('none')).toBe('No filter (runner too old to say why)');
     expect(filterLabel('none:compound')).toBe(
       'Compound command (not filtered)',
     );

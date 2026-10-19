@@ -38,9 +38,53 @@ export const createE2eApp = async (): Promise<E2eContext> => {
   };
 };
 
+/** PostgreSQL's `deadlock_detected`. */
+const DEADLOCK_DETECTED = '40P01';
+
+/** #673: how many times a reset retries after losing a deadlock. */
+export const RESET_ATTEMPTS = 5;
+
+const isDeadlock = (error: unknown): boolean => {
+  if (typeof error !== 'object' || error === null) return false;
+  const { code, meta, message } = error as {
+    code?: unknown;
+    meta?: { code?: unknown };
+    message?: unknown;
+  };
+  // Prisma wraps a raw-query failure as P2010 and carries the SQLSTATE in meta.
+  return (
+    code === DEADLOCK_DETECTED ||
+    meta?.code === DEADLOCK_DETECTED ||
+    (typeof message === 'string' && message.includes(DEADLOCK_DETECTED))
+  );
+};
+
+/**
+ * #673: runs `run`, trying again when PostgreSQL picked it as the deadlock
+ * victim. A previous test's fire-and-forget write can still hold row locks
+ * while the next `beforeEach` truncates; the victim loses nothing (the
+ * statement was rolled back), so a bounded retry is safe. Any other error, and
+ * the last deadlock, is thrown.
+ */
+export const retryOnDeadlock = async <T>(
+  run: () => Promise<T>,
+  attempts = RESET_ATTEMPTS,
+): Promise<T> => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      if (attempt >= attempts || !isDeadlock(error)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
+    }
+  }
+};
+
 export const resetDatabase = (prisma: PrismaService) =>
-  prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE user_sessions, settings, users, login_throttles, audit_folds CASCADE',
+  retryOnDeadlock(() =>
+    prisma.$executeRawUnsafe(
+      'TRUNCATE TABLE user_sessions, settings, users, login_throttles, audit_folds CASCADE',
+    ),
   );
 
 export const createUser = async (

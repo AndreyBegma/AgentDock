@@ -18,6 +18,7 @@ import {
   type DropMove,
   decideDrop,
 } from '../../lib/board/board-state';
+import { runWaitsFor } from '../../lib/board/dependencies';
 import {
   type BoardFilter,
   isFiltering,
@@ -95,8 +96,8 @@ export function BoardColumns({
   canTerminal,
   actions,
   filter,
-  compact,
   olderCompleted,
+  hints,
   onOpen,
   onOpenPlanTask,
   onOpenTerminal,
@@ -112,9 +113,10 @@ export function BoardColumns({
   actions: CardActions;
   /** C-29: what the toolbar hides; a hidden card is still in the column. */
   filter: BoardFilter;
-  compact: boolean;
   /** Set while the server has older Completed cards than the board holds. */
   olderCompleted?: OlderCompleted;
+  /** #660: triage hints waiting on a card, by card number. */
+  hints?: ReadonlyMap<number, number>;
   onOpen: (card: BoardCardView) => void;
   onOpenPlanTask: (task: BoardPlanTaskView) => void;
   onOpenTerminal: (card: BoardCardView) => void;
@@ -387,7 +389,7 @@ export function BoardColumns({
                 projectId={projectId}
                 card={item.card}
                 canOperate={canOperate}
-                compact={compact}
+                hints={hints?.get(item.card.number)}
                 menu={menu}
                 selection={
                   canOperate
@@ -472,16 +474,11 @@ export function BoardColumns({
                   <MenuItem onSelect={() => setMoving(card)}>Move…</MenuItem>
                 ) : null}
                 {canOperate && (canRun(card) || canRetry(card)) ? (
-                  <MenuItem
-                    // #480: the stack's design holds Run; the label says why.
-                    disabled={actions.busy || busy || !!card.stack?.gate}
-                    onSelect={() => actions.run(card)}
-                  >
-                    {canRetry(card) ? 'Run again' : 'Run'}
-                    {card.stack?.gate
-                      ? ` — ${card.stack.gate.toLowerCase()}`
-                      : ''}
-                  </MenuItem>
+                  <RunMenuItem
+                    card={card}
+                    disabled={actions.busy || busy}
+                    onRun={() => void actions.run(card)}
+                  />
                 ) : null}
                 {canOperate && approveRunOffer(card) ? (
                   <MenuItem
@@ -613,5 +610,27 @@ function ColumnSelectAll({
         onChange={() => onToggle(order)}
       />
     </span>
+  );
+}
+
+/**
+ * The card menu's Run. #480: the stack's design holds it; #638: so does a
+ * dependency without a ready pull request. The label says why.
+ */
+function RunMenuItem({
+  card,
+  disabled,
+  onRun,
+}: {
+  card: BoardCardView;
+  disabled: boolean;
+  onRun: () => void;
+}) {
+  const hold = card.stack?.gate ?? runWaitsFor(card.dependsOn);
+  return (
+    <MenuItem disabled={disabled || hold !== null} onSelect={onRun}>
+      {canRetry(card) ? 'Run again' : 'Run'}
+      {hold ? ` — ${hold.charAt(0).toLowerCase()}${hold.slice(1)}` : ''}
+    </MenuItem>
   );
 }

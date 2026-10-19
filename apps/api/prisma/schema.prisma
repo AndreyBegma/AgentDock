@@ -77,6 +77,7 @@ model User {
   designComments              DesignComment[]
   boardCardsCreated           BoardCard[]                   @relation("BoardCardCreatedBy")
   boardStacksCreated          BoardStack[]                  @relation("BoardStackCreatedBy")
+  boardStackRunsStarted       BoardStackRun[]               @relation("BoardStackRunStartedBy")
   boardCardsMoved             BoardCard[]                   @relation("BoardCardMovedBy")
   boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
   boardCardRounds             BoardCardRound[]
@@ -87,6 +88,7 @@ model User {
   attachmentsUploaded         Attachment[]
   tokenSaverSettingsUpdated   TokenSaverSettings[]
   stewardSettingsUpdated      StewardSettings[]
+  aiDigestSettingsUpdated     AiDigestSettings[]
   settings                    UserSettings?
   planCandidatesDecided       PlanCandidate[]               @relation("PlanCandidateDecidedBy")
 
@@ -457,6 +459,9 @@ model Project {
   stewardSettings      StewardSettings?
   stewardIncidents     StewardIncident[]
   stewardDigests       StewardDigest[]
+  aiDigestSettings     AiDigestSettings?
+  aiDigests            AiDigest[]
+  aiSummaries          AiSummary[]
   handoffNotes         HandoffNote[]
   rules                ProjectRule[]
   telegramLinks        TelegramLink[]
@@ -1641,6 +1646,8 @@ enum RunKind {
   /// Steward's local haiku: a stall's classification or the digest prose
   /// (issue #447 D3, D16).
   steward
+  /// The assistant's read-only code question on the runner (issue #622).
+  code_ask
 }
 
 enum RunStatus {
@@ -2932,6 +2939,14 @@ enum CardCiState {
   red
 }
 
+/// Shared `CARD_EFFORTS` (#663, ADR-0068 §5): the Claude CLI's `--effort` of a
+/// card's work rounds.
+enum CardEffort {
+  low
+  medium
+  high
+}
+
 /// A work item AgentDock owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
@@ -2971,6 +2986,12 @@ model BoardCard {
   /// #322 D6: the recommended design model (`opus | sonnet`) and its reason.
   recommendedDesignModel  String?
   recommendedDesignReason String?
+  /// #663: the recommended work effort, from the same `card.assess` answer as
+  /// `recommendedModel`.
+  recommendedEffort       CardEffort?
+  /// #663: the work effort override, stored only when it differs from the
+  /// default (the #322 D3 rule); `null` follows the default.
+  effort                  CardEffort?
   /// #322 D6: the hash of the assessed input; an answer applies only while
   /// the card still hashes to it (ADR-0027 D4).
   assessmentHash          String?
@@ -3061,6 +3082,8 @@ model BoardCard {
   /// #443: the accepted dependency whose acceptance tried the failed auto-run;
   /// `null` when the failure came from approving the design (#273).
   autoRunAfter            Int?
+  /// #652: the stack whose Run stack tried the failed start; `null` otherwise.
+  autoRunStack            Int?
   /// #443: Auto-run when ready — accepting the last open dependency starts
   /// the Run. Off by default; it turns itself off when it fires, so it starts
   /// the card at most once.
@@ -3086,10 +3109,20 @@ model BoardCard {
   planId                  String?
   /// #480 (ADR-0044): the stage of the stack the card belongs to; at most one.
   stageId                 String?
+  /// #636 (ADR-0064): the branch the card's PR targets and its worktree was
+  /// cut from, when it is not the project base — the branch of the one
+  /// unmerged dependency it is stacked on. `null` is the project base.
+  prBase                  String?
+  /// #636: the dependency `prBase` belongs to; both are cleared once that
+  /// dependency merges and the card's PR is retargeted onto the base.
+  prBaseCardId            String?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
   project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  prBaseCard         BoardCard?             @relation("BoardCardPrBase", fields: [prBaseCardId], references: [id], onDelete: SetNull)
+  /// #636: the cards stacked on this one's branch.
+  stackedOn          BoardCard[]            @relation("BoardCardPrBase")
   plan               Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
   stage              BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
   trackedSession     AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
@@ -3114,6 +3147,12 @@ model BoardCard {
   pullRequests       BoardCardPullRequest[]
   /// #592: the intake candidate accepted as this card.
   candidate          PlanCandidate?
+  /// #660: the triage hints written when the card was made.
+  triage             BoardCardTriage?
+  /// #652: the card's place in its stack's run queue.
+  stackRunEntry      BoardStackRunCard?
+  /// #652: the stack runs this card paused.
+  stackRunsPaused    BoardStackRun[]        @relation("BoardStackRunPausedCard")
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3122,7 +3161,50 @@ model BoardCard {
   @@index([projectId, fingerprint])
   @@index([planId])
   @@index([stageId])
+  @@index([prBaseCardId])
   @@map("board_cards")
+}
+
+/// #660: where a card's triage is. `hidden` is a triage the gateway refused
+/// for the cap, the provider or the model: nothing is shown.
+enum BoardCardTriageState {
+  pending
+  ready
+  failed
+  hidden
+}
+
+/// #660: the triage hints of a card made by the intake or the assistant —
+/// possible duplicates, a kind and a priority. Advice only: nothing here
+/// changes the card until the person applies a hint. A hint dismissed or
+/// applied is stamped and never shown again.
+model BoardCardTriage {
+  cardId                String               @id
+  state                 BoardCardTriageState @default(pending)
+  /// Who the triage call was made for; null once the user is deleted.
+  userId                String?
+  /// The provider of the call, to hide the hints while its cap is reached.
+  provider              LlmProvider?
+  /// `[{cardId, reason}]`: open cards of the project the model judged the same work.
+  duplicates            Json?
+  suggestedKind         BoardCardKind?
+  kindReason            String?
+  /// Shared `TRIAGE_PRIORITIES` without `normal`: `high` or `low`.
+  suggestedPriority     String?
+  priorityReason        String?
+  duplicatesDismissedAt DateTime?
+  kindDismissedAt       DateTime?
+  kindAppliedAt         DateTime?
+  priorityDismissedAt   DateTime?
+  priorityAppliedAt     DateTime?
+  /// The `llm_calls` row of the triage call.
+  llmCallId             String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  card BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@map("board_card_triage")
 }
 
 /// #337 D8: `cardId` runs after `dependsOnId`. Both cards are of one project
@@ -3168,9 +3250,74 @@ model BoardStack {
   stages      BoardStackStage[]
   design      TaskDesign?
   designTurns PlanTurn[]
+  /// #652: Run stack's queue and its state.
+  run         BoardStackRun?
 
   @@unique([projectId, number])
   @@map("board_stacks")
+}
+
+/// #652: what Run stack does to a stack — `running` starts its queued cards
+/// as they become ready, `paused` waits for a person after a refused start or
+/// a failed round, `stopped` had its queue removed, `done` started them all.
+enum BoardStackRunState {
+  running
+  paused
+  stopped
+  done
+}
+
+/// #652: a stack's run. One per stack; pressing Run stack again resumes it.
+model BoardStackRun {
+  id            String             @id @default(cuid())
+  stackId       String             @unique
+  state         BoardStackRunState
+  /// The person who pressed Run stack: the queued cards start as them.
+  startedById   String?
+  /// Their project role then (`operator` or `admin`).
+  startedByRole String
+  /// Why it paused — a `BoardErrorCode`, `round_failed` or `unknown`; `null` unless paused.
+  pausedCode    String?
+  /// At most 500 characters.
+  pausedMessage String?
+  pausedCardId  String?
+  pausedAt      DateTime?
+  startedAt     DateTime
+  updatedAt     DateTime           @updatedAt
+
+  stack      BoardStack          @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  startedBy  User?               @relation("BoardStackRunStartedBy", fields: [startedById], references: [id], onDelete: SetNull)
+  pausedCard BoardCard?          @relation("BoardStackRunPausedCard", fields: [pausedCardId], references: [id], onDelete: SetNull)
+  cards      BoardStackRunCard[]
+
+  @@index([pausedCardId])
+  @@map("board_stack_runs")
+}
+
+/// #652: a card's place in a stack run — `queued` and ready to start,
+/// `waiting` for a dependency, or `started` by the run (`roundId`).
+enum BoardStackRunCardStatus {
+  queued
+  waiting
+  started
+}
+
+/// #652: one card of a stack run's queue. A card is in one stack, so in one run.
+model BoardStackRunCard {
+  id        String                  @id @default(cuid())
+  runId     String
+  cardId    String                  @unique
+  status    BoardStackRunCardStatus @default(queued)
+  /// The round the run started; `null` until it starts one.
+  roundId   String?
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  run  BoardStackRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  card BoardCard     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("board_stack_run_cards")
 }
 
 /// #480: one stage of a stack. Its cards may run in parallel; they wait on
@@ -3613,8 +3760,11 @@ model TokenSaverStat {
   /// Null for the orchestrator and manual sessions, or a run the API does not know.
   runId         String?
   runKind       TokenSaverRunKind
-  /// `<family>/<command>`, e.g. `js/jest`; `none` when no filter matched.
+  /// `<family>/<command>`, e.g. `js/jest`; `none` or a `none:*` reason when no filter matched.
   filter        String
+  /// #648: the program the command ran (`git log`), never its arguments;
+  /// null on rows of older runners and on reads.
+  program       String?
   rawBytes      Int
   keptBytes     Int
   /// `AGENTDOCK_RAW=1`: the command ran unfiltered.
@@ -3824,6 +3974,7 @@ enum LlmFeature {
   search
   triage
   title
+  assistant_summary
 }
 
 enum LlmCallOutcome {
@@ -3912,11 +4063,16 @@ model AssistantConversation {
   /// The model picked for the conversation; null is the instance default.
   provider  LlmProvider?
   model     String?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  /// English digest of the messages older than the verbatim window; null until
+  /// the conversation outgrows it (ADR-0068 §10).
+  summary     String?
+  /// The id of the newest message the summary covers.
+  summaryUpTo String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project     Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project     Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
   messages      AssistantMessage[]
   attachments   AssistantAttachment[]
   telegramLinks TelegramLink[]
@@ -3978,4 +4134,91 @@ model AssistantAttachment {
   @@index([conversationId, createdAt])
   @@index([messageId])
   @@map("assistant_attachments")
+}
+
+// ─── AI digest and summaries (#658) ─────────────────────────────────────────
+
+/// A project's daily AI digest setting. A missing row means `AI_DIGEST_DEFAULTS`:
+/// off, 09:00 UTC.
+model AiDigestSettings {
+  projectId   String   @id
+  enabled     Boolean  @default(false)
+  /// `HH:MM` in `timezone`.
+  time        String   @default("09:00")
+  /// IANA zone the time is read in — the project's.
+  timezone    String   @default("UTC")
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("ai_digest_settings")
+}
+
+/// Mirrors `AI_DIGEST_STATUSES`. `pending` claims the occurrence while it is
+/// made, so two instances ticking together make one digest.
+enum AiDigestStatus {
+  pending
+  sent
+  skipped
+}
+
+/// One daily occurrence of a project's AI digest: the digest made, or why it
+/// was skipped. `(projectId, dueAt)` makes a repeated tick a no-op.
+model AiDigest {
+  id         String         @id @default(cuid())
+  projectId  String
+  /// The occurrence: the configured time on its day, in UTC.
+  dueAt      DateTime
+  status     AiDigestStatus
+  /// The period covered.
+  from       DateTime
+  to         DateTime
+  /// `{ done, stuck, waiting }` of `AiDigestView`; null when skipped.
+  content    Json?
+  /// The model's overview, in English; null when skipped.
+  overview   String?
+  provider   LlmProvider?
+  model      String?
+  /// An `LlmErrorCode`, or `no_model`, when skipped.
+  skipReason String?
+  createdAt  DateTime       @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, dueAt])
+  @@index([projectId, createdAt])
+  @@map("ai_digests")
+}
+
+/// Mirrors `AI_SUMMARY_SUBJECTS`.
+enum AiSummarySubject {
+  card
+  session
+}
+
+/// The cached summary of a card (with its PR) or a session, one per reader
+/// language. `sourceHash` fingerprints what it was made from: a summary whose
+/// source changed is made again, an unchanged one is served without a call.
+model AiSummary {
+  id          String           @id @default(cuid())
+  projectId   String
+  subject     AiSummarySubject
+  /// `board_cards.id` or `sessions.id`; no foreign key, like incidents.
+  subjectId   String
+  /// BCP 47 primary language the text is written in, e.g. `en`, `ru`.
+  language    String
+  sourceHash  String
+  text        String
+  provider    LlmProvider
+  model       String
+  costUsd     Decimal          @db.Decimal(14, 6)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([subject, subjectId, language])
+  @@map("ai_summaries")
 }

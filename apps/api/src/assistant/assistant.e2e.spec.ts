@@ -10,6 +10,8 @@ import { ControlService } from '../control/control.service';
 import { LLM_SECRETS_KEY_ENV } from '../llm/llm-secrets';
 import { requestOf } from '../llm/providers/testing';
 import { createLlmE2eApp, type LlmE2eContext } from '../llm/testing/llm-e2e';
+import { RunnerCommandService } from '../runners/runner-command.service';
+import { RunnerPresence } from '../runners/runner-presence';
 import {
   createUser,
   login,
@@ -193,7 +195,12 @@ describe('Assistant (e2e)', () => {
     ctx.providerFetch.mockImplementation(async (input, init) => {
       const { body } = await requestOf(input, init);
       const model = String(body?.model);
-      const system = String(body?.system ?? '');
+      // A cached prompt goes as text blocks (the stable part, then the tail).
+      const system = Array.isArray(body?.system)
+        ? (body.system as { text: string }[]).map((b) => b.text).join('\n\n')
+        : String(body?.system ?? '');
+      // #660: a queued card's triage runs beside the chat; it gets no hints.
+      if (system.startsWith('You triage')) return answer([{ text: ['{}'] }]);
       calls.push({ model, system, body: body ?? {} });
       if (model === HAIKU) {
         return answer([{ text: ['Queue ', 'blockers'] }], {
@@ -364,6 +371,69 @@ describe('Assistant (e2e)', () => {
     expect(
       (await alice.get(`/assistant/conversations/${conversation.id}`)).body,
     ).toMatchObject({ title: 'Queue blockers', projectId: projects.dock });
+  });
+
+  it('caches the stable prompt and tools, and sends 20 messages plus a stored summary (ADR-0068 §10)', async () => {
+    const conversation = await open(alice, { projectId: projects.dock });
+    // 60 earlier messages, 30 exchanges.
+    const base = Date.parse('2026-10-01T00:00:00Z');
+    await ctx.prisma.assistantMessage.createMany({
+      data: Array.from({ length: 60 }, (_, i) => ({
+        id: `m${String(i).padStart(2, '0')}`,
+        conversationId: conversation.id,
+        role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
+        content: `message ${i}`,
+        displayContent: `message ${i}`,
+        language: 'en',
+        createdAt: new Date(base + i * 1_000),
+      })),
+    });
+    script.push(
+      answer([{ text: english('Done.', 'And now?') }]),
+      answer([{ text: english('Again.', 'Once more?') }]),
+    );
+
+    await say(conversation.id, 'And now?');
+    const chat = calls.find((c) => c.model === OPUS);
+    if (!chat) throw new Error('the chat model was not called');
+    const sent = chat.body.messages as { content: unknown }[];
+    // The newest 20 of the 60, then the new message.
+    expect(sent).toHaveLength(21);
+    expect(JSON.stringify(sent[0])).toContain('message 40');
+    expect(chat.system).not.toContain('Earlier in this conversation');
+    // The stable part and the last tool carry a cache breakpoint; the tail
+    // (date, person, project) does not.
+    const blocks = chat.body.system as {
+      text: string;
+      cache_control?: object;
+    }[];
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(blocks[1].cache_control).toBeUndefined();
+    const tools = chat.body.tools as { cache_control?: object }[];
+    expect(tools.at(-1)?.cache_control).toEqual({ type: 'ephemeral' });
+    expect(tools.slice(0, -1).some((t) => t.cache_control)).toBe(false);
+
+    // The messages that slid out were folded into the stored summary by the
+    // cheapest model, tagged as its own feature.
+    const stored = await ctx.prisma.assistantConversation.findUniqueOrThrow({
+      where: { id: conversation.id },
+    });
+    expect(stored.summary).toBe('Queue blockers');
+    expect(stored.summaryUpTo).not.toBeNull();
+    const ledger = await ctx.prisma.llmCall.findMany({
+      orderBy: { ts: 'asc' },
+    });
+    expect(ledger.map((c) => c.feature)).toEqual(
+      expect.arrayContaining(['assistant', 'assistant_summary']),
+    );
+
+    // The next turn sends the summary, and no new summary is made until the
+    // window slides again... it slides each turn, so one more is made.
+    await say(conversation.id, 'Once more?');
+    const next = calls.filter((c) => c.model === OPUS).at(-1);
+    expect(next?.system).toContain('Earlier in this conversation');
+    expect(next?.system).toContain('Queue blockers');
   });
 
   it('ends with a typed error once the provider cap is reached, and stores nothing', async () => {
@@ -723,6 +793,211 @@ describe('Assistant (e2e)', () => {
     );
     expect(toolResults(calls[1])[0]).toContain('needs the operator role');
     expect(await ctx.prisma.actionRequest.count()).toBe(0);
+  });
+
+  describe('code tools (#622)', () => {
+    const toolNames = (call: ProviderCall) =>
+      ((call.body.tools ?? []) as { name: string }[]).map((t) => t.name);
+
+    it('with the runner offline, returns a typed error and the assistant says so', async () => {
+      const send = jest.spyOn(ctx.app.get(RunnerCommandService), 'send');
+      const conversation = await open(alice, { projectId: projects.dock });
+      script.push(
+        answer([
+          {
+            tool: {
+              id: 'toolu_1',
+              name: 'search_code',
+              input: { query: 'computeInvoice' },
+            },
+          },
+        ]),
+        answer([
+          {
+            text: english(
+              "I can't read the code: the project's runner is offline.",
+              'Where is computeInvoice implemented?',
+            ),
+          },
+        ]),
+      );
+      const events = await say(
+        conversation.id,
+        'Where is computeInvoice implemented?',
+      );
+      expect(toolNames(calls[0])).toEqual(
+        expect.arrayContaining(['search_code', 'read_file', 'ask_code_agent']),
+      );
+      expect(calls[0].system).toContain('runner_offline');
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: 'tool',
+          status: 'done',
+          name: 'search_code',
+          ok: false,
+        }),
+      );
+      const [result] = toolResults(calls[1]);
+      expect(result).toContain('runner_offline');
+      expect(result).toContain('offline');
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it("with the runner online, reads the code through the project's runner and cites its files", async () => {
+      const presence = ctx.app.get(RunnerPresence);
+      jest.spyOn(presence, 'isConnected').mockReturnValue(true);
+      jest.spyOn(presence, 'commandSupport').mockReturnValue('supported');
+      const send = jest
+        .spyOn(ctx.app.get(RunnerCommandService), 'send')
+        .mockImplementation(async (_runner, name) => {
+          if (name === 'repo.search') {
+            return {
+              status: 'ok',
+              rttMs: 3,
+              output: {
+                matches: [
+                  {
+                    path: 'src/billing/invoice.ts',
+                    line: 12,
+                    text: 'export function computeInvoice(total: number) {',
+                  },
+                ],
+                truncated: false,
+                withheld: 0,
+              },
+            } as never;
+          }
+          return {
+            status: 'ok',
+            rttMs: 3,
+            output: {
+              path: 'src/billing/invoice.ts',
+              content: 'export function computeInvoice(total: number) {\n',
+              startLine: 12,
+              endLine: 12,
+              totalLines: 40,
+              truncated: false,
+            },
+          } as never;
+        });
+      const conversation = await open(alice, { projectId: projects.dock });
+      script.push(
+        answer([
+          {
+            tool: {
+              id: 'toolu_1',
+              name: 'search_code',
+              input: { query: 'computeInvoice' },
+            },
+          },
+        ]),
+        answer([
+          {
+            tool: {
+              id: 'toolu_2',
+              name: 'read_file',
+              input: { path: 'src/billing/invoice.ts', startLine: 12 },
+            },
+          },
+        ]),
+        answer([
+          {
+            text: english(
+              'It is in `src/billing/invoice.ts:12`.',
+              'Where is computeInvoice implemented?',
+            ),
+          },
+        ]),
+      );
+      const events = await say(
+        conversation.id,
+        'Where is computeInvoice implemented?',
+      );
+      expect(send.mock.calls.map((c) => [c[0], c[1], c[2]])).toEqual([
+        [
+          runnerId,
+          'repo.search',
+          {
+            projectId: projects.dock,
+            root: '/srv/dev/AgentDock',
+            query: 'computeInvoice',
+          },
+        ],
+        [
+          runnerId,
+          'repo.read',
+          {
+            projectId: projects.dock,
+            root: '/srv/dev/AgentDock',
+            path: 'src/billing/invoice.ts',
+            startLine: 12,
+          },
+        ],
+      ]);
+      expect(toolResults(calls[1])[0]).toContain('src/billing/invoice.ts');
+      expect(toolResults(calls[2])[1]).toContain('computeInvoice(total');
+      const done = events.at(-1);
+      expect(done).toMatchObject({ type: 'done' });
+      const [, reply] = await messagesOf(conversation.id);
+      expect(reply.displayContent).toContain('src/billing/invoice.ts:12');
+      expect(reply.tools.map((t) => [t.name, t.ok])).toEqual([
+        ['search_code', true],
+        ['read_file', true],
+      ]);
+    });
+
+    it('delegates to the code agent as a code_ask run of the project', async () => {
+      const presence = ctx.app.get(RunnerPresence);
+      jest.spyOn(presence, 'isConnected').mockReturnValue(true);
+      jest.spyOn(presence, 'commandSupport').mockReturnValue('supported');
+      const profile = await ctx.prisma.runtimeProfile.create({
+        data: {
+          runnerId,
+          key: 'claude-work',
+          label: 'Claude',
+          runtime: 'claude',
+          env: {},
+          args: [],
+          authenticated: true,
+        },
+      });
+      await ctx.prisma.project.update({
+        where: { id: projects.dock },
+        data: { defaultProfileId: profile.id },
+      });
+      jest.spyOn(ctx.app.get(RunnerCommandService), 'send').mockResolvedValue({
+        status: 'ok',
+        rttMs: 9,
+        output: {
+          answer: 'Invoices are computed in `src/billing/invoice.ts:12`.',
+          truncated: false,
+        },
+      } as never);
+      const conversation = await open(alice, { projectId: projects.dock });
+      script.push(
+        answer([
+          {
+            tool: {
+              id: 'toolu_1',
+              name: 'ask_code_agent',
+              input: { question: 'Where are invoices computed?' },
+            },
+          },
+        ]),
+        answer([{ text: english('See `src/billing/invoice.ts:12`.', 'Q') }]),
+      );
+      await say(conversation.id, 'Where are invoices computed?');
+      expect(toolResults(calls[1])[0]).toContain('src/billing/invoice.ts:12');
+      const run = await ctx.prisma.run.findFirstOrThrow({
+        where: { kind: 'code_ask' },
+      });
+      expect(run).toMatchObject({
+        projectId: projects.dock,
+        status: 'succeeded',
+        triggeredByType: 'user',
+        triggeredById: aliceId,
+      });
+    });
   });
 
   describe('attachments', () => {

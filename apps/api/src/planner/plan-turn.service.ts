@@ -522,7 +522,7 @@ export class PlanTurnService {
           select: { body: true, projectId: true },
         }),
         this.store.currentTasks(this.prisma, plan),
-        this.session(plan, spec.task),
+        this.session(plan, spec.task, spec.design),
         designPromptParts(this.prisma, plan, project, spec, contractVersion),
         // #337 D10: an older runner gets the turn without the files.
         intake && runnerTakesPlanAttachments(project.runnerVersion)
@@ -647,7 +647,11 @@ export class PlanTurnService {
           caller,
         );
       }
-      if (spec.task && spec.task.sessionId === null) {
+      if (
+        spec.task &&
+        spec.task.sessionId === null &&
+        spec.design?.mode !== 'revise'
+      ) {
         await tx.planTask.update({
           where: { id: spec.task.id },
           data: { sessionId: session.id },
@@ -763,7 +767,13 @@ export class PlanTurnService {
   private async session(
     plan: Plan,
     task: PlanTask | null,
+    design?: DesignTurnPlan,
   ): Promise<PlanTurnSession> {
+    // #628: a design revise runs in a session of its own — its prompt
+    // carries the previous revision, so it need not resume the task's.
+    if (task && design?.mode === 'revise') {
+      return { id: randomUUID(), resume: false };
+    }
     if (!task) {
       const started = await this.prisma.planTurn.count({
         where: { planId: plan.id, taskId: null, ...sessionStarted },

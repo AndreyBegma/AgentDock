@@ -42,6 +42,7 @@ import { boardError, cardNotFound } from './board-error';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardSessionMessages } from './board-session-message.service';
+import { BoardStackRuns } from './board-stack-runs';
 import { BoardStacks } from './board-stacks';
 import type { BoardActor } from './board-work';
 import {
@@ -98,6 +99,7 @@ export class BoardController {
     private readonly bulk: BoardBulk,
     private readonly messages: BoardSessionMessages,
     private readonly stacks: BoardStacks,
+    private readonly stackRuns: BoardStackRuns,
   ) {}
 
   // ─── Stacks (#480, ADR-0044) ───────────────────────────────────────────────
@@ -134,6 +136,40 @@ export class BoardController {
       access.projectId,
       stackNumber(number),
       dto,
+      actorOf(access, user, ctx),
+    );
+  }
+
+  /** #652: queues the stack's To Do cards and starts what is ready. */
+  @Post('board/stacks/:number/run')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  runStack(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<BoardStackDetail> {
+    return this.stackRuns.start(
+      access.projectId,
+      stackNumber(number),
+      actorOf(access, user, ctx),
+    );
+  }
+
+  /** #652: removes the stack run's queue; running cards keep running. */
+  @Post('board/stacks/:number/stop')
+  @HttpCode(200)
+  @ProjectRole('operator')
+  stopStack(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<BoardStackDetail> {
+    return this.stackRuns.stop(
+      access.projectId,
+      stackNumber(number),
       actorOf(access, user, ctx),
     );
   }

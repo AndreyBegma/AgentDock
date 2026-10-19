@@ -123,7 +123,7 @@ export class CardDesignTurnService {
           where: { projectId: card.projectId },
           select: { model: true },
         }),
-        this.session(card),
+        this.session(card, batch),
         // #480: the stack's approved design, as reference.
         loadStackReference(this.prisma, card.id),
       ]);
@@ -347,9 +347,16 @@ export class CardDesignTurnService {
     }
   }
 
-  /** `--session-id` until the card's design session exists, then `--resume`. */
-  private async session(card: BoardCard): Promise<PlanTurnSession> {
-    if (card.designSessionId === null) {
+  /**
+   * `--session-id` until the card's design session exists, then `--resume`.
+   * #628: a revise runs in a session of its own — its prompt carries the
+   * previous revision, so it need not resume every turn the design has had.
+   */
+  private async session(
+    card: BoardCard,
+    batch: DesignTurnPlan,
+  ): Promise<PlanTurnSession> {
+    if (card.designSessionId === null || batch.mode === 'revise') {
       return { id: randomUUID(), resume: false };
     }
     const started = await this.prisma.planTurn.count({

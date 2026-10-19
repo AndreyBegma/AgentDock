@@ -10,8 +10,11 @@ describe('createExec timeout', () => {
   });
 
   it('honours a longer per-call timeout over the default', async () => {
-    const exec = createExec(env, 100);
-    const result = await exec('sleep', ['0.4'], { timeoutMs: 5_000 });
+    // The default is far below the child's runtime, and the per-call limit far
+    // above it, so only the per-call value deciding can let the child finish —
+    // a loaded host stretches neither margin into the other.
+    const exec = createExec(env, 20);
+    const result = await exec('sleep', ['0.5'], { timeoutMs: 60_000 });
     expect(result).toEqual({ code: 0, stdout: '', stderr: '' });
   });
 

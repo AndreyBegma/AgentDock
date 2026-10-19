@@ -45,6 +45,7 @@ const ref = (stage: number) => ({
 });
 
 const stack = (over: Partial<BoardStackView> = {}): BoardStackView => ({
+  run: null,
   id: 'stack-3',
   number: 3,
   label: 'S-3',

@@ -7,11 +7,14 @@ import {
   type CardCommandName,
   type CardPrCloseArgs,
   type CardPrCloseResult,
+  type CardPrRetargetArgs,
+  type CardPrRetargetResult,
   type CommandErrorCode,
   cardChecksResultSchema,
   cardCiRetriggerResultSchema,
   cardCommands,
   cardPrCloseResultSchema,
+  cardPrRetargetResultSchema,
   type DocsPublishSpecsArgs,
   type DocsPublishSpecsResult,
   docsPublishSpecsResultSchema,
@@ -72,6 +75,7 @@ export class BoardCommands {
       | 'card.checks'
       | 'card.ciRetrigger'
       | 'card.prClose'
+      | 'card.prRetarget'
       | 'issue.create'
       | 'plan.close'
       | 'pr.inspect'
@@ -99,6 +103,11 @@ export class BoardCommands {
         `The runner does not serve ${name}; update it`,
       );
     }
+  }
+
+  /** #652: whether the runner is connected now — a stack run waits for it. */
+  isConnected(runnerId: string): boolean {
+    return this.presence.isConnected(runnerId);
   }
 
   /** Whether `name` can be sent to `runnerId` now — `assertReady` without the throw. */
@@ -208,6 +217,37 @@ export class BoardCommands {
     );
     if (result.status !== 'ok') return result;
     const output = cardCiRetriggerResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
+  }
+
+  /** #636: whether the connected runner advertises `card.prRetarget`. */
+  servesPrRetarget(runnerId: string): boolean {
+    if (!this.presence.isConnected(runnerId)) return false;
+    return (
+      this.presence.commandSupport(runnerId, 'card.prRetarget') === 'supported'
+    );
+  }
+
+  /** #636: moves a stacked card PR onto the project base. */
+  async retargetPr(
+    runnerId: string,
+    args: CardPrRetargetArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardPrRetargetResult>> {
+    this.assertReady(runnerId, 'card.prRetarget');
+    const result = await this.commands.send(
+      runnerId,
+      'card.prRetarget',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = cardPrRetargetResultSchema.safeParse(result.output);
     return output.success
       ? { status: 'ok', output: output.data }
       : {

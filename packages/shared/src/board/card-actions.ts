@@ -58,6 +58,17 @@ export const isWorktreeGoneError = (error: string | null): boolean =>
   /not found on the runner.*has no worktree/.test(error ?? '');
 
 /**
+ * #630: the runner's refusal to push a card branch whose remote holds commits
+ * the card's branch never had — somebody else's work, which a person merges.
+ */
+export const divergedBranchMessage = (branch: string, remote: string): string =>
+  `origin/${branch} (${remote}) has commits the card's branch never had, so nothing was pushed: merge them into the branch, then create the pull request again`;
+
+/** #630: whether a failed collect is `divergedBranchMessage`. */
+export const isDivergedBranchError = (error: string | null): boolean =>
+  /has commits the card's branch never had/.test(error ?? '');
+
+/**
  * #395: Create pull request can be pressed — not while a collect is under
  * way, nor once the worktree is gone.
  */

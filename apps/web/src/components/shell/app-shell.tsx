@@ -18,7 +18,9 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
+import { Separator } from '@andrewbehma/glass-ui/separator';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
 import { ArrowLeft, LogOut, Search, User } from 'lucide-react';
 import Link from 'next/link';
@@ -33,6 +35,7 @@ import {
 import { api, describeError } from '../../lib/api';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { Assistant } from '../assistant/assistant';
+import { AskBoardDialog } from '../board-ai/ask-board-dialog';
 import { Capsule } from './capsule';
 import { crumbsFor, pageTitleOf } from './crumbs';
 import { useKeyboardOpen } from './keyboard';
@@ -52,7 +55,7 @@ import {
   visibleNav,
 } from './nav';
 import { NotificationBell } from './notification-bell';
-import { paletteGroups } from './palette';
+import { ASK_PREFIX, paletteGroups } from './palette';
 import { Rail } from './rail';
 import { useRailCollapsed, useRailToggleShortcut } from './rail-collapse';
 import {
@@ -97,12 +100,14 @@ function ConnectionDot({ status, paused }: ReturnType<typeof useLivePaused>) {
   const label = liveDotLabel(status, paused);
   const tone = status === 'connected' ? 'ok' : 'warn';
   return (
-    <span className="inline-flex items-center gap-2" title={label}>
-      <Badge dot tone={tone} aria-hidden="true" />
-      <span className="sr-only" role="status">
-        {label}
+    <Tooltip content={label}>
+      <span className="inline-flex size-4 shrink-0 items-center justify-center">
+        <Badge dot tone={tone} className="size-2" aria-hidden="true" />
+        <span className="sr-only" role="status">
+          {label}
+        </span>
       </span>
-    </span>
+    </Tooltip>
   );
 }
 
@@ -120,6 +125,8 @@ export function AppShell({
   const keyboard = useKeyboardOpen();
   const [theme, setTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // #660: the question asked from the palette; null while none is open.
+  const [asking, setAsking] = useState<string | null>(null);
   const projectId = projectIdOf(pathname);
   const projects = useProjects();
   const recent = useRecent(paletteOpen, projectId);
@@ -201,7 +208,9 @@ export function AppShell({
   const onSelect = (item: { id: string }) => {
     setPaletteOpen(false);
     if (item.id.startsWith('go:')) router.push(item.id.slice(3));
-    else if (item.id === 'action:theme') cycleTheme();
+    else if (item.id.startsWith(ASK_PREFIX)) {
+      setAsking(item.id.slice(ASK_PREFIX.length));
+    } else if (item.id === 'action:theme') cycleTheme();
     else if (item.id === 'action:logout') void logout();
   };
 
@@ -237,90 +246,110 @@ export function AppShell({
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
             <header
-              className={`glass rounded-surface flex h-14 shrink-0 items-center ${narrow ? 'gap-0.5 px-2' : 'gap-3 px-4'}`}
+              // #654: one row of `--size-control` controls on a shared centre
+              // line — the trail and its live dot left, one group right.
+              className={`glass rounded-surface flex h-14 shrink-0 items-center ${narrow ? 'gap-1 px-2' : 'gap-3 pr-3 pl-4'}`}
             >
-              {narrow ? (
-                // A phone has no room for the trail: the page, and a way up.
-                <div className="flex min-w-0 flex-1 items-center gap-1">
-                  {parent?.href ? (
-                    <Link
-                      href={parent.href}
-                      aria-label={`Back to ${parent.label}`}
-                      className="flex size-8 shrink-0 items-center justify-center rounded-control text-ink-2 hover:bg-hover hover:text-ink"
-                    >
-                      <ArrowLeft size={16} aria-hidden="true" />
-                    </Link>
-                  ) : null}
-                  <span className="truncate text-section text-ink">
-                    {crumbs.at(-1)?.label}
-                  </span>
-                </div>
-              ) : (
-                <Breadcrumb
-                  items={crumbs}
-                  aria-label="Breadcrumb"
-                  overflowLabel="Show the path"
-                  className="min-w-0 flex-1"
-                  link={({ href, className, children: content, ...rest }) => (
-                    <Link href={href} className={className} {...rest}>
-                      {content}
-                    </Link>
-                  )}
-                />
-              )}
-              <span className={narrow ? 'px-1.5' : undefined}>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {narrow ? (
+                  // A phone has no room for the trail: the page, and a way up.
+                  <>
+                    {parent?.href ? (
+                      <Link
+                        href={parent.href}
+                        aria-label={`Back to ${parent.label}`}
+                        className="flex size-(--size-control) shrink-0 items-center justify-center rounded-control text-ink-2 hover:bg-hover hover:text-ink"
+                      >
+                        <ArrowLeft size={16} aria-hidden="true" />
+                      </Link>
+                    ) : null}
+                    <span className="truncate text-section text-ink">
+                      {crumbs.at(-1)?.label}
+                    </span>
+                  </>
+                ) : (
+                  <Breadcrumb
+                    items={crumbs}
+                    aria-label="Breadcrumb"
+                    overflowLabel="Show the path"
+                    // The page itself is set in the section style (S-4 mockup).
+                    className="min-w-0 [&_[aria-current=page]]:text-section [&_[aria-current=page]]:font-semibold"
+                    link={({ href, className, children: content, ...rest }) => (
+                      <Link href={href} className={className} {...rest}>
+                        {content}
+                      </Link>
+                    )}
+                  />
+                )}
                 <ConnectionDot {...live} />
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                icon={narrow}
-                onClick={() => setPaletteOpen(true)}
-                aria-label="Open command palette"
-              >
-                <Search size={14} aria-hidden="true" />
-                {narrow ? null : <KeyHint keys="mod+k" />}
-              </Button>
-              <NotificationBell />
-              <MenuRoot>
-                <MenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="rounded-full"
-                    aria-label="Account menu"
-                  >
-                    <Avatar size="sm" name={displayName} />
-                  </button>
-                </MenuTrigger>
-                <MenuContent align="end">
-                  <MenuLabel>
-                    {displayName} · {user.role}
-                  </MenuLabel>
-                  <MenuItem onSelect={() => router.push('/account')}>
-                    <User size={16} aria-hidden="true" />
-                    Account
-                  </MenuItem>
-                  <MenuSeparator />
-                  <MenuLabel>Theme</MenuLabel>
-                  <MenuRadioGroup
-                    value={theme}
-                    onValueChange={(value) => {
-                      if (isThemeMode(value)) setTheme(value);
-                    }}
-                  >
-                    {THEME_MODES.map((mode) => (
-                      <MenuRadioItem key={mode} value={mode}>
-                        {THEME_LABEL[mode]}
-                      </MenuRadioItem>
-                    ))}
-                  </MenuRadioGroup>
-                  <MenuSeparator />
-                  <MenuItem tone="danger" onSelect={() => void logout()}>
-                    <LogOut size={16} aria-hidden="true" />
-                    Log out
-                  </MenuItem>
-                </MenuContent>
-              </MenuRoot>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  variant={narrow ? 'ghost' : 'glass'}
+                  size="md"
+                  icon={narrow}
+                  onClick={() => setPaletteOpen(true)}
+                  aria-label="Open command palette"
+                  className={
+                    narrow ? undefined : 'mr-1 w-56 justify-start gap-2 px-2'
+                  }
+                >
+                  <Search size={14} aria-hidden="true" />
+                  {narrow ? null : (
+                    <>
+                      <span className="flex-1 text-left font-normal text-ink-3">
+                        Search…
+                      </span>
+                      <KeyHint keys="mod+k" />
+                    </>
+                  )}
+                </Button>
+                <NotificationBell />
+                <Separator orientation="vertical" className="mx-1 h-4" />
+                <MenuRoot>
+                  <MenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="rounded-full"
+                      aria-label="Account menu"
+                    >
+                      <Avatar
+                        size="sm"
+                        name={displayName}
+                        className="size-(--size-control)"
+                      />
+                    </button>
+                  </MenuTrigger>
+                  <MenuContent align="end">
+                    <MenuLabel>
+                      {displayName} · {user.role}
+                    </MenuLabel>
+                    <MenuItem onSelect={() => router.push('/account')}>
+                      <User size={16} aria-hidden="true" />
+                      Account
+                    </MenuItem>
+                    <MenuSeparator />
+                    <MenuLabel>Theme</MenuLabel>
+                    <MenuRadioGroup
+                      value={theme}
+                      onValueChange={(value) => {
+                        if (isThemeMode(value)) setTheme(value);
+                      }}
+                    >
+                      {THEME_MODES.map((mode) => (
+                        <MenuRadioItem key={mode} value={mode}>
+                          {THEME_LABEL[mode]}
+                        </MenuRadioItem>
+                      ))}
+                    </MenuRadioGroup>
+                    <MenuSeparator />
+                    <MenuItem tone="danger" onSelect={() => void logout()}>
+                      <LogOut size={16} aria-hidden="true" />
+                      Log out
+                    </MenuItem>
+                  </MenuContent>
+                </MenuRoot>
+              </div>
             </header>
 
             {restarting ? (
@@ -385,7 +414,13 @@ export function AppShell({
           onOpenChange={setPaletteOpen}
           search={search}
           onSelect={onSelect}
-          placeholder="Go to a page, a project or a recent run"
+          placeholder="Go to a page, a project or a run — or ask the Board"
+        />
+        <AskBoardDialog
+          question={asking}
+          onOpenChange={(open) => {
+            if (!open) setAsking(null);
+          }}
         />
       </PageActionsProvider>
     </UserProvider>

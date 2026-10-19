@@ -367,7 +367,13 @@ describe('parseHookCommand (#445 amendment 11, #610)', () => {
           [
             `exec 3>>'${log}'`,
             `a() { printf '%s\\0' "$PWD" "\${FOO-unset}" "$@"; printf E >&2; }`,
-            `f() { printf 'f%s\\0' "$1"; printf 'e%s\\n' "$1" >&2; return "$1"; }`,
+            // A reader that exits without reading (`f 3 | f 0`) races its
+            // writer: if the writer is still going it dies of SIGPIPE (141) and
+            // never prints its `eN`. Ignoring SIGPIPE and silencing the failed
+            // write makes the writer finish whichever side wins; what the test
+            // compares — data, stderr, statuses — is unchanged.
+            `trap '' PIPE`,
+            `f() { printf 'f%s\\0' "$1" 2>/dev/null; printf 'e%s\\n' "$1" >&2; return "$1"; }`,
             `w() { printf '%s\\0' "$@" >&3; shift 2; "$@"; }`,
             `${text}; printf 'status %s %s' "$?" "\${PIPESTATUS[*]}" >&2`,
           ].join('\n'),

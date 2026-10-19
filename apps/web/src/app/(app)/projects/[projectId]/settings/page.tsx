@@ -15,6 +15,7 @@ import { describeProjectError } from '../../../../../lib/projects/format';
 import { useTabParam } from '../../../../../lib/projects/use-tab-param';
 import { STATUS_TONE } from '../../../../../lib/runners/format';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
+import { AiDigestTab } from './ai-digest-tab';
 import { BoardTab } from './board-tab';
 import { BudgetTab } from './budget/budget-tab';
 import { DesignTab } from './design/design-tab';
@@ -143,6 +144,13 @@ const TABS: readonly {
     label: 'Steward',
     render: ({ project, isAdmin }) => (
       <StewardTab projectId={project.id} isAdmin={isAdmin} />
+    ),
+  },
+  {
+    id: 'ai-digest',
+    label: 'AI digest',
+    render: ({ project, isAdmin }) => (
+      <AiDigestTab projectId={project.id} isAdmin={isAdmin} />
     ),
   },
   {

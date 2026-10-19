@@ -31,7 +31,9 @@ import {
 import {
   type CardRunArgs,
   type CardRunFile,
+  capabilitiesSchema,
   cardDocsBranch,
+  cardEffortAvailable,
   cardRunArgsSchema,
   ISSUE_TITLE_MAX,
   ORCHESTRATOR_DEFAULTS,
@@ -66,7 +68,10 @@ import { TextNormalizer } from '../text/text-normalizer';
 import { TokenSaverService } from '../token-saver/token-saver.service';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
-import { BoardDependencies } from './board-dependencies.service';
+import {
+  BoardDependencies,
+  type StackedBase,
+} from './board-dependencies.service';
 import { BoardFailure, boardError } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
@@ -79,7 +84,7 @@ import {
   BoardWork,
 } from './board-work';
 import type { CardFeedbackDto, RunBoardCardDto } from './dto';
-import { defaultCardModel, rememberedChoice } from './launch-choice';
+import { defaultCardLaunch, rememberedChoice } from './launch-choice';
 
 type Tx = Prisma.TransactionClient;
 
@@ -207,12 +212,21 @@ export class BoardRoundsService {
     }
     // #480 (ADR-0044): no card of a stack runs before its design is approved.
     await this.stacks.assertStackApproved(card.id);
-    // #337 D8: an open dependency warns; the person may run anyway.
-    await this.dependencies.assertRunnable(
-      card.id,
-      dto.ignoreDependencies === true,
+    // #638 (ADR-0065): an open dependency refuses the Run; nothing overrides
+    // it. #636: one unmerged dependency with an open PR stacks the card on
+    // its branch.
+    const stacked = await this.dependencies.assertRunnable(card.id);
+    await this.start(
+      card,
+      'run',
+      dto,
+      null,
+      actor,
+      [],
+      null,
+      autoRunAfter,
+      stacked,
     );
-    await this.start(card, 'run', dto, null, actor, [], null, autoRunAfter);
     return this.board.detail(projectId, number);
   }
 
@@ -374,6 +388,8 @@ export class BoardRoundsService {
     ciFix: CardCiFixInput | null = null,
     /** #443: the accepted dependency an Auto-run when ready round starts after. */
     autoRunAfter: number | null = null,
+    /** #636: the dependency a Run stacks the card on; `null` is the base. */
+    stacked: StackedBase | null = null,
   ): Promise<void> {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
@@ -410,14 +426,22 @@ export class BoardRoundsService {
       );
     }
     // #322 D2: the launch's model, else the card's, else the recommendation.
-    const defaultModel = defaultCardModel(
-      cardRecommendationOf(card).work?.model,
+    // #663: the effort beside it the same way; a `ci_fix` round defaults to
+    // `sonnet` at `low` (ADR-0068 §5).
+    const defaults = defaultCardLaunch(
+      trigger === 'ci_fix',
+      cardRecommendationOf(card).work,
       settings?.model,
     );
-    const model = dto.model ?? card.model ?? defaultModel;
+    const model = dto.model ?? card.model ?? defaults.model;
+    // #663: only a runner that advertises `cardEffort` takes the field.
+    const effort = (await this.servesEffort(project.runnerId))
+      ? (dto.effort ?? card.effort ?? defaults.effort)
+      : null;
     // #322 D3: a choice is remembered only when it differs from the default.
     const remembered = {
-      model: rememberedChoice(dto.model, defaultModel),
+      model: rememberedChoice(dto.model, defaults.model),
+      effort: rememberedChoice(dto.effort, defaults.effort),
       profileKey: rememberedChoice(
         dto.profileKey,
         dto.profileKey === undefined
@@ -426,6 +450,17 @@ export class BoardRoundsService {
       ),
     };
 
+    // #636: a Run that opens a new PR chooses its base — the dependency's
+    // branch it is stacked on, else the project base; a card with an open
+    // PR, and every other round, keeps the base the card has.
+    const choosesBase =
+      trigger === 'run' &&
+      (card.prNumber === null ||
+        card.mergedAt !== null ||
+        card.prState === 'closed');
+    const base = choosesBase
+      ? (stacked?.branch ?? project.base)
+      : (card.prBase ?? project.base);
     // A session is resumed once Claude has run in it (D5); a round 1 that
     // never started is started again.
     const resume =
@@ -570,7 +605,7 @@ export class BoardRoundsService {
             body: card.body,
             kind: card.kind,
             branch,
-            base: project.base,
+            base,
             specPath,
             specPr: specPr
               ? { repo: specPr.repo, url: specPr.url, branch: specPr.branch }
@@ -622,7 +657,7 @@ export class BoardRoundsService {
       cardId: card.id,
       projectId: project.id,
       root: project.rootPath,
-      base: project.base,
+      base,
       shortId: card.shortId,
       branch,
       session: { id: sessionId, resume },
@@ -632,6 +667,7 @@ export class BoardRoundsService {
       ...(attachmentRefs.length > 0 ? { attachments: attachmentRefs } : {}),
       profileKey: profile.key,
       model,
+      ...(effort !== null ? { effort } : {}),
       permissionMode,
       ...(ships
         ? {
@@ -674,6 +710,8 @@ export class BoardRoundsService {
             round: next,
             trigger,
             promptVersion: CARD_WORKER_PROMPT_VERSION,
+            // #663: what the round ran at; `null` is the CLI's default.
+            effort,
             // #447 DA-15: Steward resumes the round in the mode it started in.
             permissionMode,
           },
@@ -721,8 +759,17 @@ export class BoardRoundsService {
           sessionId,
           branch,
           specPath,
+          ...(choosesBase
+            ? {
+                prBase: stacked?.branch ?? null,
+                prBaseCardId: stacked?.cardId ?? null,
+              }
+            : {}),
           ...(remembered.model !== undefined
             ? { model: remembered.model }
+            : {}),
+          ...(remembered.effort !== undefined
+            ? { effort: remembered.effort }
             : {}),
           ...(remembered.profileKey !== undefined
             ? { profileKey: remembered.profileKey }
@@ -796,6 +843,7 @@ export class BoardRoundsService {
       resume,
       profileKey: profile.key,
       model,
+      effort,
       permissionMode,
       issueNumber: issue.number,
       specPath,
@@ -1028,6 +1076,16 @@ export class BoardRoundsService {
         issueNumber: card.issueNumber,
       });
     return cardFollowUpBranch(first, Math.max(prs.length, 1) + 1);
+  }
+
+  /** #663: whether the project's runner advertises `cardEffort`. */
+  private async servesEffort(runnerId: string): Promise<boolean> {
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { capabilities: true },
+    });
+    const capabilities = capabilitiesSchema.safeParse(runner?.capabilities);
+    return capabilities.success && cardEffortAvailable(capabilities.data);
   }
 
   /** #322 D3: the profile #272 D1 picks without a card or launch key. */

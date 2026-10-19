@@ -133,6 +133,11 @@ const WATCHED = {
       rounds: { none: { phase: { in: [...ACTIVE_CARD_ROUND_PHASES] } } },
     },
     { column: { in: ['in_progress', 'finished'] }, ciState: 'pending' },
+    // #636: stacked on a dependency that merged — still to be retargeted.
+    {
+      column: { in: ['in_progress', 'finished'] },
+      prBaseCard: { is: { mergedAt: { not: null } } },
+    },
   ],
 } satisfies Prisma.BoardCardWhereInput;
 
@@ -256,6 +261,14 @@ export class BoardShipping
     if (card.column !== 'in_progress' && card.column !== 'finished') return;
     const project = await this.work.project(card.projectId);
     if (!this.work.ships(project, card)) return;
+    // #636: a PR stacked on a dependency that has merged since goes onto the
+    // base — the retry of what the merge could not do.
+    if (
+      card.prBase !== null &&
+      !(await this.work.retargetIfDue(project, card))
+    ) {
+      card.prBase = null;
+    }
     // In Finished, only a merge is left to decide.
     if (
       card.column === 'finished' &&
@@ -518,7 +531,7 @@ export class BoardShipping
       return;
     }
     const input: CardCiFixInput = conflict
-      ? { reason: 'conflict', base: project.base }
+      ? { reason: 'conflict', base: card.prBase ?? project.base }
       : {
           reason: 'red',
           headSha: result.headSha,
@@ -601,10 +614,13 @@ export class BoardShipping
     // `deleteBranch` needs a runner of `card.prClose`'s release (#329 D9).
     if (!this.commands.advertisesPrClose(project.runnerId)) return;
     const card = await this.work.card(project.id, number);
+    // #636: a PR stacked on a dependency's branch is merged by no one but a
+    // person; it goes into the base once the dependency merges.
     if (
       card.column !== 'finished' ||
       card.mergedAt !== null ||
-      card.needsPerson
+      card.needsPerson ||
+      card.prBase !== null
     ) {
       return;
     }

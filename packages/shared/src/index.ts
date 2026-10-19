@@ -1,5 +1,6 @@
 export * from './action-requests';
 export * from './activity';
+export * from './ai';
 export * from './approvals';
 export * from './assess';
 export * from './assistant';
@@ -7,6 +8,7 @@ export * from './attachments';
 export * from './audit';
 export * from './auth';
 export * from './board';
+export * from './board-ai';
 export * from './budgets';
 export * from './control';
 export * from './design';

@@ -14,6 +14,7 @@ import {
   type LaunchForm,
   type LaunchKind,
   launchDefaults,
+  launchEffortOptions,
   launchModelOptions,
   launchRequest,
   profileKeysWith,
@@ -94,7 +95,8 @@ export function LaunchPopover({
 
 /**
  * The profile and model selects (#322 D1), shared by the popover and the
- * Generate panel's inline "Runs on" group. Loads the runner's Claude profiles
+ * Generate panel's inline "Runs on" group; a work launch adds the effort
+ * (#663). Loads the runner's Claude profiles
  * when mounted. `modelHint` puts the recommendation's reason under the model;
  * the inline group draws it on its own line instead.
  */
@@ -168,6 +170,22 @@ export function LaunchSelects({
           ))}
         </Select>
       </Field>
+      {kind === 'work' ? (
+        <Field label="Effort" htmlFor={`${idPrefix}-effort`}>
+          <Select
+            id={`${idPrefix}-effort`}
+            value={form.effort ?? DEFAULT_VALUE}
+            disabled={disabled}
+            onChange={(e) => onChange({ ...form, effort: e.target.value })}
+          >
+            {launchEffortOptions(card).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
     </>
   );
 }

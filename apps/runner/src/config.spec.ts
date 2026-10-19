@@ -46,6 +46,7 @@ describe('config', () => {
           'slot.message': false,
           'session.message': false,
         },
+        code: { deny: [] },
       },
     });
   });

@@ -134,5 +134,8 @@ export const BOARD_ACTION_ERROR_TEXT: Partial<Record<BoardErrorCode, string>> =
     [BOARD_ERROR.designNotApproved]:
       'This card’s design is on and not approved yet. Open the design and approve it, or approve and run from there.',
     [BOARD_ERROR.invalidMove]: MOVE_REFUSAL_TEXT.invalid_move,
-    [BOARD_ERROR.dependencyOpen]: 'A card it depends on is not completed yet.',
+    [BOARD_ERROR.dependencyOpen]:
+      'A card it depends on has no ready pull request yet.',
+    [BOARD_ERROR.dependenciesUnmerged]:
+      'More than one card it depends on is not merged yet; it branches from one only.',
   };

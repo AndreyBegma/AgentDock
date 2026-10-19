@@ -223,3 +223,15 @@ export const removeStackCard = (
   api<BoardStackDetail>(`${stackPath(projectId, number)}/cards/${card}`, {
     method: 'DELETE',
   });
+
+/** #652: queues the stack's To Do cards and starts what is ready. */
+export const runStack = (projectId: string, number: number) =>
+  api<BoardStackDetail>(`${stackPath(projectId, number)}/run`, {
+    method: 'POST',
+  });
+
+/** #652: removes the stack run's queue; running cards keep running. */
+export const stopStack = (projectId: string, number: number) =>
+  api<BoardStackDetail>(`${stackPath(projectId, number)}/stop`, {
+    method: 'POST',
+  });

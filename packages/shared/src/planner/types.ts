@@ -426,7 +426,8 @@ export type ReviseOutput = z.infer<typeof reviseOutputSchema>;
  * `agentdock-design` blocks beside it. `addressed` lists the ids of the open
  * comments this revision answers (D10). #441: `frames` names the frames, one
  * per design block in order — no upper limit but the HTML's byte cap;
- * without it the one block is a frame named `Mockup`. The same shape under
+ * without it the one block is a frame named `Mockup`. #628: a revise may
+ * name in `kept` frames it copies unchanged; those have no block. The same shape under
  * every contract version: a v1 plan's design is switched on by hand.
  */
 export const designOutputSchema = z.strictObject({
@@ -437,6 +438,11 @@ export const designOutputSchema = z.strictObject({
   rationale: text(DESIGN_RATIONALE_MAX),
   addressed: z.array(z.string().min(1).max(64)).max(100),
   frames: z.array(text(DESIGN_FRAME_NAME_MAX)).min(1).optional(),
+  /**
+   * #628: on a revise, the frames of `frames` the turn leaves as the previous
+   * revision drew them — they have no design block; the API copies them.
+   */
+  kept: z.array(text(DESIGN_FRAME_NAME_MAX)).optional(),
 });
 export type DesignOutput = z.infer<typeof designOutputSchema>;
 

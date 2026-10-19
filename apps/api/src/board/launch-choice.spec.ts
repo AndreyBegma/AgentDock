@@ -1,5 +1,9 @@
 import { ORCHESTRATOR_DEFAULTS } from '@agentdock/shared/protocol';
-import { defaultCardModel, rememberedChoice } from './launch-choice';
+import {
+  defaultCardLaunch,
+  defaultCardModel,
+  rememberedChoice,
+} from './launch-choice';
 
 describe('defaultCardModel (#322 D2)', () => {
   it('takes the recommendation first', () => {
@@ -9,6 +13,31 @@ describe('defaultCardModel (#322 D2)', () => {
   it('falls back to the project model, then the default', () => {
     expect(defaultCardModel(null, 'haiku')).toBe('haiku');
     expect(defaultCardModel(null, null)).toBe(ORCHESTRATOR_DEFAULTS.model);
+  });
+});
+
+describe('defaultCardLaunch (#663)', () => {
+  const opusHigh = { model: 'opus', effort: 'high' } as const;
+
+  it('runs a ci_fix round on sonnet at low, whatever was recommended', () => {
+    expect(defaultCardLaunch(true, opusHigh, 'opus')).toEqual({
+      model: 'sonnet',
+      effort: 'low',
+    });
+  });
+
+  it('takes the recommendation’s model and effort for any other round', () => {
+    expect(defaultCardLaunch(false, opusHigh, 'sonnet')).toEqual(opusHigh);
+    expect(
+      defaultCardLaunch(false, { model: 'haiku', effort: null }, 'opus'),
+    ).toEqual({ model: 'haiku', effort: null });
+  });
+
+  it('without a recommendation, the project model and no effort', () => {
+    expect(defaultCardLaunch(false, null, 'haiku')).toEqual({
+      model: 'haiku',
+      effort: null,
+    });
   });
 });
 
