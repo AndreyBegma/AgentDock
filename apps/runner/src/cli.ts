@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { TERSE_REGISTER } from '@agentdock/shared';
 import type { Host } from '@agentdock/shared/protocol';
 import { accessHeaders, accessOf } from './access';
 import { runClaude } from './claude';
@@ -98,6 +99,7 @@ Used by the runner's launches (Token saver):
   read-hook                                the Read hook that refuses a whole read
                                            of a big file and a repeated read once
                                            (JSON on stdin)
+  register                                 print the terse working register
 `;
 
 class UsageError extends Error {}
@@ -532,6 +534,11 @@ export const runCli = async (
   }
   if (command === 'help' || command === '--help' || command === '-h') {
     deps.stdout(USAGE);
+    return EXIT.ok;
+  }
+  // #663 D3: the one terse register; the plugin reads this output.
+  if (command === 'register') {
+    out(deps, TERSE_REGISTER);
     return EXIT.ok;
   }
   // `main.ts` serves these before loading the CLI (#445 D3); this path is for

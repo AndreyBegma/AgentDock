@@ -1,5 +1,6 @@
 import { homedir, platform } from 'node:os';
 import { runFilter } from './engine';
+import { familyOf, switchedOffFamilies } from './env';
 import { ALL_FILTERS } from './families';
 import { runFilterHook } from './hook';
 import { runReadHook } from './read-guard';
@@ -72,9 +73,15 @@ export const processIo = (): FilterIo => {
 export const runFilterCommand = async (
   argv: readonly string[],
   io: FilterIo = processIo(),
-  filters: readonly Filter[] = ALL_FILTERS,
+  allFilters: readonly Filter[] = ALL_FILTERS,
 ): Promise<number> => {
   const [command, ...rest] = argv;
+  // #663 D9: a switched-off family is as if it did not exist.
+  const off = switchedOffFamilies(io.env);
+  const filters =
+    off.size === 0
+      ? allFilters
+      : allFilters.filter((filter) => !off.has(familyOf(filter.id)));
   if (command === 'read-hook') {
     let output = '';
     try {

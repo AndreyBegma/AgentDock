@@ -13,6 +13,7 @@ import {
   CARD_RUN_PROMPT_MAX_BYTES,
   cardPromptSchema,
 } from '../protocol';
+import { TERSE_REGISTER } from '../token-saver/register';
 import { cardDesignPath } from './naming';
 import {
   BOARD_CARD_BODY_MAX,
@@ -195,10 +196,9 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
   it('carries the working and the audience register', () => {
     const prompt = cardWorkerPrompt(plain);
     expect(prompt).toContain('## How to write');
-    expect(prompt).toContain('- Working register —');
-    expect(prompt).toContain('do not restate the plan');
-    expect(prompt).toContain('- Audience register —');
-    expect(prompt).toContain('every required section, and leave nothing out');
+    // #663 D3: the working register is the one shared text, verbatim.
+    expect(prompt).toContain(TERSE_REGISTER);
+    expect(prompt).toContain('Full sentences, every required section');
   });
 
   it('asks for offset/limit on big files and Grep/Glob first', () => {
@@ -373,8 +373,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 18', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(18);
+  it('is version 19', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(19);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
