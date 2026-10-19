@@ -1,6 +1,6 @@
 # ADR-0039: Token saver — the runner compresses what agents read, not what people read
 
-Status: accepted · Date: 2026-10-16 ·
+Status: accepted, amended by [ADR-0067](0067-the-token-saver-targets-context-residency-and-is-judged-by-cost-per-round.md) · Date: 2026-10-16 ·
 Issue: [#445](https://github.com/AndreyBegma/AgentDock/issues/445) ·
 Spec: [`docs/specs/445-token-saver.md`](../specs/445-token-saver.md)
 
