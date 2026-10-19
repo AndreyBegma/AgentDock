@@ -95,7 +95,6 @@ export function BoardColumns({
   canTerminal,
   actions,
   filter,
-  compact,
   olderCompleted,
   onOpen,
   onOpenPlanTask,
@@ -112,7 +111,6 @@ export function BoardColumns({
   actions: CardActions;
   /** C-29: what the toolbar hides; a hidden card is still in the column. */
   filter: BoardFilter;
-  compact: boolean;
   /** Set while the server has older Completed cards than the board holds. */
   olderCompleted?: OlderCompleted;
   onOpen: (card: BoardCardView) => void;
@@ -387,7 +385,6 @@ export function BoardColumns({
                 projectId={projectId}
                 card={item.card}
                 canOperate={canOperate}
-                compact={compact}
                 menu={menu}
                 selection={
                   canOperate

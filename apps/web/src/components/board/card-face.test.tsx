@@ -18,13 +18,12 @@ const MENU = <button type="button" data-menu-trigger aria-label="Actions" />;
 const render = (
   column: BoardColumn,
   extra: Partial<BoardCardView> = {},
-  options: { compact?: boolean; menu?: boolean } = {},
+  options: { menu?: boolean } = {},
 ) =>
   renderToStaticMarkup(
     <CardFace
       projectId="p1"
       canOperate
-      compact={options.compact}
       menu={options.menu === false ? undefined : MENU}
       onOpen={() => undefined}
       card={fixtureCard(7, column, {
@@ -158,7 +157,7 @@ describe('CardFace rows (C-35, #423)', () => {
     expect(header).not.toContain('ms-auto');
   });
 
-  test('the footer carries PR and Issue above a hairline; compact leaves it to the sheet', () => {
+  test('the footer carries PR and Issue above a hairline', () => {
     const extra = {
       issueNumber: 3,
       issueUrl: 'https://github.com/o/r/issues/3',
@@ -167,10 +166,7 @@ describe('CardFace rows (C-35, #423)', () => {
     expect(footer).toContain('border-t');
     expect(footer).toContain('PR #7 · Open');
     expect(footer).toContain('Issue #3');
-    const compact = render('in_progress', extra, { compact: true });
-    expect(row(compact, 'footer')).toBeNull();
-    expect(compact).not.toContain('Issue #3');
-    expect(compact).toContain('line-clamp-2');
+    expect(render('in_progress')).not.toContain('Issue #3');
   });
 
   test('round, design, hooks, auto-run failure and shipping share the status row', () => {
