@@ -105,6 +105,11 @@ export class BoardCommands {
     }
   }
 
+  /** #652: whether the runner is connected now — a stack run waits for it. */
+  isConnected(runnerId: string): boolean {
+    return this.presence.isConnected(runnerId);
+  }
+
   /** Whether `name` can be sent to `runnerId` now — `assertReady` without the throw. */
   serves(runnerId: string, name: CardCommandName): boolean {
     try {

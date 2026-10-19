@@ -170,6 +170,9 @@ export class BoardWorld {
       .spyOn(this.commands, 'advertisesPrClose')
       .mockImplementation(() => this.prCloseAdvertised);
     jest
+      .spyOn(this.commands, 'isConnected')
+      .mockImplementation(() => !this.offline);
+    jest
       .spyOn(this.commands, 'servesChecks')
       .mockImplementation(() => this.checksServed);
     jest

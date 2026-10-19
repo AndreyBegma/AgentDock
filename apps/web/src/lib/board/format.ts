@@ -392,12 +392,16 @@ export function autoRunReason(
 
 /**
  * #273 D9, #443: what the face's "Didn’t start" says — the design approval's
- * start, or Auto-run when ready's after a dependency was ready (#638).
+ * start, or Auto-run when ready's after a dependency was ready (#638). #652:
+ * or Run stack's, which paused on it.
  */
 export function autoRunFailureText(
   failure: NonNullable<BoardCardView['autoRunFailure']>,
 ): string {
   const reason = autoRunReason(failure);
+  if (failure.stack != null) {
+    return `Run stack S-${failure.stack} could not start it and paused: ${reason}`;
+  }
   return failure.after != null
     ? `Auto-run after C-${failure.after} was ready could not start: ${reason}`
     : `Design approved — the worker did not start: ${reason}`;

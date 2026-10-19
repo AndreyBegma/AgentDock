@@ -128,6 +128,12 @@ export const AUDIT_ACTIONS = [
   'stack.created',
   /** #480: a stack's title or body, or the cards of its stages, changed. */
   'stack.updated',
+  /** #652: Run stack queued the stack's To Do cards (`after: { number, cards }`). */
+  'stack.run_started',
+  /** #652: a refused start or a failed round paused the stack run (`after: { number, card, error }`). */
+  'stack.run_paused',
+  /** #652: Stop removed the stack run's queue (`after: { number, removed }`). */
+  'stack.run_stopped',
   'card.deleted',
   'card.moved',
   'card.run_started',

@@ -881,6 +881,8 @@ export interface CardAutoRunFailure {
    * Optional so older fixtures stay valid.
    */
   after?: number | null;
+  /** #652: the stack whose Run stack tried the start; absent or `null` otherwise. */
+  stack?: number | null;
 }
 
 const BOARD_ERROR_CODES: ReadonlySet<string> = new Set(
