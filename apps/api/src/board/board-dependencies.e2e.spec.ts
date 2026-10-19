@@ -15,8 +15,8 @@ describe('card dependencies (e2e, #337)', () => {
   beforeEach(() => w.reset());
   afterEach(() => w.work.settled());
 
-  const deps = (number: number) =>
-    `${w.path()}/board/cards/${number}/dependencies`;
+  const cardPath = (number: number) => `${w.path()}/board/cards/${number}`;
+  const deps = (number: number) => `${cardPath(number)}/dependencies`;
   const link = (number: number, dependsOn: number, session = w.operator) =>
     session.send('post', deps(number), { dependsOn });
 
@@ -90,7 +90,7 @@ describe('card dependencies (e2e, #337)', () => {
     expect(await w.ctx.prisma.boardCardDependency.count()).toBe(0);
   });
 
-  it('Run answers 409 dependency_open while a dependency is open; ignoreDependencies runs anyway', async () => {
+  it('Run answers 409 dependency_open while a dependency is open, with no override (#638)', async () => {
     const a = await w.createCard({ title: 'A', specOnRun: false });
     const b = await w.createCard({ title: 'B', specOnRun: false });
     await link(b.number, a.number);
@@ -101,14 +101,51 @@ describe('card dependencies (e2e, #337)', () => {
     expect(refused.body.dependencies).toEqual([
       { number: a.number, label: `C-${a.number}`, column: 'todo' },
     ]);
-    expect(w.sent('card.run')).toHaveLength(0);
+    expect(refused.body.message).toContain(`C-${a.number}`);
 
+    // The override is gone: the field is no part of the Run any more.
     const forced = await w.runCard(b.number, { ignoreDependencies: true });
-    expect(forced.status).toBe(200);
-    expect(w.sent('card.run')).toHaveLength(1);
+    expect(forced.status).toBe(400);
+    expect(w.sent('card.run')).toHaveLength(0);
   });
 
-  it('Run is not warned once the dependency is completed', async () => {
+  it('Run refuses while a dependency is In progress, and runs once it is Finished (#638)', async () => {
+    const a = await w.createCard({ title: 'A', specOnRun: false });
+    const b = await w.createCard({ title: 'B', specOnRun: false });
+    await link(b.number, a.number);
+    expect((await w.runCard(a.number)).status).toBe(200);
+
+    const running = await w.runCard(b.number);
+    expect(running.status).toBe(409);
+    expect(running.body.dependencies).toEqual([
+      { number: a.number, label: `C-${a.number}`, column: 'in_progress' },
+    ]);
+
+    await w.operator.send('post', `${cardPath(a.number)}/finish`);
+    expect((await w.card(a.number)).column).toBe('finished');
+    expect((await w.runCard(b.number)).status).toBe(200);
+  });
+
+  it('a Finished dependency sent back with feedback holds Run again (#638)', async () => {
+    const a = await w.createCard({ title: 'A', specOnRun: false });
+    const b = await w.createCard({ title: 'B', specOnRun: false });
+    await link(b.number, a.number);
+    await w.runCard(a.number);
+    await w.operator.send('post', `${cardPath(a.number)}/finish`);
+    const back = await w.operator.send(
+      'post',
+      `${cardPath(a.number)}/feedback`,
+      { text: 'Rename the button.' },
+    );
+    expect(back.status).toBe(200);
+    expect((await w.card(a.number)).column).toBe('in_progress');
+
+    const refused = await w.runCard(b.number);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toBe(BOARD_ERROR.dependencyOpen);
+  });
+
+  it('Run is not refused once the dependency is completed', async () => {
     const a = await w.createCard({ title: 'A', specOnRun: false });
     const b = await w.createCard({ title: 'B', specOnRun: false });
     await link(b.number, a.number);

@@ -18,6 +18,7 @@ import {
   type DropMove,
   decideDrop,
 } from '../../lib/board/board-state';
+import { runWaitsFor } from '../../lib/board/dependencies';
 import {
   type BoardFilter,
   isFiltering,
@@ -469,16 +470,11 @@ export function BoardColumns({
                   <MenuItem onSelect={() => setMoving(card)}>Move…</MenuItem>
                 ) : null}
                 {canOperate && (canRun(card) || canRetry(card)) ? (
-                  <MenuItem
-                    // #480: the stack's design holds Run; the label says why.
-                    disabled={actions.busy || busy || !!card.stack?.gate}
-                    onSelect={() => actions.run(card)}
-                  >
-                    {canRetry(card) ? 'Run again' : 'Run'}
-                    {card.stack?.gate
-                      ? ` — ${card.stack.gate.toLowerCase()}`
-                      : ''}
-                  </MenuItem>
+                  <RunMenuItem
+                    card={card}
+                    disabled={actions.busy || busy}
+                    onRun={() => void actions.run(card)}
+                  />
                 ) : null}
                 {canOperate && approveRunOffer(card) ? (
                   <MenuItem
@@ -610,5 +606,27 @@ function ColumnSelectAll({
         onChange={() => onToggle(order)}
       />
     </span>
+  );
+}
+
+/**
+ * The card menu's Run. #480: the stack's design holds it; #638: so does a
+ * dependency without a ready pull request. The label says why.
+ */
+function RunMenuItem({
+  card,
+  disabled,
+  onRun,
+}: {
+  card: BoardCardView;
+  disabled: boolean;
+  onRun: () => void;
+}) {
+  const hold = card.stack?.gate ?? runWaitsFor(card.dependsOn);
+  return (
+    <MenuItem disabled={disabled || hold !== null} onSelect={onRun}>
+      {canRetry(card) ? 'Run again' : 'Run'}
+      {hold ? ` — ${hold.charAt(0).toLowerCase()}${hold.slice(1)}` : ''}
+    </MenuItem>
   );
 }
