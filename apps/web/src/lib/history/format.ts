@@ -50,6 +50,7 @@ export const RUN_KIND_LABEL: Record<RunKind, string> = {
   text_normalize: 'Text translation',
   card_assess: 'Card model assessment',
   steward: 'Steward check',
+  code_ask: 'Assistant code question',
 };
 
 export const isRunKind = (value: string): value is RunKind =>

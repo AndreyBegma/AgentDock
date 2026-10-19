@@ -182,7 +182,9 @@ export const CARD_CI_MISSING_MS = 5 * 60_000;
  * Why a card is marked `needsPerson` — nothing is automated until a person
  * acts: CI still red after the fix budget (#359 D6), CI never reported on
  * the head (#484), or auto-merge refused the head the latest round left
- * (#542) — the round failed, pushed no commit, or ended at once.
+ * (#542) — the round failed, pushed no commit, or ended at once — or
+ * `card.collect` found commits on `origin/<branch>` the card's branch never
+ * had, so nothing was pushed (#630).
  */
 export const CARD_NEEDS_PERSON_REASONS = [
   'ci_still_failing',
@@ -190,6 +192,7 @@ export const CARD_NEEDS_PERSON_REASONS = [
   'round_failed',
   'round_pushed_nothing',
   'round_ended_at_once',
+  'branch_diverged',
 ] as const;
 export type CardNeedsPersonReason = (typeof CARD_NEEDS_PERSON_REASONS)[number];
 

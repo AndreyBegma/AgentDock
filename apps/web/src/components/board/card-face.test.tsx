@@ -100,6 +100,29 @@ describe('CardFace shipping state (#359)', () => {
   test('no checks, no dot', () => {
     expect(render('in_progress')).not.toContain('Checks');
   });
+
+  test('a failed collect is badged Not pushed in the status row (#630)', () => {
+    const html = render('finished', {
+      collectState: 'failed',
+      collectError: 'card.collect failed on the runner',
+    });
+    expect(row(html, 'status')).toContain('Not pushed');
+    expect(render('finished')).not.toContain('Not pushed');
+  });
+
+  test('a diverged branch needs a person and says why, once (#630)', () => {
+    const html = render('finished', {
+      collectState: 'failed',
+      collectError:
+        'origin/x (ab12cd34) has commits the card’s branch never had',
+      needsPerson: true,
+      needsPersonReason: 'branch_diverged',
+    });
+    expect(row(html, 'status')).toContain(
+      'Branch diverged on origin; not pushed',
+    );
+    expect(html).not.toContain('Not pushed');
+  });
 });
 
 describe('CardFace rows (C-35, #423)', () => {

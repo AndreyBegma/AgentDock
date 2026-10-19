@@ -19,11 +19,13 @@ import {
   type CardFinishedBy,
   type CardFinishedEventData,
   type CardMergeOutcome,
+  type CardNeedsPersonReason,
   type CardPrState,
   cardLabel,
   cardPullRequestBody,
   isActiveRoundPhase,
   isDependencySatisfied,
+  isDivergedBranchError,
   positionForIndex,
   type Role,
   RUN_UPDATED_LIVE_EVENT,
@@ -147,6 +149,13 @@ const RETRYABLE = {
 /** #329 D2: the runner pushed commits yet reported no open PR. */
 export const PUSHED_WITHOUT_PR =
   'The branch has commits ahead of the base, but the runner reported no open pull request';
+
+/**
+ * #630: the reason `needsPerson` is set with when the runner refused to push
+ * a branch whose remote holds commits the card's branch never had.
+ */
+export const BRANCH_DIVERGED =
+  'branch_diverged' satisfies CardNeedsPersonReason;
 
 const failedCollect = (error: string): CardCollectOutcome => ({
   state: 'failed',
@@ -1146,7 +1155,12 @@ export class BoardWork implements OnModuleInit {
       // A terminal card's earlier failure no longer holds once one succeeds.
       const cleared =
         terminal && card.autoRunError !== null && outcome.state !== 'failed';
+      // #630: a person merged the diverged branch; automation resumes.
+      const merged =
+        card.needsPersonReason === BRANCH_DIVERGED &&
+        outcome.state !== 'failed';
       await this.storeCollect(card, outcome, {
+        ...(merged ? { needsPerson: false, needsPersonReason: null } : {}),
         // An older runner reports no state: its PR is open (D6).
         ...(open ? { ...pr, prState: output.prState ?? 'open' } : {}),
         ...(cleared
@@ -1169,9 +1183,44 @@ export class BoardWork implements OnModuleInit {
           error instanceof BoardFailure ? error.code : 'unknown',
         );
       }
-      outcome = await this.storeCollect(card, failedCollect(message));
+      if (isDivergedBranchError(message)) {
+        outcome = await this.divergedCollect(card, message);
+      } else {
+        outcome = await this.storeCollect(card, failedCollect(message));
+      }
     }
     await this.finished(project, card, round, pr);
+    return outcome;
+  }
+
+  /**
+   * #630: the runner pushed nothing — `origin/<branch>` holds somebody
+   * else's commits. The card needs a person (`needsPerson`), with the
+   * runner's reason as its collect error; audited once per divergence.
+   */
+  private async divergedCollect(
+    card: CardForCollect,
+    message: string,
+  ): Promise<CardCollectOutcome> {
+    const known = card.needsPersonReason === BRANCH_DIVERGED;
+    const outcome = await this.storeCollect(card, failedCollect(message), {
+      needsPerson: true,
+      needsPersonReason: BRANCH_DIVERGED,
+    });
+    if (!known) {
+      await this.audit.record({
+        actor: SYSTEM_ACTOR,
+        action: 'card.auto_run_failed',
+        target: { type: 'board_card', id: card.id },
+        projectId: card.projectId,
+        after: {
+          number: card.number,
+          reason: BRANCH_DIVERGED,
+          branch: card.branch,
+        },
+        result: 'ok',
+      });
+    }
     return outcome;
   }
 

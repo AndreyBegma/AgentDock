@@ -233,6 +233,19 @@ describe('runner-local policy (ADR-0047)', () => {
     expect(reached).toEqual(dangerous().map(([name]) => name));
   });
 
+  it('deny-path and allow-path edit code.deny, and only the CLI does (#622)', () => {
+    expect(defaultPolicy().code.deny).toEqual([]);
+    expect(cli('deny-path', 'internal', 'config/prod/**').code).toBe(0);
+    expect(cli('deny-path', 'internal').code).toBe(0);
+    expect(loadConfig(configFile).policy.code.deny).toEqual([
+      'internal',
+      'config/prod/**',
+    ]);
+    expect(cli('allow-path', 'internal').code).toBe(0);
+    expect(loadConfig(configFile).policy.code.deny).toEqual(['config/prod/**']);
+    expect(cli('deny-path').code).not.toBe(0);
+  });
+
   it('a lower permission mode passes under the default cap', async () => {
     const { run, reached } = setup();
     const [[name, args]] = dangerous();

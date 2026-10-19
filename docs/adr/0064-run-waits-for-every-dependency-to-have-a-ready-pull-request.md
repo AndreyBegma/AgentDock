@@ -1,4 +1,4 @@
-# ADR-0063: Run waits for every dependency to have a ready pull request
+# ADR-0064: Run waits for every dependency to have a ready pull request
 
 Status: accepted · Date: 2026-10-19 ·
 Issue: [#638](https://github.com/AndreyBegma/AgentDock/issues/638) ·

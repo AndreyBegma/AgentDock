@@ -8,7 +8,7 @@ import {
 
 /**
  * Card dependencies (#337 D8): "after C-12" on the face, the list in the
- * sheet, and why Run is held while one is still open (#638, ADR-0063). They
+ * sheet, and why Run is held while one is still open (#638, ADR-0064). They
  * never block a move or Accept.
  */
 

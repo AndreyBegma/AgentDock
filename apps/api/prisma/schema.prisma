@@ -1641,6 +1641,8 @@ enum RunKind {
   /// Steward's local haiku: a stall's classification or the digest prose
   /// (issue #447 D3, D16).
   steward
+  /// The assistant's read-only code question on the runner (issue #622).
+  code_ask
 }
 
 enum RunStatus {

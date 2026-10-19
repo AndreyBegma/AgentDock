@@ -1,6 +1,7 @@
 import {
   CARD_COLLECT_AUTO_ATTEMPTS_MAX,
   CARD_COLLECT_RETRY_DELAY_MS,
+  divergedBranchMessage,
 } from '@agentdock/shared';
 import { BoardWorld, failed, ok } from './testing/board-e2e';
 
@@ -130,6 +131,44 @@ describe('board collect (e2e, #329)', () => {
     // Nothing left to retry.
     await runRetry(0);
     expect(w.sent('card.collect')).toHaveLength(2);
+  });
+
+  it('a diverged branch needs a person with the reason, audited once; a later success clears it (#630)', async () => {
+    const reason = divergedBranchMessage('fix/1-x', 'ab12cd34');
+    w.handlers['card.collect'] = () => failed('internal', reason);
+    await w.createCard();
+    await w.runCard(1);
+    await post(1, 'finish');
+    await w.work.settled();
+    const card = await w.card(1);
+    expect(card).toMatchObject({
+      column: 'finished',
+      collectState: 'failed',
+      needsPerson: true,
+      needsPersonReason: 'branch_diverged',
+    });
+    expect(card.collectError).toContain(reason);
+    const view = await w.operator.get(`${w.path()}/board/cards/1`);
+    expect(view.body).toMatchObject({
+      needsPerson: true,
+      needsPersonReason: 'branch_diverged',
+      collectState: 'failed',
+    });
+    await runRetry(0);
+    expect(w.sent('card.collect')).toHaveLength(2);
+    const audits = (await w.audit('card.auto_run_failed')).filter(
+      (a) => (a.after as { reason?: string }).reason === 'branch_diverged',
+    );
+    expect(audits).toHaveLength(1);
+
+    w.handlers['card.collect'] = undefined;
+    await hello();
+    expect(await w.card(1)).toMatchObject({
+      collectState: 'ok',
+      needsPerson: false,
+      needsPersonReason: null,
+      prUrl: PR_URL,
+    });
   });
 
   it('never retries a card a person moved out of Finished', async () => {

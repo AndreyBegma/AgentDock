@@ -149,7 +149,7 @@ export class BoardDependencies {
   }
 
   /**
-   * Run's check (D8, #638 ADR-0063): a dependency not in Finished or
+   * Run's check (D8, #638 ADR-0064): a dependency not in Finished or
    * Completed refuses the Run with `dependency_open`, naming the open ones.
    * There is no override.
    */

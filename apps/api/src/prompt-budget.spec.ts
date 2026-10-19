@@ -194,10 +194,12 @@ describe('prompt budgets — the assistant (C-254)', () => {
       user: { email, role: 'admin' },
       project,
       ambiguous: [],
+      codeTools: { read: true, ask: true },
     });
 
   it('stays within its budget', () => {
-    expect(tokens(prompt('a@b.c', 1))).toBeLessThanOrEqual(370);
+    // 370 before the code tools (#622) added about 90 with all three offered.
+    expect(tokens(prompt('a@b.c', 1))).toBeLessThanOrEqual(470);
   });
 
   it('keeps the date, the person and the project after the instructions', () => {
