@@ -9,7 +9,7 @@ import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { ChevronDown, Layers, TriangleAlert } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useId, useState } from 'react';
-import { dependencyChip } from '../../lib/board/dependencies';
+import { dependencyChip, runWaitsFor } from '../../lib/board/dependencies';
 import {
   COLUMN_TITLE,
   canRetry,
@@ -202,7 +202,8 @@ function StackCard({
   const pill = card.column === 'completed' ? null : roundPill(card.round);
   const cost = formatCost(card.costUsd);
   const after = dependencyChip(card.dependsOn);
-  const gate = card.stack?.gate ?? null;
+  // #480: the stack's design holds Run first; #638: then an open dependency.
+  const gate = card.stack?.gate ?? runWaitsFor(card.dependsOn);
   const runnable = canOperate && (canRun(card) || canRetry(card));
   return (
     <article className="flex min-w-0 flex-col gap-1 rounded-control bg-hover px-2.5 py-2">

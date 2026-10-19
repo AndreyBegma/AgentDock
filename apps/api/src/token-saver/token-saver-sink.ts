@@ -82,6 +82,7 @@ export class TokenSaverSink implements RunnerEventSink, OnApplicationBootstrap {
         runId: r.runId !== null && known.has(r.runId) ? r.runId : null,
         runKind: r.runKind,
         filter: r.filter,
+        program: r.program ?? null,
         rawBytes: r.rawBytes,
         keptBytes: r.keptBytes,
         bypassed: r.bypassed,

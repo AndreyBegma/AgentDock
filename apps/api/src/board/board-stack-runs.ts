@@ -525,7 +525,7 @@ export class BoardStackRuns
    */
   private async isReady(cardId: string): Promise<boolean> {
     try {
-      const stacked = await this.dependencies.assertRunnable(cardId, false);
+      const stacked = await this.dependencies.assertRunnable(cardId);
       if (stacked === null) return true;
       const deps = await this.prisma.boardCardDependency.count({
         where: { cardId },

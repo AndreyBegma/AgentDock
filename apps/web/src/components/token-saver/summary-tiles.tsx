@@ -1,12 +1,15 @@
 import type { TokenSaverSummary } from '@agentdock/shared';
 import { StatTile } from '@andrewbehma/glass-ui/stat-tile';
-import { formatNumber } from '../../lib/format';
+import { formatNumber, formatTokens } from '../../lib/format';
 import {
+  cacheReadShare,
   formatRate,
   formatSavedTokens,
   formatSavedUsd,
+  inputTokensPerRun,
   keptShare,
 } from '../../lib/token-saver/format';
+import { promptCacheTotals } from '../../lib/token-saver/summary';
 
 /** The period's four figures (Usage and the dashboard share them, D13). */
 export function SummaryTiles({ summary }: { summary: TokenSaverSummary }) {
@@ -42,5 +45,27 @@ export function SummaryTiles({ summary }: { summary: TokenSaverSummary }) {
         hint="Output no filter could safely shorten"
       />
     </div>
+  );
+}
+
+/**
+ * #648: the measured prompt cache of the period's ended runs — the share of
+ * input read from the cache and input tokens per run, from usage records, not
+ * the filter's estimate.
+ */
+export function PromptCacheTile({ summary }: { summary: TokenSaverSummary }) {
+  const totals = promptCacheTotals(summary.promptCache);
+  const none = totals.runs === 0;
+  return (
+    <StatTile
+      hue={3}
+      label="Prompt cache read share"
+      value={none ? '—' : formatRate(cacheReadShare(totals))}
+      hint={
+        none
+          ? 'No ended run with usage in this range'
+          : `${formatTokens(inputTokensPerRun(totals))} input tokens per run · ${formatNumber(totals.runs, 0)} runs, measured`
+      }
+    />
   );
 }

@@ -1474,7 +1474,8 @@ carry no `projectId`: the API resolves the project.
 | `id` | the runner's id for the row (`^[A-Za-z0-9_-]{1,64}$`). The API inserts it as the `token_saver_stats` primary key and skips duplicates, so a resent batch counts once |
 | `runId` | the launch's run; `null` exactly when `runKind` is `orchestrator` or `manual` |
 | `runKind` | `card`, `skill`, `plan`, `card_assess`, `card_capture`, `ui_profile`, `text_normalize`, `orchestrator` or `manual` — a `/cs-eco` session the runner did not launch (#475) |
-| `filter` | `<family>/<command>` (e.g. `js/jest`), or `none` when no filter matched |
+| `filter` | `<family>/<command>` (e.g. `js/jest`), or why no filter matched: `none:compound`, `none:uncovered`, `none:mode` (amendment 12); runners up to 0.12.2 write a plain `none` |
+| `program` | optional (#648): the program the command ran — `argv[0]`'s bare name plus the subcommand of a tool that has them (`git log`, `bun run`), never another argument; at most 64 characters. Absent on reads and on rows of runners up to 0.12.2 |
 | `rawBytes`, `keptBytes` | the output before and after the filter; `keptBytes ≤ rawBytes` |
 | `bypassed` | ran with `AGENTDOCK_RAW=1`; `keptBytes = rawBytes` |
 | `passedThrough` | the filter returned the original output; `keptBytes = rawBytes` |
@@ -1491,6 +1492,7 @@ carry no `projectId`: the API resolves the project.
       "data": {
         "rows": [
           { "id": "f_9c2e1a", "runId": "cmrun0001", "runKind": "card", "filter": "js/jest",
+            "program": "bun test",
             "rawBytes": 48211, "keptBytes": 3920, "bypassed": false, "passedThrough": false,
             "at": "2026-12-02T10:14:02.000Z" }
         ]

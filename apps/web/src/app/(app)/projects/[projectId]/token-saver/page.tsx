@@ -1,6 +1,10 @@
 'use client';
 
-import { isUnfilteredId } from '@agentdock/shared';
+import {
+  isUnfilteredId,
+  LAST_RUNNER_WITHOUT_FILTER_REASONS,
+} from '@agentdock/shared';
+import { Banner } from '@andrewbehma/glass-ui/banner';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
@@ -12,11 +16,20 @@ import { AsyncSection } from '../../../../../components/prerequisites/async-sect
 import { SavingsChart } from '../../../../../components/token-saver/savings-chart';
 import {
   FilterTable,
+  PromptCacheTable,
   RunKindTable,
+  UnfilteredProgramTable,
+  UnfilteredReasonTable,
 } from '../../../../../components/token-saver/summary-tables';
-import { SummaryTiles } from '../../../../../components/token-saver/summary-tiles';
+import {
+  PromptCacheTile,
+  SummaryTiles,
+} from '../../../../../components/token-saver/summary-tiles';
 import { describeTokenSaverError } from '../../../../../lib/token-saver/format';
-import { mostPassedThrough } from '../../../../../lib/token-saver/summary';
+import {
+  mostPassedThrough,
+  runnerTooOldForReasons,
+} from '../../../../../lib/token-saver/summary';
 import { useTokenSaverSummary } from '../../../../../lib/token-saver/use-token-saver-summary';
 import { presetRange } from '../../../../../lib/usage/format';
 import { Segment } from '../../../workflows/segment';
@@ -29,6 +42,8 @@ const TOP = 10;
  * #445 D13: the project's Token saver dashboard — savings over time, by
  * filter, by run kind, the bypass rate, and the filters that most often
  * returned the original (where a filter gets in the way or does not reach).
+ * #648: why commands went unfiltered, which programs, and the prompt cache
+ * as usage measured it.
  */
 export default function TokenSaverPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -86,6 +101,14 @@ export default function TokenSaverPage() {
           summary ? (
             <div className="flex flex-col gap-6">
               <SummaryTiles summary={summary} />
+              {runnerTooOldForReasons(summary) ? (
+                <Banner
+                  tone="info"
+                  title="The runner is too old to say why commands go unfiltered"
+                >
+                  {`This project's runner reports version ${summary.runnerVersion}; runners up to ${LAST_RUNNER_WITHOUT_FILTER_REASONS} record every unfiltered command as a plain “No filter”. Update the runner to see whether a command was compound, uncovered or run in a permission mode that never filters.`}
+                </Banner>
+              ) : null}
 
               <section aria-labelledby="ts-over-time">
                 <SectionHeader
@@ -128,12 +151,62 @@ export default function TokenSaverPage() {
                 </section>
               </div>
 
+              <div className="grid gap-6 lg:grid-cols-2">
+                <section aria-labelledby="ts-why-unfiltered">
+                  <SectionHeader
+                    className="mb-2"
+                    headingId="ts-why-unfiltered"
+                    title="Why commands went unfiltered"
+                    description="Every command no filter ran on, by the reason the runner gave."
+                  />
+                  <UnfilteredReasonTable filters={summary.byFilter} />
+                </section>
+                <section aria-labelledby="ts-unfiltered-programs">
+                  <SectionHeader
+                    className="mb-2"
+                    headingId="ts-unfiltered-programs"
+                    title="Most frequent unfiltered programs"
+                    description="The program and its subcommand, never its arguments."
+                  />
+                  <UnfilteredProgramTable
+                    programs={summary.unfilteredPrograms}
+                    empty={
+                      <p className="text-ink-3 text-sm">
+                        No unfiltered command named its program in this range —
+                        runners up to {LAST_RUNNER_WITHOUT_FILTER_REASONS} do
+                        not report one.
+                      </p>
+                    }
+                  />
+                </section>
+              </div>
+
+              <section aria-labelledby="ts-prompt-cache">
+                <SectionHeader
+                  className="mb-2"
+                  headingId="ts-prompt-cache"
+                  title="Prompt cache, measured"
+                  description="From the usage of ended runs started in this range — not the filter's estimate. Input counts uncached tokens, cache reads and cache writes."
+                />
+                <div className="grid gap-3 lg:grid-cols-[16rem_1fr]">
+                  <PromptCacheTile summary={summary} />
+                  <PromptCacheTable
+                    rows={summary.promptCache}
+                    empty={
+                      <p className="text-ink-3 text-sm">
+                        No ended run has usage in this range.
+                      </p>
+                    }
+                  />
+                </div>
+              </section>
+
               <section aria-labelledby="ts-original">
                 <SectionHeader
                   className="mb-2"
                   headingId="ts-original"
                   title="Filters that most often returned the original"
-                  description="Output the filter could not safely shorten, so the agent read it whole. “No filter” is a command no family covers. A filter high here is a candidate for improvement."
+                  description="Output the filter could not safely shorten, so the agent read it whole. The “No filter” reasons are the extreme case. A filter high here is a candidate for improvement."
                 />
                 <FilterTable
                   label="Filters that returned the original"

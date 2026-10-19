@@ -1,10 +1,18 @@
 import {
+  FILTER_ID_NONE,
+  FILTER_ID_NONE_COMPOUND,
+  FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE_UNCOVERED,
   isUnfilteredId,
+  runnerPredatesFilterReasons,
+  TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX,
   type TokenSavedView,
   type TokenSaverBeforeAfter,
   type TokenSaverFilterSavings,
+  type TokenSaverPromptCache,
   type TokenSaverRunKind,
   type TokenSaverSummary,
+  type TokenSaverUnfilteredProgram,
 } from '@agentdock/shared';
 import type { ChartSeries } from '@andrewbehma/glass-ui/chart';
 import { passThroughShare } from './format';
@@ -32,6 +40,9 @@ export const emptySummary = (from: string, to: string): TokenSaverSummary => ({
   byDay: [],
   byFilter: [],
   byRunKind: [],
+  unfilteredPrograms: [],
+  promptCache: [],
+  runnerVersion: null,
 });
 
 /** Merges two sides of one run kind: the average is weighted by its runs. */
@@ -73,10 +84,49 @@ function mergeBeforeAfter(
   }));
 }
 
+const byCommands = (
+  a: TokenSaverUnfilteredProgram,
+  b: TokenSaverUnfilteredProgram,
+) => b.commands - a.commands || a.program.localeCompare(b.program);
+
+/** Programs summed across projects, most commands first, the top ten. */
+function mergePrograms(
+  rows: readonly TokenSaverUnfilteredProgram[],
+): TokenSaverUnfilteredProgram[] {
+  const byProgram = new Map<string, number>();
+  for (const r of rows) {
+    byProgram.set(r.program, (byProgram.get(r.program) ?? 0) + r.commands);
+  }
+  return [...byProgram]
+    .map(([program, commands]) => ({ program, commands }))
+    .sort(byCommands)
+    .slice(0, TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX);
+}
+
+/** The prompt cache summed per run kind across projects. */
+function mergePromptCache(
+  rows: readonly TokenSaverPromptCache[],
+): TokenSaverPromptCache[] {
+  const byKind = new Map<TokenSaverRunKind, TokenSaverPromptCache>();
+  for (const r of rows) {
+    const prev = byKind.get(r.runKind);
+    byKind.set(r.runKind, {
+      runKind: r.runKind,
+      runs: (prev?.runs ?? 0) + r.runs,
+      input: (prev?.input ?? 0) + r.input,
+      cacheRead: (prev?.cacheRead ?? 0) + r.cacheRead,
+      cacheWrite: (prev?.cacheWrite ?? 0) + r.cacheWrite,
+    });
+  }
+  return [...byKind.values()];
+}
+
 /**
  * Usage on "all projects" asks every project for its summary and shows their
  * sum: totals and per-bucket savings add, the rates are re-derived from the
- * summed commands, before/after averages are weighted by their runs.
+ * summed commands, before/after averages are weighted by their runs. Programs
+ * and the prompt cache add; the runner version is one project's, so the sum
+ * has none.
  */
 export function mergeSummaries(
   summaries: readonly TokenSaverSummary[],
@@ -139,7 +189,67 @@ export function mergeSummaries(
   merged.byRunKind = [...kinds.entries()]
     .map(([runKind, v]) => ({ runKind, ...v }))
     .sort((a, b) => b.estimateUsd - a.estimateUsd);
+  merged.unfilteredPrograms = mergePrograms(
+    summaries.flatMap((s) => s.unfilteredPrograms),
+  );
+  merged.promptCache = mergePromptCache(
+    summaries.flatMap((s) => s.promptCache),
+  );
   return merged;
+}
+
+/** #648: the reasons in the order the dashboard lists them, the legacy `none` last. */
+export const UNFILTERED_REASONS = [
+  FILTER_ID_NONE_COMPOUND,
+  FILTER_ID_NONE_UNCOVERED,
+  FILTER_ID_NONE_MODE,
+  FILTER_ID_NONE,
+] as const;
+
+/**
+ * #648: "No filter" split by reason — one row per reason, always all four,
+ * with its commands and its share of the unfiltered ones (0–1).
+ */
+export function unfilteredReasons(
+  filters: readonly TokenSaverFilterSavings[],
+): { filter: string; commands: number; share: number }[] {
+  const count = (id: string) =>
+    filters.find((f) => f.filter === id)?.commands ?? 0;
+  const total = UNFILTERED_REASONS.reduce((n, id) => n + count(id), 0);
+  return UNFILTERED_REASONS.map((filter) => ({
+    filter,
+    commands: count(filter),
+    share: total > 0 ? count(filter) / total : 0,
+  }));
+}
+
+/**
+ * #648: whether to say the runner is too old to give reasons — its version
+ * predates them and none of the range's rows carries one (a build from the
+ * main branch still says 0.12.2 but sends them).
+ */
+export function runnerTooOldForReasons(summary: TokenSaverSummary): boolean {
+  return (
+    runnerPredatesFilterReasons(summary.runnerVersion) &&
+    !summary.byFilter.some(
+      (f) => isUnfilteredId(f.filter) && f.filter !== FILTER_ID_NONE,
+    )
+  );
+}
+
+/** #648: the prompt cache of every run kind together, for the tile. */
+export function promptCacheTotals(
+  rows: readonly TokenSaverPromptCache[],
+): Omit<TokenSaverPromptCache, 'runKind'> {
+  return rows.reduce(
+    (t, r) => ({
+      runs: t.runs + r.runs,
+      input: t.input + r.input,
+      cacheRead: t.cacheRead + r.cacheRead,
+      cacheWrite: t.cacheWrite + r.cacheWrite,
+    }),
+    { runs: 0, input: 0, cacheRead: 0, cacheWrite: 0 },
+  );
 }
 
 const zero: TokenSavedView = { estimateUsd: 0, estimateTokens: 0 };

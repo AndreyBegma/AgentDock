@@ -229,11 +229,6 @@ export class RunBoardCardDto implements RunBoardCardRequest {
   @IsOptional()
   @IsIn(orchestratorPermissionModeSchema.options)
   permissionMode?: OrchestratorPermissionMode;
-
-  /** #337 D8: run although a dependency is not in Completed. */
-  @IsOptional()
-  @IsBoolean()
-  ignoreDependencies?: boolean;
 }
 
 /** `POST /board/cards/:number/dependencies` (#337 D8). */

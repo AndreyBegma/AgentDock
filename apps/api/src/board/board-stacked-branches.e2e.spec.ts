@@ -132,7 +132,7 @@ describe('stacked card branches (e2e, #636)', () => {
     expect((await w.card(card.number)).prBase).toBeNull();
   });
 
-  it('two unmerged dependencies refuse Run with dependencies_unmerged; ignoreDependencies starts from the base', async () => {
+  it('two unmerged dependencies refuse Run with dependencies_unmerged, with no override (#638)', async () => {
     const a = await withOpenPr('A', 'feat/1-a', 77);
     const b = await withOpenPr('B', 'feat/2-b', 78);
     const card = await w.createCard({
@@ -152,9 +152,8 @@ describe('stacked card branches (e2e, #636)', () => {
     expect(w.sent('card.run')).toHaveLength(0);
 
     const forced = await w.runCard(card.number, { ignoreDependencies: true });
-    expect(forced.status).toBe(200);
-    expect(runBase()).toBe(BASE);
-    expect((await w.card(card.number)).prBase).toBeNull();
+    expect(forced.status).toBe(400);
+    expect(w.sent('card.run')).toHaveLength(0);
   });
 
   it('two dependencies, once both merged, start the card from the base', async () => {
@@ -189,9 +188,7 @@ describe('stacked card branches (e2e, #636)', () => {
       where: { id: todo.id },
       data: { branch: C1_BRANCH, prNumber: 77, prState: 'open' },
     });
-    expect(
-      (await w.runCard(todo.number, { ignoreDependencies: true })).status,
-    ).toBe(200);
+    expect((await w.runCard(todo.number)).status).toBe(200);
     const running = await w.runCard(card.number);
     expect(running.status).toBe(409);
     expect(running.body.error).toBe(BOARD_ERROR.dependencyOpen);

@@ -476,3 +476,43 @@ describe('finishRefusedText (#482)', () => {
     );
   });
 });
+
+describe('describeBoardError for dependencies (#638, #636)', () => {
+  const refused = (error: string, dependencies?: unknown) =>
+    new ApiError(409, error as never, 'refused', undefined, {
+      error,
+      ...(dependencies === undefined ? {} : { dependencies }),
+    });
+  const ref = (number: number, column: string) => ({
+    number,
+    label: `C-${number}`,
+    column,
+  });
+
+  test('dependency_open names what the Run waits for', () => {
+    expect(
+      describeBoardError(
+        refused('dependency_open', [ref(3, 'todo'), ref(5, 'in_progress')]),
+      ),
+    ).toBe('Waits for C-3 and C-5: no ready pull request to build on yet.');
+  });
+
+  test('dependencies_unmerged names the unmerged ones; there is no Run anyway', () => {
+    expect(
+      describeBoardError(
+        refused('dependencies_unmerged', [
+          ref(3, 'finished'),
+          ref(5, 'finished'),
+        ]),
+      ),
+    ).toBe(
+      'C-3 and C-5 are not merged yet; a card branches from one dependency only.',
+    );
+  });
+
+  test('without a readable list, the shared sentence', () => {
+    expect(describeBoardError(refused('dependency_open'))).toBe(
+      'A card it depends on has no ready pull request yet.',
+    );
+  });
+});

@@ -29,10 +29,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import {
-  BoardToolbar,
-  type Density,
-} from '../../../../../components/board/board-toolbar';
+import { BoardToolbar } from '../../../../../components/board/board-toolbar';
 import { BoardColumns } from '../../../../../components/board/board-view';
 import {
   CardSheet,
@@ -122,7 +119,6 @@ function BoardScreen() {
   const [older, setOlder] = useState<BoardCardView[]>([]);
   const [olderHasMore, setOlderHasMore] = useState<boolean>();
   const [loadingOlder, setLoadingOlder] = useState(false);
-  const [density, setDensity] = useState<Density>('comfortable');
   const url = useUrlFilters(boardFilterCodec);
   const live = useLivePaused();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -384,7 +380,7 @@ function BoardScreen() {
         </div>
       ) : null}
 
-      <BoardToolbar url={url} density={density} onDensityChange={setDensity} />
+      <BoardToolbar url={url} />
 
       <AsyncSection
         section={board}
@@ -408,7 +404,6 @@ function BoardScreen() {
               canTerminal={canAttach}
               actions={actions}
               filter={url.filters}
-              compact={density === 'compact'}
               olderCompleted={
                 hasMoreOlder && lastCompleted?.completedAt
                   ? { loading: loadingOlder, onLoad: () => void loadOlder() }

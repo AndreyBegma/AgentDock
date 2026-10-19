@@ -8,10 +8,10 @@ import { BoardRoundsService } from './board-rounds.service';
 import { type BoardActor, BoardWork } from './board-work';
 
 /**
- * Auto-run when ready (#443): accepting a card starts the Run of every To Do
- * card that waited for it, has the switch on and now has no open dependency
- * — as the person who accepted, under the manual Run's rules (slots, budget,
- * profile). A refusal is not queued: it is stored on the card
+ * Auto-run when ready (#443): a card reaching Finished (#638) or being
+ * accepted starts the Run of every To Do card that waited for it, has the
+ * switch on and now has no open dependency — as the person (or AgentDock)
+ * that moved it, under the manual Run's rules (slots, budget, profile). A refusal is not queued: it is stored on the card
  * (`autoRunFailure` with `after`) and audited, like a refused design
  * auto-run (#273 D9).
  */
@@ -27,15 +27,15 @@ export class BoardAutoRun implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.work.onAccepted((projectId, card, actor) =>
-      this.afterAccepted(projectId, card, actor),
+    this.work.onSatisfied((projectId, card, actor) =>
+      this.afterSatisfied(projectId, card, actor),
     );
   }
 
-  /** The dependants of `accepted` with the switch on, in number order. */
-  async afterAccepted(
+  /** The dependants of `satisfied` with the switch on, in number order. */
+  async afterSatisfied(
     projectId: string,
-    accepted: Pick<BoardCard, 'id' | 'number'>,
+    satisfied: Pick<BoardCard, 'id' | 'number'>,
     actor: BoardActor,
   ): Promise<void> {
     const cards = await this.prisma.boardCard.findMany({
@@ -43,24 +43,26 @@ export class BoardAutoRun implements OnModuleInit {
         projectId,
         column: 'todo',
         autoRunWhenReady: true,
-        dependsOn: { some: { dependsOnId: accepted.id } },
+        dependsOn: { some: { dependsOnId: satisfied.id } },
       },
       select: { id: true, number: true },
       orderBy: { number: 'asc' },
     });
     for (const card of cards) {
       if (await this.claim(card.id)) {
-        await this.start(projectId, card, accepted.number, actor);
+        await this.start(projectId, card, satisfied.number, actor);
       }
     }
   }
 
   /**
    * One UPDATE turns the switch off only while the card is a To Do card with
-   * it on and no open dependency. Every acceptance tries it after its own
-   * commit, so the last one to commit sees every dependency accepted; of
-   * acceptances that race, the row lock lets one through and the rest
-   * re-read the switch off. The Run starts exactly once.
+   * it on and no open dependency — none outside Finished and Completed
+   * (#638). Every Finished and every acceptance tries it after its own
+   * commit, so the last one to commit sees every dependency satisfied; of
+   * those that race (a dependency's Finished, then its Accept), the row lock
+   * lets one through and the rest re-read the switch off. The Run starts
+   * exactly once.
    */
   private async claim(cardId: string): Promise<boolean> {
     const count = await this.prisma.$executeRaw`
@@ -74,7 +76,7 @@ export class BoardAutoRun implements OnModuleInit {
              FROM board_card_dependencies AS dep
              JOIN board_cards AS target ON target.id = dep."dependsOnId"
             WHERE dep."cardId" = card.id
-              AND target."column" <> 'completed'
+              AND target."column" NOT IN ('finished', 'completed')
          )`;
     return count === 1;
   }
