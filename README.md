@@ -8,7 +8,6 @@
 [![Docs: Wiki](https://img.shields.io/badge/docs-wiki-6d5dfc)](https://github.com/AndreyBegma/AgentDock/wiki)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![agentdock-runner on npm](https://img.shields.io/npm/v/agentdock-runner?label=agentdock-runner)](https://www.npmjs.com/package/agentdock-runner)
-[![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/mkQARkBs4C)
 
 [**Wiki**](https://github.com/AndreyBegma/AgentDock/wiki) ·
 [Getting started](https://github.com/AndreyBegma/AgentDock/wiki/Getting-Started) ·
