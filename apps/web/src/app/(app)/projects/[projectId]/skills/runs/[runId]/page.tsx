@@ -392,6 +392,7 @@ export default function SkillRunPage() {
         target={attaching ? { kind: 'skill_run', runId } : undefined}
         title={`/${run.skill}`}
         onClose={() => setAttaching(false)}
+        backTo="Run"
       />
 
       <DialogRoot

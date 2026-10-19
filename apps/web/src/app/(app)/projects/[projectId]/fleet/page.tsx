@@ -468,6 +468,7 @@ function FleetWorkspace() {
         target={attach?.target}
         title={attach?.title ?? ''}
         onClose={() => setAttach(undefined)}
+        backTo="Fleet"
         message={
           canOperate && attach?.target.kind === 'slot'
             ? { send: slotSessionMessenger(projectId, attach.target.slot) }
