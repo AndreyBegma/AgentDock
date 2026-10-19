@@ -1,7 +1,12 @@
 import { designBytes } from '@agentdock/shared';
 import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
 import { assemblePrompt, type PromptInput } from '../planner/plan-prompt';
-import { type DesignPromptContext, designSections } from './design-prompt';
+import {
+  cardDesignPrompt,
+  type DesignPromptContext,
+  designSections,
+  frameSummary,
+} from './design-prompt';
 import { profilePreviewHtml } from './mockup-response';
 
 const context = (
@@ -14,7 +19,16 @@ const context = (
     revision: 1,
     title: 'Two columns',
     rationale: 'Dense.',
-    frames: ['Board page', 'Card tile'],
+    frames: [
+      {
+        name: 'Board page',
+        html: '<!doctype html><html><head><title>Board</title></head><body><h1>Sprint board</h1><h2>To do</h2><h2>Done</h2><p>BOARD-BODY</p></body></html>',
+      },
+      {
+        name: 'Card tile',
+        html: '<!doctype html><html><body><h1>Tile</h1><p>TILE-BODY</p></body></html>',
+      },
+    ],
   },
   profile: {
     version: 4,
@@ -77,6 +91,75 @@ describe('design turn prompt (D8)', () => {
       context({ mode: 'generate', previous: null, comments: [] }),
     ).join('\n\n');
     expect(generate).not.toContain('Its frames, in order');
+  });
+
+  // #628: a revise sends the frames the comments point at, and a summary of the rest.
+  it('sends the commented frame in full and only a summary of the others', () => {
+    const text = designSections(context()).join('\n\n');
+    expect(text).toContain('#### Frame "Card tile"');
+    expect(text).toContain('TILE-BODY');
+    expect(text).not.toContain('BOARD-BODY');
+    expect(text).toContain(
+      '- "Board page" — 1 KiB; titled "Board"; headings: "Sprint board", "To do", "Done"',
+    );
+    expect(text).toContain('`"kept"` naming the kept ones');
+  });
+
+  it('sends every frame in full when no comment of the variant points at one', () => {
+    const elsewhere = context().comments.map((c) => ({ ...c, variant: 1 }));
+    const text = designSections(context({ comments: elsewhere })).join('\n\n');
+    expect(text).toContain('BOARD-BODY');
+    expect(text).toContain('TILE-BODY');
+  });
+
+  it('summarizes a frame by its size, title and first headings', () => {
+    expect(
+      frameSummary({
+        name: 'Empty',
+        html: `<main>${'x'.repeat(3 * 1024)}</main>`,
+      }),
+    ).toBe('- "Empty" — 3 KiB');
+  });
+
+  it('keeps what is the same from turn to turn ahead of the turn itself', () => {
+    const prompt = cardDesignPrompt({
+      instructions: 'INSTRUCTIONS',
+      card: { number: 12, title: 'Tiles', body: 'Make tiles.' },
+      taskKey: 'card-12',
+      design: context(),
+    });
+    const at = (needle: string) => prompt.indexOf(needle);
+    expect(at('INSTRUCTIONS')).toBe(0);
+    expect(at('## The card')).toBeLessThan(at('## UI profile'));
+    expect(at('## Design skills')).toBeLessThan(at('# This turn'));
+    expect(at('# This turn')).toBeLessThan(at('## Design\n'));
+    expect(at('## Design\n')).toBeLessThan(at('## Open comments'));
+  });
+
+  it('summarizes the previous frames when nothing else brings the prompt under its cap', () => {
+    const huge = `<main>${'y'.repeat(150 * 1024)}</main>`;
+    const ctx = context();
+    const prompt = cardDesignPrompt({
+      instructions: 'INSTRUCTIONS',
+      card: { number: 12, title: 'Tiles', body: 'Make tiles.' },
+      taskKey: 'card-12',
+      design: {
+        ...ctx,
+        profile: ctx.profile
+          ? { ...ctx.profile, kit: 'k'.repeat(120 * 1024) }
+          : null,
+        previous: ctx.previous
+          ? {
+              ...ctx.previous,
+              frames: ctx.previous.frames.map((f) => ({ ...f, html: huge })),
+            }
+          : null,
+      },
+    });
+    expect(designBytes(prompt)).toBeLessThanOrEqual(PLAN_TURN_PROMPT_MAX_BYTES);
+    expect(prompt).toContain(
+      'Its frames, summarized (too large to include here):',
+    );
   });
 
   it('trims snippets from the end to keep the prompt under its cap, and says so', () => {

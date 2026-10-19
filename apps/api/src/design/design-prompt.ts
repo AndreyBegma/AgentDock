@@ -47,12 +47,16 @@ export interface DesignPromptContext {
   variantCount: number;
   /** `generate` draws a variant's first revision; `revise` its next (D10). */
   mode: 'generate' | 'revise';
-  /** The variant's latest revision, on a revise, with its frames' names (#441). */
+  /**
+   * The variant's latest revision, on a revise, with its frames (#441). #628:
+   * the prompt carries the frames the comments point at in full and a
+   * summary of the rest; the turn keeps what it does not change.
+   */
   previous: {
     revision: number;
     title: string;
     rationale: string;
-    frames: string[];
+    frames: { name: string; html: string }[];
   } | null;
   profile: DesignPromptProfile | null;
   /** The design skills to apply, installed ones only (D15). */
@@ -138,31 +142,78 @@ export const designWhat = (
     ? `Draw variant ${ctx.variant} of ${ctx.variantCount} of the mockup of ${subject}.`
     : `Revise variant ${ctx.variant} of the mockup of ${subject}: draw its revision ${(ctx.previous?.revision ?? 0) + 1}, answering the open comments.`;
 
+/** Headings a frame summary lists, and the characters each keeps. */
+const SUMMARY_HEADINGS_MAX = 8;
+const SUMMARY_TEXT_MAX = 60;
+
+const plainText = (html: string): string =>
+  html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const clip = (text: string): string =>
+  text.length > SUMMARY_TEXT_MAX
+    ? `${text.slice(0, SUMMARY_TEXT_MAX - 1)}…`
+    : text;
+
 /**
- * The design turn's sections. `snippetLimit` caps how many of the profile's
- * snippets are included, so a large kit can still fit the prompt cap; the
- * section says when some were left out.
+ * #628: one line that stands in for a frame a revision does not send in
+ * full — its size, its `<title>` and its first headings.
  */
-export const designSections = (
+export const frameSummary = (frame: { name: string; html: string }): string => {
+  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(frame.html);
+  const headings = [
+    ...frame.html.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi),
+  ]
+    .map((m) => clip(plainText(m[1] ?? '')))
+    .filter((h) => h.length > 0)
+    .slice(0, SUMMARY_HEADINGS_MAX);
+  const parts = [
+    `${Math.max(1, Math.round(designBytes(frame.html) / 1024))} KiB`,
+    title && plainText(title[1] ?? '')
+      ? `titled "${clip(plainText(title[1] ?? ''))}"`
+      : null,
+    headings.length > 0
+      ? `headings: ${headings.map((h) => `"${h}"`).join(', ')}`
+      : null,
+  ].filter((p): p is string => p !== null);
+  return `- "${frame.name}" — ${parts.join('; ')}`;
+};
+
+/**
+ * #628: the names of the previous revision's frames a revise sends in full —
+ * those an open comment left on this variant points at. With none, every
+ * frame: the turn has nothing to narrow it down.
+ */
+export const framesInFull = (ctx: DesignPromptContext): Set<string> => {
+  const frames = ctx.previous?.frames ?? [];
+  const names = new Set(frames.map((f) => f.name.toLowerCase()));
+  const pointed = new Set(
+    ctx.comments
+      .filter((c) => c.variant === ctx.variant)
+      .map((c) => c.frame.toLowerCase())
+      .filter((name) => names.has(name)),
+  );
+  return pointed.size > 0 ? pointed : names;
+};
+
+/**
+ * #628: the parts of a design turn that stay the same from turn to turn of
+ * one design — the UI profile and the skills. They come before the turn's
+ * own sections, so the prompt's changing part is its tail. `snippetLimit`
+ * caps how many of the profile's snippets are included, so a large kit can
+ * still fit the prompt cap; the section says when some were left out.
+ */
+export const designProfileSections = (
   ctx: DesignPromptContext,
   snippetLimit = Number.POSITIVE_INFINITY,
 ): string[] => {
-  const sections = [
-    '## Design',
-    [
-      `Variant: ${ctx.variant} (of ${ctx.variantCount}).`,
-      ctx.previous
-        ? `Your latest revision of this variant is revision ${ctx.previous.revision}: "${ctx.previous.title}". Its rationale: ${ctx.previous.rationale}`
-        : null,
-      ctx.previous
-        ? `Its frames, in order: ${ctx.previous.frames.map((f) => `"${f}"`).join(', ')}. Draw the whole revision again: keep the frames the comments leave alone, and change, add or drop frames as they ask. A comment names the frame it was left on in \`leftOn.frame\`.`
-        : null,
-      'Use one frame unless the task touches several pages or several standalone components; then draw one frame per page, plus one per component that matters on its own.',
-      `Answer with the \`agentdock-plan\` block — \`"variant": ${ctx.variant}\`, and \`"frames"\` naming each frame in order — and one \`agentdock-design\` block per frame, each fenced with four backticks.`,
-    ]
-      .filter((l): l is string => l !== null)
-      .join('\n'),
-  ];
+  const sections: string[] = [];
   const profile = ctx.profile;
   if (!profile) {
     sections.push(
@@ -200,6 +251,65 @@ export const designSections = (
       ? `Apply these installed skills: ${ctx.skills.map((s) => `\`${s}\``).join(', ')}.`
       : 'None.',
   );
+  return sections;
+};
+
+/** #628: a revise's previous revision — the frames in play in full, the rest summarized. */
+const previousSections = (
+  ctx: DesignPromptContext,
+  withHtml: boolean,
+): string[] => {
+  const previous = ctx.previous;
+  if (!previous) return [];
+  const full = withHtml ? framesInFull(ctx) : new Set<string>();
+  const sent = previous.frames.filter((f) => full.has(f.name.toLowerCase()));
+  const summarized = previous.frames.filter(
+    (f) => !full.has(f.name.toLowerCase()),
+  );
+  return [
+    `### Revision ${previous.revision}`,
+    ...sent.map((f) => `#### Frame "${f.name}"\n${fence('html', f.html)}`),
+    ...(summarized.length > 0
+      ? [
+          sent.length > 0
+            ? 'The other frames, summarized:'
+            : 'Its frames, summarized (too large to include here):',
+          summarized.map(frameSummary).join('\n'),
+        ]
+      : []),
+  ];
+};
+
+/**
+ * The turn's own sections: the variant, on a revise the previous revision
+ * (#628: only the frames the comments point at in full), and the open
+ * comments. `withHtml` false summarizes every previous frame, the last resort
+ * of a prompt over its cap.
+ */
+export const designTurnSections = (
+  ctx: DesignPromptContext,
+  withHtml = true,
+): string[] => {
+  const previous = ctx.previous;
+  const sections = [
+    '## Design',
+    [
+      `Variant: ${ctx.variant} (of ${ctx.variantCount}).`,
+      previous
+        ? `Your latest revision of this variant is revision ${previous.revision}: "${previous.title}". Its rationale: ${previous.rationale}`
+        : null,
+      previous
+        ? `Its frames, in order: ${previous.frames.map((f) => `"${f.name}"`).join(', ')}. Change, add or drop frames as the comments ask. A comment names the frame it was left on in \`leftOn.frame\`. Keep every frame the comments leave alone: name it in \`"kept"\` and give it no design block — AgentDock copies it from revision ${previous.revision} as it is.`
+        : null,
+      'Use one frame unless the task touches several pages or several standalone components; then draw one frame per page, plus one per component that matters on its own.',
+      previous
+        ? `Answer with the \`agentdock-plan\` block — \`"variant": ${ctx.variant}\`, \`"frames"\` naming each frame of the revision in order, kept ones included, and \`"kept"\` naming the kept ones — and one \`agentdock-design\` block per frame you draw, in order, each fenced with four backticks.`
+        : `Answer with the \`agentdock-plan\` block — \`"variant": ${ctx.variant}\`, and \`"frames"\` naming each frame in order — and one \`agentdock-design\` block per frame, each fenced with four backticks.`,
+    ]
+      .filter((l): l is string => l !== null)
+      .join('\n'),
+    ...previousSections(ctx, withHtml),
+  ];
   if (ctx.comments.length > 0) {
     sections.push(
       '## Open comments',
@@ -209,6 +319,19 @@ export const designSections = (
   }
   return sections;
 };
+
+/**
+ * The design turn's sections: the stable profile and skills first, then the
+ * turn's own (#628).
+ */
+export const designSections = (
+  ctx: DesignPromptContext,
+  snippetLimit = Number.POSITIVE_INFINITY,
+  withHtml = true,
+): string[] => [
+  ...designProfileSections(ctx, snippetLimit),
+  ...designTurnSections(ctx, withHtml),
+];
 
 /** The write turn's section for a task with an approved design (D16). */
 export const approvedDesignSections = (d: ApprovedDesignContext): string[] => [
@@ -287,20 +410,28 @@ interface DesignTurnHost {
   design: DesignPromptContext;
 }
 
+/**
+ * #628: what stays the same across the turns of one design comes first —
+ * the instructions, the contract, the owner, the reference design, the
+ * profile and the skills — and the turn's own action, variant, previous
+ * revision and comments last.
+ */
 const designTurnPromptWith = (
   host: DesignTurnHost,
-  design: string[],
+  profile: string[],
+  turn: string[],
   reference: string[],
 ): string => {
   const sections = [
     host.instructions.trim(),
     plannerOutputContract(CARD_DESIGN_CONTRACT_VERSION).trim(),
+    ...host.ownSections,
+    ...reference,
+    ...profile,
     '# This turn',
     `Action: \`design\`. ${designWhat(`${host.subject} (\`${host.taskKey}\`)`, host.design)}`,
     `Answer with exactly one \`${PLANNER_BLOCK_TAG}\` block whose \`action\` is \`design\` and whose \`taskKey\` is \`${host.taskKey}\`.`,
-    ...host.ownSections,
-    ...reference,
-    ...design,
+    ...turn,
   ];
   return `${sections.join('\n\n')}\n`;
 };
@@ -327,18 +458,20 @@ const stackReferenceSections = (
 
 /**
  * A design turn's prompt under the `plan.turn` cap: a large kit's snippets
- * are trimmed from the end first, then a reference design's HTML.
+ * are trimmed from the end first, then a reference design's HTML, then
+ * (#628) the previous revision's HTML.
  */
 const fittedDesignPrompt = (
   host: DesignTurnHost,
   reference: StackDesignReference | null,
 ): string => {
   const count = host.design.profile?.snippets.length ?? 0;
-  const build = (keep: number, withHtml: boolean) =>
+  const build = (keep: number, withReference: boolean, withFrames = true) =>
     designTurnPromptWith(
       host,
-      designSections(host.design, keep),
-      reference ? stackReferenceSections(reference, withHtml) : [],
+      designProfileSections(host.design, keep),
+      designTurnSections(host.design, withFrames),
+      reference ? stackReferenceSections(reference, withReference) : [],
     );
   let prompt = build(count, true);
   for (
@@ -350,6 +483,9 @@ const fittedDesignPrompt = (
   }
   if (reference && designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES) {
     prompt = build(0, false);
+  }
+  if (designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES) {
+    prompt = build(0, false, false);
   }
   return prompt;
 };

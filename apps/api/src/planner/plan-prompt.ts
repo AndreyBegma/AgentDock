@@ -217,6 +217,10 @@ export const assemblePrompt = (input: PromptInput): string => {
   ) {
     prompt = assembleWith(input, designSections(design, keep));
   }
+  // #628: last, the previous revision's frames are summarized only.
+  if (designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES) {
+    prompt = assembleWith(input, designSections(design, 0, false));
+  }
   return prompt;
 };
 

@@ -495,6 +495,50 @@ describe('fleet from events.jsonl (e2e)', () => {
     expect((await detail()).checkpoints).toHaveLength(2);
   });
 
+  it('keeps a run the collectors ended when a snapshot still lists it live, and the batch is acked', async () => {
+    const snapshot = (second: number) =>
+      observed(
+        second,
+        'orchestrator.snapshot',
+        {
+          state: {
+            v: 1,
+            updatedAt: at(second),
+            repo: REPO,
+            slots: {
+              i42: {
+                issue: 42,
+                model: 'opus',
+                status: 'running',
+                pr: null,
+                dispatchedAt: at(4),
+                endedAt: null,
+              },
+            },
+            personNeeded: [],
+          },
+        },
+        { source: 'code-sentinel' },
+      );
+    await send([snapshot(20)]);
+    await send([
+      observed(21, 'session.appeared', { name: 'cs-i42' }, { slot: 'i42' }),
+      observed(22, 'session.vanished', { name: 'cs-i42' }, { slot: 'i42' }),
+      observed(
+        23,
+        'worktree.changed',
+        { path: '/srv/dev/.wt-widget-i42', exists: false },
+        { slot: 'i42' },
+      ),
+    ]);
+    expect((await detail()).status).toBe('ended');
+
+    // The same dispatch read again from state.json: no second run, no throw.
+    await send([snapshot(24)]);
+    expect(await runs()).toBe(1);
+    expect((await detail()).status).toBe('ended');
+  });
+
   it('returns fleetChannel only on /fleet, which a non-member cannot read', async () => {
     await send([read(LOG[3])]);
     expect((await outsider.get(`/projects/${projectId}/fleet`)).status).toBe(

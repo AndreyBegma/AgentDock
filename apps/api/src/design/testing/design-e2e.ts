@@ -27,11 +27,16 @@ export const designResult = (
     title?: string;
     rationale?: string;
     addressed?: string[];
+    /** #628: frames named but left as the previous revision drew them. */
+    kept?: string[];
   },
   html: string | readonly { name: string; html: string }[] = MOCKUP,
 ): string => {
   const frames = typeof html === 'string' ? null : html;
-  const bodies = frames ? frames.map((f) => f.html) : [html as string];
+  const kept = new Set(output.kept ?? []);
+  const bodies = frames
+    ? frames.filter((f) => !kept.has(f.name)).map((f) => f.html)
+    : [html as string];
   return `${block({
     action: 'design',
     taskKey: output.taskKey,
@@ -40,6 +45,7 @@ export const designResult = (
     rationale: output.rationale ?? 'A single column.',
     addressed: output.addressed ?? [],
     ...(frames ? { frames: frames.map((f) => f.name) } : {}),
+    ...(output.kept ? { kept: output.kept } : {}),
   })}\n${bodies
     .map((b) => `\`\`\`\`${PLANNER_DESIGN_BLOCK_TAG}\n${b}\n\`\`\`\``)
     .join('\n\n')}\n`;

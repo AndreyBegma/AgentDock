@@ -564,6 +564,64 @@ describe('parsePlannerOutput — design', () => {
     expectViolation(parsePlannerOutput(text, 'design', ctx), 'frame_mismatch');
   });
 
+  // #628: a revise draws the frames it changes and keeps the rest.
+  const previousFrames = [
+    { name: 'Page', html: html.replace('Facts', 'Old page') },
+    { name: 'Tile', html: html.replace('Facts', 'Old tile') },
+  ];
+  const keeping = (names: string[], kept: string[], bodies: string[]) =>
+    `${fence({ ...design, frames: names, kept })}\n\n${bodies.map(block).join('\n\n')}\n`;
+
+  it('copies a kept frame from the previous revision, in its place', () => {
+    const r = parsePlannerOutput(
+      keeping(['Page', 'Tile'], ['Page'], [html.replace('Facts', 'New tile')]),
+      'design',
+      { ...ctx, previousFrames },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.frames).toEqual([
+        previousFrames[0],
+        { name: 'Tile', html: html.replace('Facts', 'New tile') },
+      ]);
+      expect(r.output.kept).toEqual(['Page']);
+    }
+  });
+
+  it('keeps every frame with no design block at all', () => {
+    const r = parsePlannerOutput(
+      keeping(['Page', 'Tile'], ['page', 'Tile'], []),
+      'design',
+      { ...ctx, previousFrames },
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.frames).toEqual(previousFrames);
+  });
+
+  it.each([
+    [
+      'a kept frame the previous revision lacks',
+      keeping(['Page', 'Card'], ['Card'], [html]),
+    ],
+    ['a kept frame frames does not list', keeping(['Page'], ['Tile'], [html])],
+    [
+      'a block for a kept frame too',
+      keeping(['Page', 'Tile'], ['Page'], [html, html]),
+    ],
+  ])('refuses %s as frame_mismatch', (_, text) => {
+    expectViolation(
+      parsePlannerOutput(text, 'design', { ...ctx, previousFrames }),
+      'frame_mismatch',
+    );
+  });
+
+  it('keeps nothing on a generate: there is no previous revision', () => {
+    expectViolation(
+      parsePlannerOutput(keeping(['Page'], ['Page'], []), 'design', ctx),
+      'frame_mismatch',
+    );
+  });
+
   it('caps the frames together, and names the frame that breaks a rule', () => {
     const half = `<p>${'x'.repeat(90 * 1024)}</p>`;
     expectViolation(

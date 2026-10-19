@@ -252,11 +252,17 @@ export class SlotProjection {
       (!prior || !dispatchedAt || prior >= dispatchedAt);
     if (sameRun) return this.update(row, source, patch, extra);
     if (options.create === false) return;
-    const later = await this.tx.slot.findFirst({
-      where: { projectId: this.project.id, name, startedAt: { gt: startedAt } },
+    // A run already started at this dispatch (one the collectors ended) is
+    // the same run: creating it again breaks the unique key and the batch.
+    const sameOrLater = await this.tx.slot.findFirst({
+      where: {
+        projectId: this.project.id,
+        name,
+        startedAt: { gte: startedAt },
+      },
       select: { id: true },
     });
-    if (later) return;
+    if (sameOrLater) return;
     return this.create(name, source, patch, { startedAt, extra });
   }
 

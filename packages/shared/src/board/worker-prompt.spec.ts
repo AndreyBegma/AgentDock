@@ -244,9 +244,7 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
 
   it('forbids rewriting a pushed commit in the stable part (#630)', () => {
     const prompt = cardWorkerPrompt(card);
-    const rule = prompt.indexOf(
-      'Never amend, rebase or reset a commit AgentDock already pushed',
-    );
+    const rule = prompt.indexOf('Never amend, rebase or reset a pushed commit');
     expect(rule).toBeGreaterThan(prompt.indexOf('## How to work'));
     expect(rule).toBeLessThan(prompt.indexOf('## Card C-12'));
   });
@@ -375,8 +373,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 17', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(17);
+  it('is version 18', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(18);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
