@@ -4,7 +4,12 @@ import { emptySummary } from '../../lib/token-saver/summary';
 import { DescriptionIncompleteBadge } from './description-incomplete-badge';
 import { FilterBreakdown } from './filter-breakdown';
 import { SavedBadge } from './saved-badge';
-import { SummaryTiles } from './summary-tiles';
+import {
+  PromptCacheTable,
+  UnfilteredProgramTable,
+  UnfilteredReasonTable,
+} from './summary-tables';
+import { PromptCacheTile, SummaryTiles } from './summary-tiles';
 
 describe('SavedBadge (#445 D13)', () => {
   test('shows "saved ≈ $x" with the tokens behind it', () => {
@@ -69,7 +74,9 @@ describe('FilterBreakdown (#445 D13)', () => {
 
   test('lists each filter with its saving and counts, in the order given', () => {
     const html = renderToStaticMarkup(<FilterBreakdown filters={filters} />);
-    expect(html.indexOf('js/jest')).toBeLessThan(html.indexOf('uncovered'));
+    expect(html.indexOf('js/jest')).toBeLessThan(
+      html.indexOf('runner too old to say why'),
+    );
     expect(html).toContain('≈ $0.30');
     expect(html).toContain('4 commands');
     expect(html).toContain('1 raw');
@@ -135,5 +142,90 @@ describe('SummaryTiles', () => {
     );
     expect(html).toContain('No filtered command in this range');
     expect(html).not.toContain('0%');
+  });
+});
+
+describe('the unfiltered breakdown (#648)', () => {
+  const none = (filter: string, commands: number) => ({
+    filter,
+    estimateUsd: 0,
+    estimateTokens: 0,
+    commands,
+    bypassed: 0,
+    passedThrough: commands,
+  });
+
+  test('a row per reason, the legacy one named as an old runner', () => {
+    const html = renderToStaticMarkup(
+      <UnfilteredReasonTable
+        filters={[none('none', 3), none('none:uncovered', 1)]}
+      />,
+    );
+    expect(html).toContain('Compound command (not filtered)');
+    expect(html).toContain('No filter for this command');
+    expect(html).toContain('Not filtered in this permission mode');
+    expect(html).toContain('No filter (runner too old to say why)');
+    expect(html).toContain('75%');
+  });
+
+  test('lists the programs with their command counts', () => {
+    const html = renderToStaticMarkup(
+      <UnfilteredProgramTable
+        programs={[
+          { program: 'git log', commands: 12 },
+          { program: 'ls', commands: 4 },
+        ]}
+        empty={<p>none</p>}
+      />,
+    );
+    expect(html).toContain('git log');
+    expect(html).toContain('12');
+    expect(
+      renderToStaticMarkup(
+        <UnfilteredProgramTable programs={[]} empty={<p>none</p>} />,
+      ),
+    ).toBe('<p>none</p>');
+  });
+});
+
+describe('the prompt cache (#648)', () => {
+  const summary = {
+    ...emptySummary('2026-10-01T00:00:00.000Z', '2026-11-01T00:00:00.000Z'),
+    promptCache: [
+      {
+        runKind: 'card' as const,
+        runs: 2,
+        input: 1_000,
+        cacheRead: 8_000,
+        cacheWrite: 1_000,
+      },
+    ],
+  };
+
+  test('the tile shows the measured read share and input per run', () => {
+    const html = renderToStaticMarkup(<PromptCacheTile summary={summary} />);
+    expect(html).toContain('80%');
+    expect(html).toContain('5k input tokens per run');
+  });
+
+  test('the tile shows a dash without runs', () => {
+    const html = renderToStaticMarkup(
+      <PromptCacheTile
+        summary={emptySummary(
+          '2026-10-01T00:00:00.000Z',
+          '2026-11-01T00:00:00.000Z',
+        )}
+      />,
+    );
+    expect(html).toContain('No ended run with usage in this range');
+  });
+
+  test('the table has a row per run kind', () => {
+    const html = renderToStaticMarkup(
+      <PromptCacheTable rows={summary.promptCache} empty={null} />,
+    );
+    expect(html).toContain('Card worker');
+    expect(html).toContain('80%');
+    expect(html).toContain('5k');
   });
 });
