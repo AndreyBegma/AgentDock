@@ -1,3 +1,4 @@
+import { AI_DIGEST_EVENT_RULES } from '../ai/activity-rules';
 import type { AuditActorType, AuditResult } from '../audit/actions';
 import { CARD_BACKGROUND_STALLED_EVENT } from '../board/contracts';
 import { cardBackgroundStalledTitle } from '../board/naming';
@@ -348,6 +349,8 @@ const EVENT_RULES: Record<string, EventRule> = {
     },
   },
   ...STEWARD_EVENT_RULES,
+  // #658: the daily AI digest, sent or skipped.
+  ...AI_DIGEST_EVENT_RULES,
 };
 
 /** Every event type the feed shows — the projector's `type IN (…)` filter. */
