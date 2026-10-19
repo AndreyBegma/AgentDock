@@ -9,6 +9,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BoardModule } from './board';
+import { BoardAiModule } from './board-ai';
 import { BudgetsModule } from './budgets';
 import { BullmqModule } from './bullmq';
 import { CaptureModule } from './capture';
@@ -119,6 +120,8 @@ import { WorkflowsModule } from './workflows';
     WebhooksModule,
     // Issue #608: the assistant, on the LLM gateway (ADR-0060).
     AssistantModule,
+    // #660: Ask the Board and triage hints.
+    BoardAiModule,
   ],
   controllers: [HealthController],
 })

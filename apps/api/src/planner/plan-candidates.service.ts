@@ -25,6 +25,7 @@ import { AttachmentsService } from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
 import { BoardPlanCards } from '../board/board-plan-cards';
 import { BoardStacks } from '../board/board-stacks';
+import { BoardTriage } from '../board-ai/board-triage.service';
 import { PrismaService } from '../database/prisma.service';
 import type { PlanActor } from './plan.service';
 import { PlanStore } from './plan-store';
@@ -160,6 +161,7 @@ export class PlanCandidatesService {
     private readonly stacks: BoardStacks,
     private readonly attachments: AttachmentsService,
     private readonly audit: AuditService,
+    private readonly triage: BoardTriage,
   ) {}
 
   /**
@@ -376,6 +378,11 @@ export class PlanCandidatesService {
       );
     }
     for (const planId of planIds) this.store.publish(projectId, planId);
+    // #660: hints for the new cards, in the background.
+    await this.triage.request(
+      made.cards.map((card) => card.id),
+      actor.userId,
+    );
     return {
       cards: made.cards.map((card, i) => ({
         candidateId: made.placed[i].row.id,

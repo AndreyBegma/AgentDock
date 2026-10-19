@@ -98,6 +98,8 @@ export interface LlmCompletion {
   stopReason: LlmStopReason;
   /** Decimal string, USD. */
   costUsd: string;
+  /** The call's `llm_calls` row. */
+  callId?: string;
 }
 
 export const emptyUsage = (): TokenBuckets => ({

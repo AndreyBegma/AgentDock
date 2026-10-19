@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { ActivityQueryService } from '../../activity/activity-query.service';
 import { ApprovalsQueryService } from '../../approvals/approvals-query.service';
 import { BoardService } from '../../board/board.service';
+import { BoardTriage } from '../../board-ai/board-triage.service';
 import { BudgetsService } from '../../budgets/budgets.service';
 import { PrismaService } from '../../database/prisma.service';
 import { FleetQueryService } from '../../fleet/fleet-query.service';
@@ -79,6 +80,7 @@ export class AssistantBoardTools implements OnModuleInit {
     private readonly sessions: SessionsQueryService,
     private readonly approvals: ApprovalsQueryService,
     private readonly requests: ActionRequestsService,
+    private readonly triage: BoardTriage,
   ) {}
 
   onModuleInit(): void {
@@ -310,6 +312,8 @@ export class AssistantBoardTools implements OnModuleInit {
             { title: input.title, body: input.body, kind: input.kind },
             { userId: ctx.user.id, role: p.role, ctx: ctx.ctx },
           );
+          // #660: hints for the new card, in the background.
+          await this.triage.request([card.id], ctx.user.id);
           return {
             summary: `Queued ${card.label} in To Do`,
             data: { number: card.number, label: card.label, column: 'todo' },
