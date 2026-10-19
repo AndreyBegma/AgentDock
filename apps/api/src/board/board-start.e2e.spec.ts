@@ -2,7 +2,7 @@ import type { BoardCardDetail } from '@agentdock/shared';
 import { BoardWorld } from './testing/board-e2e';
 
 /**
- * #640 (ADR-0063): round 1 of a card branches from its one unmerged
+ * #640 (ADR-0064): round 1 of a card branches from its one unmerged
  * dependency's branch; from the project's base with none or several, naming
  * the several. Later rounds keep it; the pull request targets the base.
  */

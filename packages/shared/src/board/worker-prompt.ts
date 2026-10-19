@@ -29,11 +29,12 @@ import type { BoardCardKind } from './types';
  * (C-131): card-supplied text — title, body, feedback, design text, the
  * project's checks — sits in a `<card>` data fence. Version 16 (C-227): the
  * project's `## Project coding rules` section. Version 17 (C-254): the
- * stable text trimmed, no rule dropped. Version 18 (#640): the branch a
- * card started from when a dependency is not merged, and the unmerged
- * dependencies whose code the branch does not have.
+ * stable text trimmed, no rule dropped. Version 18 (#630): never rewrite a
+ * commit AgentDock pushed. Version 19 (#640): the
+ * branch a card started from when a dependency is not merged, and the
+ * unmerged dependencies whose code the branch does not have.
  */
-export const CARD_WORKER_PROMPT_VERSION = 18;
+export const CARD_WORKER_PROMPT_VERSION = 19;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -66,6 +67,14 @@ const E2E_SCOPE_LINE =
  */
 const COMMIT_TRAILER_LINE =
   '- Never add a Claude attribution trailer or footer to a commit message (`Co-Authored-By: Claude …`, `Claude-Session: …`, "Generated with Claude Code"); AgentDock does not push one; reword any it names (do not push).';
+
+/**
+ * #630: a worker amended a pushed commit, and every later push was refused as
+ * a non-fast-forward. The runner reconciles a rewrite it can prove is the
+ * worker's own; the brief keeps it from happening.
+ */
+const PUSHED_HISTORY_LINE =
+  '- Never amend, rebase or reset a pushed commit; add a new one.';
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
@@ -157,7 +166,7 @@ export interface CardWorkerPromptInput {
    */
   projectRules?: string | null;
   /**
-   * #640 (ADR-0063): the one unmerged dependency whose branch `branch` was
+   * #640 (ADR-0064): the one unmerged dependency whose branch `branch` was
    * created from; the pull request still targets `base`. Absent or `null`:
    * `branch` was created from `base`.
    */
@@ -503,6 +512,7 @@ const assemblePrompt = (
     ...(card.tokenSaver ? [ONE_COMMAND_LINE] : []),
     ...LOCAL_ENVIRONMENT_LINES,
     '- Do not push and do not open a pull request: AgentDock pushes your commits.',
+    PUSHED_HISTORY_LINE,
     '- If anything is unclear, ask and wait.',
     '',
     ...REGISTER_LINES,

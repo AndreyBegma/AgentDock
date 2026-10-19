@@ -242,6 +242,13 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
     }
   });
 
+  it('forbids rewriting a pushed commit in the stable part (#630)', () => {
+    const prompt = cardWorkerPrompt(card);
+    const rule = prompt.indexOf('Never amend, rebase or reset a pushed commit');
+    expect(rule).toBeGreaterThan(prompt.indexOf('## How to work'));
+    expect(rule).toBeLessThan(prompt.indexOf('## Card C-12'));
+  });
+
   it('asks for one command per Bash call in How to work, with Token saver on (#445 amendment 11)', () => {
     const prompt = cardWorkerPrompt({ ...card, tokenSaver: true });
     const rule = prompt.indexOf('Run one command per Bash call');
@@ -366,8 +373,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 16', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(18);
+  it('is version 19', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(19);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -799,7 +806,7 @@ describe('card text is fenced as data (C-131)', () => {
   });
 });
 
-describe('worker prompt v18 — the branch a card starts from (#640)', () => {
+describe('worker prompt v19 — the branch a card starts from (#640)', () => {
   const plain: CardWorkerPromptInput = { ...card, design: null };
 
   it('names the base alone when the branch starts from it', () => {

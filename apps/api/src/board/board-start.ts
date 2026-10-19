@@ -9,7 +9,7 @@ export interface StartDependency {
   mergedAt: Date | null;
 }
 
-/** #640 (ADR-0063): what a card's round 1 creates its branch from. */
+/** #640 (ADR-0064): what a card's round 1 creates its branch from. */
 export interface CardStart {
   /** The project's base, or the one unmerged dependency's branch. */
   base: string;
@@ -43,7 +43,7 @@ export const unmergedDependencies = (
     .sort((a, b) => a.number - b.number);
 
 /**
- * #640 (ADR-0063): exactly one unmerged dependency — its branch, when the
+ * #640 (ADR-0064): exactly one unmerged dependency — its branch, when the
  * runner can start from one (`canStartFrom`); none — the project's base;
  * two or more — the project's base, and they are the missing ones. A runner
  * that cannot start from a branch leaves the one dependency missing too.

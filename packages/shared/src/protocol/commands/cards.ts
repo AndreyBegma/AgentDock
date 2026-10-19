@@ -176,7 +176,7 @@ export type CardDraftPullRequest = z.infer<typeof cardDraftPullRequestSchema>;
  * existing worktree before it resumes the session — the follow-up of a
  * merged card. `branch` must not exist yet, locally or on the remote.
  *
- * #640 (ADR-0063): with `startFrom`, a new branch is created from
+ * #640 (ADR-0064): with `startFrom`, a new branch is created from
  * `origin/<startFrom>` — a dependency card's unmerged branch, fetched first —
  * instead of `origin/<base>`. Only where the runner creates `branch` (it
  * exists neither locally nor on origin); `base` stays what the PR targets and

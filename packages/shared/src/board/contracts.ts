@@ -473,7 +473,7 @@ export interface BoardCardDetail extends BoardCardView {
   /** Fixed at the first Run (D5). */
   branch: string | null;
   /**
-   * #640 (ADR-0063): what round 1 created `branch` from, fixed with it;
+   * #640 (ADR-0064): what round 1 created `branch` from, fixed with it;
    * `null` before the first Run and for a card started before #640.
    */
   start: CardStartView | null;
@@ -511,7 +511,7 @@ export interface BoardCardDetail extends BoardCardView {
   attachments: AttachmentView[];
 }
 
-/** #640 (ADR-0063): the branch a card's round 1 started from. */
+/** #640 (ADR-0064): the branch a card's round 1 started from. */
 export interface CardStartView {
   /** The project's base, or the one unmerged dependency's branch. */
   base: string;

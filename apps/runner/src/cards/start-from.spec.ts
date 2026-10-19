@@ -7,7 +7,7 @@ import { cardsWorkspace } from './testing';
 setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS * 2);
 
 /**
- * #640 (ADR-0063): round 1 of a card that depends on an unmerged card
+ * #640 (ADR-0064): round 1 of a card that depends on an unmerged card
  * branches from that card's branch on origin; without `startFrom` it
  * branches from the base, as before.
  */

@@ -438,7 +438,7 @@ export class BoardRoundsService {
     const target = resolveSpecTarget(project);
     const specDir = target.kind === 'code_repo' ? target.specDir : null;
     const firstStart = !resume;
-    // #640 (ADR-0063): round 1 picks what its branch is created from; later
+    // #640 (ADR-0064): round 1 picks what its branch is created from; later
     // rounds reuse it.
     const canStartFrom =
       (firstStart ||
@@ -1113,7 +1113,7 @@ export class BoardRoundsService {
     }
   }
 
-  /** #640: whether the runner takes `card.run` `startFrom` (ADR-0063). */
+  /** #640: whether the runner takes `card.run` `startFrom` (ADR-0064). */
   private async startsFrom(runnerId: string): Promise<boolean> {
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
@@ -1123,7 +1123,7 @@ export class BoardRoundsService {
     return capabilities.success && cardStartFromAvailable(capabilities.data);
   }
 
-  /** #640 (ADR-0063): what round 1 of the card creates its branch from. */
+  /** #640 (ADR-0064): what round 1 of the card creates its branch from. */
   private async chooseStart(
     cardId: string,
     projectBase: string,

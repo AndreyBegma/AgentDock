@@ -3,6 +3,7 @@ import {
   type AssistantCardDraft,
   type AssistantStreamEvent,
   type AssistantToolStep,
+  type LlmProviderId,
   llmModelSeesImages,
   projectRoleAtLeast,
 } from '@agentdock/shared';
@@ -175,7 +176,7 @@ export class AssistantChat {
         { role: 'user', content: attached.length > 0 ? latest : message },
       ];
 
-      const toolCtx = this.toolContext(input, state, events);
+      const toolCtx = this.toolContext(input, picked.provider, state, events);
       const replies: string[] = [];
       const calls: LlmToolCall[] = [];
       const steps: AssistantToolStep[] = [];
@@ -191,6 +192,11 @@ export class AssistantChat {
           user,
           project: state.project,
           ambiguous: state.project ? [] : ambiguous,
+          codeTools: {
+            read: this.tools.get('read_file', picked.provider) !== undefined,
+            ask:
+              this.tools.get('ask_code_agent', picked.provider) !== undefined,
+          },
         });
         try {
           for await (const event of this.gateway.stream(
@@ -203,7 +209,10 @@ export class AssistantChat {
                 system,
                 messages,
                 // The last call answers: no more tool rounds.
-                tools: n < MAX_CALLS - 1 ? this.tools.definitions() : undefined,
+                tools:
+                  n < MAX_CALLS - 1
+                    ? this.tools.definitions(picked.provider)
+                    : undefined,
                 maxTokens: MAX_TOKENS,
               },
               signal: input.signal,
@@ -320,6 +329,7 @@ export class AssistantChat {
 
   private toolContext(
     input: TurnInput,
+    provider: LlmProviderId,
     state: { project: ToolProject | null },
     events: AssistantStreamEvent[],
   ): AssistantToolContext {
@@ -328,6 +338,8 @@ export class AssistantChat {
       user,
       ctx: input.ctx,
       conversationId: input.conversationId,
+      provider,
+      signal: input.signal,
       project: async (need, projectId) => {
         const id = projectId ?? state.project?.id;
         if (!id) {
@@ -367,10 +379,12 @@ export class AssistantChat {
     call: LlmToolCall,
     ctx: AssistantToolContext,
   ): Promise<{ step: AssistantToolStep; content: string; isError: boolean }> {
-    const tool = this.tools.get(call.name);
-    const failed = (message: string) => ({
+    const tool = this.tools.get(call.name, ctx.provider);
+    const failed = (message: string, code?: string) => ({
       step: { id: call.id, name: call.name, ok: false, summary: message },
-      content: JSON.stringify({ error: message }),
+      content: JSON.stringify(
+        code ? { error: message, code } : { error: message },
+      ),
       isError: true,
     });
     if (!tool) return failed(`There is no tool ${call.name}`);
@@ -393,7 +407,9 @@ export class AssistantChat {
         isError: false,
       };
     } catch (error) {
-      if (error instanceof AssistantToolError) return failed(error.message);
+      if (error instanceof AssistantToolError) {
+        return failed(error.message, error.code);
+      }
       if (error instanceof HttpException) {
         const body = error.getResponse();
         const message =

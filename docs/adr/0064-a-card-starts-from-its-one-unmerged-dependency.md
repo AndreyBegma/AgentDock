@@ -1,4 +1,4 @@
-# ADR-0063: A card starts from its one unmerged dependency
+# ADR-0064: A card starts from its one unmerged dependency
 
 Status: accepted · Date: 2026-10-19 ·
 Issue: [#640](https://github.com/AndreyBegma/AgentDock/issues/640) ·

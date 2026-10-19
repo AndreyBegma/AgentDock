@@ -13,7 +13,26 @@ export interface SystemPromptInput {
   project: (PromptProject & { role: string }) | null;
   /** Auto, the message names several: the assistant asks which one. */
   ambiguous: PromptProject[];
+  /** The code tools offered with this turn's model (#622). */
+  codeTools: { read: boolean; ask: boolean };
 }
+
+/** #622, ADR-0063: how to answer a question about the code. */
+const codeLines = (tools: SystemPromptInput['codeTools']): string[] => {
+  if (!tools.read && !tools.ask) {
+    return ['You cannot read code or files on any machine.'];
+  }
+  return [
+    ...(tools.read
+      ? [
+          'Code questions: for a focused one, search_code then read_file around the match; for a broad one, ask_code_agent with a self-contained question.',
+        ]
+      : ['Code questions: ask_code_agent with a self-contained question.']),
+    'Cite files as `path:line`, only paths a tool returned; never guess at code you have not read.',
+    "On runner_offline or runner_unsupported, say code questions need the project's runner online and up to date; do not answer from memory.",
+    'A refused path (path_not_allowed, policy_refused) is refused on purpose: say so; do not work around it.',
+  ];
+};
 
 const projectLine = (p: PromptProject) =>
   `- ${p.displayName} (${p.repo}), id ${p.id}`;
@@ -32,7 +51,7 @@ export const systemPrompt = (input: SystemPromptInput): string => {
     'Use the tools for facts; never invent cards, numbers, sessions or costs. A tool refusal is the answer: explain it.',
     'draft_card only shows a draft. Call queue_card only when the person asked to queue that card.',
     'request_action never runs anything: it creates a request a person approves in Approvals. Say so; never claim the action happened.',
-    'You cannot read code or files on any machine.',
+    ...codeLines(input.codeTools),
     '',
     '## Language',
     "Reply in the language of the person's latest message. Be concise; use Markdown.",

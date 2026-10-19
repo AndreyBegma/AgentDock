@@ -233,7 +233,7 @@ export const capabilitiesSchema = z.object({
    */
   sessionMessage: z.boolean().optional(),
   /**
-   * #640 (ADR-0063): the runner takes `startFrom` on `card.run` — round 1
+   * #640 (ADR-0064): the runner takes `startFrom` on `card.run` — round 1
    * branches from `origin/<startFrom>` instead of `origin/<base>`. The API
    * sends the field only when this is `true`. Absent means `false`.
    */
@@ -276,7 +276,7 @@ export const sessionMessageAvailable = (capabilities: Capabilities): boolean =>
   capabilities.sessionMessage === true;
 
 /** The runner's policy (ADR-0047); null for a runner older than it. */
-/** #640: the runner takes `card.run` `startFrom` (ADR-0063). */
+/** #640: the runner takes `card.run` `startFrom` (ADR-0064). */
 export const cardStartFromAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardStartFrom === true;
 

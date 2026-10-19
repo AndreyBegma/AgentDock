@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import {
   CARD_PR_DESCRIPTION_FILE,
   cardPullRequestBody,
+  isDivergedBranchError,
 } from '@agentdock/shared';
 import type { CardCollectArgs } from '@agentdock/shared/protocol';
 import { CommandFailure } from '../commands/failure';
@@ -171,6 +172,73 @@ describe('card.collect (#242 D8)', () => {
     ).toBe('refused');
     writeFileSync(join(record.worktree, 'notes.md'), 'left over\n');
     expect((await collectCard(deps, record, args)).pushed).toBe(true);
+  });
+});
+
+describe('card.collect after the worker rewrote a pushed commit (#630)', () => {
+  it('records the superseded remote with merge -s ours and pushes without force', async () => {
+    const { f, record, deps, args, originHead } = await setup();
+    f.write(record.worktree, { 'src/export.ts': 'export const csv = 1;\n' });
+    const pushed = await f.commitAll(record.worktree, 'feat: export as CSV');
+    await collectCard(deps, record, args);
+    expect(await originHead()).toBe(pushed);
+    // C-241: amended locally (one line different), then more commits.
+    f.write(record.worktree, { 'src/export.ts': 'export const csv = 2;\n' });
+    await f.run(record.worktree, 'commit', '-q', '-a', '--amend', '--no-edit');
+    f.write(record.worktree, { 'src/fix.ts': 'export const fix = 1;\n' });
+    const local = await f.commitAll(record.worktree, 'fix: the review');
+    const tree = await f.run(record.worktree, 'rev-parse', `${local}^{tree}`);
+
+    const result = await collectCard(deps, record, args);
+
+    expect(result.pushed).toBe(true);
+    const head = await f.run(record.worktree, 'rev-parse', 'HEAD');
+    expect(await originHead()).toBe(head);
+    expect(
+      (await f.run(record.worktree, 'log', '-1', '--format=%P', 'HEAD')).split(
+        ' ',
+      ),
+    ).toEqual([local, pushed]);
+    expect(await f.run(record.worktree, 'rev-parse', 'HEAD^{tree}')).toBe(tree);
+  });
+
+  it('merges a remote tip it pushed itself even without a reflog entry (pushedHead)', async () => {
+    const { f, record, deps, args, originHead } = await setup();
+    f.write(record.worktree, { 'a.txt': 'a\n' });
+    const pushed = await f.commitAll(record.worktree, 'feat: a');
+    await collectCard(deps, record, args);
+    await f.run(record.worktree, 'reset', '-q', '--hard', 'HEAD~1');
+    await f.run(record.worktree, 'reflog', 'expire', '--expire=now', '--all');
+    f.write(record.worktree, { 'b.txt': 'b\n' });
+    await f.commitAll(record.worktree, 'feat: b');
+
+    await collectCard(deps, { ...record, pushedHead: pushed }, args);
+
+    expect(await originHead()).toBe(
+      await f.run(record.worktree, 'rev-parse', 'HEAD'),
+    );
+  });
+
+  it("refuses somebody else's commits on origin: nothing is pushed, the reason names the branch", async () => {
+    const { f, record, deps, args, originHead } = await setup();
+    f.write(record.worktree, { 'a.txt': 'a\n' });
+    await f.commitAll(record.worktree, 'feat: a');
+    await collectCard(deps, record, args);
+    // Another clone pushes on top of the card's head.
+    const other = join(f.ws, 'other');
+    await f.run(f.ws, 'clone', '-q', '-b', BRANCH, f.origin, other);
+    f.write(other, { 'theirs.txt': 'theirs\n' });
+    const theirs = await f.commitAll(other, 'feat: theirs');
+    await f.run(other, 'push', '-q', 'origin', BRANCH);
+    f.write(record.worktree, { 'b.txt': 'b\n' });
+    await f.commitAll(record.worktree, 'feat: b');
+
+    const error = await collectCard(deps, record, args).catch((e) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(isDivergedBranchError(error.message)).toBe(true);
+    expect(error.message).toContain(`origin/${BRANCH} (${theirs.slice(0, 8)})`);
+    expect(await originHead()).toBe(theirs);
   });
 });
 

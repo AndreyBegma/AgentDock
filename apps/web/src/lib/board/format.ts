@@ -623,6 +623,23 @@ export function noPrBanner(
   return { ...noPrText(card), canCreate: true };
 }
 
+/**
+ * #630: a failed collect on the card face — a badge whose tooltip is the
+ * sheet's line. A diverged branch already shows as needing a person.
+ */
+export function collectFailedBadge(
+  card: Pick<
+    BoardCardView,
+    'collectState' | 'collectError' | 'needsPerson' | 'needsPersonReason'
+  >,
+): { label: string; text: string } | null {
+  if (card.collectState !== 'failed') return null;
+  if (card.needsPerson && card.needsPersonReason === 'branch_diverged') {
+    return null;
+  }
+  return { label: 'Not pushed', text: noPrBanner(card).text };
+}
+
 /** The link text after the hint: what the checklist holds. */
 export const HOOKS_GUIDE_LABEL = 'See the exact command for each profile';
 
@@ -631,7 +648,7 @@ export const hooksGuideHref = (projectId: string): string =>
   `/projects/${projectId}/settings?tab=sessions`;
 
 /**
- * #640 (ADR-0063): what the card's branch was created from — "Based on C-13
+ * #640 (ADR-0064): what the card's branch was created from — "Based on C-13
  * (feat/…)" or "Based on develop" — and, after it, the unmerged dependencies
  * whose code the branch does not have; `null` before the first Run.
  */
