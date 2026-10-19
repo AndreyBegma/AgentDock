@@ -48,6 +48,7 @@ export const card = (
   needsPerson: false,
   needsPersonReason: null,
   mergedAt: null,
+  prTarget: null,
   round: null,
   design: null,
   continueAfterDesign: false,

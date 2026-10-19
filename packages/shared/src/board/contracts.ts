@@ -145,6 +145,16 @@ export interface CardFleetView {
   slotGone: boolean;
 }
 
+/**
+ * #636: where a card's PR goes — the project base, or, for a card stacked on
+ * its one unmerged dependency, that dependency's branch ("into C-1's branch").
+ */
+export interface CardPrTarget {
+  branch: string;
+  /** The dependency whose branch it is; `null` for the project base. */
+  stackedOn: { number: number; label: string } | null;
+}
+
 /** One card on the board. */
 export interface BoardCardView {
   id: string;
@@ -192,6 +202,11 @@ export interface BoardCardView {
   needsPersonReason: CardNeedsPersonReason | null;
   /** #359 D8: the latest PR merged (ISO) — the Merged badge; `null` otherwise. */
   mergedAt: string | null;
+  /**
+   * #636: the branch the card's PR targets — its worktree's start. `null`
+   * before the card has a branch.
+   */
+  prTarget: CardPrTarget | null;
   /** The latest round; `null` before the first Run. */
   round: CardRoundBrief | null;
   /** #243: the Design chip; `null` when the card has no design (off). */
@@ -809,6 +824,13 @@ export const BOARD_ERROR = {
    * `ignoreDependencies`; `dependencies` names the open ones.
    */
   dependencyOpen: 'dependency_open',
+  /**
+   * 409 (#636): Run on a card with two or more dependencies whose pull
+   * requests are not merged into the project base, without
+   * `ignoreDependencies`; a card branches from one dependency only.
+   * `dependencies` names them.
+   */
+  dependenciesUnmerged: 'dependencies_unmerged',
   /** 409 (#337 D8): the dependency would close a cycle. */
   dependencyCycle: 'dependency_cycle',
   /** 400 (#337 D8): the card itself, or a number that is no card of this project. */
@@ -839,7 +861,10 @@ export interface BoardErrorBody {
   profileKey?: string;
   /** `attachment_error`: why the attachment was refused (#309). */
   code?: AttachmentRefusal;
-  /** `dependency_open` (#337 D8): the open dependencies — "C-12 is not completed yet". */
+  /**
+   * `dependency_open` (#337 D8): the open dependencies — "C-12 is not
+   * completed yet"; `dependencies_unmerged` (#636): the unmerged ones.
+   */
   dependencies?: CardDependencyRef[];
   /** `stack_refused` of a grouping (#588): the cards that cannot join, by number. */
   cards?: number[];

@@ -4,7 +4,7 @@ import {
   type CardDependencyRef,
   cardLabel,
   findDependencyCycle,
-  openDependencies,
+  isActiveRoundPhase,
   type Role,
 } from '@agentdock/shared';
 import { roleAtLeast } from '@agentdock/shared/protocol';
@@ -33,10 +33,63 @@ const refOf = (card: {
 const byNumber = (a: { number: number }, b: { number: number }) =>
   a.number - b.number;
 
+/** #636: what Run reads of a dependency to choose the card's base. */
+const STACK_FACTS = {
+  dependsOn: {
+    select: {
+      id: true,
+      number: true,
+      column: true,
+      branch: true,
+      prNumber: true,
+      prState: true,
+      mergedAt: true,
+      prBase: true,
+      rounds: {
+        orderBy: { round: 'desc' },
+        take: 1,
+        select: { phase: true },
+      },
+    },
+  },
+} as const;
+
+type StackFacts = Prisma.BoardCardDependencyGetPayload<{
+  include: typeof STACK_FACTS;
+}>['dependsOn'];
+
+/** #636: the dependency's PR is open (or draft), not merged nor closed. */
+const hasOpenPr = (dep: StackFacts): boolean =>
+  dep.prNumber !== null &&
+  dep.mergedAt === null &&
+  dep.prState !== 'merged' &&
+  dep.prState !== 'closed';
+
+/**
+ * #636: the dependency's work is in the project base — its PR merged into
+ * the base (not into a branch it was itself stacked on), or it was accepted
+ * with no open PR left.
+ */
+const landed = (dep: StackFacts): boolean =>
+  dep.mergedAt !== null
+    ? dep.prBase === null
+    : dep.column === 'completed' && !hasOpenPr(dep);
+
+/**
+ * #636: the branch a card is cut from and its PR goes into, when it is not
+ * the project base: its one unmerged dependency's.
+ */
+export interface StackedBase {
+  branch: string;
+  cardId: string;
+  number: number;
+}
+
 /**
  * Card dependencies (#337 D8): `cardId` runs after `dependsOnId`, both of one
  * project, the graph acyclic. Run warns about an open one (`dependency_open`)
- * unless told to go on; moving and Accept never look.
+ * unless told to go on; moving and Accept never look. #636: a card with one
+ * unmerged dependency that has an open PR is stacked on its branch.
  */
 @Injectable()
 export class BoardDependencies {
@@ -149,21 +202,52 @@ export class BoardDependencies {
   }
 
   /**
-   * Run's check (D8): without `ignore`, a dependency not in Completed refuses
-   * the Run with `dependency_open`, naming the open ones.
+   * Run's check (D8, #636) and the base it chooses. With `ignore`, nothing
+   * is checked and the card starts from the project base (`null`). Else,
+   * among the dependencies not landed in the base:
+   * - none: the project base;
+   * - one with a pushed branch and an open PR from a finished round: that
+   *   branch — the card is stacked on it;
+   * - one without: `dependency_open`, as before;
+   * - two or more: `dependencies_unmerged` — a card branches from one
+   *   dependency only, so it waits until they are merged.
    */
-  async assertRunnable(cardId: string, ignore: boolean): Promise<void> {
-    if (ignore) return;
-    const open = openDependencies(
-      (await this.refsOf([cardId])).get(cardId) ?? [],
-    );
-    if (open.length === 0) return;
-    const names = open.map((d) => d.label).join(', ');
+  async assertRunnable(
+    cardId: string,
+    ignore: boolean,
+  ): Promise<StackedBase | null> {
+    if (ignore) return null;
+    const rows = await this.prisma.boardCardDependency.findMany({
+      where: { cardId },
+      include: STACK_FACTS,
+    });
+    const pending = rows
+      .map((r) => r.dependsOn)
+      .filter((d) => !landed(d))
+      .sort(byNumber);
+    const [only] = pending;
+    if (!only) return null;
+    if (pending.length > 1) {
+      const names = pending.map((d) => cardLabel(d.number)).join(', ');
+      throw boardError(
+        409,
+        BOARD_ERROR.dependenciesUnmerged,
+        `${names} are not merged yet; a card branches from one dependency only`,
+        { dependencies: pending.map(refOf) },
+      );
+    }
+    if (
+      hasOpenPr(only) &&
+      only.branch !== null &&
+      !isActiveRoundPhase(only.rounds[0]?.phase)
+    ) {
+      return { branch: only.branch, cardId: only.id, number: only.number };
+    }
     throw boardError(
       409,
       BOARD_ERROR.dependencyOpen,
-      `${names} ${open.length === 1 ? 'is' : 'are'} not completed yet`,
-      { dependencies: open },
+      `${cardLabel(only.number)} is not completed yet and has no open pull request to build on`,
+      { dependencies: [refOf(only)] },
     );
   }
 
