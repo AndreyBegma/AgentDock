@@ -48,7 +48,6 @@ import {
   canRetry,
   canRun,
   canStop,
-  cardStartText,
   describeBoardError,
   FLEET_EDIT_HINT,
   finishRefusedText,
@@ -70,7 +69,11 @@ import {
   trackedStatusText,
 } from '../../lib/board/format';
 import { boardCardPageHref, boardStackPageHref } from '../../lib/board/href';
-import { canCreatePr, prChipText } from '../../lib/board/pull-request';
+import {
+  canCreatePr,
+  prChipText,
+  prTargetText,
+} from '../../lib/board/pull-request';
 import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
@@ -400,8 +403,6 @@ export function CardDetailBody({
   const [editing, setEditing] = useState(false);
   const fleet = isFleetCard(card);
   const terminalCard = isTerminalCard(card);
-  // #640: what round 1 created the branch from.
-  const startText = cardStartText(card.start);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
@@ -598,13 +599,19 @@ export function CardDetailBody({
         </div>
       ) : null}
       {card.branch ? (
-        <p className="break-all font-mono text-xs text-ink-2">{card.branch}</p>
-      ) : null}
-      {startText ? (
-        <div className="flex flex-col gap-1 text-xs text-ink-2">
-          <p className="break-all">{startText.based}</p>
-          {startText.missing ? <p>{startText.missing}</p> : null}
-        </div>
+        <p className="break-all text-xs text-ink-2">
+          <span className="font-mono">{card.branch}</span>
+          {card.prTarget ? (
+            // #636: the PR's actual target — a stacked card's dependency.
+            <span title={`The pull request goes into ${card.prTarget.branch}`}>
+              {' '}
+              → {prTargetText(card.prTarget)}
+              {card.prTarget.stackedOn ? (
+                <span className="font-mono"> ({card.prTarget.branch})</span>
+              ) : null}
+            </span>
+          ) : null}
+        </p>
       ) : null}
       {card.round?.hooksMissing
         ? (() => {

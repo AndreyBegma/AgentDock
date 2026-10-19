@@ -136,6 +136,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
     "A card's worker did not start on its own (design approval or Auto-run)",
   'card.ci_retriggered':
     "Reopened a card's pull request because CI reported no checks",
+  'card.pr_retargeted':
+    "Moved a stacked card's pull request onto the base after its dependency merged",
   'card.auto_run_toggled': 'Switched Auto-run when ready on a card',
   'card.message': 'Messaged a card session',
   'slot.session_message': 'Messaged a worker session',

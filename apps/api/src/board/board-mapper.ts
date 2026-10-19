@@ -12,11 +12,11 @@ import {
   type CardEvidenceView,
   type CardFleetView,
   type CardHooksCause,
+  type CardPrTarget,
   type CardPullRequestRef,
   type CardRoundBrief,
   type CardRoundView,
   type CardStackRef,
-  type CardStartView,
   type CardTrackingView,
   cardAutoMergeDefault,
   cardCiChecksOf,
@@ -113,6 +113,27 @@ const pullRequestsOf = (
       createdAt: pr.createdAt.toISOString(),
     }));
 
+/**
+ * #636: where a card's PR goes — the dependency's branch it is stacked on
+ * (`stackedOn` its number, when known), else the project base; `null` before
+ * the card has a branch.
+ */
+export const prTargetOf = (
+  card: Pick<BoardCard, 'branch' | 'prBase'>,
+  stackedOn: number | null,
+  projectBase: string,
+): CardPrTarget | null => {
+  if (card.branch === null) return null;
+  if (card.prBase === null) return { branch: projectBase, stackedOn: null };
+  return {
+    branch: card.prBase,
+    stackedOn:
+      stackedOn === null
+        ? null
+        : { number: stackedOn, label: cardLabel(stackedOn) },
+  };
+};
+
 /** What the mapper needs besides the rows. */
 export interface CardFacts {
   /** Cost of each round's run, a decimal string; absent when nothing is priced. */
@@ -143,6 +164,8 @@ export interface CardFacts {
   restartSavings?: ReadonlyMap<string, string>;
   /** #480: each card's stack, by card id; absent is none. */
   stacks?: ReadonlyMap<string, CardStackRef>;
+  /** #636: where each card's PR goes, by card id; absent is not known. */
+  prTargets?: ReadonlyMap<string, CardPrTarget>;
   now: Date;
 }
 
@@ -381,6 +404,7 @@ export const toCardView = (
       ? card.needsPersonReason
       : null,
   mergedAt: iso(card.mergedAt),
+  prTarget: facts.prTargets?.get(card.id) ?? null,
   round: brief(card, card.rounds[0], facts),
   design: designOf(card.design),
   continueAfterDesign: card.continueAfterDesign,
@@ -480,24 +504,6 @@ const toRoundView = (
 });
 
 /** `attachments`: the card's and its rounds', oldest first (#309). */
-/** #640: what round 1 started from; `null` until it is stored. */
-export const cardStartOf = (
-  card: Pick<BoardCard, 'startBase' | 'startCardNumber' | 'startMissing'>,
-): CardStartView | null =>
-  card.startBase === null
-    ? null
-    : {
-        base: card.startBase,
-        card:
-          card.startCardNumber === null
-            ? null
-            : {
-                number: card.startCardNumber,
-                label: cardLabel(card.startCardNumber),
-              },
-        missing: [...card.startMissing].sort((a, b) => a - b).map(cardLabel),
-      };
-
 export const toCardDetail = (
   card: CardWithPeople,
   facts: CardFacts,
@@ -512,7 +518,6 @@ export const toCardDetail = (
   designModel: card.designModel,
   recommendation: cardRecommendationOf(card),
   branch: card.branch,
-  start: cardStartOf(card),
   worktree: card.worktree,
   specPath: card.specPath,
   specPr:

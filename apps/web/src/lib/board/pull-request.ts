@@ -2,6 +2,7 @@ import type {
   BoardCardView,
   CardCollectOutcome,
   CardPrState,
+  CardPrTarget,
 } from '@agentdock/shared';
 
 /** #329 D6: the PR's state as the card shows it, next to `PR #n`. */
@@ -20,6 +21,17 @@ export function prChipText(
   return card.prState
     ? `PR #${card.prNumber} · ${PR_STATE_LABEL[card.prState]}`
     : `PR #${card.prNumber}`;
+}
+
+/**
+ * #636: where the card's PR goes — "into C-1's branch" for a card stacked on
+ * its dependency, else "into develop"; null before the card has a branch.
+ */
+export function prTargetText(target: CardPrTarget | null): string | null {
+  if (target === null) return null;
+  return target.stackedOn
+    ? `into ${target.stackedOn.label}’s branch`
+    : `into ${target.branch}`;
 }
 
 /** #329 D5: shared with the bot (#578). */

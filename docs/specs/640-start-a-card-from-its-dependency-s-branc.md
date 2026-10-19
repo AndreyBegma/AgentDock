@@ -2,6 +2,15 @@
 
 Issue: #640
 
+## Status
+Superseded by #636 ([ADR-0064](../adr/0064-a-dependent-card-branches-from-its-dependency-with-a-stacked-pr.md)),
+which merged first and implements the same start from the one unmerged
+dependency's branch. #640's own implementation was dropped in favour of
+it. Where they differ, #636's decisions stand: the pull request is stacked
+into the dependency's branch and moved onto the base when the dependency
+merges, and a Run with two or more unmerged dependencies is refused
+(`dependencies_unmerged`) instead of starting from the base.
+
 ## What to do
 A board card's round always branches from the project base (`project.base` in `apps/api/src/board/board-work.ts`). When a card depends on a card whose pull request is open but not merged, the agent works without the code it depends on.
 

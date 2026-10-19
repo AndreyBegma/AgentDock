@@ -75,6 +75,35 @@ export function openDependenciesOf(error: unknown): CardDependencyRef[] | null {
   return Array.isArray(list) ? list.filter(isRef) : [];
 }
 
+/**
+ * #636: the dependencies of a Run refused with 409 `dependencies_unmerged` —
+ * two or more not merged, while a card branches from one only; null for any
+ * other failure.
+ */
+export function unmergedDependenciesOf(
+  error: unknown,
+): CardDependencyRef[] | null {
+  if (!(error instanceof ApiError)) return null;
+  if (error.body?.error !== BOARD_ERROR.dependenciesUnmerged) return null;
+  const list = error.body.dependencies;
+  return Array.isArray(list) ? list.filter(isRef) : [];
+}
+
+/**
+ * The "Run anyway?" dialog's consequence: an open dependency's work may be
+ * missing; #636: unmerged ones mean the card starts from the project base.
+ */
+export function blockedRunText(
+  label: string,
+  dependencies: readonly Pick<CardDependencyRef, 'label'>[],
+  unmerged: boolean,
+): string {
+  if (!unmerged) {
+    return `${openDependencyText(dependencies)} ${label} was meant to run after it, so its worker may miss that work.`;
+  }
+  return `${labelList(dependencies) || 'Its dependencies'} are not merged yet, and a card branches from one dependency only. ${label} would start from the project base without their work.`;
+}
+
 /** The sheet's add field: a card number, `12` or `C-12`; null when it is not one. */
 export function parseCardNumber(raw: string): number | null {
   const match = /^\s*(?:c-?)?(\d{1,9})\s*$/i.exec(raw);

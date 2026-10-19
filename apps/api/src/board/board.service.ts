@@ -11,6 +11,7 @@ import {
   CARD_SUMMARY_MAX,
   type CardMergeOutcome,
   type CardPrCloseOutcome,
+  type CardPrTarget,
   type CardPullRequestView,
   type CollectBoardCardResponse,
   captureFingerprint,
@@ -48,6 +49,7 @@ import {
   type CardFacts,
   type CardWithRounds,
   cardDesignSelect,
+  prTargetOf,
   toCardDetail,
   toCardView,
   toSettingsView,
@@ -394,8 +396,54 @@ export class BoardService implements OnModuleInit {
         this.prisma,
         cards.flatMap((c) => (c.rounds[0] ? [c.rounds[0].id] : [])),
       ),
+      prTargets: await this.prTargets(cards),
       now: new Date(),
     };
+  }
+
+  /**
+   * #636: where each card's PR goes — the dependency's branch it is stacked
+   * on, else its project's base; absent before the card has a branch.
+   */
+  private async prTargets(
+    cards: readonly CardWithRounds[],
+  ): Promise<Map<string, CardPrTarget>> {
+    const targets = new Map<string, CardPrTarget>();
+    const branched = cards.filter((c) => c.branch !== null);
+    if (branched.length === 0) return targets;
+    const baseCardIds = branched
+      .map((c) => c.prBaseCardId)
+      .filter((id): id is string => id !== null);
+    const [bases, numbers] = await Promise.all([
+      Promise.all(
+        [...new Set(branched.map((c) => c.projectId))].map(
+          async (id) => [id, (await this.work.project(id)).base] as const,
+        ),
+      ),
+      baseCardIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.boardCard.findMany({
+            where: { id: { in: baseCardIds } },
+            select: { id: true, number: true },
+          }),
+    ]);
+    const baseOf = new Map(bases);
+    const numberOf = new Map(numbers.map((c) => [c.id, c.number]));
+    for (const card of branched) {
+      const base = baseOf.get(card.projectId);
+      const target =
+        base === undefined
+          ? null
+          : prTargetOf(
+              card,
+              card.prBaseCardId === null
+                ? null
+                : (numberOf.get(card.prBaseCardId) ?? null),
+              base,
+            );
+      if (target) targets.set(card.id, target);
+    }
+    return targets;
   }
 
   /**

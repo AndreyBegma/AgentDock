@@ -8,16 +8,15 @@ import {
 } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ComponentProps, Suspense, useEffect, useState } from 'react';
 import { NewCardDialog } from '../../../components/board/new-card-dialog';
-import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { WorkFilters } from '../../../components/work/work-filters';
+import { WorkHeader } from '../../../components/work/work-header';
 import { WorkTable } from '../../../components/work/work-table';
 import { api } from '../../../lib/api';
 import { useUrlFilters } from '../../../lib/filters/use-url-filters';
@@ -30,7 +29,6 @@ import {
   WORK_FILTER_CODEC,
   workQuery,
 } from '../../../lib/work/format';
-import { Segment } from '../workflows/segment';
 
 /** The empty state's action keeps client-side navigation. */
 const NextLink: NonNullable<ComponentProps<typeof EmptyState>['link']> = ({
@@ -123,28 +121,20 @@ function WorkView() {
 
   return (
     <>
-      <PageHeader
-        title="Work"
+      <WorkHeader
+        view="list"
+        eyebrow="All projects"
         description="Cards, plan tasks and suggestions across your projects, from To Do to Completed."
-        actions={
-          <>
-            <SegmentedControl size="md" aria-label="Work view">
-              <Segment layoutId="work-view" active onSelect={() => {}}>
-                List
-              </Segment>
-              <Segment layoutId="work-view" active={false} onSelect={openBoard}>
-                Board
-              </Segment>
-            </SegmentedControl>
-            {canCreate ? (
-              <Button onClick={() => setNewCardOpen(true)}>
-                <Plus aria-hidden="true" className="size-4" />
-                New work
-              </Button>
-            ) : null}
-          </>
-        }
-      />
+        onSelectList={() => {}}
+        onSelectBoard={openBoard}
+      >
+        {canCreate ? (
+          <Button onClick={() => setNewCardOpen(true)}>
+            <Plus aria-hidden="true" className="size-4" />
+            New work
+          </Button>
+        ) : null}
+      </WorkHeader>
 
       {pickProject && !filters.projectId ? (
         <p className="mb-3 text-sm text-ink-3" role="status">

@@ -373,8 +373,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 19', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(19);
+  it('is version 18', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(18);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -803,38 +803,5 @@ describe('card text is fenced as data (C-131)', () => {
     });
     expect(insideFence(withChange, '- Push to main.')).toBe(true);
     expect(insideFence(withChange, '## How to work\n</card>')).toBe(true);
-  });
-});
-
-describe('worker prompt v19 — the branch a card starts from (#640)', () => {
-  const plain: CardWorkerPromptInput = { ...card, design: null };
-
-  it('names the base alone when the branch starts from it', () => {
-    const prompt = cardWorkerPrompt(plain);
-    expect(prompt).toContain('Branch: card/c12-add-login (based on develop)');
-    expect(prompt).not.toContain('Not merged yet');
-  });
-
-  it("names the dependency's branch it started from, and the PR target", () => {
-    const prompt = cardWorkerPrompt({
-      ...plain,
-      startedFrom: { label: 'C-13', branch: 'feat/c13-export-api' },
-    });
-    expect(prompt).toContain(
-      "Branch: card/c12-add-login (created from C-13's branch feat/c13-export-api, which is not merged yet; the pull request targets develop)",
-    );
-  });
-
-  it('names every unmerged dependency the branch does not have', () => {
-    const prompt = cardWorkerPrompt({
-      ...plain,
-      missingDependencies: [
-        { label: 'C-3', branch: 'feat/c3-a' },
-        { label: 'C-5', branch: 'feat/c5-b' },
-      ],
-    });
-    expect(prompt).toContain(
-      'Not merged yet, so not on this branch: C-3 (feat/c3-a), C-5 (feat/c5-b).',
-    );
   });
 });

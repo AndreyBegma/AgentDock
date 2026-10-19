@@ -13,7 +13,6 @@ import {
   canRun,
   canStop,
   cardByNumber,
-  cardStartText,
   columnsOf,
   describeBoardError,
   designBlocksRun,
@@ -475,31 +474,5 @@ describe('finishRefusedText (#482)', () => {
     expect(finishRefusedText('internal')).toBe(
       'finish_card was refused: internal. Ask the worker to call it again, or finish the card yourself.',
     );
-  });
-});
-
-describe('cardStartText (#640)', () => {
-  test('is null before the first Run', () => {
-    expect(cardStartText(null)).toBeNull();
-  });
-
-  test('names the dependency whose branch the card started from', () => {
-    expect(
-      cardStartText({
-        base: 'feat/c13-export-api',
-        card: { number: 13, label: 'C-13' },
-        missing: [],
-      }),
-    ).toEqual({ based: 'Based on C-13 (feat/c13-export-api)', missing: null });
-  });
-
-  test('names the base and the unmerged dependencies it lacks', () => {
-    expect(
-      cardStartText({ base: 'develop', card: null, missing: ['C-3', 'C-5'] }),
-    ).toEqual({
-      based: 'Based on develop',
-      missing:
-        'Without C-3, C-5: their pull requests were not merged when the card started.',
-    });
   });
 });

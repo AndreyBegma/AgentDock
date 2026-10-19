@@ -31,10 +31,8 @@ import {
 import {
   type CardRunArgs,
   type CardRunFile,
-  capabilitiesSchema,
   cardDocsBranch,
   cardRunArgsSchema,
-  cardStartFromAvailable,
   ISSUE_TITLE_MAX,
   ORCHESTRATOR_DEFAULTS,
   type OrchestratorPermissionMode,
@@ -68,12 +66,14 @@ import { TextNormalizer } from '../text/text-normalizer';
 import { TokenSaverService } from '../token-saver/token-saver.service';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
-import { BoardDependencies } from './board-dependencies.service';
+import {
+  BoardDependencies,
+  type StackedBase,
+} from './board-dependencies.service';
 import { BoardFailure, boardError } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
 import { BoardStacks } from './board-stacks';
-import { type CardStart, chooseCardStart } from './board-start';
 import {
   ACTIVE_PHASES,
   BOARD_SYSTEM_ACTOR,
@@ -210,12 +210,23 @@ export class BoardRoundsService {
     }
     // #480 (ADR-0044): no card of a stack runs before its design is approved.
     await this.stacks.assertStackApproved(card.id);
-    // #337 D8: an open dependency warns; the person may run anyway.
-    await this.dependencies.assertRunnable(
+    // #337 D8: an open dependency warns; the person may run anyway. #636:
+    // one unmerged dependency with an open PR stacks the card on its branch.
+    const stacked = await this.dependencies.assertRunnable(
       card.id,
       dto.ignoreDependencies === true,
     );
-    await this.start(card, 'run', dto, null, actor, [], null, autoRunAfter);
+    await this.start(
+      card,
+      'run',
+      dto,
+      null,
+      actor,
+      [],
+      null,
+      autoRunAfter,
+      stacked,
+    );
     return this.board.detail(projectId, number);
   }
 
@@ -377,6 +388,8 @@ export class BoardRoundsService {
     ciFix: CardCiFixInput | null = null,
     /** #443: the accepted dependency an Auto-run when ready round starts after. */
     autoRunAfter: number | null = null,
+    /** #636: the dependency a Run stacks the card on; `null` is the base. */
+    stacked: StackedBase | null = null,
   ): Promise<void> {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
@@ -429,6 +442,17 @@ export class BoardRoundsService {
       ),
     };
 
+    // #636: a Run that opens a new PR chooses its base — the dependency's
+    // branch it is stacked on, else the project base; a card with an open
+    // PR, and every other round, keeps the base the card has.
+    const choosesBase =
+      trigger === 'run' &&
+      (card.prNumber === null ||
+        card.mergedAt !== null ||
+        card.prState === 'closed');
+    const base = choosesBase
+      ? (stacked?.branch ?? project.base)
+      : (card.prBase ?? project.base);
     // A session is resumed once Claude has run in it (D5); a round 1 that
     // never started is started again.
     const resume =
@@ -438,15 +462,6 @@ export class BoardRoundsService {
     const target = resolveSpecTarget(project);
     const specDir = target.kind === 'code_repo' ? target.specDir : null;
     const firstStart = !resume;
-    // #640 (ADR-0064): round 1 picks what its branch is created from; later
-    // rounds reuse it.
-    const canStartFrom =
-      (firstStart ||
-        (card.startBase !== null && card.startBase !== project.base)) &&
-      (await this.startsFrom(project.runnerId));
-    const start = firstStart
-      ? await this.chooseStart(card.id, project.base, canStartFrom)
-      : null;
     // #243 D6: a needed design is approved before the worker starts.
     const design = trigger === 'run' ? await this.approvedDesign(card) : null;
     // #480: the card's stack — its place, and its approved design as reference.
@@ -513,15 +528,6 @@ export class BoardRoundsService {
           title: card.title,
           issueNumber: issue.number,
         }));
-    // #640: a follow-up starts from the updated base, never a dependency's.
-    const startBase = followUp ? null : (start?.base ?? card.startBase);
-    const startFrom =
-      canStartFrom &&
-      startBase !== null &&
-      startBase !== project.base &&
-      startBase !== branch
-        ? startBase
-        : undefined;
     // #379: a spec in an external docs repository goes in through its own
     // pull request, before the worker starts; the card's branch never holds it.
     let specPr = cardSpecPrOf(card);
@@ -591,7 +597,7 @@ export class BoardRoundsService {
             body: card.body,
             kind: card.kind,
             branch,
-            base: project.base,
+            base,
             specPath,
             specPr: specPr
               ? { repo: specPr.repo, url: specPr.url, branch: specPr.branch }
@@ -629,14 +635,6 @@ export class BoardRoundsService {
               : null,
             attachments: attachmentBriefs,
             projectRules,
-            startedFrom:
-              start?.card != null
-                ? { label: cardLabel(start.card), branch: start.base }
-                : null,
-            missingDependencies: (start?.missing ?? []).map((d) => ({
-              label: cardLabel(d.number),
-              branch: d.branch,
-            })),
           });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null && specPr === null
@@ -651,7 +649,7 @@ export class BoardRoundsService {
       cardId: card.id,
       projectId: project.id,
       root: project.rootPath,
-      base: project.base,
+      base,
       shortId: card.shortId,
       branch,
       session: { id: sessionId, resume },
@@ -672,7 +670,6 @@ export class BoardRoundsService {
           }
         : {}),
       ...(followUp ? { newBranch: true } : {}),
-      ...(startFrom !== undefined ? { startFrom } : {}),
       ...saver.args,
     };
     const valid = cardRunArgsSchema.safeParse({ ...draft, runId: 'pending' });
@@ -751,20 +748,12 @@ export class BoardRoundsService {
           sessionId,
           branch,
           specPath,
-          // #640: fixed with the branch; a follow-up's branch is the base's.
-          ...(start
+          ...(choosesBase
             ? {
-                startBase: start.base,
-                startCardNumber: start.card,
-                startMissing: start.missing.map((d) => d.number),
+                prBase: stacked?.branch ?? null,
+                prBaseCardId: stacked?.cardId ?? null,
               }
-            : followUp
-              ? {
-                  startBase: project.base,
-                  startCardNumber: null,
-                  startMissing: [],
-                }
-              : {}),
+            : {}),
           ...(remembered.model !== undefined
             ? { model: remembered.model }
             : {}),
@@ -837,11 +826,6 @@ export class BoardRoundsService {
       ...(autoRunAfter !== null ? { autoRunAfter } : {}),
       branch,
       ...(followUp ? { newBranch: true } : {}),
-      ...(startFrom !== undefined ? { startFrom } : {}),
-      ...(start?.card != null ? { startCard: start.card } : {}),
-      ...(start && start.missing.length > 0
-        ? { missingDependencies: start.missing.map((d) => d.number) }
-        : {}),
       resume,
       profileKey: profile.key,
       model,
@@ -1111,43 +1095,6 @@ export class BoardRoundsService {
         `${active} of ${maxRunning} card workers are running in this project`,
       );
     }
-  }
-
-  /** #640: whether the runner takes `card.run` `startFrom` (ADR-0064). */
-  private async startsFrom(runnerId: string): Promise<boolean> {
-    const runner = await this.prisma.runner.findUnique({
-      where: { id: runnerId },
-      select: { capabilities: true },
-    });
-    const capabilities = capabilitiesSchema.safeParse(runner?.capabilities);
-    return capabilities.success && cardStartFromAvailable(capabilities.data);
-  }
-
-  /** #640 (ADR-0064): what round 1 of the card creates its branch from. */
-  private async chooseStart(
-    cardId: string,
-    projectBase: string,
-    canStartFrom: boolean,
-  ): Promise<CardStart> {
-    const rows = await this.prisma.boardCardDependency.findMany({
-      where: { cardId },
-      select: {
-        dependsOn: {
-          select: {
-            number: true,
-            branch: true,
-            prNumber: true,
-            prState: true,
-            mergedAt: true,
-          },
-        },
-      },
-    });
-    return chooseCardStart(
-      rows.map((r) => r.dependsOn),
-      projectBase,
-      canStartFrom,
-    );
   }
 
   private record(

@@ -12,6 +12,7 @@ import {
   cardChecks,
   closeCardPr,
   mergeCard,
+  retargetCardPr,
   retriggerCardCi,
 } from '../cards';
 import { type Clock, isoNow } from '../clock';
@@ -295,6 +296,13 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'card.ciRetrigger': (args) =>
       context.cards
         ? retriggerCardCi(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'card.prRetarget': (args) =>
+      context.cards
+        ? retargetCardPr(args, {
             exec: context.exec,
             watchedProjects: context.watchedProjects,
           })

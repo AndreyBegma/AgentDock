@@ -161,7 +161,6 @@ describe('capability detection', () => {
       steward: true,
       handoff: true,
       sessionMessage: true,
-      cardStartFrom: true,
     });
   });
 
