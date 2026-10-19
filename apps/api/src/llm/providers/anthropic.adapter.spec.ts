@@ -232,6 +232,64 @@ describe('AnthropicAdapter', () => {
     ]);
   });
 
+  it('caches the stable prefix: the system block and the last tool, not the tail', async () => {
+    const fetchMock = jest.fn(async () => sseResponse(STREAM));
+    const adapter = new AnthropicAdapter({ fetch: fetchMock });
+    const tool = (name: string) => ({
+      name,
+      description: name,
+      inputSchema: { properties: {} },
+    });
+    await collect(
+      adapter.stream({
+        apiKey: KEY,
+        request: {
+          model: 'claude-opus-5-5',
+          system: 'Stable.',
+          systemTail: 'Today is Monday.',
+          cachePrefix: true,
+          messages: [{ role: 'user', content: 'hi' }],
+          tools: [tool('a'), tool('b')],
+        },
+      }),
+    );
+    const [input, init] = fetchMock.mock.calls[0] as unknown as [
+      unknown,
+      RequestInit,
+    ];
+    const { body } = await requestOf(input, init);
+    expect(body?.system).toEqual([
+      { type: 'text', text: 'Stable.', cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: 'Today is Monday.' },
+    ]);
+    const tools = body?.tools as { cache_control?: unknown }[];
+    expect(tools[0].cache_control).toBeUndefined();
+    expect(tools[1].cache_control).toEqual({ type: 'ephemeral' });
+  });
+
+  it('joins the tail into one plain system string when nothing is cached', async () => {
+    const fetchMock = jest.fn(async () => sseResponse(STREAM));
+    const adapter = new AnthropicAdapter({ fetch: fetchMock });
+    await collect(
+      adapter.stream({
+        apiKey: KEY,
+        request: {
+          model: 'claude-opus-5-5',
+          system: 'Stable.',
+          systemTail: 'Tail.',
+          messages: [{ role: 'user', content: 'hi' }],
+        },
+      }),
+    );
+    const [input, init] = fetchMock.mock.calls[0] as unknown as [
+      unknown,
+      RequestInit,
+    ];
+    expect((await requestOf(input, init)).body?.system).toBe(
+      'Stable.\n\nTail.',
+    );
+  });
+
   it('answers a rejected key as llm_key_rejected, without the key', async () => {
     const adapter = new AnthropicAdapter({
       fetch: async () =>

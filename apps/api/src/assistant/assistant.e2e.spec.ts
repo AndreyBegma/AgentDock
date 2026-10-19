@@ -195,7 +195,10 @@ describe('Assistant (e2e)', () => {
     ctx.providerFetch.mockImplementation(async (input, init) => {
       const { body } = await requestOf(input, init);
       const model = String(body?.model);
-      const system = String(body?.system ?? '');
+      // A cached prompt goes as text blocks (the stable part, then the tail).
+      const system = Array.isArray(body?.system)
+        ? (body.system as { text: string }[]).map((b) => b.text).join('\n\n')
+        : String(body?.system ?? '');
       // #660: a queued card's triage runs beside the chat; it gets no hints.
       if (system.startsWith('You triage')) return answer([{ text: ['{}'] }]);
       calls.push({ model, system, body: body ?? {} });
@@ -368,6 +371,69 @@ describe('Assistant (e2e)', () => {
     expect(
       (await alice.get(`/assistant/conversations/${conversation.id}`)).body,
     ).toMatchObject({ title: 'Queue blockers', projectId: projects.dock });
+  });
+
+  it('caches the stable prompt and tools, and sends 20 messages plus a stored summary (ADR-0068 §10)', async () => {
+    const conversation = await open(alice, { projectId: projects.dock });
+    // 60 earlier messages, 30 exchanges.
+    const base = Date.parse('2026-10-01T00:00:00Z');
+    await ctx.prisma.assistantMessage.createMany({
+      data: Array.from({ length: 60 }, (_, i) => ({
+        id: `m${String(i).padStart(2, '0')}`,
+        conversationId: conversation.id,
+        role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
+        content: `message ${i}`,
+        displayContent: `message ${i}`,
+        language: 'en',
+        createdAt: new Date(base + i * 1_000),
+      })),
+    });
+    script.push(
+      answer([{ text: english('Done.', 'And now?') }]),
+      answer([{ text: english('Again.', 'Once more?') }]),
+    );
+
+    await say(conversation.id, 'And now?');
+    const chat = calls.find((c) => c.model === OPUS);
+    if (!chat) throw new Error('the chat model was not called');
+    const sent = chat.body.messages as { content: unknown }[];
+    // The newest 20 of the 60, then the new message.
+    expect(sent).toHaveLength(21);
+    expect(JSON.stringify(sent[0])).toContain('message 40');
+    expect(chat.system).not.toContain('Earlier in this conversation');
+    // The stable part and the last tool carry a cache breakpoint; the tail
+    // (date, person, project) does not.
+    const blocks = chat.body.system as {
+      text: string;
+      cache_control?: object;
+    }[];
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(blocks[1].cache_control).toBeUndefined();
+    const tools = chat.body.tools as { cache_control?: object }[];
+    expect(tools.at(-1)?.cache_control).toEqual({ type: 'ephemeral' });
+    expect(tools.slice(0, -1).some((t) => t.cache_control)).toBe(false);
+
+    // The messages that slid out were folded into the stored summary by the
+    // cheapest model, tagged as its own feature.
+    const stored = await ctx.prisma.assistantConversation.findUniqueOrThrow({
+      where: { id: conversation.id },
+    });
+    expect(stored.summary).toBe('Queue blockers');
+    expect(stored.summaryUpTo).not.toBeNull();
+    const ledger = await ctx.prisma.llmCall.findMany({
+      orderBy: { ts: 'asc' },
+    });
+    expect(ledger.map((c) => c.feature)).toEqual(
+      expect.arrayContaining(['assistant', 'assistant_summary']),
+    );
+
+    // The next turn sends the summary, and no new summary is made until the
+    // window slides again... it slides each turn, so one more is made.
+    await say(conversation.id, 'Once more?');
+    const next = calls.filter((c) => c.model === OPUS).at(-1);
+    expect(next?.system).toContain('Earlier in this conversation');
+    expect(next?.system).toContain('Queue blockers');
   });
 
   it('ends with a typed error once the provider cap is reached, and stores nothing', async () => {

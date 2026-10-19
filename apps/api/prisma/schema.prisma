@@ -3960,6 +3960,7 @@ enum LlmFeature {
   search
   triage
   title
+  assistant_summary
 }
 
 enum LlmCallOutcome {
@@ -4048,11 +4049,16 @@ model AssistantConversation {
   /// The model picked for the conversation; null is the instance default.
   provider  LlmProvider?
   model     String?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  /// English digest of the messages older than the verbatim window; null until
+  /// the conversation outgrows it (ADR-0068 §10).
+  summary     String?
+  /// The id of the newest message the summary covers.
+  summaryUpTo String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project     Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project     Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
   messages      AssistantMessage[]
   attachments   AssistantAttachment[]
   telegramLinks TelegramLink[]

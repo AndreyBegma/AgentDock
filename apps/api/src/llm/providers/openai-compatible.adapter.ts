@@ -113,7 +113,10 @@ type ChatMessage = Record<string, unknown>;
 
 export const toChatMessages = (request: LlmRequest): ChatMessage[] => {
   const out: ChatMessage[] = [];
-  if (request.system) out.push({ role: 'system', content: request.system });
+  const system = [request.system, request.systemTail]
+    .filter(Boolean)
+    .join('\n\n');
+  if (system) out.push({ role: 'system', content: system });
   for (const message of request.messages as readonly LlmMessage[]) {
     if (message.role === 'user') {
       out.push({

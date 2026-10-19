@@ -26,7 +26,12 @@ import { ATTACHMENT_INCLUDE, toMessageView } from './assistant-mapper';
 import { AssistantModels, type PickedModel } from './assistant-models';
 import { BilingualSplitter, type BilingualTrailer } from './bilingual';
 import { projectsNamedIn } from './project-resolver';
-import { type PromptProject, systemPrompt, TITLE_SYSTEM } from './prompts';
+import {
+  type PromptProject,
+  SUMMARY_SYSTEM,
+  systemPromptParts,
+  TITLE_SYSTEM,
+} from './prompts';
 import {
   type AssistantToolContext,
   AssistantToolError,
@@ -37,8 +42,15 @@ import {
 
 /** Model calls of one turn: tool rounds, then the answer. */
 const MAX_CALLS = 8;
-/** Earlier messages sent as context. */
-const HISTORY = 40;
+/**
+ * Earlier messages sent verbatim (ADR-0068 §10); older ones go as the stored
+ * summary.
+ */
+const HISTORY = 20;
+/** Most messages one summary refresh folds in. */
+const SUMMARY_BATCH = 40;
+/** Characters of one message the summary call reads. */
+const SUMMARY_MESSAGE_CHARS = 1_500;
 const MAX_TOKENS = 4_096;
 /** `language` when the model gave no trailer. */
 const UNKNOWN_LANGUAGE = 'und';
@@ -187,8 +199,9 @@ export class AssistantChat {
         const splitter = new BilingualSplitter();
         const ledger: LlmLedger = {};
         const toolCalls: LlmToolCall[] = [];
-        const system = systemPrompt({
+        const { stable, tail } = systemPromptParts({
           now: new Date(),
+          summary: conversation.summary,
           user,
           project: state.project,
           ambiguous: state.project ? [] : ambiguous,
@@ -206,7 +219,9 @@ export class AssistantChat {
               provider: picked.provider,
               request: {
                 model: picked.model,
-                system,
+                system: stable,
+                systemTail: tail,
+                cachePrefix: true,
                 messages,
                 // The last call answers: no more tool rounds.
                 tools:
@@ -304,6 +319,8 @@ export class AssistantChat {
           yield { type: 'title', title };
         }
       }
+
+      await this.refreshSummary(user, conversation);
 
       const [userView, replyView] = await Promise.all(
         [userRow.id, replyRow.id].map(async (id) =>
@@ -452,6 +469,73 @@ export class AssistantChat {
       projectId: project.id,
       projectName: project.displayName,
     };
+  }
+
+  /**
+   * ADR-0068 §10: the messages that slid out of the verbatim window are folded
+   * into the stored summary. Runs only when the window has slid past what the
+   * summary covers; the cheapest enabled model, tagged `assistant_summary`;
+   * best effort — a failure leaves the old summary and the next turn retries.
+   */
+  private async refreshSummary(
+    user: AuthUser,
+    conversation: {
+      id: string;
+      summary: string | null;
+      summaryUpTo: string | null;
+    },
+  ): Promise<void> {
+    try {
+      // Everything but the newest HISTORY messages — what the next turn sends
+      // as the summary instead of verbatim — newest first.
+      const outside = await this.prisma.assistantMessage.findMany({
+        where: { conversationId: conversation.id },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: HISTORY,
+        take: SUMMARY_BATCH,
+      });
+      const newest = outside[0];
+      if (!newest || newest.id === conversation.summaryUpTo) return;
+      const chronological = outside.reverse();
+      const seen = chronological.findIndex(
+        (m) => m.id === conversation.summaryUpTo,
+      );
+      const fresh = chronological.slice(seen + 1);
+      const model = await this.models.cheapest();
+      if (!model) return;
+      const transcript = fresh
+        .map(
+          (m) =>
+            `${m.role === 'user' ? 'Person' : 'Assistant'}: ${historyText(m.content, m.toolResults).slice(0, SUMMARY_MESSAGE_CHARS)}`,
+        )
+        .join('\n\n');
+      const completion = await this.gateway.complete({
+        userId: user.id,
+        feature: 'assistant_summary',
+        provider: model.provider,
+        request: {
+          model: model.model,
+          system: SUMMARY_SYSTEM,
+          messages: [
+            {
+              role: 'user',
+              content: `Earlier summary:\n${conversation.summary ?? '(none)'}\n\nNew messages:\n${transcript}`,
+            },
+          ],
+          maxTokens: 700,
+        },
+      });
+      const summary = completion.text.trim();
+      if (!summary) return;
+      await this.prisma.assistantConversation.update({
+        where: { id: conversation.id },
+        data: { summary, summaryUpTo: newest.id },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `conversation summary not refreshed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /** ADR-0060 §2: the cheapest enabled model, tagged `title`; best effort. */
