@@ -88,11 +88,19 @@ export const CS_ECO_ENV = 'CS_ECO';
 export const SCOUT_AGENT = 'scout';
 
 /**
- * D9: the haiku scout. Claude Code 2.1.301 defines subagents on
- * `--agents <json>`, not in a settings file. Read-only tools: it searches
- * and reads, it never decides or edits.
+ * #663: Claude Code's built-in explorer. Its own definition is
+ * `model: 'inherit'` — an opus session explores on opus.
  */
-export const SCOUT_AGENTS = {
+export const EXPLORE_AGENT = 'Explore';
+
+/**
+ * D9: the haiku scout; #663 (ADR-0068): the built-in `Explore` on haiku.
+ * Claude Code 2.1.301 defines subagents on `--agents <json>`, not in a
+ * settings file, and 2.1.303 lets an `--agents` entry replace a built-in of
+ * the same name. Read-only tools: they search and read, they never decide or
+ * edit.
+ */
+export const LAUNCH_AGENTS = {
   [SCOUT_AGENT]: {
     description:
       'Fast, cheap, read-only search. Use it for broad codebase searches and for reading many files to answer one question; it returns what it found with file paths and line numbers. It never edits and never decides.',
@@ -101,7 +109,54 @@ export const SCOUT_AGENTS = {
     model: 'haiku',
     tools: ['Read', 'Grep', 'Glob'],
   },
+  [EXPLORE_AGENT]: {
+    description:
+      'Read-only search agent for broad fan-out searches: when answering means sweeping many files, directories or naming conventions and you only need the conclusion. Say how thorough to be: quick, medium or very thorough.',
+    prompt:
+      'You explore a codebase for the session that called you. Find what it asked for and report the conclusion with file paths and line numbers, quoting only the lines that matter. Read excerpts rather than whole files. You are read-only: never edit, create or delete a file, and never run a command that changes anything.',
+    model: 'haiku',
+    tools: ['Read', 'Grep', 'Glob'],
+  },
 } as const;
+
+/**
+ * #663 (ADR-0068 §1): the settings that shrink a launch's fixed prefix,
+ * checked against Claude Code 2.1.303 and measured on a recorded first turn
+ * (`fixtures/first-turn.json`): without the built-in commit and pull request
+ * instructions (about 0.7k tokens; the worker prompt and the project rules
+ * carry the git workflow), and with each skill's description in the listing
+ * cut to its first 200 characters (about 4.4k). `disableBundledSkills` was
+ * measured too and grew the prefix, so it is not set. Deferred MCP tools need
+ * no setting: an unset `ENABLE_TOOL_SEARCH` already defers them on a
+ * first-party host, and any explicit value would also force them through a
+ * proxy that may not forward tool references.
+ */
+export const PREFIX_SETTINGS = {
+  includeGitInstructions: false,
+  skillListingMaxDescChars: 200,
+} as const;
+
+/**
+ * #663 (ADR-0068 §1): Claude Code's prompt-cache TTL for the main
+ * conversation, `5m` or `1h`; it wins over `ENABLE_PROMPT_CACHING_1H`.
+ */
+export const PROMPT_CACHE_TTL_ENV = 'CLAUDE_CODE_PROMPT_CACHE_TTL';
+
+/**
+ * #663: moves the per-machine sections (cwd, env, memory paths, git status)
+ * out of the system prompt into the first user message, so the prefix is the
+ * same across rounds and runners.
+ */
+export const EXCLUDE_DYNAMIC_SECTIONS_FLAG =
+  '--exclude-dynamic-system-prompt-sections';
+
+/**
+ * #663 (ADR-0068 §1): the kinds whose prefix is reused across rounds — card
+ * and CI-fix rounds, both `card` — and so pay for the one-hour TTL (a write
+ * costs 2× the input price against 1.25×) and a prefix without dynamic
+ * sections.
+ */
+export const SHARED_PREFIX_KINDS: readonly TokenSaverRunKind[] = ['card'];
 
 /** One argument for `sh -c`: bare when it is safe, else single-quoted. */
 export const shellQuote = (arg: string): string =>
@@ -215,7 +270,10 @@ export interface TokenSaverLaunchInput {
    * the arguments after `mcp` (the card's artifact guard).
    */
   agentdock: false | readonly string[];
-  /** D9: whether the launch gets the scout; a launch without tools does not. */
+  /**
+   * D9: whether the launch gets the scout, and with it the haiku `Explore`
+   * (#663); a launch without tools can call neither.
+   */
   scout: boolean;
   /** Hooks the launch already carries (the card's injected wiring). */
   baseSettings?: LaunchSettings;
@@ -238,11 +296,13 @@ export interface TokenSaverLaunch {
  * when a file cannot be written: the launch then runs unfiltered rather than
  * not at all.
  *
- * On: `--settings` (the filter hook), `--strict-mcp-config` with
- * `agentdock` (where the launch uses it) and the allowed servers copied
- * from the profile's own config (D6), the scout on `--agents` (D9), and the
- * env for compaction (D10), the plugin's eco hooks off (#616) and the
- * filter's stats and raw files.
+ * On: `--settings` (the filter hook and the prefix settings of #663),
+ * `--strict-mcp-config` with `agentdock` (where the launch uses it) and the
+ * allowed servers copied from the profile's own config (D6), the scout and
+ * the haiku `Explore` on `--agents` (D9, #663), and the env for compaction
+ * (D10), the plugin's eco hooks off (#616) and the filter's stats and raw
+ * files. A card or CI-fix round also gets the one-hour cache TTL and a
+ * prefix without dynamic sections (#663).
  */
 export const tokenSaverLaunch = (
   input: TokenSaverLaunchInput,
@@ -279,10 +339,10 @@ export const tokenSaverLaunch = (
   };
   try {
     mkdirSync(rawDir, { recursive: true, mode: 0o700 });
-    writeJsonAtomic(
-      settingsFile,
-      filterHookSettings(input.selfCommand, input.baseSettings),
-    );
+    writeJsonAtomic(settingsFile, {
+      ...PREFIX_SETTINGS,
+      ...filterHookSettings(input.selfCommand, input.baseSettings),
+    });
     // 0600 (writeJsonAtomic): the copied definitions may hold secrets.
     writeJsonAtomic(mcpFile, { mcpServers: servers });
     // DR-05: the stats reader's identity for this dir — not the rows'.
@@ -295,6 +355,7 @@ export const tokenSaverLaunch = (
     return null;
   }
 
+  const sharedPrefix = SHARED_PREFIX_KINDS.includes(input.runKind);
   return {
     args: [
       '--settings',
@@ -302,11 +363,13 @@ export const tokenSaverLaunch = (
       '--strict-mcp-config',
       '--mcp-config',
       mcpFile,
-      ...(input.scout ? ['--agents', JSON.stringify(SCOUT_AGENTS)] : []),
+      ...(input.scout ? ['--agents', JSON.stringify(LAUNCH_AGENTS)] : []),
+      ...(sharedPrefix ? [EXCLUDE_DYNAMIC_SECTIONS_FLAG] : []),
     ],
     env: {
       [AUTOCOMPACT_WINDOW_ENV]: String(autoCompactWindowFor(COMPACT_AT_TOKENS)),
       [AUTOCOMPACT_PCT_ENV]: '100',
+      ...(sharedPrefix ? { [PROMPT_CACHE_TTL_ENV]: '1h' } : {}),
       [CS_ECO_ENV]: 'off',
       [LAUNCH_SETTINGS_ENV]: settingsFile,
       ...filterEnv(run),

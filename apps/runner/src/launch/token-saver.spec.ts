@@ -17,6 +17,7 @@ import {
   LAUNCH_SETTINGS_ENV,
 } from '../filter/env';
 import { tempDir } from '../testing/fixtures';
+import firstTurn from './fixtures/first-turn.json';
 import { profileClaudeJson, profileMcpServerNames } from './profile-mcp';
 import {
   AUTOCOMPACT_PCT_ENV,
@@ -25,8 +26,12 @@ import {
   COMPACT_AT_TOKENS,
   CS_ECO_ENV,
   compactThreshold,
+  EXCLUDE_DYNAMIC_SECTIONS_FLAG,
+  EXPLORE_AGENT,
   filterHookSettings,
-  SCOUT_AGENTS,
+  LAUNCH_AGENTS,
+  PREFIX_SETTINGS,
+  PROMPT_CACHE_TTL_ENV,
   type TokenSaverLaunchInput,
   tokenSaverLaunch,
 } from './token-saver';
@@ -92,8 +97,8 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(existsSync(join(dir, 'token-saver-settings.json'))).toBe(false);
   });
 
-  it('passes the settings, a strict MCP list and the scout, in that order', () => {
-    const launch = tokenSaverLaunch(input());
+  it('passes the settings, a strict MCP list and the agents, in that order', () => {
+    const launch = tokenSaverLaunch(input({ runKind: 'skill' }));
     expect(launch).not.toBeNull();
     expect(launch?.args).toEqual([
       '--settings',
@@ -102,9 +107,53 @@ describe('tokenSaverLaunch (#445)', () => {
       '--mcp-config',
       join(dir, 'token-saver-mcp.json'),
       '--agents',
-      JSON.stringify(SCOUT_AGENTS),
+      JSON.stringify(LAUNCH_AGENTS),
     ]);
-    expect(SCOUT_AGENTS.scout.model).toBe('haiku');
+    expect(LAUNCH_AGENTS.scout.model).toBe('haiku');
+  });
+
+  it('runs the built-in Explore on haiku, read-only, beside the scout (#663)', () => {
+    const launch = tokenSaverLaunch(input());
+    const args = launch?.args ?? [];
+    const agents = JSON.parse(args[args.indexOf('--agents') + 1] ?? '{}');
+    expect(Object.keys(agents)).toEqual(['scout', EXPLORE_AGENT]);
+    expect(EXPLORE_AGENT).toBe('Explore');
+    expect(agents.Explore.model).toBe('haiku');
+    expect(agents.Explore.tools).toEqual(['Read', 'Grep', 'Glob']);
+  });
+
+  it('writes the prefix settings beside the hooks, for every kind (#663)', () => {
+    for (const runKind of ['card', 'plan', 'skill', 'orchestrator'] as const) {
+      const launch = tokenSaverLaunch(input({ runKind }));
+      const settings = JSON.parse(
+        readFileSync(launch?.settingsFile ?? '', 'utf8'),
+      );
+      expect(settings.includeGitInstructions).toBe(false);
+      expect(settings.skillListingMaxDescChars).toBe(200);
+      expect(Object.keys(settings.hooks)).toContain('PreToolUse');
+    }
+  });
+
+  it('gives a card or CI-fix round the one-hour TTL and a prefix without dynamic sections (#663)', () => {
+    const launch = tokenSaverLaunch(input({ runKind: 'card' }));
+    expect(launch?.env[PROMPT_CACHE_TTL_ENV]).toBe('1h');
+    expect(launch?.args.at(-1)).toBe(EXCLUDE_DYNAMIC_SECTIONS_FLAG);
+  });
+
+  it('leaves every other kind on the default TTL and the full prefix (#663)', () => {
+    for (const runKind of [
+      'skill',
+      'plan',
+      'ui_profile',
+      'card_assess',
+      'card_capture',
+      'text_normalize',
+      'orchestrator',
+    ] as const) {
+      const launch = tokenSaverLaunch(input({ runKind }));
+      expect(launch?.env[PROMPT_CACHE_TTL_ENV]).toBeUndefined();
+      expect(launch?.args).not.toContain(EXCLUDE_DYNAMIC_SECTIONS_FLAG);
+    }
   });
 
   it('gives an allowlist of [playwright] exactly agentdock and playwright', () => {
@@ -165,6 +214,7 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(launch?.env).toEqual({
       [AUTOCOMPACT_WINDOW_ENV]: '183000',
       [AUTOCOMPACT_PCT_ENV]: '100',
+      [PROMPT_CACHE_TTL_ENV]: '1h',
       [CS_ECO_ENV]: 'off',
       [LAUNCH_SETTINGS_ENV]: join(dir, 'token-saver-settings.json'),
       [FILTER_STATS_ENV]: join(dir, 'filter-stats.jsonl'),
@@ -257,6 +307,41 @@ describe('tokenSaverLaunch (#445)', () => {
       expect(autoCompactWindowFor(10_000)).toBe(100_000);
       expect(autoCompactWindowFor(COMPACT_AT_TOKENS)).toBe(183_000);
     });
+  });
+});
+
+/**
+ * #663 acceptance: the first turn of a card, design or Planner launch is 25k
+ * tokens or less. Measured, not assumed: a wrongly named flag does nothing
+ * silently (ADR-0068), so the figure comes from a recorded turn, and the
+ * recording is tied to the settings it was made with.
+ */
+describe('first-turn prefix (#663)', () => {
+  const PREFIX_BUDGET = 25_000;
+  const total = (usage: {
+    input_tokens: number;
+    cache_read_input_tokens: number;
+    cache_creation_input_tokens: number;
+  }): number =>
+    usage.input_tokens +
+    usage.cache_read_input_tokens +
+    usage.cache_creation_input_tokens;
+
+  it('was recorded with the prefix settings the launch writes today', () => {
+    expect(firstTurn.settings).toEqual({ ...PREFIX_SETTINGS });
+  });
+
+  it.each([
+    ['card and CI-fix', firstTurn.turns.card.usage],
+    ['Planner and design', firstTurn.turns.plan.usage],
+  ])('keeps the %s first turn at 25k tokens or less', (_, usage) => {
+    expect(total(usage)).toBeLessThanOrEqual(PREFIX_BUDGET);
+  });
+
+  it('is smaller than the launch without the prefix settings', () => {
+    expect(total(firstTurn.turns.card.usage)).toBeLessThan(
+      total(firstTurn.baseline.usage),
+    );
   });
 });
 

@@ -25,7 +25,11 @@ import {
   uiProfileTokenSaver,
 } from '../uiprofile/executor';
 import { expectEcoEnv } from './testing';
-import type { TokenSaverLaunch } from './token-saver';
+import {
+  EXCLUDE_DYNAMIC_SECTIONS_FLAG,
+  PROMPT_CACHE_TTL_ENV,
+  type TokenSaverLaunch,
+} from './token-saver';
 
 /**
  * #445 acceptance: every launch passes `--settings` and `--strict-mcp-config`
@@ -74,6 +78,31 @@ const expectWired = (args: readonly string[], launch: TokenSaverLaunch) => {
     launch.settingsFile,
     '--strict-mcp-config',
   ]);
+};
+
+/**
+ * #663 (ADR-0068): every launch with tools runs `Explore` on haiku and writes
+ * the prefix settings; only a card or CI-fix round gets the one-hour TTL and
+ * a prefix without dynamic sections.
+ */
+const expectLeanPrefix = (
+  args: readonly string[],
+  env: Readonly<Record<string, string | undefined>>,
+  launch: TokenSaverLaunch,
+  sharedPrefix: boolean,
+) => {
+  const agents = JSON.parse(args[args.indexOf('--agents') + 1] ?? '{}');
+  expect(agents.Explore?.model).toBe('haiku');
+  const settings = JSON.parse(readFileSync(launch.settingsFile, 'utf8'));
+  expect(settings.includeGitInstructions).toBe(false);
+  expect(settings.skillListingMaxDescChars).toBe(200);
+  if (sharedPrefix) {
+    expect(env[PROMPT_CACHE_TTL_ENV]).toBe('1h');
+    expect(args).toContain(EXCLUDE_DYNAMIC_SECTIONS_FLAG);
+  } else {
+    expect(env[PROMPT_CACHE_TTL_ENV]).toBeUndefined();
+    expect(args).not.toContain(EXCLUDE_DYNAMIC_SECTIONS_FLAG);
+  }
 };
 
 describe('card worker launch (#445)', () => {
@@ -157,8 +186,27 @@ describe('card worker launch (#445)', () => {
       playwright: { command: 'pw' },
     });
     expectEcoEnv(spec.env);
+    expectLeanPrefix(spec.args, spec.env, ts, true);
     expect(spec.env[FILTER_RUN_ENV]).toBe('run_1');
     expect(spec.env.AGENTDOCK_CARD).toBe('abcd1234');
+  });
+
+  it('wires a CI-fix round — the card’s resumed session — the same way (#663)', () => {
+    const round = { ...args, session: { id: S1, resume: true } };
+    const ts = cardTokenSaver(
+      profile,
+      { ...round, tokenSaver: ON },
+      home,
+      dir,
+      SELF,
+      injected,
+    );
+    if (!ts) throw new Error('expected a launch');
+    const spec = cardLaunchSpec(profile, round, '/w', null, injected.files, ts);
+    expectWired(spec.args, ts);
+    expectEcoEnv(spec.env);
+    expectLeanPrefix(spec.args, spec.env, ts, true);
+    expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('card');
   });
 
   it('leaves a plugin profile its own hooks: only the filter hook', () => {
@@ -257,6 +305,7 @@ describe('skill run launch (#445)', () => {
     ]);
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('skill');
     expectEcoEnv(spec.env);
+    expectLeanPrefix(spec.args, spec.env, ts, false);
   });
 });
 
@@ -307,6 +356,7 @@ describe('plan turn launch (#445)', () => {
     expect(Object.keys(serversOf(ts))).toContain('agentdock');
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('plan');
     expectEcoEnv(spec.env);
+    expectLeanPrefix(spec.args, spec.env, ts, false);
   });
 });
 
@@ -339,6 +389,7 @@ describe('design turn launch (#628)', () => {
     expect(spec.args).toContain(session.resume ? '--resume' : '--session-id');
     expect(spec.args[spec.args.indexOf('-p') + 2]).toBe(session.id);
     expectEcoEnv(spec.env);
+    expectLeanPrefix(spec.args, spec.env, ts, false);
   });
 
   it.each(turns)('launches %s as before when it is off', (_, session) => {
@@ -406,6 +457,7 @@ describe('design build launch (#445)', () => {
     expect(Object.keys(serversOf(ts))).toEqual(['playwright']);
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('ui_profile');
     expectEcoEnv(spec.env);
+    expectLeanPrefix(spec.args, spec.env, ts, false);
   });
 });
 
@@ -463,5 +515,6 @@ describe('orchestrator session launch (#445)', () => {
     expect(ts.env[FILTER_PROJECT_ENV]).toBe('prj_a');
     expect(ts.env[FILTER_RUN_ENV]).toBeUndefined();
     expectEcoEnv(ts.env);
+    expectLeanPrefix(argv, ts.env, ts, false);
   });
 });

@@ -31,11 +31,47 @@ For every Claude launch the runner makes, with the project's setting on:
   file. The launch sets `CS_ECO=off`, so the code-sentinel plugin's `/cs-eco`
   hooks never guard the same read a second time.
 - **Broad searches go to a cheaper helper**, and the worker prompt is ordered
-  so the model's cache hits.
+  so the model's cache hits. Claude Code's built-in `Explore` agent runs on
+  `haiku` too, instead of the session's own model.
+- **The fixed prefix is smaller.** Every turn re-reads the system prompt, the
+  tools and the instruction files, so the launch trims them (see
+  [the launch prefix](#the-launch-prefix)).
 
 The setting is per project, **on by default**, and an administrator of the
 project can switch it off under **Settings › Token saver**. Off launches every
 agent exactly as it was launched before the feature.
+
+## The launch prefix
+
+[#663](https://github.com/AndreyBegma/AgentDock/issues/663),
+[ADR-0068](../adr/0068-the-token-saver-targets-context-residency-and-is-judged-by-cost-per-round.md).
+Cache reads are almost all of what a session spends, and the fixed prefix is
+re-read on every turn. The runner sets these on each launch; every name was
+checked against Claude Code 2.1.303 (`apps/runner/src/launch/token-saver.ts`).
+
+| What | How | Launches |
+|---|---|---|
+| Compact at 150k | `CLAUDE_CODE_AUTO_COMPACT_WINDOW=183000` (the window less Claude Code's output reserve and summary buffer is 150k); `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=100` neutralises a percentage a profile carries | all |
+| No built-in commit and pull request instructions | `includeGitInstructions: false` in the launch settings | all |
+| Shorter skill listing | `skillListingMaxDescChars: 200` in the launch settings | all |
+| `Explore` on `haiku` | an `Explore` entry in `--agents`, which replaces the built-in of that name | all with tools |
+| One-hour prompt cache | `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` | card and CI-fix rounds |
+| Prefix shared across rounds and runners | `--exclude-dynamic-system-prompt-sections` (cwd, env, memory paths and git status move to the first message) | card and CI-fix rounds |
+
+Two levers are deliberately not set:
+
+- **Deferred MCP tools.** Claude Code already defers them when
+  `ENABLE_TOOL_SEARCH` is unset and the host is Anthropic's own. An explicit
+  value would also force deferral through a proxy that may not support it.
+- **`disableBundledSkills`.** Measured, it made the prefix about 4k tokens
+  larger.
+
+The effect is measured, not assumed: a wrongly named flag does nothing
+silently. `apps/runner/src/launch/fixtures/first-turn.json` records a first
+turn with these settings (about 23k tokens, against about 28.5k without them),
+and a test holds it to the 25k target and to the settings it was recorded
+with. Re-record it when the settings, the launch agents or the Claude Code
+version change.
 
 ## What is never hidden
 
