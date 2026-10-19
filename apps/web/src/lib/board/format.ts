@@ -17,6 +17,7 @@ import {
   type CardCaptureView,
   type CardRoundBrief,
   type CardRoundPhase,
+  type CardStartView,
   COLUMN_TITLE,
   canRetry,
   canRun,
@@ -628,3 +629,23 @@ export const HOOKS_GUIDE_LABEL = 'See the exact command for each profile';
 /** #281 D6: the Settings › Sessions checklist of the card's project. */
 export const hooksGuideHref = (projectId: string): string =>
   `/projects/${projectId}/settings?tab=sessions`;
+
+/**
+ * #640 (ADR-0063): what the card's branch was created from — "Based on C-13
+ * (feat/…)" or "Based on develop" — and, after it, the unmerged dependencies
+ * whose code the branch does not have; `null` before the first Run.
+ */
+export function cardStartText(
+  start: CardStartView | null,
+): { based: string; missing: string | null } | null {
+  if (!start) return null;
+  return {
+    based: start.card
+      ? `Based on ${start.card.label} (${start.base})`
+      : `Based on ${start.base}`,
+    missing:
+      start.missing.length > 0
+        ? `Without ${start.missing.join(', ')}: ${start.missing.length === 1 ? 'its pull request was' : 'their pull requests were'} not merged when the card started.`
+        : null,
+  };
+}

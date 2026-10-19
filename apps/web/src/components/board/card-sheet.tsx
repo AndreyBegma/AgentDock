@@ -48,6 +48,7 @@ import {
   canRetry,
   canRun,
   canStop,
+  cardStartText,
   describeBoardError,
   FLEET_EDIT_HINT,
   finishRefusedText,
@@ -399,6 +400,8 @@ export function CardDetailBody({
   const [editing, setEditing] = useState(false);
   const fleet = isFleetCard(card);
   const terminalCard = isTerminalCard(card);
+  // #640: what round 1 created the branch from.
+  const startText = cardStartText(card.start);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
@@ -596,6 +599,12 @@ export function CardDetailBody({
       ) : null}
       {card.branch ? (
         <p className="break-all font-mono text-xs text-ink-2">{card.branch}</p>
+      ) : null}
+      {startText ? (
+        <div className="flex flex-col gap-1 text-xs text-ink-2">
+          <p className="break-all">{startText.based}</p>
+          {startText.missing ? <p>{startText.missing}</p> : null}
+        </div>
       ) : null}
       {card.round?.hooksMissing
         ? (() => {
