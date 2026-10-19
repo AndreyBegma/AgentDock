@@ -85,6 +85,7 @@ export class LlmGateway {
       usage,
       stopReason,
       costUsd: ledger.costUsd ?? '0',
+      callId: ledger.callId,
     };
   }
 

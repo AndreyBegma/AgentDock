@@ -97,6 +97,7 @@ export function BoardColumns({
   actions,
   filter,
   olderCompleted,
+  hints,
   onOpen,
   onOpenPlanTask,
   onOpenTerminal,
@@ -114,6 +115,8 @@ export function BoardColumns({
   filter: BoardFilter;
   /** Set while the server has older Completed cards than the board holds. */
   olderCompleted?: OlderCompleted;
+  /** #660: triage hints waiting on a card, by card number. */
+  hints?: ReadonlyMap<number, number>;
   onOpen: (card: BoardCardView) => void;
   onOpenPlanTask: (task: BoardPlanTaskView) => void;
   onOpenTerminal: (card: BoardCardView) => void;
@@ -386,6 +389,7 @@ export function BoardColumns({
                 projectId={projectId}
                 card={item.card}
                 canOperate={canOperate}
+                hints={hints?.get(item.card.number)}
                 menu={menu}
                 selection={
                   canOperate

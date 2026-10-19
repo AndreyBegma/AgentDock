@@ -35,6 +35,7 @@ import {
 import { api, describeError } from '../../lib/api';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { Assistant } from '../assistant/assistant';
+import { AskBoardDialog } from '../board-ai/ask-board-dialog';
 import { Capsule } from './capsule';
 import { crumbsFor, pageTitleOf } from './crumbs';
 import { useKeyboardOpen } from './keyboard';
@@ -54,7 +55,7 @@ import {
   visibleNav,
 } from './nav';
 import { NotificationBell } from './notification-bell';
-import { paletteGroups } from './palette';
+import { ASK_PREFIX, paletteGroups } from './palette';
 import { Rail } from './rail';
 import { useRailCollapsed, useRailToggleShortcut } from './rail-collapse';
 import {
@@ -124,6 +125,8 @@ export function AppShell({
   const keyboard = useKeyboardOpen();
   const [theme, setTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // #660: the question asked from the palette; null while none is open.
+  const [asking, setAsking] = useState<string | null>(null);
   const projectId = projectIdOf(pathname);
   const projects = useProjects();
   const recent = useRecent(paletteOpen, projectId);
@@ -205,7 +208,9 @@ export function AppShell({
   const onSelect = (item: { id: string }) => {
     setPaletteOpen(false);
     if (item.id.startsWith('go:')) router.push(item.id.slice(3));
-    else if (item.id === 'action:theme') cycleTheme();
+    else if (item.id.startsWith(ASK_PREFIX)) {
+      setAsking(item.id.slice(ASK_PREFIX.length));
+    } else if (item.id === 'action:theme') cycleTheme();
     else if (item.id === 'action:logout') void logout();
   };
 
@@ -409,7 +414,13 @@ export function AppShell({
           onOpenChange={setPaletteOpen}
           search={search}
           onSelect={onSelect}
-          placeholder="Go to a page, a project or a recent run"
+          placeholder="Go to a page, a project or a run — or ask the Board"
+        />
+        <AskBoardDialog
+          question={asking}
+          onOpenChange={(open) => {
+            if (!open) setAsking(null);
+          }}
         />
       </PageActionsProvider>
     </UserProvider>

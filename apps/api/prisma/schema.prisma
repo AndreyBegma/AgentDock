@@ -3133,6 +3133,8 @@ model BoardCard {
   pullRequests       BoardCardPullRequest[]
   /// #592: the intake candidate accepted as this card.
   candidate          PlanCandidate?
+  /// #660: the triage hints written when the card was made.
+  triage             BoardCardTriage?
   /// #652: the card's place in its stack's run queue.
   stackRunEntry      BoardStackRunCard?
   /// #652: the stack runs this card paused.
@@ -3147,6 +3149,48 @@ model BoardCard {
   @@index([stageId])
   @@index([prBaseCardId])
   @@map("board_cards")
+}
+
+/// #660: where a card's triage is. `hidden` is a triage the gateway refused
+/// for the cap, the provider or the model: nothing is shown.
+enum BoardCardTriageState {
+  pending
+  ready
+  failed
+  hidden
+}
+
+/// #660: the triage hints of a card made by the intake or the assistant —
+/// possible duplicates, a kind and a priority. Advice only: nothing here
+/// changes the card until the person applies a hint. A hint dismissed or
+/// applied is stamped and never shown again.
+model BoardCardTriage {
+  cardId                String               @id
+  state                 BoardCardTriageState @default(pending)
+  /// Who the triage call was made for; null once the user is deleted.
+  userId                String?
+  /// The provider of the call, to hide the hints while its cap is reached.
+  provider              LlmProvider?
+  /// `[{cardId, reason}]`: open cards of the project the model judged the same work.
+  duplicates            Json?
+  suggestedKind         BoardCardKind?
+  kindReason            String?
+  /// Shared `TRIAGE_PRIORITIES` without `normal`: `high` or `low`.
+  suggestedPriority     String?
+  priorityReason        String?
+  duplicatesDismissedAt DateTime?
+  kindDismissedAt       DateTime?
+  kindAppliedAt         DateTime?
+  priorityDismissedAt   DateTime?
+  priorityAppliedAt     DateTime?
+  /// The `llm_calls` row of the triage call.
+  llmCallId             String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  card BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@map("board_card_triage")
 }
 
 /// #337 D8: `cardId` runs after `dependsOnId`. Both cards are of one project

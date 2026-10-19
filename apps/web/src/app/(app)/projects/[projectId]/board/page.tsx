@@ -69,6 +69,7 @@ import {
   findPlanTask,
   parsePlanTaskParam,
 } from '../../../../../lib/board/plan-tasks';
+import { fetchTriageCounts } from '../../../../../lib/board-ai/client';
 import { useUrlFilters } from '../../../../../lib/filters/use-url-filters';
 import { useLive } from '../../../../../lib/live/use-live';
 import { useReadiness } from '../../../../../lib/readiness/use-readiness';
@@ -170,6 +171,15 @@ function BoardScreen() {
   );
   const planTaskItems: readonly BoardPlanTaskView[] =
     planTasks.data?.items ?? [];
+  // #660: hints are advice — a failed read shows none.
+  const triage = useSection(
+    () => fetchTriageCounts(projectId).catch(() => ({ cards: [] })),
+    [projectId, version],
+  );
+  const hints = useMemo(
+    () => new Map((triage.data?.cards ?? []).map((c) => [c.number, c.hints])),
+    [triage.data],
+  );
   const readiness = useReadiness(projectId);
 
   // Older Completed pages are fetched by hand; a fresh first page resets them.
@@ -409,6 +419,7 @@ function BoardScreen() {
                   ? { loading: loadingOlder, onLoad: () => void loadOlder() }
                   : undefined
               }
+              hints={hints}
               onOpen={(card) => select(card.number)}
               onOpenPlanTask={selectPlanTask}
               onOpenTerminal={setAttaching}

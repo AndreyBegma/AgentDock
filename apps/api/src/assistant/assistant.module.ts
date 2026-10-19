@@ -6,6 +6,7 @@ import { AttachmentStore } from '../attachments/attachment-store';
 import { AttachmentsStoreModule } from '../attachments/attachments-store.module';
 import { uploadOptions } from '../attachments/upload-storage';
 import { BoardModule } from '../board/board.module';
+import { BoardAiModule } from '../board-ai/board-ai.module';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { FleetModule } from '../fleet/fleet.module';
 import { LlmModule } from '../llm/llm.module';
@@ -37,6 +38,7 @@ import { AssistantToolRegistry } from './tools/registry';
     PricesModule,
     ProjectsModule,
     BoardModule,
+    BoardAiModule,
     FleetModule,
     QueueModule,
     BudgetsModule,
