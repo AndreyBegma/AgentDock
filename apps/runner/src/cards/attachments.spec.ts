@@ -42,6 +42,20 @@ const refOf = (id: string, name: string, bytes: Uint8Array): AttachmentRef => ({
 
 const text = (value: string): Uint8Array => new TextEncoder().encode(value);
 
+/** #628: a real 3200×800 PNG, made from a 1×1 one. */
+const wideScreenshot = (): Promise<Uint8Array> =>
+  new Bun.Image(
+    Uint8Array.from(
+      atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      ),
+      (c) => c.charCodeAt(0),
+    ),
+  )
+    .resize(3200, 800)
+    .png()
+    .bytes();
+
 const setup = async () => {
   const f = await cardsWorkspace();
   teardown.push(f.cleanup);
@@ -274,5 +288,39 @@ describe('syncAttachments', () => {
     writeFileSync(join(s.dir, 'a9-removed.png'), 'old');
     await syncAttachments(s.deps, s.worktree, [], undefined);
     expect(readdirSync(s.dir)).toEqual([]);
+  });
+
+  // #628: a plan or design turn reads an image at the size the model uses.
+  it('scales an image for a model once, and keeps it across syncs', async () => {
+    const s = await setup();
+    const shot = await wideScreenshot();
+    s.bodies.set('a1', shot);
+    const refs: AttachmentRef[] = [
+      { ...refOf('a1', 'shot.png', shot), mime: 'image/png' },
+    ];
+
+    await syncAttachments(s.deps, s.worktree, refs, s.source(), {
+      forModel: true,
+    });
+    const file = join(s.dir, 'a1-shot.png');
+    const meta = await new Bun.Image(readFileSync(file)).metadata();
+    expect([meta.format, meta.width, meta.height]).toEqual(['png', 1568, 392]);
+    expect(readdirSync(s.dir)).toEqual(['a1-shot.png']);
+
+    await syncAttachments(s.deps, s.worktree, refs, s.source(), {
+      forModel: true,
+    });
+    expect(s.requests).toHaveLength(1);
+  });
+
+  it("keeps a card worktree's image as the person attached it", async () => {
+    const s = await setup();
+    const shot = await wideScreenshot();
+    s.bodies.set('a1', shot);
+    const refs: AttachmentRef[] = [
+      { ...refOf('a1', 'shot.png', shot), mime: 'image/png' },
+    ];
+    await syncAttachments(s.deps, s.worktree, refs, s.source());
+    expect(sha(readFileSync(join(s.dir, 'a1-shot.png')))).toBe(sha(shot));
   });
 });

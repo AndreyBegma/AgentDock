@@ -38,6 +38,7 @@ import {
   cardDesignTaskKey,
   type DesignKey,
   designGates,
+  previousFramesOf,
   stackDesignTaskKey,
 } from '../design/design-store';
 import {
@@ -493,6 +494,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         taskKey: host.taskKey,
         variant: designPlan.variant,
         openCommentIds: designPlan.comments,
+        previousFrames: await previousFramesOf(tx, owner, designPlan),
       });
       if (!parsed.ok) {
         return fail(
@@ -605,6 +607,11 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           taskKey: task.key,
           variant: designPlan.variant,
           openCommentIds: designPlan.comments,
+          previousFrames: await previousFramesOf(
+            tx,
+            { planId: plan.id, taskKey: task.key },
+            designPlan,
+          ),
         });
       case 'clarify':
       case 'decompose':

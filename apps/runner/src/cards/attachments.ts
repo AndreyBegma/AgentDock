@@ -22,6 +22,7 @@ import { CommandFailure } from '../commands/failure';
 import { errorMessage } from '../log';
 import { normalizeServer } from '../server-url';
 import { excludeFromGit, type GitDeps } from './git';
+import { modelImage } from './model-image';
 
 /** Where and as whom the runner reads attachments (#309 D9). */
 export interface AttachmentSource {
@@ -135,13 +136,39 @@ const ensureDirectory = (worktree: string): string => {
   return real;
 };
 
-/** True when `file` already holds exactly what `ref` promised. */
-const present = (file: string, ref: AttachmentRef): boolean => {
+/**
+ * #628: beside the attachments directory, what each file a model reads was
+ * made from — the source's SHA-256 and the written file's — so a scaled
+ * image is not downloaded again on every turn.
+ */
+const MODEL_MANIFEST = 'attachments-model.json';
+type ModelManifest = Record<string, { source: string; sha256: string }>;
+
+const readManifest = (file: string): ModelManifest => {
   try {
-    return (
-      lstatSync(file).isFile() &&
-      matches(ref, new Uint8Array(readFileSync(file)))
-    );
+    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    return parsed && typeof parsed === 'object'
+      ? (parsed as ModelManifest)
+      : {};
+  } catch {
+    return {};
+  }
+};
+
+/**
+ * True when `file` already holds what `ref` promised — exactly, or (#628)
+ * as the manifest says the model copy of it was written.
+ */
+const present = (
+  file: string,
+  ref: AttachmentRef,
+  model: ModelManifest[string] | null,
+): boolean => {
+  try {
+    if (!lstatSync(file).isFile()) return false;
+    const bytes = new Uint8Array(readFileSync(file));
+    if (model === null) return matches(ref, bytes);
+    return model.source === ref.sha256 && sha256Of(bytes) === model.sha256;
   } catch {
     return false;
   }
@@ -176,6 +203,15 @@ const inPool = async <T>(
   if (failure) throw failure;
 };
 
+export interface SyncAttachmentsOptions {
+  /**
+   * #628: the files are only read by a model — a plan or design turn — so
+   * an image is scaled to the size the model reads (`modelImage`). A card's
+   * worktree keeps the originals: its worker may commit one.
+   */
+  forModel?: boolean;
+}
+
 /**
  * #309 D9: makes `<worktree>/.agentdock/attachments/` hold exactly `refs`.
  * A file already there with the right size and SHA-256 is kept; every other
@@ -189,6 +225,7 @@ export const syncAttachments = async (
   worktree: string,
   refs: readonly AttachmentRef[],
   source: AttachmentSource | undefined,
+  options: SyncAttachmentsOptions = {},
 ): Promise<void> => {
   const directory = join(worktree, ATTACHMENTS_WORKTREE_DIR);
   if (refs.length === 0 && !existsSync(directory)) return;
@@ -202,16 +239,34 @@ export const syncAttachments = async (
       if (!wanted.has(entry))
         rmSync(join(dir, entry), { recursive: true, force: true });
     }
-    const missing = [...wanted].filter(
-      ([name, ref]) => !present(join(dir, name), ref),
-    );
+    const manifestFile = join(dir, '..', MODEL_MANIFEST);
+    const before = options.forModel ? readManifest(manifestFile) : {};
+    const manifest: ModelManifest = {};
+    const missing = [...wanted].filter(([name, ref]) => {
+      const model = options.forModel
+        ? (before[name] ?? { source: '', sha256: '' })
+        : null;
+      if (!present(join(dir, name), ref, model)) return true;
+      if (model) manifest[name] = model;
+      return false;
+    });
     if (missing.length > 0 && !source) {
       throw unavailable('this runner has no way to download attachments');
     }
     await inPool(missing, PARALLEL_DOWNLOADS, async ([name, ref]) => {
       if (!source) return;
-      writeAtomic(dir, name, await download(source, ref));
+      const bytes = await download(source, ref);
+      if (!options.forModel) {
+        writeAtomic(dir, name, bytes);
+        return;
+      }
+      const model = await modelImage(bytes, ref.mime);
+      writeAtomic(dir, name, model);
+      manifest[name] = { source: ref.sha256, sha256: sha256Of(model) };
     });
+    if (options.forModel) {
+      writeFileSync(manifestFile, JSON.stringify(manifest), { mode: 0o644 });
+    }
   } catch (error) {
     if (error instanceof CommandFailure) throw error;
     throw unavailable(

@@ -180,6 +180,75 @@ describe('card design (e2e, #243)', () => {
     expect(design.activeTurnId).not.toBeNull();
   });
 
+  it('#628: a revise runs in a session of its own and keeps a frame it does not draw', async () => {
+    await h.seedProfile();
+    const card = await h.designedCard(1);
+    await generate(card.number);
+    const frames = [
+      {
+        name: 'Page',
+        html: '<!doctype html><html><body><h1>Login page</h1><p>PAGE-BODY</p></body></html>',
+      },
+      {
+        name: 'Form',
+        html: '<!doctype html><html><body><p>FORM-BODY</p></body></html>',
+      },
+    ];
+    await h.finishCard(
+      card.id,
+      designResult({ taskKey: KEY, variant: 1 }, frames),
+    );
+    const base = h.cardDesignBase(card.number);
+    const [drawn] = (await h.cardDesign(card.number)).revisions;
+    const commented = await h.author.send('post', `${base}/comments`, {
+      revisionId: drawn.id,
+      frame: 1,
+      kind: 'general',
+      body: 'Label every field.',
+    });
+    expect(commented.status).toBe(201);
+    expect((await h.author.send('post', `${base}/revise`)).status).toBe(201);
+
+    const stored = await h.ctx.prisma.boardCard.findUniqueOrThrow({
+      where: { id: card.id },
+    });
+    const revise = h.sentOf('plan.turn').at(-1) ?? {};
+    const session = revise.session as { id: string; resume: boolean };
+    expect(session.resume).toBe(false);
+    expect(session.id).not.toBe(stored.designSessionId);
+    const prompt = String(revise.prompt);
+    expect(prompt).toContain('FORM-BODY');
+    expect(prompt).not.toContain('PAGE-BODY');
+    expect(prompt).toContain('- "Page" — 1 KiB; headings: "Login page"');
+    expect(prompt.indexOf('PROFILE KIT')).toBeLessThan(
+      prompt.indexOf('# This turn'),
+    );
+
+    await h.finishCard(
+      card.id,
+      designResult({ taskKey: KEY, variant: 1, kept: ['Page'] }, [
+        frames[0],
+        { name: 'Form', html: frames[1].html.replace('FORM', 'LABELLED') },
+      ]),
+    );
+    const next = (await h.cardDesign(card.number)).revisions.find(
+      (r) => r.revision === 2,
+    );
+    if (!next) throw new Error('expected revision 2');
+    const html = (position: number) =>
+      h.author.get(`/design-revisions/${next.id}/frames/${position}/html`);
+    expect((await html(0)).text).toContain('PAGE-BODY');
+    expect((await html(1)).text).toContain('LABELLED-BODY');
+    // The card's design session stays for its next Generate.
+    expect(
+      (
+        await h.ctx.prisma.boardCard.findUniqueOrThrow({
+          where: { id: card.id },
+        })
+      ).designSessionId,
+    ).toBe(stored.designSessionId);
+  });
+
   it('approving chains no write turn, sends plan.close, and with the switch off starts nothing', async () => {
     await h.seedProfile();
     const card = await h.designedCard(2);

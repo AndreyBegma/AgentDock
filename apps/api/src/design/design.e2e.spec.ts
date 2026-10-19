@@ -690,6 +690,58 @@ describe('design stage (e2e)', () => {
     );
     expect(prompt).toContain('"frame": "Card tile"');
     expect(prompt).toContain(pin.id);
+    // #628: the frame the pin is on in full, a summary of the others, in a
+    // session of the revise's own.
+    expect(prompt).toContain('#### Frame "Card tile"');
+    expect(prompt).toContain('<button>Tile</button>');
+    expect(prompt).not.toContain('<button>Board</button>');
+    expect(prompt).toContain('- "Board page" — 1 KiB');
+    const task = await h.ctx.prisma.planTask.findFirstOrThrow({
+      where: { planId: plan.id, key: 't1' },
+    });
+    const session = h.sentOf('plan.turn').at(-1)?.session as {
+      id: string;
+      resume: boolean;
+    };
+    expect(session.resume).toBe(false);
+    expect(session.id).not.toBe(task.sessionId);
+
+    // The turn draws the tile and keeps the other two as they were.
+    const retile = MOCKUP.replace('Export', 'Rounded tile');
+    await h.finish(
+      plan.id,
+      designResult(
+        {
+          taskKey: 't1',
+          variant: 1,
+          addressed: [pin.id],
+          kept: ['Board page', 'Card tile!'],
+        },
+        [FRAMES[0], { name: 'Card tile', html: retile }, FRAMES[2]],
+      ),
+    );
+    const next = (await design(plan.id)).revisions.find(
+      (r) => r.revision === 2,
+    );
+    if (!next) throw new Error('expected revision 2');
+    const htmlOf = async (position: number) =>
+      (
+        await h.author.get(
+          `/design-revisions/${next.id}/frames/${position}/html`,
+        )
+      ).text;
+    expect(next.frames.map((f) => f.name)).toEqual(FRAMES.map((f) => f.name));
+    expect(await htmlOf(0)).toContain('<button>Board</button>');
+    expect(await htmlOf(1)).toContain('<button>Rounded tile</button>');
+    expect(await htmlOf(2)).toContain('<button>Tile 2</button>');
+    // The task's own session is left as it was.
+    expect(
+      (
+        await h.ctx.prisma.planTask.findUniqueOrThrow({
+          where: { id: task.id },
+        })
+      ).sessionId,
+    ).toBe(task.sessionId);
   });
 
   it('reads a revision stored before frames as one frame named Mockup (#441)', async () => {

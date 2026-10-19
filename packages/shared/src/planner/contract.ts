@@ -161,6 +161,11 @@ export interface PlannerParseContexts {
     taskKey: string;
     variant: number;
     openCommentIds: readonly string[];
+    /**
+     * #628: a revise's previous revision of the variant, in order — the
+     * frames `kept` may name. Absent on a generate: nothing can be kept.
+     */
+    previousFrames?: readonly DesignFrameDraft[];
   };
   /** #337: what decides whether the intake turn may still ask. */
   intake: VersionContext & IntakeTurnState;
@@ -413,11 +418,14 @@ const intakeBranchSchema = (json: unknown) => {
 /**
  * Spec 223 D7, #441: the design blocks, one per frame `names` lists — or the
  * one block of a turn that names no frames — each validated against D6, and
- * together at most `DESIGN_HTML_MAX_BYTES`.
+ * together at most `DESIGN_HTML_MAX_BYTES`. #628: a frame named in `kept`
+ * has no block; it is the previous revision's frame of that name, as drawn.
  */
 const parseDesignBlocks = (
   text: string,
   names: readonly string[] | undefined,
+  kept: readonly string[],
+  previous: readonly DesignFrameDraft[],
 ):
   | { ok: true; frames: DesignFrameDraft[] }
   | { ok: false; error: PlannerContractViolation } => {
@@ -428,7 +436,13 @@ const parseDesignBlocks = (
       `the ${PLANNER_DESIGN_BLOCK_TAG} block is never closed`,
     );
   }
-  if (blocks.length === 0) {
+  if (kept.length > 0 && names === undefined) {
+    return violation(
+      'frame_mismatch',
+      '"kept" names frames, but "frames" does not list them',
+    );
+  }
+  if (blocks.length === 0 && kept.length === 0) {
     return violation('no_design_block', `no ${PLANNER_DESIGN_BLOCK_TAG} block`);
   }
   if (names === undefined && blocks.length > 1) {
@@ -438,12 +452,6 @@ const parseDesignBlocks = (
     );
   }
   const frameNames = names ?? [DESIGN_LEGACY_FRAME_NAME];
-  if (frameNames.length !== blocks.length) {
-    return violation(
-      'frame_mismatch',
-      `"frames" names ${frameNames.length} frame${frameNames.length === 1 ? '' : 's'}, but there ${blocks.length === 1 ? 'is 1' : `are ${blocks.length}`} ${PLANNER_DESIGN_BLOCK_TAG} block${blocks.length === 1 ? '' : 's'}`,
-    );
-  }
   const seen = new Set<string>();
   for (const name of frameNames) {
     const key = name.toLowerCase();
@@ -452,16 +460,48 @@ const parseDesignBlocks = (
     }
     seen.add(key);
   }
+  const keptKeys = new Set(kept.map((name) => name.toLowerCase()));
+  const earlier = new Map(previous.map((f) => [f.name.toLowerCase(), f]));
+  for (const name of kept) {
+    if (!seen.has(name.toLowerCase())) {
+      return violation(
+        'frame_mismatch',
+        `"kept" names ${name}, which "frames" does not list`,
+      );
+    }
+    if (!earlier.has(name.toLowerCase())) {
+      return violation(
+        'frame_mismatch',
+        `"kept" names ${name}, which the previous revision does not have`,
+      );
+    }
+  }
+  const drawn = frameNames.filter((name) => !keptKeys.has(name.toLowerCase()));
+  if (drawn.length !== blocks.length) {
+    return violation(
+      'frame_mismatch',
+      `"frames" names ${drawn.length} frame${drawn.length === 1 ? '' : 's'} to draw${keptKeys.size > 0 ? ` (besides ${keptKeys.size} kept)` : ''}, but there ${blocks.length === 1 ? 'is 1' : `are ${blocks.length}`} ${PLANNER_DESIGN_BLOCK_TAG} block${blocks.length === 1 ? '' : 's'}`,
+    );
+  }
   const frames: DesignFrameDraft[] = [];
   let total = 0;
-  for (const [i, html] of (blocks as string[]).entries()) {
-    const name = frameNames[i];
-    const check = validateMockup(html);
-    if (!check.ok) {
-      return violation(
-        check.reason,
-        blocks.length > 1 ? `frame "${name}": ${check.message}` : check.message,
-      );
+  let block = 0;
+  for (const name of frameNames) {
+    const copy = keptKeys.has(name.toLowerCase())
+      ? earlier.get(name.toLowerCase())
+      : undefined;
+    // A kept frame was validated when its revision was drawn.
+    const html = copy ? copy.html : (blocks[block++] as string);
+    if (!copy) {
+      const check = validateMockup(html);
+      if (!check.ok) {
+        return violation(
+          check.reason,
+          frameNames.length > 1
+            ? `frame "${name}": ${check.message}`
+            : check.message,
+        );
+      }
     }
     total += designBytes(html);
     frames.push({ name, html });
@@ -630,7 +670,12 @@ export function parsePlannerOutput(
           `addressed names ${unknown}, which is not an open comment of this design`,
         );
       }
-      const design = parseDesignBlocks(text, output.frames);
+      const design = parseDesignBlocks(
+        text,
+        output.frames,
+        output.kept ?? [],
+        ctx.previousFrames ?? [],
+      );
       if (!design.ok) return design;
       const parsedDesign: PlannerParseResult<'design'> = {
         ok: true,
@@ -737,6 +782,7 @@ Frames:
 
 - Draw one frame unless the task touches several pages or several standalone components. Then draw one frame per page, plus one per component that matters on its own (its states side by side).
 - \`"frames"\` lists a short name per frame (at most ${DESIGN_FRAME_NAME_MAX} characters, distinct), in the order of the design blocks: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out; the frame is then named "${DESIGN_LEGACY_FRAME_NAME}".
+- On a revision, \`"kept"\` names the frames of \`"frames"\` you leave exactly as the previous revision drew them, by their previous names. A kept frame has no design block — AgentDock copies it; every other frame of \`"frames"\` has one, in order.
 
 The mockup's rules — a frame that breaks one fails the turn:
 
@@ -821,7 +867,7 @@ write     → { "action": "write", "taskKey": key, "document": markdown, "assump
 revise    → { "action": "revise", "tasks": [ Task | { "key": key } ] }${
     v2
       ? `
-design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ], "frames"?: [ string ] }`
+design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ], "frames"?: [ string ], "kept"?: [ string ] }`
       : ''
   }
 \`\`\`
