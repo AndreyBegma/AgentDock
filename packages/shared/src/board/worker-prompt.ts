@@ -4,6 +4,7 @@ import { attachmentWorktreePath } from '../attachments/names';
 import { attachmentKindLabel } from '../attachments/types';
 import { HANDOFF_NOTE_MAX_TOKENS, HANDOFF_SECTIONS } from '../handoff/note';
 import { CARD_RUN_PROMPT_MAX_BYTES } from '../protocol/commands/cards';
+import { TERSE_REGISTER_LINES } from '../token-saver/register';
 import { cardLabel } from './naming';
 import type { CardCiCheck } from './shipping';
 import type { BoardCardKind } from './types';
@@ -30,9 +31,10 @@ import type { BoardCardKind } from './types';
  * project's checks — sits in a `<card>` data fence. Version 16 (C-227): the
  * project's `## Project coding rules` section. Version 17 (C-254): the
  * stable text trimmed, no rule dropped. Version 18 (#630): never rewrite a
- * commit AgentDock pushed.
+ * commit AgentDock pushed. Version 19 (#663 D2, D3): the working register is
+ * the shared terse register.
  */
-export const CARD_WORKER_PROMPT_VERSION = 18;
+export const CARD_WORKER_PROMPT_VERSION = 19;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'AGENTDOCK_CARD';
@@ -425,12 +427,7 @@ const pullRequestSection = (card: CardWorkerPromptInput): string[] => {
  * #445 D7: two registers. What only the worker reads is terse; what a person
  * reads is complete.
  */
-const REGISTER_LINES = [
-  '## How to write',
-  '',
-  '- Working register — what only you read: do not narrate, do not restate the plan, keep status lines short.',
-  `- Audience register — what a person reads (a question, the PR description, the \`${FINISH_CARD_TOOL}\` summary, a spec, a design file): full sentences, with every required section, and leave nothing out.`,
-];
+const REGISTER_LINES = ['## How to write', '', ...TERSE_REGISTER_LINES];
 
 /**
  * #445 amendment 11: 629 of 634 card Bash calls were chains the hook may not
