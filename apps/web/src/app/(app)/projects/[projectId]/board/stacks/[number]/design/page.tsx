@@ -26,6 +26,7 @@ import {
   applyViewerChange,
   resolveViewerState,
 } from '../../../../../../../../lib/design/viewer-state';
+import { useStepBack } from '../../../../../../../../lib/navigation/step-back';
 import { useErrorToast } from '../../../../../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../../../../../lib/section/use-section';
 import { useProjectDetail } from '../../../../use-project-detail';
@@ -51,10 +52,15 @@ export default function StackDesignViewerPage() {
     [projectId, number, section.data?.updatedAt],
   );
   const back = boardStackPageHref(projectId, number);
+  const leave = useStepBack(back);
 
   if (!Number.isInteger(number) || number < 1 || isNotFound(stack.error)) {
     return (
-      <FullScreenLayer label="Design viewer">
+      <FullScreenLayer
+        label="Design viewer"
+        onBack={() => router.push(`/projects/${projectId}/board`)}
+        bar={{ label: 'Board' }}
+      >
         <div className="p-6">
           <EmptyState
             title="Stack not found"
@@ -74,11 +80,20 @@ export default function StackDesignViewerPage() {
   }
 
   return (
-    <FullScreenLayer label="Design viewer">
+    <FullScreenLayer
+      label="Design viewer"
+      onBack={leave}
+      bar={{
+        label: 'Stack',
+        title: 'Design',
+        subtitle: stack.data?.label ?? `S-${number}`,
+      }}
+    >
       <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
         <Link
           href={back}
-          className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+          // Below `lg` the phone back bar is the way out (#677).
+          className={`${buttonClassName({ variant: 'ghost', size: 'sm' })} max-lg:hidden`}
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           Back to the stack
