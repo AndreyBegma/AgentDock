@@ -1,5 +1,6 @@
 import type {
   BoardAskResponse,
+  BoardSearchResponse,
   BoardTriageCounts,
   CardTriageView,
 } from '@agentdock/shared';
@@ -28,7 +29,7 @@ import {
 } from '../projects';
 import { BoardAskService } from './board-ask.service';
 import { BoardTriage } from './board-triage.service';
-import { BoardAskDto, TriageHintDto } from './dto';
+import { BoardAskDto, BoardSearchDto, TriageHintDto } from './dto';
 
 /** Questions one person may ask per window: each is two model calls. */
 export const BOARD_ASK_LIMIT = 20;
@@ -63,6 +64,16 @@ export class BoardAskController {
     @Body() dto: BoardAskDto,
   ): Promise<BoardAskResponse> {
     return this.ask.ask(user, dto.question);
+  }
+
+  @Post('search')
+  @HttpCode(200)
+  @AskThrottle()
+  search(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: BoardSearchDto,
+  ): Promise<BoardSearchResponse> {
+    return this.ask.searchAgain(user, dto.query);
   }
 }
 

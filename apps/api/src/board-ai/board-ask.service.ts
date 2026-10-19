@@ -3,6 +3,7 @@ import {
   type BoardAskHit,
   type BoardAskQuery,
   type BoardAskResponse,
+  type BoardSearchResponse,
   cardLabel,
 } from '@agentdock/shared';
 import { Injectable } from '@nestjs/common';
@@ -70,8 +71,9 @@ export class BoardAskService {
     });
     const parsed = parseAskAnswer(modelJson(queried.text));
     if (!parsed) {
+      // Not 502: the web reads a gateway status as the API being down.
       throw boardAiError(
-        502,
+        422,
         'ai_bad_answer',
         'The model did not turn the question into a query; try asking differently',
       );
@@ -102,6 +104,22 @@ export class BoardAskService {
       query: parsed.query,
       hits,
     };
+  }
+
+  /** `POST /board/search`: a query again, over the person's projects, no model. */
+  async searchAgain(
+    user: AuthUser,
+    query: BoardAskQuery,
+  ): Promise<BoardSearchResponse> {
+    const accessible = await this.prisma.project.findMany({
+      where: this.access.visibleWhere(user),
+      select: { id: true, displayName: true, repo: true },
+    });
+    const { hits } = await this.search(
+      projectsOfQuery(query.projects, accessible),
+      query,
+    );
+    return { hits };
   }
 
   /** The hits of a query in `scope`, newest first, and how many there were. */

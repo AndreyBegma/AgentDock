@@ -299,6 +299,34 @@ describe('Ask the Board and triage hints (e2e)', () => {
       expect(calls).toHaveLength(0);
     });
 
+    it('runs a query again without a model call, still over accessible projects', async () => {
+      const query = {
+        projects: [],
+        text: ['digest'],
+        columns: [],
+        kind: null,
+        prState: null,
+        checks: null,
+        withinDays: null,
+        sources: ['cards'],
+      };
+      const res = await alice.send('post', '/board/search', { query });
+      expect(res.status).toBe(200);
+      expect(
+        (
+          res.body as { hits: { number: number; projectId: string }[] }
+        ).hits.map((h) => [h.projectId, h.number]),
+      ).toEqual([[dock, 12]]);
+      expect(calls).toHaveLength(0);
+      expect(
+        (
+          await alice.send('post', '/board/search', {
+            query: { ...query, columns: ['review'] },
+          })
+        ).status,
+      ).toBe(400);
+    });
+
     it('refuses an empty question', async () => {
       const res = await alice.send('post', '/board/ask', { question: '  ' });
       expect(res.status).toBe(400);

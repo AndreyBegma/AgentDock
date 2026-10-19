@@ -105,6 +105,7 @@ import { CardHandoffSection } from './handoff/card-handoff-section';
 import { LaunchPopover } from './launch-popover';
 import { MovePicker } from './move-picker';
 import { SuggestionSheetBody } from './suggestion-sheet';
+import { TriageHints } from './triage-hints';
 import type { CardActions } from './use-card-actions';
 import { useCardMove } from './use-card-move';
 
@@ -815,6 +816,17 @@ export function CardDetailBody({
     />
   );
 
+  // #660: hints on a card the intake or the assistant made; none on others.
+  const triageSection = (
+    <TriageHints
+      projectId={projectId}
+      number={card.number}
+      refresh={card}
+      canOperate={canOperate}
+      onChanged={onSaved}
+    />
+  );
+
   const dependenciesSection = (
     <CardDependenciesSection
       projectId={projectId}
@@ -1073,6 +1085,7 @@ export function CardDetailBody({
         />
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <div className="flex min-w-0 flex-col gap-6">
+            {triageSection}
             {panel(cardForm)}
             {panel(roundsSection)}
           </div>
@@ -1118,6 +1131,7 @@ export function CardDetailBody({
             <ExternalLink aria-hidden="true" className="size-4" />
           </NextLink>
         </div>
+        {triageSection}
         {runSection}
         {designSection}
         {dependenciesSection}

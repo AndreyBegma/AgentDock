@@ -87,6 +87,18 @@ export interface BoardAskResponse {
   hits: BoardAskHit[];
 }
 
+/**
+ * `POST /board/search`: a query run again without a model call — what the
+ * dialog sends when the person removes one of its chips.
+ */
+export interface BoardSearchRequest {
+  query: BoardAskQuery;
+}
+
+export interface BoardSearchResponse {
+  hits: BoardAskHit[];
+}
+
 /** #660: the three hints a new card may get. */
 export const TRIAGE_HINTS = ['duplicates', 'kind', 'priority'] as const;
 export type TriageHint = (typeof TRIAGE_HINTS)[number];

@@ -3,7 +3,15 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { Check, Clock, GitMerge, Layers, Paperclip, Zap } from 'lucide-react';
+import {
+  Check,
+  Clock,
+  GitMerge,
+  Layers,
+  Paperclip,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
 import NextLink from 'next/link';
 import type { ReactNode } from 'react';
 import { attachmentCountLabel } from '../../lib/attachments/format';
@@ -30,6 +38,7 @@ import {
 } from '../../lib/board/format';
 import { prChipText } from '../../lib/board/pull-request';
 import { ciDot, shippingBadge } from '../../lib/board/shipping';
+import { hintsLabel } from '../../lib/board-ai/triage';
 import { formatCost } from '../../lib/format';
 import { safeHttpsUrl } from '../../lib/queue/format';
 import { StewardChip } from '../steward/steward-chip';
@@ -64,10 +73,13 @@ export function CardFace({
   canOperate,
   menu,
   selection,
+  hints,
   onOpen,
 }: {
   projectId: string;
   card: BoardCardView;
+  /** #660: triage hints waiting on the card; absent or 0 is none. */
+  hints?: number;
   canOperate: boolean;
   /** The Board's card menu (`slots.menu`), placed at the end of the header. */
   menu?: ReactNode;
@@ -126,6 +138,16 @@ export function CardFace({
           {card.kind === 'bug' ? (
             <Chip size="sm" tone="danger" className={HEAD_CHIP}>
               Bug
+            </Chip>
+          ) : null}
+          {hints ? (
+            <Chip
+              size="sm"
+              title="Triage hints: open the card to apply or dismiss them"
+              className={`${HEAD_CHIP} gap-1`}
+            >
+              <Sparkles aria-hidden="true" className="size-3" />
+              {hintsLabel(hints)}
             </Chip>
           ) : null}
           {card.attachmentCount > 0 ? (
