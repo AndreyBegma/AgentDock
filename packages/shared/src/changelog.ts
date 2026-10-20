@@ -58,10 +58,6 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       },
       {
         kind: 'fixed',
-        text: 'A project the runner’s policy refuses to watch now says why and shows the exact command to run on the runner’s machine.',
-      },
-      {
-        kind: 'fixed',
         text: 'Design mockups with many frames are no longer refused for their size, and a frame whose script cannot run is turned away with a reason.',
       },
     ],
