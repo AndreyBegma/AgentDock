@@ -3,7 +3,9 @@
 Status: accepted · Date: 2026-10-19 · Amends [ADR-0029](0029-accepting-a-board-card-may-merge-its-pull-request-through-the-runner.md) ·
 Card: C-268 · Issue: #636 ·
 Spec: [`docs/specs/636-branch-a-dependent-card-from-its-depende.md`](../specs/636-branch-a-dependent-card-from-its-depende.md) ·
-Amended by [ADR-0065](0065-run-waits-for-every-dependency-to-have-a-ready-pull-request.md) (§1: no `ignoreDependencies`; an open dependency is refused first)
+Amended by [ADR-0065](0065-run-waits-for-every-dependency-to-have-a-ready-pull-request.md) (§1: no `ignoreDependencies`; an open dependency is refused first) ·
+Amended by C-299 / [#709](https://github.com/AndreyBegma/AgentDock/issues/709) (§5–§7: the base read from GitHub, the forward PR, Completed means landed;
+spec [`docs/specs/709-a-stacked-card-can-ship-into-a-dependenc.md`](../specs/709-a-stacked-card-can-ship-into-a-dependenc.md))
 
 ## Context
 
@@ -48,6 +50,44 @@ it and its PR conflicted with C-1's.
 4. **A stacked PR is never auto-merged.** Auto-merge (ADR-0035) skips a card
    whose `prBase` is set: its PR would merge into the dependency's branch,
    not the base. It ships once it has been retargeted.
+5. **The base is read from GitHub, not only from `mergedAt` (#709).**
+   `mergedAt` comes from the PR poll, which can lag a merge made by hand.
+   Whenever the Board is about to rely on a dependency being unmerged — a
+   Run choosing the base, a later round keeping a stored base, a merge on
+   Accept, the PR poll of a stacked card — it reads that dependency's open
+   PR live through `card.checks` (which now also returns the PR's `base`
+   and `mergedAt`). A PR merged there is recorded as merged on the spot (and
+   its stacked PRs retargeted, §3); a closed one counts as no PR, so the
+   card starts from the project base. Before Accept's `card.merge` of a
+   stacked PR whose dependency has merged, the PR is retargeted first; if
+   it cannot be, the merge is refused with `merge_failed` reason
+   `base_merged` and nothing is sent to GitHub.
+6. **A merge into a dead dependency branch is carried forward.** A stacked
+   PR found merged (`mergedAt` set, its base not the project base) at or
+   after its dependency's own PR merged never reached the base. AgentDock
+   opens a forward PR `<card branch> → <project base>` through `card.prOpen`,
+   a typed runner command (ADR-0010) that reuses an open PR of that branch
+   into the base or runs `gh pr create`, then reads `mergeable`. The card
+   takes the forward PR as its PR (open, CI pending, base cleared), keeps
+   the old PR in its PR history, and the move is audited as
+   `card.pr_forwarded` with both numbers. A forward PR that conflicts with
+   the base marks the card `needsPerson` (`forward_conflict`, also found by
+   the PR poll later); one that cannot be opened marks it `forward_failed`.
+   GitHub's "no commits between" means the work already landed: the base
+   is cleared and nothing is opened. A stacked PR that merged before its
+   dependency did lands with it and is left alone. The card's own
+   dependants stay stacked until the forward PR merges.
+7. **Completed means landed.** Accept without `merge` or `closePr` of a
+   card whose work is not in the project base — an open PR, a PR merged
+   into a dead dependency branch, a closed PR, or a failed collect with no
+   PR — is refused with 409 `not_landed` and one sentence naming the
+   missing landing. The person may confirm with `confirmUnlanded: true`;
+   the web Accept dialog shows the sentence and offers "Accept anyway".
+   Bulk complete sends no confirmation, so such a card is that card's
+   `not_landed` error. A PR merged into a dependency branch that is still
+   live counts as landed: it reaches the base with the dependency. The card
+   sheet shows a stacked target prominently, and warns once that
+   dependency's own PR has merged (`prTarget.stackedOn.merged`).
 
 ## Consequences
 
@@ -60,3 +100,9 @@ it and its PR conflicted with C-1's.
   then finds it already on the base or not open.
 - A card with several unmerged dependencies waits; merging several
   dependency branches into one card's branch is out of scope.
+- (#709) A Run, a merge and the poll of a stacked card cost one `card.checks`
+  call per open dependency PR. A runner that does not serve `card.checks`
+  falls back to the stored `mergedAt`, as before; one that does not serve
+  `card.prOpen` leaves a dead-branch merge to the person (`forward_failed`).
+- (#709) No column records the forward: the audit entry `card.pr_forwarded`
+  is what tells the poll that the card's open PR is a forward PR.
