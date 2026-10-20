@@ -64,17 +64,18 @@ export class RunnerSettingsService {
     patch: RunnerSettingsPatch,
     actor: RunnerSettingsActor,
   ): Promise<Runner> {
+    const before = await this.prisma.runner.findUnique({ where: { id } });
+    // Someone who is neither an admin nor its local user does not see it —
+    // checked before the field permission so a 403 never confirms an id.
+    if (!before || (!actor.isAdmin && before.localUserId !== actor.userId)) {
+      throw runnerError(404, RUNNER_ERROR.notFound, 'Runner not found');
+    }
     if (patch.localUserId !== undefined && !actor.isAdmin) {
       throw runnerError(
         403,
         RUNNER_ERROR.forbidden,
         "Only an admin changes a runner's local user",
       );
-    }
-    const before = await this.prisma.runner.findUnique({ where: { id } });
-    // Someone who is neither an admin nor its local user does not see it.
-    if (!before || (!actor.isAdmin && before.localUserId !== actor.userId)) {
-      throw runnerError(404, RUNNER_ERROR.notFound, 'Runner not found');
     }
     if (patch.localUserId) {
       const user = await this.prisma.user.findUnique({

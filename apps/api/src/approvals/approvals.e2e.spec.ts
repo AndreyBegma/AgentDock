@@ -511,6 +511,20 @@ describe('merge approval queue (e2e)', () => {
       expect(response.body.error).toBe('approval_not_found');
     });
 
+    it('answers 400 to a PR number beyond int4, not 500', async () => {
+      const detail = await operatorOfA.get(
+        `/projects/${a}/approvals/99999999999`,
+      );
+      expect(detail.status).toBe(400);
+      const approve = await operatorOfA.send(
+        'post',
+        `/projects/${a}/approvals/99999999999/approve`,
+        { headSha: H1 },
+      );
+      expect(approve.status).toBe(400);
+      expect(commands.approve).not.toHaveBeenCalled();
+    });
+
     it('answers 409 not_waiting to a second approval of the same head', async () => {
       expect((await approve(H1)).status).toBe(200);
       const again = await approve(H1);

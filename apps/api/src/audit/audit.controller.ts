@@ -16,9 +16,10 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { Roles } from '../auth/decorators';
-import { AuditQueryService, auditNotFound } from './audit-query.service';
+import { PositiveBigIntPipe } from '../common/pipes';
+import { AuditQueryService } from './audit-query.service';
 import { AuditVerificationService } from './audit-verification.service';
-import { AuditFiltersQuery, ListAuditQuery, SEQ_PATTERN } from './dto';
+import { AuditFiltersQuery, ListAuditQuery } from './dto';
 
 /** Admin only (D11). Read and verify — no route modifies a record. */
 @Roles('admin')
@@ -64,8 +65,9 @@ export class AuditController {
   }
 
   @Get(':seq')
-  detail(@Param('seq') seq: string): Promise<AuditRecordView> {
-    if (!SEQ_PATTERN.test(seq)) throw auditNotFound();
-    return this.query.get(BigInt(seq));
+  detail(
+    @Param('seq', PositiveBigIntPipe) seq: bigint,
+  ): Promise<AuditRecordView> {
+    return this.query.get(seq);
   }
 }

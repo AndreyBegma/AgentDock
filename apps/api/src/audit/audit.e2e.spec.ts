@@ -815,7 +815,17 @@ describe('audit log (e2e)', () => {
         hash: expect.stringMatching(/^[0-9a-f]{64}$/),
       });
       expect((await admin.get('/admin/audit/999999999999')).status).toBe(404);
-      expect((await admin.get('/admin/audit/abc')).status).toBe(404);
+      // Malformed or beyond int8: 400, never a 500 from the database.
+      for (const seq of ['abc', '0', '99999999999999999999']) {
+        expect((await admin.get(`/admin/audit/${seq}`)).status).toBe(400);
+      }
+      expect(
+        (
+          await admin
+            .get('/admin/audit')
+            .query({ cursor: '9999999999999999999' })
+        ).status,
+      ).toBe(400);
       expect(
         (await admin.get('/admin/audit').query({ limit: '201' })).status,
       ).toBe(400);
