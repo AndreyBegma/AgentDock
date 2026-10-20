@@ -18,6 +18,7 @@ const STATIC: Record<string, string> = {
   '/admin/integrations/telegram': 'Telegram',
   '/admin/integrations/triggers': 'Triggers',
   '/admin/integrations/webhooks': 'Webhooks',
+  '/whats-new': 'What’s new',
 };
 
 /** Paths in the trail that have no page of their own. */
