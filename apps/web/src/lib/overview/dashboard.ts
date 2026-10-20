@@ -12,7 +12,7 @@ import type {
 import { orchestratorSettingsHref } from '../control/reasons';
 import { ORCHESTRATOR_STATUS_LABEL } from '../fleet/format';
 import { slotHref } from '../fleet/workspace-url';
-import { RUN_KIND_LABEL } from '../history/format';
+import { RUN_KIND_LABEL, runHref } from '../history/format';
 
 /**
  * The Overview dashboard (issue #159) is composed from the per-project routes
@@ -199,7 +199,7 @@ export function needsYou(
         kind: 'failed',
         title: runTitle(run),
         reason: 'Failed — see what went wrong',
-        href: `/projects/${project.id}/history/${run.id}`,
+        href: runHref(project.id, run.id),
         since: ended,
       });
     }

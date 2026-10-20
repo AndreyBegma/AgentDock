@@ -21,7 +21,7 @@ import {
   formatNumber,
   formatTokens,
 } from '../../../../../lib/format';
-import { RUN_KIND_LABEL } from '../../../../../lib/history/format';
+import { RUN_KIND_LABEL, runsHref } from '../../../../../lib/history/format';
 import { waitingApprovals } from '../../../../../lib/overview/dashboard';
 import {
   costTrend,
@@ -76,7 +76,6 @@ export function ProjectStats({
 }) {
   const { runs, previousRuns, cost, previousCost, costSeries, budgets } =
     figures;
-  const history = `/projects/${projectId}/history`;
   const runsLoading = runs.loading && !runs.data;
   const runsFailed = runs.data === undefined && runs.error !== null;
   // A page is 200 runs; a longer period counts what it holds and says so.
@@ -125,7 +124,7 @@ export function ProjectStats({
         hint={
           runsFailed ? notAnswering('History') : `Runs ${PERIOD_LABEL[period]}`
         }
-        href={`${history}?status=succeeded`}
+        href={runsHref(projectId, { status: 'succeeded' })}
       >
         {throughputData ? (
           <Trend
@@ -148,7 +147,7 @@ export function ProjectStats({
               ? 'Nothing merged yet'
               : 'From a run’s start to its merge'
         }
-        href={`${history}?status=succeeded`}
+        href={runsHref(projectId, { status: 'succeeded' })}
       >
         {runs.data ? (
           <Trend
@@ -209,7 +208,7 @@ export function ProjectStats({
               ? 'No run has finished yet'
               : `${formatNumber(runs.data?.counts.failed ?? 0)} failed of ${formatNumber(finished)} finished`
         }
-        href={`${history}?status=failed`}
+        href={runsHref(projectId, { status: 'failed' })}
       />
     </div>
   );

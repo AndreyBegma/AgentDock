@@ -57,7 +57,6 @@ function kindOf(segments: readonly string[], index: number): string {
   if (parent === 'projects' && index === 1) return 'Project';
   if (parent === 'sessions') return 'Session';
   if (parent === 'runs' && segments[index - 2] === 'skills') return 'Skill run';
-  if (parent === 'history') return 'Run';
   if (parent === 'planner') return 'Plan';
   return 'Details';
 }

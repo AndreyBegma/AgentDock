@@ -19,6 +19,8 @@ import {
   prLabel,
   RUN_KIND_LABEL,
   RUN_STATUS_LABEL,
+  runHref,
+  runsHref,
   runTitle,
 } from '../../../../../lib/history/format';
 import { slotHue } from '../../../../../lib/hue';
@@ -39,7 +41,6 @@ export function RecentTasks({
   runs: Section<RunPage>;
 }) {
   const router = useRouter();
-  const history = `/projects/${projectId}/history`;
   const columns = useMemo<Column<RunSummary>[]>(
     () => [
       {
@@ -48,7 +49,7 @@ export function RecentTasks({
         cell: (run) => (
           <span className="flex min-w-48 flex-col">
             <NextLink
-              href={`${history}/${run.id}`}
+              href={runHref(projectId, run.id)}
               className="underline-offset-2 hover:underline"
             >
               {runTitle(run)}
@@ -122,7 +123,7 @@ export function RecentTasks({
         ),
       },
     ],
-    [history],
+    [projectId],
   );
 
   return (
@@ -133,10 +134,10 @@ export function RecentTasks({
         description="The latest work the agents picked up, newest first."
         actions={
           <NextLink
-            href={history}
+            href={runsHref(projectId)}
             className={buttonClassName({ variant: 'ghost', size: 'sm' })}
           >
-            Open history
+            Open runs
             <ChevronRight aria-hidden="true" className="size-4" />
           </NextLink>
         }
@@ -145,7 +146,7 @@ export function RecentTasks({
         section={runs}
         unavailable={{
           title: 'Recent tasks could not be loaded',
-          stillWorks: 'History and the fleet are still available.',
+          stillWorks: 'Runs and the fleet are still available.',
         }}
         isEmpty={(page) => !page.items.some(isTask)}
         empty={
@@ -174,7 +175,7 @@ export function RecentTasks({
               rows={page.items.filter(isTask).slice(0, RECENT_TASKS)}
               getRowId={(run) => run.id}
               columns={columns}
-              onRowActivate={(run) => router.push(`${history}/${run.id}`)}
+              onRowActivate={(run) => router.push(runHref(projectId, run.id))}
             />
           </ScrollX>
         )}

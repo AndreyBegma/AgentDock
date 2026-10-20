@@ -8,7 +8,6 @@ import {
   FolderGit2,
   Gauge,
   GitMerge,
-  History,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
@@ -46,7 +45,7 @@ export interface NavEntry {
   exact?: boolean;
   /**
    * A data page (#213): the shell gives it the wide column (max-w-7xl), and
-   * so every page below it (a run under History, a session under Sessions).
+   * so every page below it (a skill run under Skills, a session under Sessions).
    */
   wide?: boolean;
   /**
@@ -168,8 +167,8 @@ export const NAV: NavSection[] = [
     id: 'project',
     title: 'Project',
     projectScoped: true,
-    // C-282: five in view, the Board first; the rest under More. Queue and
-    // Activity absorb Approvals and History in later cards of stack S-7.
+    // C-282: five in view, the Board first; the rest under More. Activity
+    // absorbed History as its Runs tab (C-285); Queue absorbs Approvals.
     entries: [
       {
         id: 'board',
@@ -239,15 +238,6 @@ export const NAV: NavSection[] = [
         href: '/projects/:projectId/approvals',
         label: 'Approvals',
         icon: GitMerge,
-        minRole: 'viewer',
-        enabled: true,
-      },
-      {
-        id: 'history',
-        wide: true,
-        href: '/projects/:projectId/history',
-        label: 'History',
-        icon: History,
         minRole: 'viewer',
         enabled: true,
       },

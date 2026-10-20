@@ -37,22 +37,23 @@ describe('crumbsFor', () => {
     ]);
   });
 
-  test('a run reads as its issue and slot', () => {
+  test('a skill run reads as its skill', () => {
     const names = new Map([
       [PROJECT, 'AgentDock'],
-      [RUN, '#155 · i155'],
+      [RUN, 'review'],
     ]);
-    expect(labels(`/projects/${PROJECT}/history/${RUN}`, names)).toEqual([
+    expect(labels(`/projects/${PROJECT}/skills/runs/${RUN}`, names)).toEqual([
       'Projects',
       'AgentDock',
-      'History',
-      '#155 · i155',
+      'Skills',
+      'Runs',
+      'review',
     ]);
   });
 
   test('an id never shows as text, even before its name is known', () => {
-    const trail = labels(`/projects/${PROJECT}/history/${RUN}`);
-    expect(trail).toEqual(['Projects', 'Project', 'History', 'Run']);
+    const trail = labels(`/projects/${PROJECT}/planner/${RUN}`);
+    expect(trail).toEqual(['Projects', 'Project', 'Planner', 'Plan']);
     expect(trail.join(' ')).not.toMatch(/cmg/i);
     expect(labels(`/sessions/${SESSION}`)).toEqual(['Sessions', 'Session']);
     expect(labels(`/projects/${PROJECT}/skills/runs/${RUN}`)).toEqual([

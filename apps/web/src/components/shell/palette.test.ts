@@ -129,7 +129,7 @@ describe('paletteGroups', () => {
     const recent = groups.find((group) => group.id === 'recent');
     expect(recent?.items.map((item) => [item.id, item.label])).toEqual([
       ['go:/sessions/s1', 'Fix the login loop'],
-      ['go:/projects/p1/history/r1', '#155 · i155'],
+      ['go:/projects/p1/activity?tab=runs&run=r1', '#155 · i155'],
     ]);
   });
 

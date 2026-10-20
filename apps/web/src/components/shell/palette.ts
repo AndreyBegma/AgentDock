@@ -18,6 +18,7 @@ import {
   SquareTerminal,
   User,
 } from 'lucide-react';
+import { runHref } from '../../lib/history/format';
 import { planHref } from '../../lib/planner/href';
 import { planLabel, runLabel, sessionLabel } from './crumbs';
 import { type VisibleSection, visibleNav } from './nav';
@@ -172,7 +173,7 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
       };
     }
     return {
-      id: `go:/projects/${run.projectId}/history/${run.id}`,
+      id: `go:${runHref(run.projectId, run.id)}`,
       label: runLabel(run),
       hint: ['Run', where].filter(Boolean).join(' · '),
       icon: Play,
