@@ -8,6 +8,7 @@ import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import { useParams } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
+import { WatchRefusalBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import { ApiError, api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
@@ -225,6 +226,8 @@ export default function ProjectSettingsPage() {
           </span>
         }
       />
+      {/* #691: an online runner whose policy refuses the project. */}
+      <WatchRefusalBanner project={project} />
 
       <TabGroup value={tab} onValueChange={setTab}>
         {/* Twelve tabs do not fit a phone: the strip scrolls inside its box. */}

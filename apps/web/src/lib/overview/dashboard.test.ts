@@ -35,6 +35,7 @@ const project = (id: string): ProjectSummary => ({
   base: 'main',
   docsKind: null,
   role: 'operator',
+  watchRefusal: null,
 });
 
 const slot = (over: Partial<SlotSummary>): SlotSummary => ({

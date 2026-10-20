@@ -6,7 +6,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   type HelloMessage,
   runtimeProfileSchema,
@@ -567,6 +567,100 @@ describe('agentdock-runner CLI', () => {
         runnerId: 'rn_1',
         config: { projects: [], pollIntervalsMs: {} },
         ackedSeq: 0,
+      });
+    });
+
+    describe('upgrading from before 0.13 (#691)', () => {
+      /** A runner.json as 0.12 wrote it: no `policy` block, a cached list. */
+      const pre013 = (root: string) => {
+        mkdirSync(dirname(paths().configFile), { recursive: true });
+        writeFileSync(
+          paths().configFile,
+          JSON.stringify({
+            server: server.origin,
+            runnerId: 'rn_1',
+            token: TOKEN,
+            profiles: [
+              { id: 'claude-default', runtime: 'claude', env: {}, args: [] },
+            ],
+            projects: [
+              { id: 'prj_a', root },
+              { id: 'prj_b', root: '/srv/dev/with space' },
+            ],
+            otlp: null,
+          }),
+        );
+      };
+
+      it('prints and logs the upgrade notice with the cached roots, allows nothing, and reports every project refused', async () => {
+        const root = join(home, 'dev', 'app');
+        mkdirSync(root, { recursive: true });
+        pre013(root);
+        server.welcome = () => ({
+          type: 'welcome',
+          runnerId: 'rn_1',
+          config: {
+            projects: [
+              { id: 'prj_a', root },
+              { id: 'prj_b', root: '/srv/dev/with space' },
+            ],
+            pollIntervalsMs: {},
+          },
+          ackedSeq: 0,
+        });
+        const { controller, exit, live } = start();
+        await live();
+        const refused = () =>
+          server
+            .of('events')
+            .flatMap((m) => m.events)
+            .find((e) => e.type === 'runner.watch_refused');
+        await until(() => refused() !== undefined);
+        const event = refused();
+        controller.abort();
+        expect(await exit).toBe(EXIT.ok);
+
+        const err = stderr.join('');
+        expect(err).toContain('AgentDock runner 0.13 upgrade');
+        expect(err).toContain(`  ${root} (prj_a)`);
+        expect(err).toContain('agentdock-runner policy allow-root --watched');
+        expect(err).toContain(
+          `agentdock-runner policy allow-root ${root} '/srv/dev/with space'`,
+        );
+        const logged = err
+          .split('\n')
+          .filter((l) => l.startsWith('{'))
+          .map((l) => JSON.parse(l) as { msg: string; roots?: string[] })
+          .find((l) => l.msg.startsWith('runner 0.13 upgrade'));
+        expect(logged?.roots).toEqual([root, '/srv/dev/with space']);
+
+        // Nothing allowed by itself, and still no policy block on disk.
+        const file = JSON.parse(readFileSync(paths().configFile, 'utf8'));
+        expect(file.policy).toBeUndefined();
+        expect(file.projects.map((p: { id: string }) => p.id)).toEqual([
+          'prj_a',
+          'prj_b',
+        ]);
+        const data = event?.data as {
+          projects: { projectId: string; message: string }[];
+        };
+        expect(data.projects.map((p) => p.projectId)).toEqual([
+          'prj_a',
+          'prj_b',
+        ]);
+        expect(data.projects[0].message).toBe(
+          "refused by this runner's policy (allowedRoots): this runner allows no project root yet. On the runner's machine: `agentdock-runner policy allow-root " +
+            `${root}\``,
+        );
+      });
+
+      it('says nothing on a config with a policy block', async () => {
+        paired();
+        const { controller, exit, live } = start();
+        await live();
+        controller.abort();
+        expect(await exit).toBe(EXIT.ok);
+        expect(stderr.join('')).not.toContain('0.13 upgrade');
       });
     });
 
