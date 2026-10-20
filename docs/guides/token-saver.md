@@ -17,7 +17,7 @@ For every Claude launch the runner makes, with the project's setting on:
 - **Command output is shortened.** When an agent runs a covered command (a test
   run, `git log`, a build…), the runner's filter keeps the lines that matter
   and hides the rest. The agent sees a footer such as
-  `[agentdock filter: 412 lines hidden · full output: <path> · NAUTELLE_RAW=1 to bypass]`.
+  `[nautelle filter: 412 lines hidden · full output: <path> · NAUTELLE_RAW=1 to bypass]`.
 - **Only the MCP servers you allow are loaded.** Every other server's tool
   schemas cost no tokens (see [the allowlist](#the-mcp-allowlist)).
 - **The history is compacted at about 150k tokens**, on every model. On a 1M
@@ -139,8 +139,8 @@ the filter is getting in the way.
 Under **Settings › Token saver** the list **MCP servers agents load** has one
 checkbox per server the runner reports for the project's profiles.
 
-- `agentdock` is always loaded and is not in the list.
-- An **empty list means `agentdock` only**. Every unticked server is not loaded
+- `nautelle` is always loaded and is not in the list.
+- An **empty list means `nautelle` only**. Every unticked server is not loaded
   at all, so a card that used Playwright or GlitchTip needs its checkbox
   ticked.
 - A name that is allowed but that no profile reports any more stays visible and
