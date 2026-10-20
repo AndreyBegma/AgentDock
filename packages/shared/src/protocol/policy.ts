@@ -113,7 +113,7 @@ export const policyAllowsCommand = (
 export const policyFixHint = (rule: PolicyRule, detail?: string): string => {
   switch (rule) {
     case 'allowedRoots':
-      return 'agentdock-runner policy allow-root <dir>';
+      return `agentdock-runner policy allow-root ${detail ?? '<dir>'}`;
     case 'maxPermissionMode':
       return `agentdock-runner policy set maxPermissionMode ${detail ?? '<mode>'}`;
     case 'terminal.write':

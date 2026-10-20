@@ -1,4 +1,5 @@
 import type { ProjectSummary } from '@agentdock/shared';
+import { parsePolicyRefusal } from '../runners/policy';
 import { isRunnerOnline } from './facts';
 
 /** What a `PrerequisiteBanner` shows (rule R4): the missing thing, what it blocks, the fix. */
@@ -71,5 +72,54 @@ export function runnerOfflineCopy(
       ? "Nothing on this page can reach the project's machine until it reconnects."
       : "Nothing on this page can reach the project's machine until it reconnects. Ask an administrator to start it.",
     ...link,
+  };
+}
+
+/** The runner's own command that allows every root it watched (#691). */
+export const ALLOW_WATCHED_COMMAND =
+  'agentdock-runner policy allow-root --watched';
+
+/** A watch refusal's banner: the copy, and the commands to run on the runner's machine. */
+export interface WatchRefusalCopy extends PrerequisiteCopy {
+  commands: string[];
+}
+
+/**
+ * #691: the banner for a project the runner's local policy refuses to watch
+ * (ADR-0047), or null when it watches it. Only the person on that machine can
+ * lift it, so it names the exact command, never a page of this app. While
+ * the runner is offline its own banner says more, so this one waits.
+ */
+export function watchRefusalCopy(
+  project: Pick<ProjectSummary, 'runnerName' | 'runnerStatus'> & {
+    watchRefusal?: string | null;
+  },
+): WatchRefusalCopy | null {
+  const { runnerName: name, runnerStatus: status, watchRefusal } = project;
+  if (!watchRefusal || !isRunnerOnline(status)) return null;
+  const refusal = parsePolicyRefusal(watchRefusal);
+  const title = `Runner ${name} refuses to watch this project.`;
+  const blocks =
+    'The Board, card collect and the Planner stop for this project until its folder is allowed.';
+  if (!refusal) {
+    return {
+      tone: 'danger',
+      title,
+      body: `${watchRefusal}. ${blocks}`,
+      commands: [],
+    };
+  }
+  const why = refusal.reason.charAt(0).toUpperCase() + refusal.reason.slice(1);
+  // A root outside allowedRoots: its own line, or every root the runner
+  // watched at once. Another refusal has no root to allow.
+  const commands =
+    refusal.rule === 'allowedRoots' && !refusal.fix.endsWith('<dir>')
+      ? [refusal.fix, ALLOW_WATCHED_COMMAND]
+      : [refusal.fix];
+  return {
+    tone: 'danger',
+    title,
+    body: `${why}. ${blocks} Only the person on the runner's machine can allow it: run this there.`,
+    commands,
   };
 }

@@ -6,7 +6,13 @@ import type { Host } from '@agentdock/shared/protocol';
 import { accessHeaders, accessOf } from './access';
 import { runClaude } from './claude';
 import type { Clock } from './clock';
-import { ConfigError, isPaired, loadConfig, saveConfig } from './config';
+import {
+  ConfigError,
+  hasPolicyBlock,
+  isPaired,
+  loadConfig,
+  saveConfig,
+} from './config';
 import type { RunnerConnection, SocketFactory } from './connection';
 import { runDaemon } from './daemon';
 import { createExec, type Exec } from './detect/exec';
@@ -23,6 +29,7 @@ import { otlpSettings } from './otlp';
 import { PairingError, pair } from './pairing';
 import { runPolicy } from './policy/cli';
 import { nodeRealpath } from './policy/roots';
+import { reportUpgrade } from './policy/upgrade';
 import { normalizeServer, ServerUrlError } from './server-url';
 import { EXIT, launchAgentPlist, serviceUnit } from './service';
 import { setupClaude } from './setup/claude';
@@ -55,6 +62,8 @@ export interface CliDeps {
   cwd?: string;
   /** The parent pid; `process.ppid` by default. */
   ppid?: number;
+  /** A yes/no question on the terminal; Bun's `confirm` by default. */
+  confirm?: (question: string) => boolean;
 }
 
 const USAGE = `Usage: agentdock-runner <command>
@@ -296,6 +305,10 @@ const runCommand = async ({
     deps.stderr(`${warning}\n`);
     log.warn(warning);
   }
+  // #691: a config from before 0.13 has no policy, so nothing is watched.
+  if (!hasPolicyBlock(paths.configFile)) {
+    reportUpgrade(config.projects, log, deps.stderr);
+  }
   if (config.profiles.length === 0) {
     log.warn(
       'no runtime profiles configured; nothing can be launched. Run `agentdock-runner profiles --detect --write`',
@@ -410,7 +423,12 @@ const profilesCommand = async ({
   const proposed = detectProfiles(deps.env, paths.home);
   out(deps, JSON.stringify(withAuthentication(proposed, paths.home), null, 2));
   if (write) {
-    saveConfig(paths.configFile, { ...config, profiles: proposed });
+    // Only the policy CLI writes a policy: a pre-0.13 file keeps none (#691).
+    saveConfig(
+      paths.configFile,
+      { ...config, profiles: proposed },
+      { withoutPolicy: !hasPolicyBlock(paths.configFile) },
+    );
     deps.stderr(`Wrote ${proposed.length} profiles to ${paths.configFile}\n`);
   }
   return EXIT.ok;
@@ -516,6 +534,7 @@ const COMMANDS: Record<string, (context: Context) => Promise<number>> = {
       realpath: nodeRealpath,
       stdout: deps.stdout,
       stderr: deps.stderr,
+      confirm: deps.confirm ?? ((question) => confirm(question)),
     }),
   // `mcp` and `claude` take their arguments raw: the wave-3 slots own them.
   mcp: ({ deps, paths, args }) => runMcp(args, localDeps(deps, paths)),

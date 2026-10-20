@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { readdirSync, statSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import {
   ConfigError,
+  hasPolicyBlock,
   isPaired,
   loadConfig,
   saveConfig,
@@ -65,6 +72,22 @@ describe('config', () => {
     expect(config.policy.allowedRoots).toEqual(['/srv/dev']);
     expect(config.policy.maxPermissionMode).toBe('auto');
     expect(config.policy.terminal.write).toBe(true);
+  });
+
+  it('writes no policy block for the person into a pre-0.13 file (#691)', () => {
+    mkdirSync(join(dir, 'agentdock'));
+    writeFileSync(path, JSON.stringify({ runnerId: 'rn_1', projects: [] }));
+    expect(hasPolicyBlock(path)).toBe(false);
+    updateConfig(path, { projects: [{ id: 'prj_a', root: '/srv/dev/a' }] });
+    expect(JSON.parse(readFileSync(path, 'utf8')).policy).toBeUndefined();
+    expect(hasPolicyBlock(path)).toBe(false);
+    expect(loadConfig(path).projects).toEqual([
+      { id: 'prj_a', root: '/srv/dev/a' },
+    ]);
+    // A file the CLI wrote keeps its block; a missing file is no upgrade.
+    saveConfig(path, { policy: { allowedRoots: ['/srv/dev'] } });
+    expect(hasPolicyBlock(path)).toBe(true);
+    expect(hasPolicyBlock(join(dir, 'nope.json'))).toBe(true);
   });
 
   it('never lets the daemon rewrite insecureServer (D-06)', () => {

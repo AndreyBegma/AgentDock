@@ -234,7 +234,9 @@ caches it in its config file so collectors run before the first connect. A
 `root` must be absolute; the runner watches it only when its real path is
 inside the policy's `allowedRoots` and it is a git main checkout (ADR-0047) —
 a refused project is left out and logged, and its commands answer
-`policy_refused` or `path_not_allowed`.
+`policy_refused` or `path_not_allowed`. The runner also reports the refused
+projects in `runner.watch_refused` (below), so the web app can say so on the
+project (#691).
 
 ### `config`
 
@@ -339,6 +341,18 @@ always present on the wire.
 
 `runner.spool_truncated` (source `runner`) is emitted when the spool cap drops
 its oldest segment: `data` is `{ fromSeq, toSeq, bytes }` of what was lost.
+
+`runner.watch_refused` (source `runner`, no `project`; #691) names every
+watch-list project the runner-local policy refuses: `data` is
+`{ projects: [{ projectId, message }] }`, where `message` has the shape of a
+`policy_refused` message (below) with the exact command for that project's
+root — e.g. ``refused by this runner's policy (allowedRoots): this runner
+allows no project root yet. On the runner's machine: `agentdock-runner policy
+allow-root /home/archi/dev/widget` ``. The runner sends it once per start and
+whenever the refused set changes, so `projects: []` clears an earlier one; the
+API keeps the latest message on each project (`watchRefusal` in
+`GET /projects`) and clears it on the runner's other projects. It is a report
+only: nothing the server sends back can change the policy.
 
 ### Fleet events
 
@@ -612,6 +626,16 @@ therefore keeps a `policy` block in its own `runner.json`. Only the CLI on the
 machine writes it — `agentdock-runner policy show|set|allow-root|deny-root|deny-path|allow-path` and
 `pair --allow-root <dir>` — and no message from the server (`welcome`,
 `config`, any command) can change it. A running daemon re-reads it within 5 s.
+
+`policy allow-root --watched [--yes]` (#691) allows the roots of the projects
+in the cached watch list: it prints them, leaves out the ones that do not
+exist on the machine or are already allowed, and asks before it writes
+(`--yes` skips the question). It is the person's answer to the 0.13 upgrade
+notice: a runner started on a `runner.json` with no `policy` block — one
+written before 0.13 — logs and prints that it watches nothing, with the cached
+roots and this command. It never allows them itself, and the daemon never
+writes a default `policy` block into that file, so the notice repeats on every
+start until the person sets a policy.
 
 | Rule | Default | Refuses |
 |---|---|---|

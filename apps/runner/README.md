@@ -46,6 +46,24 @@ does not install ([ADR-0049](../../docs/adr/0049-runner-releases-are-signed-and-
 first, so it works on a clean checkout. Releasing is in
 [deploy/README.md](../../deploy/README.md#releasing-the-runner).
 
+## Upgrading to 0.13
+
+0.13 adds the runner-local security policy
+([ADR-0047](../../docs/adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)).
+Its `allowedRoots` is empty by default, so a runner upgraded from 0.12 or
+earlier watches **no** project until you allow their folders, on its machine:
+
+```sh
+agentdock-runner policy allow-root --watched   # the roots it watched before; asks first, --yes skips it
+agentdock-runner policy allow-root ~/dev       # or name the folders yourself
+```
+
+A runner started on a `runner.json` with no `policy` block logs and prints a
+notice that lists the projects it watched and these commands, on every start
+until you set a policy. It never allows them itself, and the server cannot.
+The web app shows the same refusal, with the command, on each project. See
+[CHANGELOG.md](CHANGELOG.md).
+
 ## Commands
 
 | Command | What it does |
@@ -54,6 +72,7 @@ first, so it works on a clean checkout. Releasing is in
 | `run` | the daemon, in the foreground |
 | `status` | config, spool and whether the server answers |
 | `profiles [--detect [--write]]` | configured profiles; `--detect` proposes them, `--write` stores the proposal |
+| `policy show\|set\|allow-root\|deny-root\|deny-path\|allow-path` | the runner-local policy ([ADR-0047](../../docs/adr/0047-a-runner-local-security-policy-the-server-cannot-change.md)); `allow-root --watched [--yes]` allows the roots of the cached watch list after asking |
 | `install-service` | writes the systemd user unit (Linux) or the launchd agent (macOS) and prints how to start it |
 | `mcp` | the `agentdock` MCP server over stdio, for the Claude Code plugin ([spec 201](../../docs/specs/201-claude-code-integration.md) D20); see below |
 | `version` | prints the version and the target, e.g. `0.1.0 darwin-arm64` |

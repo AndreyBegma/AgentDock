@@ -11,6 +11,7 @@ import {
   ProjectsController,
 } from './projects.controller';
 import { ProjectsService } from './projects.service';
+import { WatchRefusalSink } from './watch-refusal-sink';
 
 @Module({
   imports: [RunnersModule, LiveModule],
@@ -21,6 +22,7 @@ import { ProjectsService } from './projects.service';
     ProjectInspector,
     ProjectsService,
     ProjectMembersService,
+    WatchRefusalSink,
   ],
   // #11–#13 import this module and put `@UseGuards(ProjectAccessGuard)` and
   // `@ProjectRole()` on their `:projectId` routes (spec 10 D12).

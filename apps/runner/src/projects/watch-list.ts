@@ -1,4 +1,4 @@
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject, WatchRefusal } from '@agentdock/shared/protocol';
 import type { CollectorRegistry } from '../collectors';
 import { errorMessage, type Logger } from '../log';
 
@@ -15,6 +15,12 @@ export interface WatchListOptions {
    * through it; a refused project is left out, not watched.
    */
   admit: (project: WatchedProject) => Promise<string | null>;
+  /**
+   * #691: the projects the policy refuses, with why — on start and whenever
+   * that set changes, `[]` once none is. The daemon sends it to the server as
+   * `runner.watch_refused`, so the web can say why a project is not watched.
+   */
+  report?: (refused: WatchRefusal[]) => void;
   log: Logger;
 }
 
@@ -33,6 +39,8 @@ export class WatchList {
   private projects: WatchedProject[] = [];
   /** The last list asked for, before the policy: `reapply` re-checks it. */
   private requested: WatchedProject[];
+  /** The refused set last reported; null before the first report. */
+  private reported: string | null = null;
 
   constructor(private readonly options: WatchListOptions) {
     this.requested = options.initial.map((p) => ({ ...p }));
@@ -61,15 +69,26 @@ export class WatchList {
         this.options.admit(p).catch((error) => errorMessage(error)),
       ),
     );
-    return projects.filter((p, i) => {
-      const refused = verdicts[i];
-      if (refused === null) return true;
+    const refused: WatchRefusal[] = [];
+    const admitted = projects.filter((p, i) => {
+      const reason = verdicts[i];
+      if (reason === null) return true;
       this.options.log.warn('watch list: project refused by policy', {
         projectId: p.id,
-        reason: refused,
+        reason,
       });
+      refused.push({ projectId: p.id, message: reason });
       return false;
     });
+    this.report(refused);
+    return admitted;
+  }
+
+  private report(refused: WatchRefusal[]): void {
+    const key = JSON.stringify(refused);
+    if (key === this.reported) return;
+    this.reported = key;
+    this.options.report?.(refused);
   }
 
   /** Applies the server's list: collectors follow it, the cache is rewritten when it changed. */
