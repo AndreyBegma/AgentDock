@@ -547,6 +547,7 @@ function BoardScreen() {
         target={attaching ? { kind: 'card', cardId: attaching.id } : undefined}
         title={attaching ? `${attaching.label} ${attaching.title}` : 'Card'}
         onClose={() => setAttaching(undefined)}
+        backTo="Board"
         message={
           canOperate && attaching
             ? {
