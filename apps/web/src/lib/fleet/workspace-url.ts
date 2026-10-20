@@ -1,7 +1,7 @@
 /**
  * The agent workspace's state in the URL (#160): which agents are open in the
  * dock, which one is in front, and which view the page shows —
- * `?open=i42,i43&focus=i42&view=list`. Pure, so the rules are tested without
+ * `?open=i42,i43&focus=i42&view=canvas`. Pure, so the rules are tested without
  * a router; the page reads `URLSearchParams` and writes `toSearch()` back.
  */
 
@@ -29,7 +29,7 @@ export interface WorkspaceState {
 export const EMPTY_WORKSPACE: WorkspaceState = {
   open: [],
   focus: null,
-  view: 'canvas',
+  view: 'list',
 };
 
 export const isSlotName = (value: string): boolean => SLOT_NAME.test(value);
@@ -51,7 +51,8 @@ export function parseWorkspace(params: {
     (isSlotName(focusRaw) && open.includes(focusRaw))
       ? focusRaw
       : null;
-  const view: WorkspaceView = params.get('view') === 'list' ? 'list' : 'canvas';
+  const view: WorkspaceView =
+    params.get('view') === 'canvas' ? 'canvas' : 'list';
   return { open, focus, view };
 }
 
@@ -71,7 +72,7 @@ export function toSearch(
   }
   if (state.open.length > 0) params.set('open', state.open.join(','));
   if (state.focus) params.set('focus', state.focus);
-  if (state.view === 'list') params.set('view', 'list');
+  if (state.view === 'canvas') params.set('view', 'canvas');
   // Slot names are `[a-z0-9-]`; a literal comma reads better than `%2C`.
   const text = params.toString().replace(/%2C/g, ',');
   return text ? `?${text}` : '';

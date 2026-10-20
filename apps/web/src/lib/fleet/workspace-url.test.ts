@@ -17,10 +17,10 @@ const parse = (query: string) => parseWorkspace(new URLSearchParams(query));
 
 describe('parseWorkspace', () => {
   test('reads the open tabs, the focus and the view', () => {
-    expect(parse('open=i42,i43&focus=i42&view=list')).toEqual({
+    expect(parse('open=i42,i43&focus=i42&view=canvas')).toEqual({
       open: ['i42', 'i43'],
       focus: 'i42',
-      view: 'list',
+      view: 'canvas',
     });
   });
 
@@ -45,15 +45,15 @@ describe('parseWorkspace', () => {
     expect(parse(`open=${many.join(',')}`).open).toHaveLength(OPEN_MAX);
   });
 
-  test('an unknown view is the canvas', () => {
-    expect(parse('view=grid').view).toBe('canvas');
+  test('an unknown view is the list', () => {
+    expect(parse('view=grid').view).toBe('list');
   });
 });
 
 describe('toSearch', () => {
   test('writes commas plainly and keeps other parameters', () => {
     expect(
-      toSearch({ open: ['i42', 'i43'], focus: 'i42', view: 'canvas' }, [
+      toSearch({ open: ['i42', 'i43'], focus: 'i42', view: 'list' }, [
         ['tab', 'chat'],
         ['open', 'stale'],
       ]),
@@ -68,7 +68,7 @@ describe('toSearch', () => {
     const state: WorkspaceState = {
       open: ['a', 'b-1'],
       focus: 'b-1',
-      view: 'list',
+      view: 'canvas',
     };
     expect(parse(toSearch(state).slice(1))).toEqual(state);
   });
@@ -78,7 +78,7 @@ describe('transitions', () => {
   test('opening adds a tab and brings it to the front; reopening only focuses', () => {
     const one = openSlot(EMPTY_WORKSPACE, 'a');
     const two = openSlot(one, 'b');
-    expect(two).toEqual({ open: ['a', 'b'], focus: 'b', view: 'canvas' });
+    expect(two).toEqual({ open: ['a', 'b'], focus: 'b', view: 'list' });
     expect(openSlot(two, 'a')).toEqual({ ...two, focus: 'a' });
   });
 
@@ -106,38 +106,40 @@ describe('transitions', () => {
     const state = {
       open: ['a', 'b', 'c'],
       focus: 'b',
-      view: 'canvas',
+      view: 'list',
     } as const;
     expect(closeSlot({ ...state, open: [...state.open] }, 'b').focus).toBe('c');
     expect(
       closeSlot({ ...state, open: [...state.open], focus: 'c' }, 'c').focus,
     ).toBe('b');
-    expect(closeSlot({ open: ['a'], focus: 'a', view: 'canvas' }, 'a')).toEqual(
-      { open: [], focus: null, view: 'canvas' },
-    );
+    expect(closeSlot({ open: ['a'], focus: 'a', view: 'list' }, 'a')).toEqual({
+      open: [],
+      focus: null,
+      view: 'list',
+    });
   });
 
   test('closing a background tab keeps the focus', () => {
     expect(
-      closeSlot({ open: ['a', 'b'], focus: 'b', view: 'canvas' }, 'a'),
-    ).toEqual({ open: ['b'], focus: 'b', view: 'canvas' });
+      closeSlot({ open: ['a', 'b'], focus: 'b', view: 'list' }, 'a'),
+    ).toEqual({ open: ['b'], focus: 'b', view: 'list' });
   });
 
   test('closing the orchestrator clears the focus', () => {
     expect(
       closeSlot(
-        { open: ['a'], focus: 'orchestrator', view: 'canvas' },
+        { open: ['a'], focus: 'orchestrator', view: 'list' },
         'orchestrator',
       ),
-    ).toEqual({ open: ['a'], focus: null, view: 'canvas' });
+    ).toEqual({ open: ['a'], focus: null, view: 'list' });
   });
 
   test('collapse all, blur and the view', () => {
-    const state = { open: ['a', 'b'], focus: 'a', view: 'list' } as const;
+    const state = { open: ['a', 'b'], focus: 'a', view: 'canvas' } as const;
     const copy = { ...state, open: [...state.open] };
-    expect(closeAll(copy)).toEqual({ open: [], focus: null, view: 'list' });
+    expect(closeAll(copy)).toEqual({ open: [], focus: null, view: 'canvas' });
     expect(blur(copy)).toEqual({ ...copy, focus: null });
-    expect(setView(copy, 'canvas').view).toBe('canvas');
+    expect(setView(copy, 'list').view).toBe('list');
   });
 });
 
@@ -148,7 +150,7 @@ describe('slotHref', () => {
     expect(parse(href.split('?')[1] ?? '')).toEqual({
       open: ['i42'],
       focus: 'i42',
-      view: 'canvas',
+      view: 'list',
     });
   });
 
