@@ -7,7 +7,9 @@
  *     privileged and reads no secret;
  *   - a step that can run on a tag (a release) mounts nothing but the Docker
  *     socket, so it never reuses a cache another pipeline wrote;
- *   - every `bun install` uses `--frozen-lockfile`.
+ *   - every `bun install` uses `--frozen-lockfile`;
+ *   - every command is a string: an unquoted item holding `: ` parses as a
+ *     map, and Woodpecker rejects the whole pipeline.
  *
  *   bun scripts/check-ci.ts [workflow.yml ...]
  *
@@ -115,8 +117,13 @@ export const checkWorkflow = (file: string, workflow: Workflow): string[] => {
     }
 
     for (const command of step.commands ?? []) {
+      if (typeof command !== 'string') {
+        violations.push(
+          `${label} has a command that is not a string (quote an item holding ': ')`,
+        );
+        continue;
+      }
       if (
-        typeof command === 'string' &&
         /\bbun install\b/.test(command) &&
         !command.includes('--frozen-lockfile')
       ) {

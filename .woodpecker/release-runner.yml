@@ -137,7 +137,9 @@ steps:
             npm publish --access public "apps/runner/release/npm/$${pkg}"
           fi
         done
-      - npm deprecate "agentdock-runner@$${version}" 'Renamed to nautelle-runner: npm i -g nautelle-runner (ADR-0073)'
+      # A block scalar: the message's ': ' would make a plain item a map.
+      - |
+        npm deprecate "agentdock-runner@$${version}" 'Renamed to nautelle-runner: npm i -g nautelle-runner (ADR-0073)'
 
   - name: homebrew-tap
     image: *ci_image
