@@ -96,6 +96,52 @@ describe('GitHub event routing (spec 27 D8)', () => {
     });
   });
 
+  it('reads the repository id and the name as GitHub spells it (D7)', () => {
+    const facts = payloadFacts('issues', {
+      action: 'labeled',
+      repository: { id: 4_200_000_001, full_name: 'AndreyBegma/Nautelle' },
+    });
+    expect(facts).toMatchObject({
+      fullName: 'andreybegma/nautelle',
+      repoName: 'AndreyBegma/Nautelle',
+      repoId: 4_200_000_001,
+      previousFullName: null,
+    });
+    expect(
+      payloadFacts('issues', { repository: { id: '7', full_name: 'a/b' } })
+        .repoId,
+    ).toBeNull();
+  });
+
+  it('routes repository renamed to a rename with the old name; other repository actions are ignored', () => {
+    const renamed = {
+      action: 'renamed',
+      changes: { repository: { name: { from: 'AgentDock' } } },
+      repository: {
+        id: 99,
+        full_name: 'AndreyBegma/Nautelle',
+        owner: { login: 'AndreyBegma' },
+      },
+    };
+    expect(payloadFacts('repository', renamed).previousFullName).toBe(
+      'andreybegma/agentdock',
+    );
+    expect(route('repository', renamed)).toEqual({
+      kind: 'rename',
+      previousFullName: 'andreybegma/agentdock',
+    });
+    expect(route('repository', { ...renamed, changes: undefined })).toEqual({
+      kind: 'rename',
+      previousFullName: null,
+    });
+    expect(route('repository', { ...renamed, action: 'edited' })).toEqual({
+      kind: 'ignore',
+      reason: 'action',
+    });
+    // Only `repository` deliveries carry a previous name.
+    expect(payloadFacts('issues', renamed).previousFullName).toBeNull();
+  });
+
   it('survives a payload of the wrong shape', () => {
     expect(payloadFacts('issues', null).fullName).toBeNull();
     expect(payloadFacts('issues', [1, 2]).action).toBeNull();

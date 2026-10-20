@@ -27,6 +27,8 @@ export const GITHUB_APP_EVENTS = [
   'check_run',
   'status',
   'push',
+  /** Renames: `projects.repo` follows the repository (D7). Needs only Metadata. */
+  'repository',
 ] as const;
 
 /** D5: the public route GitHub delivers to. */

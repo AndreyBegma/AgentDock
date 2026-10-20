@@ -181,6 +181,7 @@ export const EVENT_LABEL: Record<(typeof GITHUB_APP_EVENTS)[number], string> = {
   check_run: 'Check run',
   status: 'Status',
   push: 'Push',
+  repository: 'Repository',
 };
 
 export const toCredentialsRequest = (

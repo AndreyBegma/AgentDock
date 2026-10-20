@@ -163,6 +163,7 @@ CREATE TRIGGER audit_records_no_truncate
 | `project.member_remove` | remove a member | user (admin) | user | before: `{ userId, roleOverride }` |
 | `project.docs_source_override` | manual docs source | user (admin) | project | `{ kind, localPath, repo, manual }` |
 | `project.docs_source_reset` | restore detection | user (admin) | project | `{ kind, localPath, repo, manual }` |
+| `project.repo_rename` | a GitHub App delivery names the project's repository (by id) differently ([#27](27-github-app.md) D7) | system | project | `repo`; `meta: { via: "github", event, deliveryId, repoId }` |
 
 Every `project.*` record carries `projectId`. `project.inspect` and
 `project.refresh` are runner commands, recorded as `runner.command` /

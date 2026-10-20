@@ -33,6 +33,7 @@ describe('buildGitHubAppManifest (spec 27 D1, D2, D14)', () => {
       'check_run',
       'status',
       'push',
+      'repository',
     ]);
     expect(manifest.default_events).toEqual([...GITHUB_APP_EVENTS]);
     expect(manifest.hook_attributes).toEqual({
