@@ -112,9 +112,9 @@ package sources are `apps/runner/npm/package.json`,
 | # | Step | Owner | Check |
 |---|---|---|---|
 | 6.1 | GlitchTip: rename the product's project if one exists. On 2026-10-20 the `luna` organization had no AgentDock project, so there may be nothing to do. | Person | GlitchTip *Projects* shows no `agentdock` project |
-| 6.2 | Staging compose project `agentdock-staging` (`deploy/staging/docker-compose.yml`: `name:`, `container_name: agentdock-staging-*`, images `agentdock-api:staging` / `agentdock-web:staging`), the stack directory `/home/archi/stacks/agentdock-staging`, and the scripts that name them (`deploy/staging/*.sh`, `.woodpecker/pipeline.yml`, deploy/README.md). **Docker prefixes volumes with the compose project name**: renaming the project to `nautelle-staging` starts an empty database. Copy `agentdock-staging_pgdata`, `_redis` and `_attachments` into the new volumes first, or pin the old volume names with `name:` in the compose file. | Orchestrator (pull request) and Person (host) | after the deploy, `docker ps --format '{{.Names}}' \| grep staging` shows the new names and the staging board still has its cards |
+| 6.2 | Staging compose project `agentdock-staging` (`deploy/staging/docker-compose.yml`: `name:`, `container_name: agentdock-staging-*`, images `agentdock-api:staging` / `agentdock-web:staging`), the stack directory `/home/archi/stacks/agentdock-staging`, and the scripts that name them (`deploy/staging/*.sh`, `.woodpecker/pipeline.yml`, deploy/README.md). **Volume names are pinned** with `name:` in the compose file (`agentdock-staging_pgdata`, `_redis`, `_attachments` — the names Docker gave them under the old project), so renaming the project to `nautelle-staging` keeps the same volumes and the same data. Leave those `name:` values alone. Compose warns once that each volume "was created for project agentdock-staging"; that warning is expected. | Orchestrator (pull request) and Person (host) | after the deploy, `docker ps --format '{{.Names}}' \| grep staging` shows the new names, `docker volume ls \| grep agentdock-staging_` still lists the three volumes, `docker inspect -f '{{range .Mounts}}{{.Name}} {{end}}' <new postgres container>` shows `agentdock-staging_pgdata`, and the staging board still has its cards |
 | 6.3 | The CI image `agentdock-ci:node-bun` (`deploy/ci-image/Dockerfile`, both pipeline files). A push must build the new tag before a pull request can use it (deploy/README.md, *Trust levels*). | Orchestrator | a pull request after the push runs on the new image |
-| 6.4 | Local development: `docker/docker-compose.yml` (`name: agentdock`, `agentdock-postgres`, `agentdock-redis`) and `scripts/db-start-docker.sh`. The same volume warning applies: `agentdock_postgres_data` holds every developer's local database. Database names (`agentdock`, `agentdock_test`, `agentdock_<slot>_test`) are not part of this card. | Orchestrator (pull request) | `bun run db:setup` on a fresh machine works; on an existing one the data is still there |
+| 6.4 | Local development: `docker/docker-compose.yml` (`name: agentdock`, `agentdock-postgres`, `agentdock-redis`) and `scripts/db-start-docker.sh`. Its volumes are pinned the same way (`agentdock_postgres_data`, `agentdock_redis_data`), so renaming the project keeps every developer's local database; leave those `name:` values alone. Database names (`agentdock`, `agentdock_test`, `agentdock_<slot>_test`) are not part of this card. | Orchestrator (pull request) | `bun run db:setup` on a fresh machine works; on an existing one the data is still there |
 | 6.5 | The landing site: separate repository `agentdock-landing`, Cloudflare tunnel `agentdock-landing`, domain `agentdock.luna-realm.com`. The domain stays for now. Rename the repository and the tunnel only together with the domain (step 7). | Person | `curl -sI https://agentdock.luna-realm.com/` answers `200` |
 
 ## 7. Staging domain — deferred
@@ -165,9 +165,11 @@ Only after step 1. One pull request into `develop`, and after C-297 has merged
   Settings → Webhooks → Recent Deliveries* first (deploy/README.md, *A pull
   request with no pipeline*). A second hook left behind by Repair delivers
   twice; delete the one whose URL Woodpecker no longer serves.
-- Staging volumes: never `docker compose down -v` while moving to a new
-  compose project name. `down.sh` keeps the volumes; keep it that way until
-  the copy is checked.
+- Staging volumes: the compose files pin the volume names, so a new compose
+  project name reuses them. Never `docker compose down -v` around the rename,
+  and never change a volume's `name:` without copying its data first. After
+  the first `up` under the new name, `docker volume ls` must show the same
+  `agentdock-staging_*` volumes in use and no new `nautelle-staging_*` ones.
 - npm names cannot be taken back once published and deprecated packages stay
   installable; deprecation is the rollback-safe choice, `npm unpublish` is
   not.
