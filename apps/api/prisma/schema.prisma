@@ -101,6 +101,9 @@ model UserSettings {
   userId        String   @id
   /// The model New Card and New Plan preselect; null: `PLANNING_MODEL_DEFAULT`.
   planningModel String?
+  /// C-294: the last `APP_VERSION` this person opened What's new on; null:
+  /// never. The shell shows an unread dot while it differs.
+  seenVersion   String?
   updatedAt     DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
