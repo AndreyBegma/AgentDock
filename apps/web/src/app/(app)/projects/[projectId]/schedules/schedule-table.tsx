@@ -3,10 +3,17 @@
 import type { AdminScheduleView, ScheduleView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
+import { type Column } from '@andrewbehma/glass-ui/data-table';
+import {
+  MenuContent,
+  MenuItem,
+  MenuRoot,
+  MenuTrigger,
+} from '@andrewbehma/glass-ui/menu';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
+import { ResponsiveRows } from '../../../../../components/responsive-rows/responsive-rows';
 import {
   DISABLED_REASON_LABEL,
   describeTarget,
@@ -23,9 +30,84 @@ export interface ScheduleActions {
   onDelete: (schedule: ScheduleView) => void;
 }
 
+type Row = ScheduleView | AdminScheduleView;
+
+/** Edit, Run now and Delete behind one menu: three buttons a row was noise. */
+function RowMenu({
+  schedule,
+  actions,
+  busy,
+}: {
+  schedule: Row;
+  actions: ScheduleActions;
+  busy: boolean;
+}) {
+  return (
+    <MenuRoot>
+      <MenuTrigger asChild>
+        <Button
+          variant="ghost"
+          icon
+          size="sm"
+          disabled={busy}
+          aria-label={`Actions for ${schedule.name}`}
+        >
+          <MoreHorizontal aria-hidden="true" className="size-4" />
+        </Button>
+      </MenuTrigger>
+      <MenuContent align="end">
+        <MenuItem onSelect={() => actions.onEdit(schedule)}>Edit</MenuItem>
+        <MenuItem onSelect={() => actions.onRunNow(schedule)}>Run now</MenuItem>
+        <MenuItem tone="danger" onSelect={() => actions.onDelete(schedule)}>
+          Delete
+        </MenuItem>
+      </MenuContent>
+    </MenuRoot>
+  );
+}
+
+function EnabledControl({
+  schedule,
+  actions,
+}: {
+  schedule: Row;
+  actions?: ScheduleActions;
+}) {
+  return actions ? (
+    <>
+      <span id={`schedule-on-${schedule.id}`} className="sr-only">
+        Enable {schedule.name}
+      </span>
+      <Toggle
+        checked={schedule.enabled}
+        labelledBy={`schedule-on-${schedule.id}`}
+        onChange={(value) => actions.onToggle(schedule, value)}
+      />
+    </>
+  ) : (
+    <Badge
+      tone={schedule.enabled ? 'ok' : 'neutral'}
+      label={schedule.enabled ? 'on' : 'off'}
+    />
+  );
+}
+
+function LastFiring({ schedule }: { schedule: Row }) {
+  const last = schedule.lastFiring;
+  return last ? (
+    <Badge
+      tone={FIRING_STATUS_TONE[last.status]}
+      label={FIRING_STATUS_LABEL[last.status]}
+    />
+  ) : (
+    <span className="text-ink-3">never</span>
+  );
+}
+
 /**
- * The schedules table of a project and, with `showProject`, of the admin page.
- * Clicking a name opens the detail sheet.
+ * The schedules of a project and, with `showProject`, of the admin page: a
+ * table from tablet up, stacked rows on a phone (stack S-7). Clicking a name
+ * opens the detail sheet; Edit, Run now and Delete sit in the row's menu.
  */
 export function ScheduleTable({
   schedules,
@@ -34,26 +116,39 @@ export function ScheduleTable({
   busyId,
   onOpen,
 }: {
-  schedules: Array<ScheduleView | AdminScheduleView>;
+  schedules: Row[];
   showProject?: boolean;
   actions?: ScheduleActions;
   busyId?: string | null;
   onOpen: (schedule: ScheduleView) => void;
 }) {
-  type Row = ScheduleView | AdminScheduleView;
+  const nameButton = (schedule: Row) => (
+    <button
+      type="button"
+      className="min-w-0 text-left font-medium underline-offset-2 hover:underline"
+      onClick={() => onOpen(schedule)}
+    >
+      {schedule.name}
+    </button>
+  );
+  const projectLink = (schedule: Row) => (
+    <Link
+      href={`/projects/${schedule.projectId}/schedules`}
+      className="underline-offset-2 hover:underline"
+    >
+      {'projectName' in schedule ? schedule.projectName : schedule.projectId}
+    </Link>
+  );
   const columns: Column<Row>[] = [
     {
       id: 'name',
-      header: 'Name',
+      header: 'Schedule',
       cell: (schedule) => (
         <span className="flex flex-col">
-          <button
-            type="button"
-            className="text-left font-medium underline-offset-2 hover:underline"
-            onClick={() => onOpen(schedule)}
-          >
-            {schedule.name}
-          </button>
+          {nameButton(schedule)}
+          <span className="font-mono text-xs text-ink-3">
+            {describeTarget(schedule.target)}
+          </span>
           {schedule.disabledReason && !schedule.enabled ? (
             <span className="text-xs text-warn">
               {DISABLED_REASON_LABEL[schedule.disabledReason]}
@@ -67,31 +162,13 @@ export function ScheduleTable({
           {
             id: 'project',
             header: 'Project',
-            cell: (schedule: Row) => (
-              <Link
-                href={`/projects/${schedule.projectId}/schedules`}
-                className="underline-offset-2 hover:underline"
-              >
-                {'projectName' in schedule
-                  ? schedule.projectName
-                  : schedule.projectId}
-              </Link>
-            ),
+            cell: projectLink,
           },
         ]
       : []),
     {
-      id: 'runs',
-      header: 'Runs',
-      cell: (schedule) => (
-        <span className="font-mono text-sm">
-          {describeTarget(schedule.target)}
-        </span>
-      ),
-    },
-    {
       id: 'cron',
-      header: 'Cron',
+      header: 'When',
       cell: (schedule) => (
         <span className="flex flex-col">
           <span className="font-mono text-sm">{schedule.cron}</span>
@@ -103,37 +180,14 @@ export function ScheduleTable({
     {
       id: 'last',
       header: 'Last firing',
-      cell: ({ lastFiring: last }) =>
-        last ? (
-          <Badge
-            tone={FIRING_STATUS_TONE[last.status]}
-            label={FIRING_STATUS_LABEL[last.status]}
-          />
-        ) : (
-          <span className="text-ink-3">never</span>
-        ),
+      cell: (schedule) => <LastFiring schedule={schedule} />,
     },
     {
       id: 'enabled',
-      header: 'Enabled',
-      cell: (schedule) =>
-        actions ? (
-          <>
-            <span id={`schedule-on-${schedule.id}`} className="sr-only">
-              Enable {schedule.name}
-            </span>
-            <Toggle
-              checked={schedule.enabled}
-              labelledBy={`schedule-on-${schedule.id}`}
-              onChange={(value) => actions.onToggle(schedule, value)}
-            />
-          </>
-        ) : (
-          <Badge
-            tone={schedule.enabled ? 'ok' : 'neutral'}
-            label={schedule.enabled ? 'on' : 'off'}
-          />
-        ),
+      header: 'On',
+      cell: (schedule) => (
+        <EnabledControl schedule={schedule} actions={actions} />
+      ),
     },
     ...(actions
       ? [
@@ -141,49 +195,60 @@ export function ScheduleTable({
             id: 'actions',
             header: <span className="sr-only">Actions</span>,
             align: 'end' as const,
-            cell: (schedule: Row) => {
-              const busy = busyId === schedule.id;
-              return (
-                <span className="inline-flex justify-end gap-2">
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => actions.onEdit(schedule)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => actions.onRunNow(schedule)}
-                  >
-                    Run now
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => actions.onDelete(schedule)}
-                  >
-                    Delete
-                  </Button>
-                </span>
-              );
-            },
+            cell: (schedule: Row) => (
+              <RowMenu
+                schedule={schedule}
+                actions={actions}
+                busy={busyId === schedule.id}
+              />
+            ),
           },
         ]
       : []),
   ];
   return (
-    <ScrollX label="Schedules" edgeClassName="from-surface">
-      <DataTable
-        rows={schedules}
-        getRowId={(schedule) => schedule.id}
-        columns={columns}
-        stickyHeader={false}
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Schedules"
+      rows={schedules}
+      getRowId={(schedule) => schedule.id}
+      columns={columns}
+      stacked={(schedule) => (
+        <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex items-start justify-between gap-3">
+            <span className="flex min-w-0 flex-col">
+              {nameButton(schedule)}
+              {showProject ? (
+                <span className="text-xs text-ink-3">
+                  {projectLink(schedule)}
+                </span>
+              ) : null}
+              <span className="break-all font-mono text-xs text-ink-3">
+                {describeTarget(schedule.target)}
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1">
+              <EnabledControl schedule={schedule} actions={actions} />
+              {actions ? (
+                <RowMenu
+                  schedule={schedule}
+                  actions={actions}
+                  busy={busyId === schedule.id}
+                />
+              ) : null}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-2">
+            <span className="font-mono">{schedule.cron}</span>
+            <span>{nextRunLabel(schedule)}</span>
+            <LastFiring schedule={schedule} />
+          </div>
+          {schedule.disabledReason && !schedule.enabled ? (
+            <span className="text-xs text-warn">
+              {DISABLED_REASON_LABEL[schedule.disabledReason]}
+            </span>
+          ) : null}
+        </div>
+      )}
+    />
   );
 }

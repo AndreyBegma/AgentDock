@@ -12,7 +12,8 @@ import type {
 import { orchestratorSettingsHref } from '../control/reasons';
 import { ORCHESTRATOR_STATUS_LABEL } from '../fleet/format';
 import { slotHref } from '../fleet/workspace-url';
-import { RUN_KIND_LABEL } from '../history/format';
+import { RUN_KIND_LABEL, runHref } from '../history/format';
+import { approvalsHref as approvalsTab } from '../queue/tabs';
 
 /**
  * The Overview dashboard (issue #159) is composed from the per-project routes
@@ -110,7 +111,7 @@ export function approvalsHref(
     const view = approvals.get(project.id);
     return view !== undefined && awaiting(view).length > 0;
   });
-  return first ? `/projects/${first.id}/approvals` : '/projects';
+  return first ? approvalsTab(first.id) : '/projects';
 }
 
 /**
@@ -199,7 +200,7 @@ export function needsYou(
         kind: 'failed',
         title: runTitle(run),
         reason: 'Failed — see what went wrong',
-        href: `/projects/${project.id}/history/${run.id}`,
+        href: runHref(project.id, run.id),
         since: ended,
       });
     }
@@ -238,7 +239,7 @@ export function needsYou(
           ? `PR #${approval.pr} · ${approval.title}`
           : `PR #${approval.pr}`,
         reason: 'Waiting for your merge approval',
-        href: `/projects/${project.id}/approvals`,
+        href: approvalsTab(project.id),
         since: approval.waitingSince,
       });
     }

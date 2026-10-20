@@ -316,7 +316,9 @@ describe('errors', () => {
   });
 
   test('skillRunsHref filters History to skill runs', () => {
-    expect(skillRunsHref('p1')).toBe('/projects/p1/history?kind=skill');
+    expect(skillRunsHref('p1')).toBe(
+      '/projects/p1/activity?tab=runs&kind=skill',
+    );
   });
 
   describe('runProfileReason', () => {

@@ -4,7 +4,6 @@ import {
   TOKEN_SAVER_UNMEASURED_KINDS,
   type TokenSaverCostPerRound,
 } from '@agentdock/shared';
-import { DataTable } from '@andrewbehma/glass-ui/data-table';
 import type { ReactNode } from 'react';
 import { formatCost, formatNumber, formatTokens } from '../../lib/format';
 import {
@@ -17,7 +16,7 @@ import {
   type CostPerRoundTrend,
   costPerRoundTrends,
 } from '../../lib/token-saver/summary';
-import { ScrollX } from '../scroll-x/scroll-x';
+import { ResponsiveRows } from '../responsive-rows/responsive-rows';
 
 const num = (text: string) => <span className="num">{text || '—'}</span>;
 
@@ -103,14 +102,12 @@ export function CostPerRoundTable({
     },
   ];
   return (
-    <ScrollX label="Cost per round by session kind">
-      <DataTable
-        rows={trends}
-        getRowId={(t) => t.sessionKind}
-        columns={columns}
-        className="min-w-[48rem]"
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Cost per round by session kind"
+      rows={trends}
+      getRowId={(t) => t.sessionKind}
+      columns={columns}
+    />
   );
 }
 
@@ -135,14 +132,12 @@ export function CostPerRoundWeeksTable({
     ...measured((r: TokenSaverCostPerRound) => r),
   ];
   return (
-    <ScrollX label="Cost per round by week">
-      <DataTable
-        rows={[...rows]}
-        getRowId={(r) => `${r.sessionKind}:${r.week}`}
-        columns={columns}
-        className="min-w-[48rem]"
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Cost per round by week"
+      rows={[...rows]}
+      getRowId={(r) => `${r.sessionKind}:${r.week}`}
+      columns={columns}
+    />
   );
 }
 

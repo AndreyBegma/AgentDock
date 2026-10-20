@@ -105,6 +105,12 @@ export const PLANNER_VIOLATION_REASONS = [
   'design_unpinned_version',
   /** Design: network calls, a form submit, top navigation. */
   'design_forbidden_feature',
+  /**
+   * Design (#690): an inline script that does not parse as a classic script,
+   * or declares a top-level name the window already holds — the browser
+   * refuses the whole script. Checked by the API, which has a JS compiler.
+   */
+  'design_script_invalid',
   /** Design: `variant` is not the variant the turn was asked for. */
   'variant_mismatch',
   /** Design: `addressed` names a comment that is not open on the design. */
@@ -795,6 +801,7 @@ The mockup's rules — a frame that breaks one fails the turn:
 - External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS. No other host, and no relative URL: inline it or use a \`data:\` URL (images and fonts only).
 - Every script or package URL names an exact version: \`react@18.3.1\`, never \`react@18\` or \`latest\`.
 - No network calls (\`fetch\`, \`XMLHttpRequest\`, \`WebSocket\`, \`EventSource\`, \`sendBeacon\`), no form that submits, no navigation of the top or parent window, no \`window.open\`, no \`<iframe>\`, \`<object>\`, \`<embed>\` or \`<base>\`, no link to another site.
+- Wrap inline scripts in an IIFE; never declare a top-level name after a window global (\`top\`, \`window\`, \`self\`, \`name\`, …).
 - The theme switches through \`:root[data-theme="light"]\` and \`:root[data-theme="dark"]\`.
 - \`variant\` is the variant the turn names (1–${DESIGN_VARIANTS_MAX}); \`addressed\` lists only ids of the open comments the turn gave you.
 `;

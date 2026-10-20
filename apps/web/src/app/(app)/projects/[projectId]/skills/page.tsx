@@ -7,20 +7,20 @@ import type {
 } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
+import { Button } from '@andrewbehma/glass-ui/button';
+import type { Column } from '@andrewbehma/glass-ui/data-table';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import { Section } from '@andrewbehma/glass-ui/section';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { Play } from 'lucide-react';
+import { Play, RefreshCw, Search } from 'lucide-react';
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
-import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
+import { ResponsiveRows } from '../../../../../components/responsive-rows/responsive-rows';
 import { api } from '../../../../../lib/api';
 import { Time } from '../../../../../lib/format/time';
 import { useSection } from '../../../../../lib/section/use-section';
@@ -42,7 +42,7 @@ import {
 import { useProjectDetail } from '../use-project-detail';
 import { RunDialog } from './run-dialog';
 
-/** One scope's skills: a `DataTable` that scrolls inside its own frame (#213). */
+/** One scope's skills: a table from tablet up, stacked rows on a phone. */
 function SkillRows({
   items,
   canOperate,
@@ -53,6 +53,24 @@ function SkillRows({
   onRun: (skill: InstalledSkillView) => void;
 }) {
   const rows = dedupeSkills(items);
+  const runControl = ({ skill: item }: SkillRow) =>
+    item.runnable && item.runtime === 'claude' ? (
+      <Tooltip content={`Run ${item.invocation}`}>
+        <Button
+          size="sm"
+          icon
+          variant="ghost"
+          aria-label={`Run ${item.invocation}`}
+          onClick={() => onRun(item)}
+        >
+          <Play aria-hidden="true" className="size-4" />
+        </Button>
+      </Tooltip>
+    ) : (
+      <span className="text-xs text-ink-3">
+        {item.runnable ? 'Claude only' : 'Not runnable'}
+      </span>
+    );
   const columns: Column<SkillRow>[] = [
     {
       id: 'skill',
@@ -100,37 +118,39 @@ function SkillRows({
             id: 'run',
             header: <span className="sr-only">Run</span>,
             align: 'end' as const,
-            cell: ({ skill: item }: SkillRow) =>
-              item.runnable && item.runtime === 'claude' ? (
-                <Tooltip content={`Run ${item.invocation}`}>
-                  <Button
-                    size="sm"
-                    icon
-                    variant="ghost"
-                    aria-label={`Run ${item.invocation}`}
-                    onClick={() => onRun(item)}
-                  >
-                    <Play aria-hidden="true" className="size-4" />
-                  </Button>
-                </Tooltip>
-              ) : (
-                <span className="text-xs text-ink-3">
-                  {item.runnable ? 'Claude only' : 'Not runnable'}
-                </span>
-              ),
+            cell: runControl,
           },
         ]
       : []),
   ];
   return (
-    <ScrollX label="Skills" edgeClassName="from-surface">
-      <DataTable
-        rows={rows}
-        getRowId={(row) => row.skill.id}
-        columns={columns}
-        stickyHeader={false}
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Skills"
+      rows={rows}
+      getRowId={(row) => row.skill.id}
+      columns={columns}
+      stacked={(row) => (
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="break-all font-mono text-sm">
+              {row.skill.invocation}
+            </span>
+            <span className="line-clamp-2 text-xs text-ink-2">
+              {row.skill.description ?? '—'}
+            </span>
+            <span className="text-xs text-ink-3">
+              {row.skill.runtime} · {provenanceLabel(row.skill)}
+              {row.profiles.length > 0
+                ? ` · ${profilesLabel(row.profiles)}`
+                : ''}
+            </span>
+          </span>
+          {canOperate ? (
+            <span className="shrink-0">{runControl(row)}</span>
+          ) : null}
+        </div>
+      )}
+    />
   );
 }
 
@@ -146,6 +166,7 @@ export default function ProjectSkillsPage() {
 function SkillsView() {
   const { projectId } = useParams<{ projectId: string }>();
   const runParam = useSearchParams().get('run');
+  const router = useRouter();
   const detail = useProjectDetail(projectId);
   const project = detail.data;
   const skills = useSection(
@@ -209,11 +230,8 @@ function SkillsView() {
       <EmptyState
         title="Project not found"
         description="It was removed, or you are not a member of it."
-        action={
-          <Link href="/projects" className="text-sm text-accent-ink underline">
-            Open Projects
-          </Link>
-        }
+        link={Link}
+        action={{ label: 'Open Projects', href: '/projects' }}
       />
     );
   }
@@ -225,6 +243,7 @@ function SkillsView() {
       <div className="flex flex-col gap-3">
         <PageHeader
           className="mb-0"
+          link={Link}
           title="Skills"
           description={
             <>
@@ -247,20 +266,28 @@ function SkillsView() {
               </Link>
             </>
           }
-          actions={
-            canOperate ? (
-              <>
-                <Button variant="glass" disabled={refreshing} onClick={refresh}>
-                  {refreshing ? 'Scanning…' : 'Rescan'}
-                </Button>
-                <Link
-                  href="/skills"
-                  className={buttonClassName({ variant: 'solid' })}
-                >
-                  Find skills
-                </Link>
-              </>
-            ) : undefined
+          primaryAction={
+            canOperate
+              ? {
+                  label: refreshing ? 'Scanning…' : 'Rescan',
+                  icon: RefreshCw,
+                  onClick: () => {
+                    if (!refreshing) void refresh();
+                  },
+                }
+              : undefined
+          }
+          overflow={
+            canOperate
+              ? [
+                  {
+                    id: 'find',
+                    label: 'Find skills',
+                    icon: Search,
+                    onSelect: () => router.push('/skills'),
+                  },
+                ]
+              : undefined
           }
         />
         {project ? <RunnerOfflineBanner project={project} /> : null}
@@ -288,37 +315,26 @@ function SkillsView() {
                 ? 'The last scan found no skill for this project. Add one to the repository’s skills folder, or find one to install, then rescan.'
                 : 'Nothing has been scanned yet. A rescan asks the runner to look.'
             }
-            action={
-              canOperate ? (
-                <Button variant="glass" disabled={refreshing} onClick={refresh}>
-                  {refreshing ? 'Scanning…' : 'Rescan'}
-                </Button>
-              ) : undefined
-            }
+            link={Link}
+            action={{ label: 'Find skills', href: '/skills' }}
           />
         }
       >
         {() =>
           groups.map((group) => (
-            <section key={group.scope} aria-labelledby={`scope-${group.scope}`}>
-              <SectionHeader
-                headingId={`scope-${group.scope}`}
-                className="mb-2"
-                title={
-                  <>
-                    {SCOPE_LABEL[group.scope]}{' '}
-                    <span className="font-normal text-ink-3">
-                      ({dedupeSkills(group.items).length})
-                    </span>
-                  </>
-                }
-              />
+            <Section
+              key={group.scope}
+              surface="none"
+              pad="none"
+              title={SCOPE_LABEL[group.scope]}
+              className="mb-6 last:mb-0"
+            >
               <SkillRows
                 items={group.items}
                 canOperate={canOperate}
                 onRun={setRunning}
               />
-            </section>
+            </Section>
           ))
         }
       </AsyncSection>

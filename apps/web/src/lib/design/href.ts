@@ -57,9 +57,8 @@ export const uiProfilePreviewSrc = (
     String(version),
   )}`;
 
-/** A profile build's run, on the project's History. */
-export const runHref = (projectId: string, runId: string): string =>
-  `/projects/${projectId}/history/${runId}`;
+/** A profile build's run, beside the Runs tab of the project's Activity. */
+export { runHref } from '../history/format';
 
 /** The project's installed skills (#24): the choices for design skills. */
 export const installedSkillsApi = (projectId: string): string =>

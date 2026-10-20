@@ -43,12 +43,12 @@ process state.
 
 - From `lg` (1024 px) up: `NavRail` — Workspace, the current project's working
   pages (titled with its name: Project, Work, Activity), a **More** group under
-  them (Fleet, Queue, Approvals, History, Token saver, Skills, Schedules,
+  them (Fleet, Queue, Token saver, Skills, Schedules,
   Settings) and Admin. More and Admin are `collapsible` groups; inside a
   project Workspace is one too. Each folds by default, unfolds by itself while
   one of its pages is open and remembers its state per browser under its own
   `localStorage` key (`railGroups` in `nav.ts` models the split, C-247).
-  Badges: the waiting-approvals count on Approvals, the slots that wait on a
+  Badges: the waiting-approvals count on Queue (Approvals is its tab, C-284), the slots that wait on a
   person on Fleet; while More is folded Fleet's count rides More's title
   ("More · 2").
 - Below `lg`: `BottomCapsule` (#521), floating clear of the screen's edges,

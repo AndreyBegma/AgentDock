@@ -7,7 +7,7 @@ import type {
   UsageTimeseriesResponse,
 } from '@agentdock/shared';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import { Section } from '@andrewbehma/glass-ui/section';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import Link from 'next/link';
@@ -202,30 +202,23 @@ function UsageView() {
                   isAdmin={isAdmin}
                 />
 
-                <section className="mb-6" aria-labelledby="usage-over-time">
-                  <SectionHeader
-                    className="mb-2"
-                    headingId="usage-over-time"
-                    title="Cost over time"
-                  />
+                <Section className="mb-6" title="Cost over time" surface="none">
                   {data.byRuntime.series.length > 0 ? (
                     <CostChart series={data.byRuntime} interval={interval} />
                   ) : (
                     empty
                   )}
-                </section>
+                </Section>
 
-                <section aria-labelledby="usage-breakdown">
-                  <SectionHeader
-                    className="mb-2"
-                    headingId="usage-breakdown"
-                    title="Breakdown"
-                    description={
-                      drillable
-                        ? 'Open a row to narrow the page to it.'
-                        : undefined
-                    }
-                  />
+                <Section
+                  title="Breakdown"
+                  surface="none"
+                  description={
+                    drillable
+                      ? 'Open a row to narrow the page to it.'
+                      : undefined
+                  }
+                >
                   {/* Under the heading, not beside it: at 390 px the
                       segments would squeeze the heading to a word a line. */}
                   <div className="mb-3 min-w-0 max-w-full">
@@ -283,7 +276,7 @@ function UsageView() {
                         : undefined
                     }
                   />
-                </section>
+                </Section>
               </div>
             ) : null
           }

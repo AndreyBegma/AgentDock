@@ -84,9 +84,7 @@ describe('visibleNav', () => {
       'Fleet',
       'Board',
       'Queue',
-      'Approvals',
       'Activity',
-      'History',
       'Skills',
       'Schedules',
       'Settings',
@@ -118,7 +116,7 @@ describe('visibleNav', () => {
 describe('activeEntryId: one active item', () => {
   test('inside a project only the sub-page is active, never Projects', () => {
     expect(activeAt('admin', '/projects/p1/fleet')).toBe('fleet');
-    expect(activeAt('admin', '/projects/p1/history/r1')).toBe('history');
+    expect(activeAt('admin', '/projects/p1/activity')).toBe('project-activity');
     expect(activeAt('admin', '/projects/p1/skills/runs/r1')).toBe(
       'project-skills',
     );
@@ -219,7 +217,7 @@ describe('tabBarSplit', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
       tabs: ['Board', 'Queue', 'Activity'],
       more: [
-        'project: Fleet, Settings, Project home, Approvals, History, Planner, Schedules, Skills, Token saver',
+        'project: Fleet, Settings, Project home, Planner, Schedules, Skills, Token saver',
         'workspace: Overview, Projects, Work, Activity, Sessions, Usage, Workflows, Skills',
       ],
     });
@@ -251,8 +249,7 @@ describe('isWideEntry', () => {
 
   test('data pages and the pages below them take the wide column', () => {
     expect(wideAt('/sessions')).toBe(true);
-    expect(wideAt('/projects/p1/history')).toBe(true);
-    expect(wideAt('/projects/p1/history/r1')).toBe(true);
+    expect(wideAt('/projects/p1/activity')).toBe(true);
     expect(wideAt('/projects/p1/board')).toBe(true);
     expect(wideAt('/admin/audit')).toBe(true);
   });
@@ -318,8 +315,6 @@ describe('railGroups (C-247)', () => {
       collapsible: true,
       entries: [
         'Project home',
-        'Approvals',
-        'History',
         'Planner',
         'Schedules',
         'Skills',
@@ -381,7 +376,7 @@ describe('iconRailSplit (C-282)', () => {
         'project: Board, Fleet, Queue, Activity, Settings',
       ],
       more: [
-        'project: Project home, Approvals, History, Planner, Schedules, Skills, Token saver',
+        'project: Project home, Planner, Schedules, Skills, Token saver',
         'workspace: Activity, Sessions, Usage, Workflows, Skills',
       ],
     });

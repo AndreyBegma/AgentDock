@@ -324,6 +324,7 @@ function BoardScreen() {
       <div className="flex shrink-0 flex-col gap-3">
         <WorkHeader
           view="board"
+          title="Board"
           eyebrow={project?.displayName ?? 'Project'}
           stats={
             view && meta

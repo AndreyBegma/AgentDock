@@ -8,9 +8,8 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
-import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import { Section } from '@andrewbehma/glass-ui/section';
 import {
   Table,
   TableCell,
@@ -25,7 +24,6 @@ import {
   formatCountdown,
   issueQueueArgs,
   KIND_LABEL,
-  pendingRequests,
   prApproveArgs,
   recentRequests,
   requestTitle,
@@ -43,12 +41,12 @@ import { Time } from '../../lib/format/time';
 import { useErrorToast } from '../../lib/section/use-error-toast';
 import { RevealedInput, ToolUseDialogBody } from './tool-use-review';
 
-type Decision = 'approve' | 'deny';
+export type Decision = 'approve' | 'deny';
 
 /** The countdown ticks once a second. */
 const TICK_MS = 1_000;
 
-function RequestCell({ request }: { request: ActionRequestSummary }) {
+export function RequestCell({ request }: { request: ActionRequestSummary }) {
   const review = reviewToolUse(request);
   const pr = prApproveArgs(request);
   const issue = issueQueueArgs(request);
@@ -113,7 +111,13 @@ function HeadSuffix({ request }: { request: ActionRequestSummary }) {
 }
 
 /** Time left on a pending request; "Expired" while the next refetch is on its way. */
-function Countdown({ expiresAt, now }: { expiresAt: string; now: number }) {
+export function Countdown({
+  expiresAt,
+  now,
+}: {
+  expiresAt: string;
+  now: number;
+}) {
   const left = secondsLeft(expiresAt, now);
   return (
     <Badge
@@ -125,23 +129,16 @@ function Countdown({ expiresAt, now }: { expiresAt: string; now: number }) {
 }
 
 /**
- * The Approvals page's "Action requests" tab (spec 201 D18): what Claude Code
- * sessions asked a person to decide. Operators approve or deny; a viewer reads.
- * A `tool_use` approval only answers the waiting hook; the other kinds run as
- * the approver on the server.
+ * Approving and denying action requests (spec 201 D18), for the Queue page's
+ * Approvals tab (C-284): what Claude Code sessions asked a person to decide.
+ * `ask` opens the right dialog, or decides at once; `dialogs` is rendered once
+ * by the caller. A `tool_use` approval only answers the waiting hook; the
+ * other kinds run as the approver on the server.
  */
-export function ActionRequestsPanel({
-  projectId,
-  rows,
-  canOperate,
-  onChanged,
-}: {
-  projectId: string;
-  rows: ActionRequestSummary[];
-  canOperate: boolean;
-  onChanged: () => void;
-}) {
-  const [now, setNow] = useState(() => Date.now());
+export function useActionRequestDecisions(
+  projectId: string,
+  onChanged: () => void,
+) {
   const [asking, setAsking] = useState<{
     request: ActionRequestSummary;
     decision: Decision;
@@ -150,15 +147,6 @@ export function ActionRequestsPanel({
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const showError = useErrorToast();
-
-  const pending = pendingRequests(rows);
-  const recent = recentRequests(rows);
-
-  useEffect(() => {
-    if (pending.length === 0) return;
-    const id = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(id);
-  }, [pending.length]);
 
   const decide = async (
     request: ActionRequestSummary,
@@ -206,109 +194,8 @@ export function ActionRequestsPanel({
   const toolReview = toolAsk ? reviewToolUse(toolAsk) : null;
   const verb = asking?.decision === 'approve' ? 'Approve' : 'Deny';
 
-  return (
-    <div className="flex flex-col gap-6">
-      {pending.length === 0 ? (
-        <EmptyState
-          title="No action requests waiting"
-          description="When a Claude Code session asks to use a tool while you are away, or to start the orchestrator, the request waits here and in Telegram."
-        />
-      ) : (
-        <Table scroll>
-          <TableHead>
-            <TableRow>
-              <TableCell head>Request</TableCell>
-              <TableCell head>Asked</TableCell>
-              <TableCell head>Expires in</TableCell>
-              <TableCell head>
-                <span className="sr-only">Decide</span>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <tbody>
-            {pending.map((request) => (
-              <TableRow key={request.id}>
-                <TableCell>
-                  <RequestCell request={request} />
-                </TableCell>
-                <TableCell>
-                  <Time value={request.createdAt} />
-                </TableCell>
-                <TableCell>
-                  <Countdown expiresAt={request.expiresAt} now={now} />
-                </TableCell>
-                <TableCell>
-                  {canOperate ? (
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="glass"
-                        size="sm"
-                        disabled={busy}
-                        aria-label={`Deny: ${requestTitle(request)}`}
-                        onClick={() => ask(request, 'deny')}
-                      >
-                        Deny
-                      </Button>
-                      <Button
-                        variant="glass"
-                        size="sm"
-                        disabled={
-                          busy || secondsLeft(request.expiresAt, now) === 0
-                        }
-                        aria-label={`Approve: ${requestTitle(request)}`}
-                        onClick={() => ask(request, 'approve')}
-                      >
-                        Approve
-                      </Button>
-                    </div>
-                  ) : null}
-                </TableCell>
-              </TableRow>
-            ))}
-          </tbody>
-        </Table>
-      )}
-
-      {recent.length > 0 ? (
-        <section className="flex flex-col gap-3">
-          <SectionHeader title="Recent requests" />
-          <Table scroll>
-            <TableHead>
-              <TableRow>
-                <TableCell head>Request</TableCell>
-                <TableCell head>Outcome</TableCell>
-                <TableCell head>When</TableCell>
-                <TableCell head>Note</TableCell>
-              </TableRow>
-            </TableHead>
-            <tbody>
-              {recent.map((request) => (
-                <TableRow key={request.id}>
-                  <TableCell>
-                    <span className="font-medium">{requestTitle(request)}</span>
-                    <HeadSuffix request={request} />
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      tone={STATUS_TONE[request.status]}
-                      label={STATUS_LABEL[request.status]}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Time value={request.decidedAt ?? request.expiresAt} />
-                  </TableCell>
-                  <TableCell>
-                    <span className="line-clamp-2 break-words">
-                      {request.note ?? '—'}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </tbody>
-          </Table>
-        </section>
-      ) : null}
-
+  const dialogs = (
+    <>
       {/* C-115: a tool is approved only here, with its whole input in view. */}
       <DialogRoot
         open={toolAsk !== undefined}
@@ -394,6 +281,67 @@ export function ActionRequestsPanel({
           if (asking) void decide(asking.request, asking.decision, note.trim());
         }}
       />
-    </div>
+    </>
+  );
+
+  return { ask, busy, dialogs };
+}
+
+/** The current time, ticking once a second while `active` (a countdown runs). */
+export function useCountdownNow(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), TICK_MS);
+    return () => clearInterval(id);
+  }, [active]);
+  return now;
+}
+
+/** Decided and expired requests, newest first; nothing when there are none. */
+export function RecentRequests({
+  rows,
+}: {
+  rows: readonly ActionRequestSummary[];
+}) {
+  const recent = recentRequests(rows);
+  if (recent.length === 0) return null;
+  return (
+    <Section title="Recent action requests" surface="none">
+      <Table scroll>
+        <TableHead>
+          <TableRow>
+            <TableCell head>Request</TableCell>
+            <TableCell head>Outcome</TableCell>
+            <TableCell head>When</TableCell>
+            <TableCell head>Note</TableCell>
+          </TableRow>
+        </TableHead>
+        <tbody>
+          {recent.map((request) => (
+            <TableRow key={request.id}>
+              <TableCell>
+                <span className="font-medium">{requestTitle(request)}</span>
+                <HeadSuffix request={request} />
+              </TableCell>
+              <TableCell>
+                <Badge
+                  tone={STATUS_TONE[request.status]}
+                  label={STATUS_LABEL[request.status]}
+                />
+              </TableCell>
+              <TableCell>
+                <Time value={request.decidedAt ?? request.expiresAt} />
+              </TableCell>
+              <TableCell>
+                <span className="line-clamp-2 break-words">
+                  {request.note ?? '—'}
+                </span>
+              </TableCell>
+            </TableRow>
+          ))}
+        </tbody>
+      </Table>
+    </Section>
   );
 }

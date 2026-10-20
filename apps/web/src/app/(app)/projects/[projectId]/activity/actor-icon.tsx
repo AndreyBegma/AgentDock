@@ -1,6 +1,6 @@
 import type { ActivityActorType } from '@agentdock/shared';
 import { Bot, Cog, Server, User } from 'lucide-react';
-import { ACTOR_LABEL } from '../../../../../../lib/history/format';
+import { ACTOR_LABEL } from '../../../../../lib/history/format';
 
 const ICON = {
   user: User,

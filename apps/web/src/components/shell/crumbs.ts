@@ -11,6 +11,7 @@ export type CrumbNames = ReadonlyMap<string, string>;
 /** Pages with a label of their own that the nav registry does not hold. */
 const STATIC: Record<string, string> = {
   '/account': 'Account',
+  '/account/about': 'About',
   '/account/notifications': 'Notifications',
   '/admin': 'Admin',
   '/admin/integrations/github': 'GitHub App',
@@ -58,7 +59,6 @@ function kindOf(segments: readonly string[], index: number): string {
   if (parent === 'projects' && index === 1) return 'Project';
   if (parent === 'sessions') return 'Session';
   if (parent === 'runs' && segments[index - 2] === 'skills') return 'Skill run';
-  if (parent === 'history') return 'Run';
   if (parent === 'planner') return 'Plan';
   return 'Details';
 }

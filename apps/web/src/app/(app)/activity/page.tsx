@@ -1,5 +1,6 @@
 'use client';
 
+import { Section } from '@andrewbehma/glass-ui/section';
 import { AiDigestPanel } from '../../../components/ai/digest-panel';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { useProjects } from '../../../components/shell/use-shell-data';
@@ -16,7 +17,9 @@ export default function ActivityPage() {
         description="What happened across your projects: pull requests, blockers, runner changes and schedule runs."
       />
       <AiDigestPanel projects={projects} />
-      <ActivityFeed isAdmin={user.role === 'admin'} />
+      <Section title="Feed" surface="none">
+        <ActivityFeed isAdmin={user.role === 'admin'} />
+      </Section>
     </>
   );
 }

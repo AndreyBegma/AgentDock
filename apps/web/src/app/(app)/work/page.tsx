@@ -123,8 +123,9 @@ function WorkView() {
     <>
       <WorkHeader
         view="list"
-        eyebrow="All projects"
-        description="Cards, plan tasks and suggestions across your projects, from To Do to Completed."
+        title="Work"
+        eyebrow="Workspace"
+        description="Cards, plan tasks and suggestions across every project."
         onSelectList={() => {}}
         onSelectBoard={openBoard}
       >

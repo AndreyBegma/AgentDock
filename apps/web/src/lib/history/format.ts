@@ -12,7 +12,7 @@ import { dayBoundary } from '../activity/format';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
 import { CHECKS_LABEL } from '../fleet/format';
 import { formatDate, formatNumber } from '../format';
-import { formatCost, formatTokens } from '../sessions/format';
+import { formatCost, formatDuration, formatTokens } from '../sessions/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -149,6 +149,41 @@ export function toRunQuery(filters: RunFilters): RunListQuery {
   return query;
 }
 
+/** The Runs tab of a project's Activity (C-285), which took over History. */
+export function runsHref(
+  projectId: string,
+  filters: Partial<RunFilters> = {},
+): string {
+  const params = new URLSearchParams({ tab: 'runs' });
+  for (const key of RUN_FILTER_KEYS) {
+    const value = filters[key];
+    if (value) params.set(key, value);
+  }
+  return `/projects/${projectId}/activity?${params}`;
+}
+
+/** One run, open beside the Runs tab: a sheet on a phone, a panel from tablet up. */
+export const runHref = (projectId: string, runId: string): string =>
+  `/projects/${projectId}/activity?tab=runs&run=${encodeURIComponent(runId)}`;
+
+/**
+ * Where an old `/history` or `/history/:runId` link lands: the Runs tab, with
+ * the filters it carried (an unknown one is dropped) and the run open.
+ */
+export function historyRedirectTarget(
+  projectId: string,
+  search: Record<string, string | string[] | undefined>,
+  runId?: string,
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(search)) {
+    const text = Array.isArray(value) ? value[0] : value;
+    if (text !== undefined) params.set(key, text);
+  }
+  const target = runsHref(projectId, runFiltersFromSearch(params));
+  return runId ? `${target}&run=${encodeURIComponent(runId)}` : target;
+}
+
 /** The status chips, in the order a person scans for trouble. */
 export const RUN_STATUS_CHIPS: readonly RunStatus[] = [
   'running',
@@ -248,6 +283,35 @@ export function costLabel(usage: RunUsage): string {
   return usage.unpricedRequests > 0
     ? `${cost} + ${usage.unpricedRequests} unpriced`
     : cost;
+}
+
+/**
+ * The line under a run's title on the Runs timeline (C-285): History's
+ * columns — kind, runtime, PR, duration, tokens and cost — with the empty
+ * ones left out. The start is the row's time and its day heading.
+ */
+export function runFacts(
+  run: Pick<
+    RunSummary,
+    | 'kind'
+    | 'runtime'
+    | 'model'
+    | 'prNumber'
+    | 'prChecks'
+    | 'durationMs'
+    | 'usage'
+  >,
+): string {
+  return [
+    RUN_KIND_LABEL[run.kind],
+    runtimeLabel(run),
+    prLabel(run),
+    formatDuration(run.durationMs),
+    run.usage.requests === 0 ? '—' : `${tokensLabel(run.usage)} tokens`,
+    costLabel(run.usage),
+  ]
+    .filter((part) => part !== '—')
+    .join(' · ');
 }
 
 /** What went wrong with a run, for the banner its page leads with (#213). */
