@@ -1,13 +1,16 @@
 import {
+  designBytes,
   PLANNER_DISCUSS_CONTRACT,
   PLANNER_INTAKE_CONTRACT,
   type PlanQuestion,
   plannerOutputContract,
 } from '@agentdock/shared';
+import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
 import { readCardInstructions } from './plan-intake';
 import {
   assemblePrompt,
   DISCUSS_INSTRUCTIONS,
+  FAILURE_NOTE_MAX_CHARS,
   type PromptInput,
   type PromptTask,
 } from './plan-prompt';
@@ -250,5 +253,73 @@ describe('assemblePrompt — a discussion turn (#590)', () => {
     expect(prompt.indexOf('And the webhook secret?')).toBeGreaterThan(
       prompt.indexOf('How are runner tokens checked?'),
     );
+  });
+});
+
+describe('assemblePrompt: a retried turn (#687)', () => {
+  const failure =
+    'contract_violation: design_too_large: the frame is 300 KiB; the limit is 256 KiB';
+  const note = `The previous attempt failed: ${failure}. Fix this in your answer.`;
+
+  it('tells a retried design turn why the last attempt failed', () => {
+    const prompt = assemblePrompt({
+      ...base,
+      action: 'design',
+      taskKey: 't1',
+      previousFailure: failure,
+      design: {
+        variant: 1,
+        variantCount: 2,
+        mode: 'generate',
+        previous: null,
+        profile: null,
+        skills: [],
+        comments: [],
+      },
+    });
+    expect(prompt).toContain('design_too_large');
+    expect(prompt).toContain(note);
+  });
+
+  it('tells a retried non-design turn why the last attempt failed', () => {
+    const prompt = assemblePrompt({
+      ...base,
+      previousFailure: 'contract_violation: no_block: no block in the answer',
+    });
+    expect(prompt).toContain(
+      'The previous attempt failed: contract_violation: no_block: no block in the answer. Fix this in your answer.',
+    );
+  });
+
+  it('tells a retried intake and discussion turn too', () => {
+    for (const action of ['intake', 'discuss'] as const) {
+      const prompt = assemblePrompt({
+        ...base,
+        action,
+        previousFailure: failure,
+      });
+      expect(prompt).toContain(note);
+    }
+  });
+
+  it('leaves a turn with no stored error as it is', () => {
+    const plain = assemblePrompt(base);
+    expect(assemblePrompt({ ...base, previousFailure: undefined })).toBe(plain);
+    expect(assemblePrompt({ ...base, previousFailure: '  \n ' })).toBe(plain);
+    expect(plain).not.toContain('The previous attempt failed');
+  });
+
+  it('caps the note and keeps it to one line', () => {
+    const long = `contract_violation: x\n${'é'.repeat(5000)}`;
+    const prompt = assemblePrompt({ ...base, previousFailure: long });
+    const line = prompt
+      .split('\n')
+      .find((l) => l.startsWith('The previous attempt failed:'));
+    expect(line).toBeDefined();
+    expect(line?.length).toBeLessThanOrEqual(
+      FAILURE_NOTE_MAX_CHARS +
+        'The previous attempt failed: . Fix this in your answer.'.length,
+    );
+    expect(designBytes(prompt)).toBeLessThan(PLAN_TURN_PROMPT_MAX_BYTES);
   });
 });
