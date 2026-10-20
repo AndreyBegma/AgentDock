@@ -33,6 +33,7 @@ describe('buildGitHubAppManifest (spec 27 D1, D2, D14)', () => {
       'check_run',
       'status',
       'push',
+      'repository',
     ]);
     expect(manifest.default_events).toEqual([...GITHUB_APP_EVENTS]);
     expect(manifest.hook_attributes).toEqual({
@@ -42,7 +43,7 @@ describe('buildGitHubAppManifest (spec 27 D1, D2, D14)', () => {
     expect(manifest.redirect_url).toBe(
       'https://web.example/admin/integrations/github/callback',
     );
-    expect(manifest.name).toBe('AgentDock dock.example');
+    expect(manifest.name).toBe('Nautelle dock.example');
   });
 
   it('sets the hook inactive without PUBLIC_URL', () => {

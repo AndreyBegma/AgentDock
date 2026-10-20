@@ -1,4 +1,4 @@
-import type { UsageErrorBody, UsageErrorCode } from '@agentdock/shared';
+import type { UsageErrorBody, UsageErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the usage and price routes, shaped like every other API error. */

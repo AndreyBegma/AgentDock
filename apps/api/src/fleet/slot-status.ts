@@ -1,4 +1,4 @@
-import type { PaneState, PrState, SlotStatus } from '@agentdock/shared';
+import type { PaneState, PrState, SlotStatus } from '@nautelle/shared';
 
 /** What a slot's status is derived from — the columns the projector keeps. */
 export interface SlotStatusInputs {

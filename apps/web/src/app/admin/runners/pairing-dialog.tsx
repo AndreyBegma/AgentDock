@@ -1,15 +1,15 @@
 'use client';
 
-import {
-  type AdminRunner,
-  type PairingCodeResponse,
-  pairCommand,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  type AdminRunner,
+  type PairingCodeResponse,
+  pairCommand,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import {

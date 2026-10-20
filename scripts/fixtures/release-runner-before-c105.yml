@@ -64,7 +64,7 @@ steps:
     volumes: *caches
     environment: *cache_env
     commands:
-      - bunx turbo run test --filter=@agentdock/runner
+      - bunx turbo run test --filter=@nautelle/runner
 
   - name: build-release
     image: *ci_image

@@ -1,4 +1,4 @@
-import { SCHEDULE_FIRING_REASONS } from '@agentdock/shared';
+import { SCHEDULE_FIRING_REASONS } from '@nautelle/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { ScheduleFirer } from './schedule-firer';

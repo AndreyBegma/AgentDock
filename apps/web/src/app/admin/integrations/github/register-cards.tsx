@@ -1,12 +1,5 @@
 'use client';
 
-import {
-  GITHUB_APP_EVENTS,
-  GITHUB_APP_PERMISSIONS,
-  type GitHubAppView,
-  type GitHubManifestRequest,
-  type GitHubManifestResponse,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -14,6 +7,13 @@ import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  GITHUB_APP_EVENTS,
+  GITHUB_APP_PERMISSIONS,
+  type GitHubAppView,
+  type GitHubManifestRequest,
+  type GitHubManifestResponse,
+} from '@nautelle/shared';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { DisabledReason } from '../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../lib/api';
@@ -78,7 +78,7 @@ export function RegisterCard({ view }: { view: Unregistered }) {
       <SectionHeader className="mb-2" title="Register the App" />
       <p className="mb-4 max-w-prose text-sm text-ink-2">
         One read-only GitHub App for this instance. GitHub shows the permissions
-        before you confirm; AgentDock never writes to GitHub through it.
+        before you confirm; Nautelle never writes to GitHub through it.
       </p>
       {view.publicUrl ? null : (
         <div className="mb-4 max-w-prose">

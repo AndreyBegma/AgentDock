@@ -1,6 +1,6 @@
 # 282 — Terminal work and fleet work on the Board
 
-Issue: [#282](https://github.com/AndreyBegma/AgentDock/issues/282) · ADR: [0030](../adr/0030-terminal-work-and-fleet-work-appear-on-the-board.md)
+Issue: [#282](https://github.com/AndreyBegma/Nautelle/issues/282) · ADR: [0030](../adr/0030-terminal-work-and-fleet-work-appear-on-the-board.md)
 
 ## Summary
 
@@ -51,7 +51,7 @@ The owner answered Q1–Q4 on 2026-10-15.
 
 - A1. "Mirror can be edited" means the content and comments are edited, and edits reach the running worker through `slot.message`. Columns still follow the slot, and only Finished → Completed is manual.
 - A2. "The automatic work checkbox" is a new per-card `autoCollect` with a project default `autoCollectTracked` (off). No existing field means "push and open a PR".
-- A3. Fleet cards are created only for projects whose runner reports slots (the `Slot` projection, spec 160). Issues outside an AgentDock project are not mirrored.
+- A3. Fleet cards are created only for projects whose runner reports slots (the `Slot` projection, spec 160). Issues outside a Nautelle project are not mirrored.
 
 ## Code facts
 

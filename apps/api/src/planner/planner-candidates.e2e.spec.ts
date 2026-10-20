@@ -2,7 +2,7 @@ import type {
   AcceptCandidatesResponse,
   PlanCandidateView,
   PlanDetail,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { block, PlannerHarness } from './testing/planner-e2e';
 
 /**

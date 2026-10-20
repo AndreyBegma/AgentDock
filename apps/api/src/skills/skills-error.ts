@@ -1,4 +1,4 @@
-import type { SkillsErrorBody, SkillsErrorCode } from '@agentdock/shared';
+import type { SkillsErrorBody, SkillsErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /**

@@ -7,8 +7,8 @@ import {
   PLANNER_ERROR,
   type TaskDesignPatchRequest,
   type TaskDesignView,
-} from '@agentdock/shared';
-import { RUNNER_FEATURE_COMMANDS } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { RUNNER_FEATURE_COMMANDS } from '@nautelle/shared/protocol';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import type {
   BoardCard,

@@ -1,7 +1,7 @@
-import { type BoardPlanTaskView, planTaskBoardLabel } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import { type BoardPlanTaskView, planTaskBoardLabel } from '@nautelle/shared';
 import type { ReactNode } from 'react';
 import { planTaskDesignChip, planTaskPill } from '../../lib/board/plan-tasks';
 import { safeHttpsUrl } from '../../lib/queue/format';

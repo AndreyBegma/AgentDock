@@ -1,4 +1,4 @@
-import type { SessionContentPage } from '@agentdock/shared';
+import type { SessionContentPage } from '@nautelle/shared';
 import {
   Controller,
   Delete,

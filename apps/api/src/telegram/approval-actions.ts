@@ -1,4 +1,4 @@
-import { APPROVALS_ERROR } from '@agentdock/shared';
+import { APPROVALS_ERROR } from '@nautelle/shared';
 import { fitsInt8 } from './callback-data';
 import type { InlineKeyboardButton } from './telegram-client';
 
@@ -117,11 +117,11 @@ export type ApprovalRefusal =
   | 'role';
 
 const REFUSALS: Record<ApprovalRefusal, string> = {
-  invalid_button: 'This button is no longer valid. Decide in AgentDock.',
-  not_linked: 'This chat is not linked to AgentDock.',
+  invalid_button: 'This button is no longer valid. Decide in Nautelle.',
+  not_linked: 'This chat is not linked to Nautelle.',
   unknown_message:
-    'This message is not one AgentDock can act on any more. Decide in AgentDock.',
-  inactive_user: 'Your AgentDock account is not active.',
+    'This message is not one Nautelle can act on any more. Decide in Nautelle.',
+  inactive_user: 'Your Nautelle account is not active.',
   not_member: 'You are not a member of this project any more.',
   role: 'Only an operator or an admin of this project can approve or request changes.',
 };
@@ -133,7 +133,7 @@ export const refusalText = (reason: ApprovalRefusal): string =>
 export const serviceErrorText = (code: string | null, pr: number): string => {
   switch (code) {
     case APPROVALS_ERROR.headMoved:
-      return `PR #${pr} has new commits since this message. Review the new head in AgentDock.`;
+      return `PR #${pr} has new commits since this message. Review the new head in Nautelle.`;
     case APPROVALS_ERROR.notWaiting:
       return `PR #${pr} is not waiting for a decision.`;
     case APPROVALS_ERROR.approvalNotFound:
@@ -147,7 +147,7 @@ export const serviceErrorText = (code: string | null, pr: number): string => {
     case APPROVALS_ERROR.commandUnavailable:
       return 'The runner could not be reached. Try again in a moment.';
     default:
-      return 'The decision could not be recorded. Try again, or decide in AgentDock.';
+      return 'The decision could not be recorded. Try again, or decide in Nautelle.';
   }
 };
 

@@ -1,7 +1,7 @@
 import {
   type InboundDeliveryCreatedData,
   WEBHOOK_LIVE_EVENTS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { InboundDelivery } from '@prisma/client';
 import { LiveService } from '../../live/live.service';

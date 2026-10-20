@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ActionRequestSummary } from '@agentdock/shared';
+import type { ActionRequestSummary } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   reviewToolUse,

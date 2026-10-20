@@ -4,7 +4,7 @@ import {
   BOARD_CARD_BODY_MAX,
   projectRoleAtLeast,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { AttachmentStore } from '../attachments/attachment-store';
 import {

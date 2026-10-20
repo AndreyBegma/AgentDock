@@ -4,7 +4,7 @@ import {
   SCHEDULE_MISSED_GRACE_MS,
   type ScheduleFiringReason,
   type ScheduleMissedPolicy,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { CronSchedule } from './cron';
 
 /** Caps the walk over missed occurrences; `missedCount` saturates there. */

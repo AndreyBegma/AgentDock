@@ -12,14 +12,14 @@ import {
   STEWARD_KIND_LABEL,
   STEWARD_NOTIFICATION_KIND,
   stewardIncidentEventDataSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   API_EVENT_SOURCE,
   EVENTS_DUPLICATE_EVENT,
   paneDialogSchema,
   parseFleetEvent,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 
 /** The columns of an `events` row the matcher reads. */
 export interface MatchableEvent {

@@ -3,7 +3,7 @@ import type {
   AssistantConversationView,
   AssistantMessageView,
   AssistantToolStep,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   AssistantAttachment,
   AssistantConversation,

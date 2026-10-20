@@ -1,4 +1,4 @@
-import { LLM_PROVIDER_INFO, type LlmProviderId } from '@agentdock/shared';
+import { LLM_PROVIDER_INFO, type LlmProviderId } from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import { resetDate } from '../assistant/notice';
 

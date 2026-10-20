@@ -3,7 +3,7 @@ import type {
   AssistantConversationView,
   AssistantMessageView,
   AssistantStreamEvent,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import type request from 'supertest';
 import { ControlService } from '../control/control.service';
@@ -137,7 +137,7 @@ describe('Assistant (e2e)', () => {
     bob = await login(ctx, 'bob@example.com');
     runnerId = (await ctx.prisma.runner.create({ data: { name: 'desk' } })).id;
     projects = {
-      dock: await project('AgentDock', 'acme/agentdock'),
+      dock: await project('Nautelle', 'acme/agentdock'),
       billingApi: await project('billing-api', 'acme/billing-api'),
       billingWeb: await project('billing-web', 'acme/billing-web'),
       other: await project('Secret Garden', 'acme/secret-garden'),
@@ -469,23 +469,20 @@ describe('Assistant (e2e)', () => {
       answer([
         {
           text: english(
-            'AgentDock has nothing queued.',
-            'What is in the AgentDock queue?',
+            'Nautelle has nothing queued.',
+            'What is in the Nautelle queue?',
           ),
         },
       ]),
     );
-    const events = await say(
-      conversation.id,
-      'What is in the AgentDock queue?',
-    );
+    const events = await say(conversation.id, 'What is in the Nautelle queue?');
     expect(events[0]).toEqual({
       type: 'project',
       projectId: projects.dock,
-      projectName: 'AgentDock',
+      projectName: 'Nautelle',
     });
     expect(calls[0].system).toContain(
-      `The conversation is about AgentDock (acme/agentdock), id ${projects.dock}`,
+      `The conversation is about Nautelle (acme/agentdock), id ${projects.dock}`,
     );
     const view = (
       await alice.get(`/assistant/conversations/${conversation.id}`)
@@ -664,7 +661,7 @@ describe('Assistant (e2e)', () => {
     expect(results).toHaveLength(4);
     expect(results.join('\n')).not.toContain('Hidden roadmap item');
     expect(results.join('\n')).not.toContain('Secret Garden');
-    expect(results[0]).toContain('AgentDock');
+    expect(results[0]).toContain('Nautelle');
     expect(results[0]).toContain('billing-web');
     expect(results[1]).toContain('no access to that project');
     // The stored reply keeps the steps.
@@ -919,7 +916,7 @@ describe('Assistant (e2e)', () => {
           'repo.search',
           {
             projectId: projects.dock,
-            root: '/srv/dev/AgentDock',
+            root: '/srv/dev/Nautelle',
             query: 'computeInvoice',
           },
         ],
@@ -928,7 +925,7 @@ describe('Assistant (e2e)', () => {
           'repo.read',
           {
             projectId: projects.dock,
-            root: '/srv/dev/AgentDock',
+            root: '/srv/dev/Nautelle',
             path: 'src/billing/invoice.ts',
             startLine: 12,
           },

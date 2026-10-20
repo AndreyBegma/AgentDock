@@ -3,7 +3,7 @@ import type {
   FilterStatRow,
   TokenSaverSettingsView,
   TokenSaverSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BoardWorld, ROOT_B } from '../board/testing/board-e2e';
 import { usageByRun } from '../history/run-usage';
 import type { LocalCall } from '../local/local-call';

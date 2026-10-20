@@ -1,11 +1,13 @@
 import {
+  LEGACY_WEBHOOK_HEADERS,
   WEBHOOK_ATTEMPT_ERRORS,
   WEBHOOK_CIRCUIT_OPEN_MS,
   WEBHOOK_CLAIM_BATCH,
   WEBHOOK_HEADERS,
+  WEBHOOK_USER_AGENT,
   WEBHOOK_WORKER_INTERVAL_MS,
   type WebhookCircuitState,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Inject,
   Injectable,
@@ -41,7 +43,6 @@ const LEADER_RETRY_MS = 30_000;
  * that outlives it is taken as dead and another probe is allowed.
  */
 const CLAIM_LEASE_EXTRA_MS = 60_000;
-const USER_AGENT = 'AgentDock-Webhooks/1';
 
 interface ClaimRow {
   id: string;
@@ -267,14 +268,20 @@ export class WebhookDeliveryWorker
       };
     }
     const body = JSON.stringify(delivery.payload);
+    const signature = signOutbound(secret, body);
     const result = await guardedPost({
       url: webhook.url,
       body,
+      // ADR-0073: the legacy header names too, until runner 0.16.0, so a
+      // receiver that checks them keeps working.
       headers: {
-        'User-Agent': USER_AGENT,
+        'User-Agent': WEBHOOK_USER_AGENT,
         [WEBHOOK_HEADERS.event]: delivery.eventType,
         [WEBHOOK_HEADERS.delivery]: delivery.id,
-        [WEBHOOK_HEADERS.signature]: signOutbound(secret, body),
+        [WEBHOOK_HEADERS.signature]: signature,
+        [LEGACY_WEBHOOK_HEADERS.event]: delivery.eventType,
+        [LEGACY_WEBHOOK_HEADERS.delivery]: delivery.id,
+        [LEGACY_WEBHOOK_HEADERS.signature]: signature,
       },
       allowlist,
       resolve: this.options.resolve,

@@ -3,7 +3,7 @@ import {
   type ProjectRuntimeProfile,
   SKILLS_ERROR,
   type SkillRunRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   isTerminalSkillRunPhase,
   type OrchestratorPermissionMode,
@@ -14,12 +14,13 @@ import {
   type SkillFrontmatter,
   type SkillRunPhase,
   type SkillScope,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';
 import { updateRunnerText } from '../control/format';
 import { safeHttpsUrl } from '../fleet/format';
+import { runsHref } from '../history/format';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -203,7 +204,7 @@ export function runProfileReason(
 
 /** Where the runs of skills are listed. */
 export const skillRunsHref = (projectId: string): string =>
-  `/projects/${projectId}/history?kind=skill`;
+  runsHref(projectId, { kind: 'skill' });
 
 export const SKILL_OUTPUT_LABEL = {
   report: 'Report — nothing is pushed',

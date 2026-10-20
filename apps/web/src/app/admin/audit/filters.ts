@@ -2,7 +2,7 @@ import {
   AUDIT_ACTIONS,
   AUDIT_RESULTS,
   type AuditResult,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   actionGroupLabel,
   actionLabel,

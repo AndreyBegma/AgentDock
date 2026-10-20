@@ -6,7 +6,7 @@ import {
   type LlmProviderId,
   type LlmSpendView,
   llmMonthStart,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { type LlmProviderSetting, Prisma } from '@prisma/client';
 import { SecretCipherError } from '../common/crypto';

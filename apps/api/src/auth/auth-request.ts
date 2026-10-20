@@ -1,4 +1,4 @@
-import type { PublicUser } from '@agentdock/shared';
+import type { PublicUser } from '@nautelle/shared';
 import type { Request } from 'express';
 
 export type AuthUser = PublicUser;

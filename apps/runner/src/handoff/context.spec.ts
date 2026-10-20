@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { HANDOFF_PERSON_MARK } from '@agentdock/shared';
+import { HANDOFF_PERSON_MARK } from '@nautelle/shared';
 import { type CardRecord, CardStore } from '../cards/record';
 import { isolatedGit } from '../skills/testing';
 import { tempDir } from '../testing/fixtures';
@@ -62,7 +62,7 @@ const setup = async () => {
     worktree,
     branch: 'card/c12-add-login',
     base: 'main',
-    tmuxSession: 'agentdock-card-ab12cd34',
+    tmuxSession: 'nautelle-card-ab12cd34',
     runId: 'run_1',
     phase: 'ended',
     startedAt: '2026-10-16T10:00:00.000Z',
@@ -104,7 +104,7 @@ describe('the card note of a session (#449 D6)', () => {
       updatedAt: '2026-10-16T11:00:00.000Z',
     });
     const context = sessionNoteContext(found ?? never());
-    expect(context).toContain('AgentDock card C-12');
+    expect(context).toContain('Nautelle card C-12');
     expect(context).toContain(`Ask before renaming.${HANDOFF_PERSON_MARK}`);
   });
 

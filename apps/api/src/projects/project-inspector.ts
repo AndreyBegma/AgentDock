@@ -2,12 +2,12 @@ import type {
   ProjectErrorBody,
   ProjectErrorCode,
   Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CommandResult,
   ProjectInspection,
   ProjectScanRulesResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { HttpException, Injectable } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import { RunnerCommandService } from '../runners/runner-command.service';

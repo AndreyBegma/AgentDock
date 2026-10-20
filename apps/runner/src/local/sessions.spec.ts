@@ -49,9 +49,9 @@ describe('HookSessions (spec 201 D10, D22)', () => {
 
   it('keeps the manual tmux session a SessionStart reported', () => {
     const sessions = new HookSessions();
-    sessions.started('m', '/w/app', [], 'agentdock-manual-0a1b2c3d');
+    sessions.started('m', '/w/app', [], 'nautelle-manual-0a1b2c3d');
     expect(sessions.manualOf('m')).toEqual({
-      tmuxSession: 'agentdock-manual-0a1b2c3d',
+      tmuxSession: 'nautelle-manual-0a1b2c3d',
       cwd: '/w/app',
     });
     sessions.started('plain', '/w/app', []);

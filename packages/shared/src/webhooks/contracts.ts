@@ -11,18 +11,32 @@ import type { WebhookEnvelope, WebhookEventType } from './events';
 
 export const WEBHOOK_HEADERS = {
   /** Inbound: unix seconds, the signed `<timestamp>`. */
-  timestamp: 'X-AgentDock-Timestamp',
+  timestamp: 'X-Nautelle-Timestamp',
   /** Inbound: the caller's unique id; outbound: the delivery id. */
-  delivery: 'X-AgentDock-Delivery',
+  delivery: 'X-Nautelle-Delivery',
   /** Inbound `sha256=<hex>`; outbound `t=<unix>,v1=<hex>`. */
-  signature: 'X-AgentDock-Signature',
+  signature: 'X-Nautelle-Signature',
   /** Outbound: the envelope's `type`. */
-  event: 'X-AgentDock-Event',
+  event: 'X-Nautelle-Event',
 } as const;
+
+/**
+ * The headers' names before the rename (ADR-0073): sent beside the new ones
+ * and read when the new one is absent, until runner 0.16.0.
+ */
+export const LEGACY_WEBHOOK_HEADERS = {
+  timestamp: 'X-AgentDock-Timestamp',
+  delivery: 'X-AgentDock-Delivery',
+  signature: 'X-AgentDock-Signature',
+  event: 'X-AgentDock-Event',
+} as const satisfies Record<keyof typeof WEBHOOK_HEADERS, string>;
+
+/** The webhook sender's User-Agent. */
+export const WEBHOOK_USER_AGENT = 'Nautelle-Webhooks/1';
 
 /** D2: a timestamp further than this from the server's clock is refused. */
 export const INBOUND_TIMESTAMP_TOLERANCE_SEC = 5 * 60;
-/** D2: longest `X-AgentDock-Delivery`. */
+/** D2: longest `X-Nautelle-Delivery`. */
 export const INBOUND_DELIVERY_ID_MAX_CHARS = 64;
 /** D2: how long a delivery id is remembered for replay detection. */
 export const INBOUND_NONCE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -192,7 +206,7 @@ export interface WebhooksErrorBody {
 
 /** `POST /hooks/:publicId` → 202. */
 export interface InboundHookAccepted {
-  /** The caller's `X-AgentDock-Delivery`. */
+  /** The caller's `X-Nautelle-Delivery`. */
   deliveryId: string;
   status: InboundDeliveryStatus;
 }

@@ -5,7 +5,7 @@ import { basename, dirname, join, sep } from 'node:path';
 import type {
   PlanPublishSpecsArgs,
   PlanPublishSpecsResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
 import { resolveFleetProject } from '../fleet/project';
@@ -164,7 +164,7 @@ export const openSpecsPr = async (
     worktree,
     base,
   ]);
-  const temp = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
+  const temp = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'nautelle-pr-'));
   try {
     writeSpecFiles(worktree, content.specDir, content.files);
     await gitOk(exec, [

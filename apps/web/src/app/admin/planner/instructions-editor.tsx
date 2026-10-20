@@ -1,6 +1,5 @@
 'use client';
 
-import type { PlannerInstructionsVersion } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -8,6 +7,7 @@ import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { PlannerInstructionsVersion } from '@nautelle/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Time } from '../../../lib/format/time';
 import { useErrorToast } from '../../../lib/section/use-error-toast';

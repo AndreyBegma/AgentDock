@@ -2,7 +2,7 @@ import {
   type CodeSentinelStateSlot,
   checkpointKindSchema,
   isHttpsGithubUrl,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Applied, EventOf } from './projection';
 import type { SlotPatch, SlotProjection } from './slot-projection';
 

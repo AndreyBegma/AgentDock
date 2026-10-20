@@ -3,7 +3,7 @@ import type {
   PlanDetail,
   PlanSummary,
   PlanTurnView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { formatRelative, pluralize } from '../format';
 import { activeTurn, isActiveTurn } from '../planner/format';
 

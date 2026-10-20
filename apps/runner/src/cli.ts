@@ -1,18 +1,25 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { TERSE_REGISTER } from '@agentdock/shared';
-import type { Host } from '@agentdock/shared/protocol';
+import { TERSE_REGISTER } from '@nautelle/shared';
+import type { Host } from '@nautelle/shared/protocol';
 import { accessHeaders, accessOf } from './access';
 import { runClaude } from './claude';
 import type { Clock } from './clock';
-import { ConfigError, isPaired, loadConfig, saveConfig } from './config';
+import {
+  ConfigError,
+  hasPolicyBlock,
+  isPaired,
+  loadConfig,
+  saveConfig,
+} from './config';
 import type { RunnerConnection, SocketFactory } from './connection';
 import { runDaemon } from './daemon';
 import { createExec, type Exec } from './detect/exec';
 import { detectProfiles, withAuthentication } from './detect/profiles';
 import { type Env, type Paths, resolvePaths } from './env';
 import { runHook } from './hooks/run';
+import { type LegacyReport, legacyReportLines } from './legacy';
 import { runAway } from './local/away';
 import { localSocketPath } from './local/paths';
 import { type LocalCommandDeps, NotImplementedError } from './local/subcommand';
@@ -23,8 +30,15 @@ import { otlpSettings } from './otlp';
 import { PairingError, pair } from './pairing';
 import { runPolicy } from './policy/cli';
 import { nodeRealpath } from './policy/roots';
+import { reportUpgrade } from './policy/upgrade';
 import { normalizeServer, ServerUrlError } from './server-url';
-import { EXIT, launchAgentPlist, serviceUnit } from './service';
+import {
+  EXIT,
+  LEGACY_SERVICE_NAME,
+  launchAgentPlist,
+  SERVICE_NAME,
+  serviceUnit,
+} from './service';
 import { setupClaude } from './setup/claude';
 import { Spool } from './spool';
 import {
@@ -55,14 +69,23 @@ export interface CliDeps {
   cwd?: string;
   /** The parent pid; `process.ppid` by default. */
   ppid?: number;
+  /** A yes/no question on the terminal; Bun's `confirm` by default. */
+  confirm?: (question: string) => boolean;
+  /** The user id, for `launchctl`; `process.getuid()` by default. */
+  uid?: number;
+  /**
+   * ADR-0073: what `main.ts` adopted and moved from the `agentdock` names
+   * before the CLI started, logged once by the commands a person runs.
+   */
+  legacy?: LegacyReport;
 }
 
-const USAGE = `Usage: agentdock-runner <command>
+const USAGE = `Usage: nautelle-runner <command>
 
 Commands:
   pair --server <url> --code <XXXX-XXXX> [--no-detect] [--allow-root <dir>]… [--insecure]
        [--access-client-id <id> (--access-client-secret <secret> | --access-client-secret-stdin)]
-                                           pair this machine with an AgentDock server
+                                           pair this machine with a Nautelle server
                                            (detects runtime profiles unless --no-detect;
                                            --allow-root lets projects under <dir> be watched;
                                            --insecure allows plain http to a host that is not
@@ -70,30 +93,30 @@ Commands:
                                            --access-client-* store a Cloudflare Access
                                            service token, sent on pairing and every connect;
                                            the secret may also come from
-                                           AGENTDOCK_ACCESS_CLIENT_SECRET)
+                                           NAUTELLE_ACCESS_CLIENT_SECRET)
   run                                      run the daemon in the foreground
   status                                   show config, connectivity and spool
   profiles [--detect [--write]]            list runtime profiles, or detect them
   install-service                          write the systemd user unit (Linux)
                                            or the launchd agent (macOS)
   setup claude [--profile <key>] [--no-telemetry] [--dry-run] [--uninstall]
-                                           install the agentdock Claude Code plugin
+                                           install the nautelle Claude Code plugin
                                            and point telemetry at this runner
-  away on|off                              route permission prompts to AgentDock
+  away on|off                              route permission prompts to Nautelle
                                            while you are away
   policy show|set|allow-root|deny-root     the runner-local security policy; only
                                            this command changes it (\`policy\` for help)
   version                                  print the version and the target
 
-Used by the agentdock Claude Code plugin:
+Used by the nautelle Claude Code plugin:
   hook <name>                              report a Claude Code hook (JSON on stdin)
-  mcp                                      the agentdock MCP server (stdio)
-  claude [-- <args>]                       run claude in a tmux session AgentDock
+  mcp                                      the nautelle MCP server (stdio)
+  claude [-- <args>]                       run claude in a tmux session Nautelle
                                            can attach to
 
 Used by the runner's launches (Token saver):
   filter -- <command> [args…]              run a command and compress its output;
-                                           AGENTDOCK_RAW=1 leaves it unfiltered
+                                           NAUTELLE_RAW=1 leaves it unfiltered
   filter-hook                              the PreToolUse hook that routes Bash
                                            calls through filter (JSON on stdin)
   read-hook                                the Read hook that refuses a whole read
@@ -180,7 +203,7 @@ const pairCommand = async ({
     ? (
         await new Response((deps.stdin ?? (() => Bun.stdin.stream()))()).text()
       ).trim()
-    : (secretFlag ?? deps.env.AGENTDOCK_ACCESS_CLIENT_SECRET);
+    : (secretFlag ?? deps.env.NAUTELLE_ACCESS_CLIENT_SECRET);
   if (accessSecret) log.addSecret(accessSecret);
   if (Boolean(accessClientId) !== Boolean(accessSecret)) {
     throw new UsageError(
@@ -255,7 +278,7 @@ const pairCommand = async ({
     deps,
     roots.length > 0
       ? `Projects may be watched under: ${roots.join(', ')}`
-      : 'No project root is allowed yet: run `agentdock-runner policy allow-root <dir>` before connecting a project.',
+      : 'No project root is allowed yet: run `nautelle-runner policy allow-root <dir>` before connecting a project.',
   );
   if (detected) {
     out(deps, `Detected ${detected.length} profiles:`);
@@ -279,7 +302,7 @@ const runCommand = async ({
   const config = loadConfig(paths.configFile);
   if (!isPaired(config)) {
     deps.stderr(
-      'Not paired. Run `agentdock-runner pair --server <url> --code <code>` first.\n',
+      'Not paired. Run `nautelle-runner pair --server <url> --code <code>` first.\n',
     );
     return EXIT.failure;
   }
@@ -296,9 +319,21 @@ const runCommand = async ({
     deps.stderr(`${warning}\n`);
     log.warn(warning);
   }
+  // #691: a config from before 0.13 has no policy, so nothing is watched.
+  if (!hasPolicyBlock(paths.configFile)) {
+    reportUpgrade(config.projects, log, deps.stderr);
+  }
+  // ADR-0073: the unit or agent from before the rename is still installed.
+  for (const file of [paths.legacy.serviceFile, paths.legacy.launchAgentFile]) {
+    if (existsSync(file)) {
+      log.warn(
+        `${file} is the service from before the rename to Nautelle: run \`nautelle-runner install-service\` to replace it (ADR-0073)`,
+      );
+    }
+  }
   if (config.profiles.length === 0) {
     log.warn(
-      'no runtime profiles configured; nothing can be launched. Run `agentdock-runner profiles --detect --write`',
+      'no runtime profiles configured; nothing can be launched. Run `nautelle-runner profiles --detect --write`',
     );
   }
   clearStopStatus(paths.stopStatusFile);
@@ -398,7 +433,7 @@ const profilesCommand = async ({
   if (!detect) {
     if (config.profiles.length === 0) {
       deps.stderr(
-        'No profiles configured. Try `agentdock-runner profiles --detect`.\n',
+        'No profiles configured. Try `nautelle-runner profiles --detect`.\n',
       );
     }
     out(
@@ -410,7 +445,12 @@ const profilesCommand = async ({
   const proposed = detectProfiles(deps.env, paths.home);
   out(deps, JSON.stringify(withAuthentication(proposed, paths.home), null, 2));
   if (write) {
-    saveConfig(paths.configFile, { ...config, profiles: proposed });
+    // Only the policy CLI writes a policy: a pre-0.13 file keeps none (#691).
+    saveConfig(
+      paths.configFile,
+      { ...config, profiles: proposed },
+      { withoutPolicy: !hasPolicyBlock(paths.configFile) },
+    );
     deps.stderr(`Wrote ${proposed.length} profiles to ${paths.configFile}\n`);
   }
   return EXIT.ok;
@@ -422,6 +462,7 @@ const installServiceCommand = async ({
   args,
 }: Context): Promise<number> => {
   flags(args, {});
+  const exec = deps.exec ?? createExec(deps.env);
   if (deps.host.os === 'darwin') {
     mkdirSync(dirname(paths.launchAgentFile), { recursive: true });
     mkdirSync(dirname(paths.launchAgentLog), { recursive: true });
@@ -431,6 +472,27 @@ const installServiceCommand = async ({
       { mode: 0o644 },
     );
     out(deps, `Wrote ${paths.launchAgentFile}`);
+    // ADR-0073: the agent before the rename is unloaded and replaced.
+    if (existsSync(paths.legacy.launchAgentFile)) {
+      const domain = `gui/${deps.uid ?? process.getuid?.() ?? 0}`;
+      await exec('launchctl', [
+        'bootout',
+        domain,
+        paths.legacy.launchAgentFile,
+      ]);
+      rmSync(paths.legacy.launchAgentFile, { force: true });
+      out(deps, `Removed ${paths.legacy.launchAgentFile}`);
+      const loaded = await exec('launchctl', [
+        'bootstrap',
+        domain,
+        paths.launchAgentFile,
+      ]);
+      if (loaded?.code === 0) {
+        out(deps, `Loaded ${paths.launchAgentFile} in its place`);
+        out(deps, `Logs: ${paths.launchAgentLog}`);
+        return EXIT.ok;
+      }
+    }
     out(
       deps,
       `Load it with: launchctl bootstrap gui/$UID ${paths.launchAgentFile}`,
@@ -443,9 +505,30 @@ const installServiceCommand = async ({
     mode: 0o644,
   });
   out(deps, `Wrote ${paths.serviceFile}`);
+  // ADR-0073: the unit before the rename is stopped and replaced, so the
+  // runner is back under its new name without a second step.
+  if (existsSync(paths.legacy.serviceFile)) {
+    await exec('systemctl', [
+      '--user',
+      'disable',
+      '--now',
+      LEGACY_SERVICE_NAME,
+    ]);
+    rmSync(paths.legacy.serviceFile, { force: true });
+    out(deps, `Removed ${paths.legacy.serviceFile}`);
+    const reloaded = await exec('systemctl', ['--user', 'daemon-reload']);
+    const enabled =
+      reloaded?.code === 0
+        ? await exec('systemctl', ['--user', 'enable', '--now', SERVICE_NAME])
+        : null;
+    if (enabled?.code === 0) {
+      out(deps, `Enabled and started ${SERVICE_NAME} in its place`);
+      return EXIT.ok;
+    }
+  }
   out(
     deps,
-    'Enable it with: systemctl --user daemon-reload && systemctl --user enable --now agentdock-runner',
+    `Enable it with: systemctl --user daemon-reload && systemctl --user enable --now ${SERVICE_NAME}`,
   );
   return EXIT.ok;
 };
@@ -516,6 +599,7 @@ const COMMANDS: Record<string, (context: Context) => Promise<number>> = {
       realpath: nodeRealpath,
       stdout: deps.stdout,
       stderr: deps.stderr,
+      confirm: deps.confirm ?? ((question) => confirm(question)),
     }),
   // `mcp` and `claude` take their arguments raw: the wave-3 slots own them.
   mcp: ({ deps, paths, args }) => runMcp(args, localDeps(deps, paths)),
@@ -588,6 +672,11 @@ export const runCli = async (
     write: deps.stderr,
     now: () => new Date(deps.clock.now()),
   });
+  // ADR-0073: once per start; `mcp` and `claude` stay quiet, as `hook` does,
+  // because their output belongs to Claude Code and the terminal.
+  if (deps.legacy && command !== 'mcp' && command !== 'claude') {
+    for (const line of legacyReportLines(deps.legacy)) log.warn(line);
+  }
   try {
     return await handler({ deps, paths: resolvePaths(deps.env), log, args });
   } catch (error) {

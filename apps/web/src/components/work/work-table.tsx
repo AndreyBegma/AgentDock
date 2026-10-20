@@ -1,11 +1,11 @@
 'use client';
 
-import type { WorkItem } from '@agentdock/shared';
-import { workItemStatus } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DataTable } from '@andrewbehma/glass-ui/data-table';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { WorkItem } from '@nautelle/shared';
+import { workItemStatus } from '@nautelle/shared';
 import { Bug, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -308,10 +308,66 @@ function useColumns(toggle: (id: string) => void) {
   );
 }
 
+/** A phone row: title first, then project, status and age, so nothing scrolls sideways. */
+function StackedRow({
+  row,
+  onToggle,
+}: {
+  row: WorkDisplayRow;
+  onToggle: (id: string) => void;
+}) {
+  if (row.type === 'slot') {
+    return (
+      <li className="border-t border-line py-2 pr-3 pl-10">
+        <SlotTitle item={row.item} />
+      </li>
+    );
+  }
+  const group = row.type === 'group' ? row.group : null;
+  const item = row.type === 'group' ? null : row.item;
+  const projectId = group ? group.projectId : (item?.projectId ?? '');
+  const projectName = group ? group.projectName : (item?.projectName ?? '');
+  const updatedAt = group ? group.updatedAt : (item?.updatedAt ?? '');
+  return (
+    <li className="flex flex-col gap-1.5 border-t border-line px-3 py-3 first:border-t-0">
+      {row.type === 'group' ? (
+        <GroupTitle row={row} onToggle={() => onToggle(row.group.id)} />
+      ) : item ? (
+        <Link
+          href={item.href}
+          className="font-medium underline-offset-2 hover:underline"
+        >
+          {item.title}
+        </Link>
+      ) : null}
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          <Badge
+            shape="square"
+            hue={projectHue(projectId)}
+            aria-hidden="true"
+          />
+          <span className="truncate">{projectName}</span>
+        </span>
+        {group ? (
+          <StatusPill
+            status={WORK_PILL_STATUS[group.status]}
+            label={WORK_STATUS_LABEL[group.status]}
+          />
+        ) : item ? (
+          <StatusCell item={item} />
+        ) : null}
+        <Time value={updatedAt} />
+      </span>
+    </li>
+  );
+}
+
 /**
- * The table sits in `ScrollX`, so at 390 px it scrolls inside its own box and
- * never pushes the page sideways. #388: the slots of one fleet issue are one
- * row that expands into a row per slot; groups start collapsed.
+ * Phone and tablet: from `desktop` up the table shows, scrolling inside its own
+ * `ScrollX` box if it must; below it each row stacks into a short card, so the
+ * page never scrolls sideways. #388: the slots of one fleet issue are one row
+ * that expands into a row per slot; groups start collapsed.
  */
 export function WorkTable({ rows }: { rows: WorkItem[] }) {
   const router = useRouter();
@@ -331,19 +387,31 @@ export function WorkTable({ rows }: { rows: WorkItem[] }) {
     [rows, expanded],
   );
   return (
-    <ScrollX label="Work">
-      <DataTable
-        rows={display}
-        getRowId={(row) => row.id}
-        columns={columns}
-        onRowActivate={(row) =>
-          row.type === 'group'
-            ? toggle(row.group.id)
-            : router.push(row.item.href)
-        }
-        stickyHeader={false}
-        className="min-w-[64rem]"
-      />
-    </ScrollX>
+    <>
+      <ul
+        aria-label="Work"
+        className="surface-content flex flex-col overflow-hidden rounded-surface desktop:hidden"
+      >
+        {display.map((row) => (
+          <StackedRow key={row.id} row={row} onToggle={toggle} />
+        ))}
+      </ul>
+      <div className="max-desktop:hidden">
+        <ScrollX label="Work">
+          <DataTable
+            rows={display}
+            getRowId={(row) => row.id}
+            columns={columns}
+            onRowActivate={(row) =>
+              row.type === 'group'
+                ? toggle(row.group.id)
+                : router.push(row.item.href)
+            }
+            stickyHeader={false}
+            className="min-w-[64rem]"
+          />
+        </ScrollX>
+      </div>
+    </>
   );
 }

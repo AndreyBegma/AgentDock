@@ -1,8 +1,8 @@
 'use client';
 
-import type { PlanTaskKind, PlanTaskView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { NodeCard, type NodeCardMeta } from '@andrewbehma/glass-ui/node-card';
+import type { PlanTaskKind, PlanTaskView } from '@nautelle/shared';
 import {
   Bug,
   CircleAlert,

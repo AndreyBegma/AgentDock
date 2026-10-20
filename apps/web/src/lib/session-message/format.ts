@@ -2,7 +2,7 @@ import {
   cleanSessionMessage,
   SESSION_MESSAGE_MAX_CHARS,
   type SessionMessageOutcome,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 
 /** What became of a message, as the line under the composer says it. */

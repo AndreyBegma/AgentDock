@@ -3,7 +3,7 @@ import {
   type RepoSearchArgs,
   type RepoSearchMatch,
   type RepoSearchResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { stderrLine } from '../skills/deps';
 import { checkoutPath, SECRET_NAME_GLOBS, withheldReason } from './paths';

@@ -1,5 +1,11 @@
 'use client';
 
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
+import { TabGroup, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import {
   type CardDesignLaunchRequest,
   type CardStackRef,
@@ -10,13 +16,7 @@ import {
   type MockupPinMarker,
   type TaskDesignPatchRequest,
   type TaskDesignView,
-} from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
-import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
-import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
-import { TabGroup, TabPanel } from '@andrewbehma/glass-ui/tabs';
+} from '@nautelle/shared';
 import { Crosshair, MessageSquare } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LaunchCard } from '../../lib/board/launch';

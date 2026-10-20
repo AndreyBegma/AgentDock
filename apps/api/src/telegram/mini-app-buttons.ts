@@ -1,4 +1,4 @@
-import { cardLabel, type MiniAppTarget, miniAppPath } from '@agentdock/shared';
+import { cardLabel, type MiniAppTarget, miniAppPath } from '@nautelle/shared';
 import type {
   InlineButton,
   MenuButton,

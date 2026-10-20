@@ -50,14 +50,16 @@ export const CARD_TIMEOUTS_MS = {
   ciRetrigger: 45_000,
   /** #636: `gh pr view`, then `gh pr edit --base`. */
   prRetarget: 45_000,
+  /** #709: `gh pr list`, `gh pr create`, then `gh pr view`. */
+  prOpen: 60_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
 export const CARD_RUN_PROMPT_MAX_BYTES = 64 * 1024;
 /**
  * Files `card.run` commits as the branch's first commit: the D2 spec and
- * every frame of the approved design (#441). A design's frames share one
- * `DESIGN_HTML_MAX_BYTES`, so this bounds the command, not the frames.
+ * every frame of the approved design (#441). A frame is at most
+ * `DESIGN_HTML_MAX_BYTES` (#686), so this bounds the command, not the frames.
  */
 export const CARD_RUN_FILES_MAX = 256;
 export const CARD_RUN_FILE_MAX_BYTES = 192 * 1024;
@@ -80,11 +82,15 @@ export const cardShortIdSchema = z
   .regex(/^[a-z0-9]{8}$/, 'must match ^[a-z0-9]{8}$');
 
 /** D5: the card's tmux session. Never `cs-` — `watch.sh` treats those as slots. */
-export const CARD_SESSION_PREFIX = 'agentdock-card-';
+export const CARD_SESSION_PREFIX = 'nautelle-card-';
 
+/** A session started before the rename keeps its `agentdock-` name (ADR-0073). */
 export const cardTmuxSessionSchema = z
   .string()
-  .regex(/^agentdock-card-[a-z0-9]{8}$/, 'must be agentdock-card-<shortid>');
+  .regex(
+    /^(?:nautelle|agentdock)-card-[a-z0-9]{8}$/,
+    'must be nautelle-card-<shortid>',
+  );
 
 export const cardSessionName = (shortId: string): string =>
   CARD_SESSION_PREFIX + cardShortIdSchema.parse(shortId);
@@ -156,7 +162,7 @@ export type CardDraftPullRequest = z.infer<typeof cardDraftPullRequestSchema>;
  * D5. Round 1 (`session.resume: false`) creates the worktree
  * `<parent>/.wt-<repo>-card-<shortId>` from `origin/<base>` on `branch` — or
  * checks out `origin/<branch>` when it exists — commits `files`, then starts
- * tmux `agentdock-card-<shortId>` running `exec-run` with `interactive: true`.
+ * tmux `nautelle-card-<shortId>` running `exec-run` with `interactive: true`.
  * A later round reuses the worktree and resumes the session. The round
  * outlives this command: progress arrives as `card_run.*` events.
  *
@@ -480,7 +486,7 @@ export const CARD_PR_CLOSE_COMMENT_MAX_BYTES = CARD_MERGE_COMMENT_MAX_BYTES;
  * #329 D8 (ADR-0010, advertised per ADR-0023): Accept without merging closes
  * the card's PR through the runner's `gh`, in the project root —
  * `gh pr close <pr> --repo <o/r> --comment <comment>`, never a command text
- * (the API words it "Closed from the AgentDock Board (C-<n>)").
+ * (the API words it "Closed from the Nautelle Board (C-<n>)").
  *
  * - `deleteBranch`: then deletes the PR's head branch on GitHub as
  *   `card.merge` does (D7) — the head read from the PR, never the base.
@@ -610,6 +616,13 @@ export const cardChecksResultSchema = z.object({
   headSha: headShaSchema,
   mergeable: cardPrMergeableSchema,
   checks: z.array(cardCheckSchema).max(CARD_CHECKS_MAX),
+  /**
+   * #709: the branch the PR goes (or went) into — `baseRefName`. Absent from
+   * a runner older than #709.
+   */
+  base: z.string().min(1).max(255).optional(),
+  /** #709: when GitHub merged the PR; `null` while it is not merged. */
+  mergedAt: z.iso.datetime({ offset: true }).nullable().optional(),
 });
 export type CardChecksResult = z.infer<typeof cardChecksResultSchema>;
 
@@ -751,3 +764,71 @@ export const cardPrRetargetCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardPrRetargetCommandName = keyof typeof cardPrRetargetCommands;
+
+// card.prOpen
+
+/**
+ * #709 (ADR-0064, ADR-0010, advertised per ADR-0023): opens a pull request of
+ * a pushed card branch into `base` — the forward PR of a stacked card whose PR
+ * merged into a dependency branch that had already merged. `gh pr list --head
+ * <branch> --base <base> --state open` first, so an open PR is reused; else
+ * `gh pr create`, then `gh pr view --json mergeable`. Argument arrays only,
+ * the body through a private temporary file. The control plane never runs
+ * git itself (ADR-0001).
+ */
+export const cardPrOpenArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  /** The card's branch, the PR's head. */
+  branch: gitRefSchema,
+  /** The branch the PR goes into — the project base. */
+  base: gitRefSchema,
+  title: prTitleSchema,
+  body: prBodySchema,
+});
+export type CardPrOpenArgs = z.infer<typeof cardPrOpenArgsSchema>;
+
+/**
+ * Why no PR was opened: `no_commits` — `branch` has nothing `base` lacks, so
+ * its work has landed; `no_branch` — `branch` is gone from GitHub;
+ * `gh_failed` — `gh` could not list or create it.
+ */
+export const cardPrOpenFailReasonSchema = z.enum([
+  'no_commits',
+  'no_branch',
+  'gh_failed',
+]);
+export type CardPrOpenFailReason = z.infer<typeof cardPrOpenFailReasonSchema>;
+
+/** A refusal is a result, not a command error. */
+export const cardPrOpenResultSchema = z.discriminatedUnion('opened', [
+  z.object({
+    opened: z.literal(true),
+    prNumber: z.number().int().positive(),
+    prUrl: z.url({ protocol: /^https$/ }),
+    /** An open PR of `branch` into `base` existed; nothing was created. */
+    alreadyOpen: z.boolean(),
+    mergeable: cardPrMergeableSchema,
+  }),
+  z.object({
+    opened: z.literal(false),
+    error: cardPrOpenFailReasonSchema,
+    message: stepErrorSchema,
+  }),
+]);
+export type CardPrOpenResult = z.infer<typeof cardPrOpenResultSchema>;
+
+/**
+ * #709: `card.prOpen`, an operator command, in the `commands` allowlist
+ * beside `card.prRetarget`.
+ */
+export const cardPrOpenCommands = {
+  'card.prOpen': {
+    args: cardPrOpenArgsSchema,
+    result: cardPrOpenResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.prOpen,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardPrOpenCommandName = keyof typeof cardPrOpenCommands;

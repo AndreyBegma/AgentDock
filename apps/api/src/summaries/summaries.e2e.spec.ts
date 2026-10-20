@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { AiSummaryView } from '@agentdock/shared';
+import type { AiSummaryView } from '@nautelle/shared';
 import { answer } from '../assistant/testing/scripted-answers';
 import { LLM_SECRETS_KEY_ENV } from '../llm/llm-secrets';
 import { LLM_DEFAULT_MODEL_SETTING_KEY } from '../llm/llm-store';

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { CardCaptureView } from '@agentdock/shared';
+import type { CardCaptureView } from '@nautelle/shared';
 import { ApiError } from '../api';
 import { boardView, card } from './fixtures';
 import {

@@ -18,7 +18,7 @@ import {
   type TerminalHistoryRequestMessage,
   type TerminalResizeMessage,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Backoff } from './backoff';
 import { type Cancel, type Clock, isoNow } from './clock';
 import type { Dispatch } from './commands/dispatcher';

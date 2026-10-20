@@ -4,7 +4,7 @@ import {
   cardPrRetargetArgsSchema,
   cardPrRetargetResultSchema,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ExecResult } from '../detect/exec';
 import { retargetCardPr } from './pr-retarget';
 

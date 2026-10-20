@@ -1,4 +1,4 @@
-import { QUEUE_LIVE_EVENT, type QueueLiveChange } from '@agentdock/shared';
+import { QUEUE_LIVE_EVENT, type QueueLiveChange } from '@nautelle/shared';
 import {
   type IssueClosedData,
   type IssuesSnapshotData,
@@ -8,7 +8,7 @@ import {
   parseQueueEvent,
   type QueueEvent,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
@@ -258,7 +258,7 @@ export class QueueProjector {
       await tx.issueCache.update({ where: { id: before.id }, data: closure });
       return true;
     }
-    // A dependency closed before AgentDock first saw it: only its closure is known.
+    // A dependency closed before Nautelle first saw it: only its closure is known.
     await tx.issueCache.create({
       data: {
         projectId: project.id,

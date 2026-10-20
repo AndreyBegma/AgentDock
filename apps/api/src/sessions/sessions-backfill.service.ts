@@ -1,4 +1,4 @@
-import type { BackfillRequest, BackfillResponse } from '@agentdock/shared';
+import type { BackfillRequest, BackfillResponse } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';

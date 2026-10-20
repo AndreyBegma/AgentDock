@@ -1,4 +1,4 @@
-import type { RecomputeProgress } from '@agentdock/shared';
+import type { RecomputeProgress } from '@nautelle/shared';
 import {
   Injectable,
   Logger,

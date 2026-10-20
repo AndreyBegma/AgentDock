@@ -114,12 +114,12 @@ describe('known blocking dialogs (#435)', () => {
     const sent = await answerDialog(
       exec,
       ['-L', 's'],
-      'agentdock-card-ab12',
+      'nautelle-card-ab12',
       dialog,
     );
     expect(sent).toBe(true);
     expect(calls).toEqual([
-      ['tmux', '-L', 's', 'send-keys', '-t', '=agentdock-card-ab12:', 'Escape'],
+      ['tmux', '-L', 's', 'send-keys', '-t', '=nautelle-card-ab12:', 'Escape'],
     ]);
   });
 });

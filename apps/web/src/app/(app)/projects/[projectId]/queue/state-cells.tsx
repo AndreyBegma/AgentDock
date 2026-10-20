@@ -1,7 +1,7 @@
-import type { QueueItemView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { QueueItemView } from '@nautelle/shared';
 import {
   computedNote,
   STATE_CHIP_LABEL,
@@ -53,7 +53,7 @@ export function IssueLink({ item }: { item: QueueItemView }) {
   );
 }
 
-/** The muted "AgentDock computes X" note, only when it differs (D4). */
+/** The muted "Nautelle computes X" note, only when it differs (D4). */
 export function ComputedNote({ item }: { item: QueueItemView }) {
   const note = computedNote(item);
   return note ? <span className="text-xs text-ink-3">{note}</span> : null;

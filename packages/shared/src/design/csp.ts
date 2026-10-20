@@ -6,7 +6,7 @@ import { DESIGN_CDN_CSP_SOURCES } from './cdn';
  * defaults for that route only.
  *
  * `sandbox allow-scripts` without `allow-same-origin` gives the document an
- * opaque origin even when it is served from AgentDock's own origin: no
+ * opaque origin even when it is served from Nautelle's own origin: no
  * cookies, no storage, no API. `connect-src 'none'` stops every network call
  * a script could make; the CDN allowlist is the only place code and styles
  * come from.

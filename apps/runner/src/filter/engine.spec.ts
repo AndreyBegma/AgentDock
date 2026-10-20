@@ -10,7 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { filterStatRowSchema } from '@agentdock/shared';
+import { filterStatRowSchema } from '@nautelle/shared';
 import { type FilterDeps, judge, runFilter } from './engine';
 import { filterEnv, RAW_ENV } from './env';
 import { searchFilter } from './families/lang/files';
@@ -96,7 +96,7 @@ describe('filter -- <argv> (#445 D3, D4)', () => {
     expect(text).not.toContain('ok 17 -');
     const rawPath = join(dir, 'raw', '1.log');
     expect(text).toEndWith(
-      `[agentdock filter: 200 lines hidden · full output: ${rawPath} · AGENTDOCK_RAW=1 to bypass]\n`,
+      `[nautelle filter: 200 lines hidden · full output: ${rawPath} · NAUTELLE_RAW=1 to bypass]\n`,
     );
     // The raw file is the original, byte for byte.
     expect(readFileSync(rawPath, 'utf8')).toBe(output);

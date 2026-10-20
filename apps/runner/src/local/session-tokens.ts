@@ -15,7 +15,7 @@ import { z } from 'zod';
  * #113: the env var that carries a session's capability token to its hook
  * and MCP processes — set by the runner on the sessions it launches.
  */
-export const SESSION_TOKEN_ENV = 'AGENTDOCK_SESSION_TOKEN';
+export const SESSION_TOKEN_ENV = 'NAUTELLE_SESSION_TOKEN';
 
 /** A token on a socket line is never longer than this. */
 export const SESSION_TOKEN_MAX = 1024;

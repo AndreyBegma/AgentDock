@@ -1,10 +1,5 @@
 'use client';
 
-import type {
-  ProjectRuleCreateRequest,
-  ProjectRuleUpdateRequest,
-  ProjectRuleView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -22,6 +17,11 @@ import {
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import type {
+  ProjectRuleCreateRequest,
+  ProjectRuleUpdateRequest,
+  ProjectRuleView,
+} from '@nautelle/shared';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../../../../../../lib/api';

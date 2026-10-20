@@ -1,5 +1,5 @@
 {
-  "name": "@agentdock/shared",
+  "name": "@nautelle/shared",
   "version": "0.0.1",
   "private": true,
   "main": "./dist/index.js",
@@ -14,12 +14,20 @@
       "types": "./dist/protocol/index.d.ts",
       "import": "./dist/protocol/index.js",
       "require": "./dist/protocol/index.js"
+    },
+    "./legacy-names": {
+      "types": "./dist/legacy-names.d.ts",
+      "import": "./dist/legacy-names.js",
+      "require": "./dist/legacy-names.js"
     }
   },
   "typesVersions": {
     "*": {
       "protocol": [
         "./dist/protocol/index.d.ts"
+      ],
+      "legacy-names": [
+        "./dist/legacy-names.d.ts"
       ]
     }
   },

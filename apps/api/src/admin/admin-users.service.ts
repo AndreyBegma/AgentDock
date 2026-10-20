@@ -1,4 +1,4 @@
-import { type AdminUser, AUTH_ERROR, type Role } from '@agentdock/shared';
+import { type AdminUser, AUTH_ERROR, type Role } from '@nautelle/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Prisma, User, UserStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

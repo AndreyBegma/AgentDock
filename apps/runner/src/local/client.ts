@@ -36,7 +36,7 @@ import {
   type LocalMethodName,
   type LocalMethodResult,
   localMethods,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Socket } from 'bun';
 import type { z } from 'zod';
 import {

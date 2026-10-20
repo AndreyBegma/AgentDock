@@ -14,8 +14,8 @@ import {
   CARD_PR_DESCRIPTION_FILE,
   cardPullRequestBody,
   isDivergedBranchError,
-} from '@agentdock/shared';
-import type { CardCollectArgs } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CardCollectArgs } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec, ExecOptions } from '../detect/exec';
 import { GITHUB_GIT_CONFIG, GitAuth, HARDENED_GIT_CONFIG } from '../git-auth';
@@ -60,7 +60,7 @@ const setup = async () => {
     worktree: cardWorktreePath(f.root, 'ab12cd34'),
     branch: BRANCH,
     base: 'main',
-    tmuxSession: 'agentdock-card-ab12cd34',
+    tmuxSession: 'nautelle-card-ab12cd34',
     runId: 'run_1',
     phase: 'running',
     startedAt: '2026-10-14T12:00:00.000Z',
@@ -134,8 +134,8 @@ describe('card.collect (#242 D8)', () => {
     );
     expect(create?.body).toContain('Added the CSV export.');
     expect(create?.body).toContain('Closes #42');
-    expect(create?.body).toContain('AgentDock-Card: C-12');
-    expect(create?.body?.match(/AgentDock-Card:/g)).toHaveLength(1);
+    expect(create?.body).toContain('Nautelle-Card: C-12');
+    expect(create?.body?.match(/Nautelle-Card:/g)).toHaveLength(1);
 
     // Feedback round: more work, collected again — pushed, the PR reused.
     f.write(record.worktree, { 'src/export.ts': 'export const csv = 2;\n' });
@@ -251,7 +251,7 @@ describe('card.collect after card.close removed the worktree (#344)', () => {
       .run(f.root, 'rev-parse', '--verify', '--quiet', `refs/heads/${BRANCH}`)
       .catch(() => null);
   const collectWorktrees = (ws: string) =>
-    readdirSync(ws).filter((name) => name.startsWith('agentdock-collect-'));
+    readdirSync(ws).filter((name) => name.startsWith('nautelle-collect-'));
 
   it('pushes the kept local branch, opens the PR, then drops the temporary worktree and the pushed branch', async () => {
     const { f, record, deps, args, originHead } = await setup();
@@ -273,7 +273,7 @@ describe('card.collect after card.close removed the worktree (#344)', () => {
     expect(collectWorktrees(f.ws)).toEqual([]);
     expect(
       await f.run(f.root, 'worktree', 'list', '--porcelain'),
-    ).not.toContain('agentdock-collect-');
+    ).not.toContain('nautelle-collect-');
   });
 
   it('opens the PR of a branch that is only on origin, leaving no local branch', async () => {
@@ -463,7 +463,7 @@ describe('card.collect — the PR description (#359 D3)', () => {
     '',
     '## Acceptance criteria',
     '- [x] CSV download — unit test.',
-    'AgentDock-Card: C-99',
+    'Nautelle-Card: C-99',
   ].join('\n');
 
   const work = async (
@@ -484,8 +484,8 @@ describe('card.collect — the PR description (#359 D3)', () => {
     expect(body).toContain('## What changed and why');
     expect(body).toContain('- [x] CSV download — unit test.');
     expect(body).not.toContain('Added the CSV export.');
-    expect(body.match(/AgentDock-Card:/g)).toHaveLength(1);
-    expect(body.trimEnd().endsWith('AgentDock-Card: C-12')).toBe(true);
+    expect(body.match(/Nautelle-Card:/g)).toHaveLength(1);
+    expect(body.trimEnd().endsWith('Nautelle-Card: C-12')).toBe(true);
     expect(
       await f.run(record.worktree, 'ls-tree', '-r', '--name-only', 'HEAD'),
     ).not.toContain('.agentdock');
@@ -514,7 +514,7 @@ describe('card.collect — the PR description (#359 D3)', () => {
       'acme/widget',
     ]);
     expect(f.edits[0]?.body).toContain('## Acceptance criteria');
-    expect(f.edits[0]?.body).toContain('AgentDock-Card: C-12');
+    expect(f.edits[0]?.body).toContain('Nautelle-Card: C-12');
     expect(f.edits[0]?.body).not.toContain('C-99');
   });
 
@@ -641,10 +641,10 @@ describe('card.collect — the PR description (#359 D3)', () => {
   });
 
   it('pullRequestBodyOf appends the marker when the API body has one', () => {
-    expect(pullRequestBodyOf('Body', 'x\n\nAgentDock-Card: C-3')).toBe(
-      'Body\n\nAgentDock-Card: C-3\n',
+    expect(pullRequestBodyOf('Body', 'x\n\nNautelle-Card: C-3')).toBe(
+      'Body\n\nNautelle-Card: C-3\n',
     );
-    expect(pullRequestBodyOf('Body\nAgentDock-Card: C-9', 'no marker')).toBe(
+    expect(pullRequestBodyOf('Body\nNautelle-Card: C-9', 'no marker')).toBe(
       'Body\n',
     );
   });

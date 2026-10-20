@@ -60,7 +60,7 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
         runKind: 'card',
       }),
       filters: [bunTest, demoFilter],
-      selfCommand: ['/opt/agentdock/agentdock-runner'],
+      selfCommand: ['/opt/agentdock/nautelle-runner'],
       home: '/home/u',
       os: 'linux',
       now: () => Date.parse('2026-10-16T12:00:00.000Z'),
@@ -83,14 +83,14 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     }
   };
 
-  it('runs `bun run test` as `agentdock-runner filter -- bun run test`', () => {
+  it('runs `bun run test` as `nautelle-runner filter -- bun run test`', () => {
     const out = runFilterHook(JSON.stringify(preToolUse('bun run test')), deps);
     const parsed = JSON.parse(out) as HookOutput;
     expect(parsed.hookSpecificOutput.hookEventName).toBe('PreToolUse');
     expect(parsed.hookSpecificOutput.permissionDecision).toBe('allow');
     // The whole input comes back, only the command changed.
     expect(parsed.hookSpecificOutput.updatedInput).toEqual({
-      command: '/opt/agentdock/agentdock-runner filter -- bun run test',
+      command: '/opt/agentdock/nautelle-runner filter -- bun run test',
       description: 'Run the tests',
       timeout: 120000,
     });
@@ -111,14 +111,12 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
 
   it('keeps assignments in front, so the bypass reaches the filter', () => {
     const out = runFilterHook(
-      JSON.stringify(preToolUse('AGENTDOCK_RAW=1 bun test')),
+      JSON.stringify(preToolUse('NAUTELLE_RAW=1 bun test')),
       deps,
     );
     expect(
       (JSON.parse(out) as HookOutput).hookSpecificOutput.updatedInput.command,
-    ).toBe(
-      'AGENTDOCK_RAW=1 /opt/agentdock/agentdock-runner filter -- bun test',
-    );
+    ).toBe('NAUTELLE_RAW=1 /opt/agentdock/nautelle-runner filter -- bun test');
   });
 
   it('rewrites nothing with Token saver off — the launch sets no filter env', () => {
@@ -225,7 +223,7 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
 
   describe('by permission mode (amendments 9 and 10)', () => {
     const wrapped = (command: string) => ({
-      command: `/opt/agentdock/agentdock-runner filter -- ${command}`,
+      command: `/opt/agentdock/nautelle-runner filter -- ${command}`,
       description: 'Run the tests',
       timeout: 120000,
     });
@@ -236,7 +234,7 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
           hookEventName: 'PreToolUse',
           permissionDecision: 'allow',
           permissionDecisionReason:
-            'AgentDock token saver: the output is filtered; AGENTDOCK_RAW=1 runs it unfiltered',
+            'Nautelle token saver: the output is filtered; NAUTELLE_RAW=1 runs it unfiltered',
           updatedInput: wrapped(command),
         },
       });
@@ -333,7 +331,7 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     expect(
       (JSON.parse(out) as HookOutput).hookSpecificOutput.updatedInput.command,
     ).toBe(
-      `FOO='a b' /opt/agentdock/agentdock-runner filter -- bun test 'x y' ';'`,
+      `FOO='a b' /opt/agentdock/nautelle-runner filter -- bun test 'x y' ';'`,
     );
   });
 
@@ -348,19 +346,19 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
     it.each([
       [
         'cd apps/runner && bun test',
-        'cd apps/runner && /opt/agentdock/agentdock-runner filter -- bun test',
+        'cd apps/runner && /opt/agentdock/nautelle-runner filter -- bun test',
       ],
       [
         `cd  "/repo/a b"   &&  CI=1 bun run test 'x y'`,
-        `cd '/repo/a b' && CI=1 /opt/agentdock/agentdock-runner filter -- bun run test 'x y'`,
+        `cd '/repo/a b' && CI=1 /opt/agentdock/nautelle-runner filter -- bun run test 'x y'`,
       ],
       [
         'bun test 2>&1',
-        '/opt/agentdock/agentdock-runner filter -- bun test 2>&1',
+        '/opt/agentdock/nautelle-runner filter -- bun test 2>&1',
       ],
       [
         `cd 'it'\\''s' && bun test\t2>&1  `,
-        `cd 'it'\\''s' && /opt/agentdock/agentdock-runner filter -- bun test 2>&1`,
+        `cd 'it'\\''s' && /opt/agentdock/nautelle-runner filter -- bun test 2>&1`,
       ],
     ])('rewrites %p from its words', (command, expected) => {
       expect(rewritten(command)).toBe(expected);
@@ -407,7 +405,7 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
       matches: (argv) => argv.join(' ') === 'bun run lint',
       apply: () => null,
     };
-    const self = '/opt/agentdock/agentdock-runner filter --';
+    const self = '/opt/agentdock/nautelle-runner filter --';
     const rewritten = (command: string, mode = 'auto') => {
       const out = runFilterHook(JSON.stringify(preToolUse(command, {}, mode)), {
         ...deps,

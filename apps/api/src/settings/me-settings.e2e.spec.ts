@@ -1,4 +1,4 @@
-import type { UserSettingsView } from '@agentdock/shared';
+import type { UserSettingsView } from '@nautelle/shared';
 import {
   createE2eApp,
   createUser,

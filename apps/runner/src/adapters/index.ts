@@ -1,4 +1,4 @@
-import type { Runtime } from '@agentdock/shared/protocol';
+import type { Runtime } from '@nautelle/shared/protocol';
 import { claudeAdapter } from './claude/adapter';
 import { codexAdapter } from './codex/adapter';
 import type { RuntimeAdapter } from './types';

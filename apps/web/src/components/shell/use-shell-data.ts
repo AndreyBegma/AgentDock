@@ -6,7 +6,7 @@ import type {
   ProjectSummary,
   RunPage,
   SessionListResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { RecentEntities } from './palette';

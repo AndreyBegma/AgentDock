@@ -26,7 +26,7 @@ describe('mcpSessionToken (#113)', () => {
     expect(mcpSessionToken({ env: {}, socketPath, ppid: 301 })).toBeUndefined();
     expect(
       mcpSessionToken({
-        env: { AGENTDOCK_SESSION_TOKEN: 'tok-env' },
+        env: { NAUTELLE_SESSION_TOKEN: 'tok-env' },
         socketPath,
         ppid: 300,
       }),

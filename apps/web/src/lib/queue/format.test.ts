@@ -4,7 +4,7 @@ import {
   type QueueItemView,
   type QueueState,
   type QueueView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   allowedLabels,
@@ -135,12 +135,12 @@ describe('boardColumns', () => {
 describe('computedNote', () => {
   const computed = { state: 'ready' as const, why: '', clears: null };
 
-  test('shown when the orchestrator disagrees with AgentDock', () => {
+  test('shown when the orchestrator disagrees with Nautelle', () => {
     const disagree = item(1, 'blocked_work', {
       source: 'orchestrator',
       computed,
     });
-    expect(computedNote(disagree)).toBe('AgentDock computes READY');
+    expect(computedNote(disagree)).toBe('Nautelle computes READY');
   });
 
   test('absent when they agree, or when the verdict is computed', () => {
@@ -224,7 +224,7 @@ describe('describeQueueError', () => {
 
   test('command_unavailable without a runner name still says to update it', () => {
     expect(describeQueueError(apiError(503, 'command_unavailable'))).toContain(
-      'Update the AgentDock runner on the project’s machine',
+      'Update the Nautelle runner on the project’s machine',
     );
   });
 
@@ -250,7 +250,7 @@ describe('misc', () => {
       new ApiError(503, 'command_unavailable' as never, 'x'),
       'laptop',
     );
-    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).toContain('Update the Nautelle runner on laptop');
     expect(text).not.toContain('not deployed');
   });
 

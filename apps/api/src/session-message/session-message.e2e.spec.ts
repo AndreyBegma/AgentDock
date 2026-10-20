@@ -1,5 +1,5 @@
-import type { BoardCardDetail, PendingQuestion } from '@agentdock/shared';
-import type { SessionMessageArgs } from '@agentdock/shared/protocol';
+import type { BoardCardDetail, PendingQuestion } from '@nautelle/shared';
+import type { SessionMessageArgs } from '@nautelle/shared/protocol';
 import { BoardWorld, ROOT_A } from '../board/testing/board-e2e';
 import {
   type CommandSendResult,

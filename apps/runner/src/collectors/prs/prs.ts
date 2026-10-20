@@ -1,5 +1,5 @@
-import { type CheckRollupEntry, rollupChecks } from '@agentdock/shared';
-import type { PrChecks } from '@agentdock/shared/protocol';
+import { type CheckRollupEntry, rollupChecks } from '@nautelle/shared';
+import type { PrChecks } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import type { Exec } from '../../detect/exec';
 import type { FleetEmitter, FleetProject } from '../../fleet/project';

@@ -2,14 +2,14 @@ import type {
   InstalledSkillView,
   SkillPreviewView,
   SkillRunView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   isRunnableSkill,
   type SkillFile,
   type SkillFrontmatter,
   type SkillRunChangedFile,
   skillPhaseToRunStatus,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type {
   InstalledSkill,
   Prisma,

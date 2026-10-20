@@ -1,16 +1,16 @@
 'use client';
 
-import type {
-  OrchestratorSettingsView,
-  OrchestratorStartRequest,
-} from '@agentdock/shared';
-import type {
-  OrchestratorMode,
-  OrchestratorPermissionMode,
-} from '@agentdock/shared/protocol';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import type {
+  OrchestratorSettingsView,
+  OrchestratorStartRequest,
+} from '@nautelle/shared';
+import type {
+  OrchestratorMode,
+  OrchestratorPermissionMode,
+} from '@nautelle/shared/protocol';
 import { useEffect, useState } from 'react';
 import {
   MODE_LABEL,

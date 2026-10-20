@@ -3,7 +3,7 @@ import {
   PULL_REQUEST_BODY_MAX_BYTES,
   type SnapshotIssue,
   type SnapshotPullRequest,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import type { Exec } from '../../detect/exec';
 

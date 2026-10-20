@@ -1,4 +1,4 @@
-import type { CommandRunLiveEvent } from '@agentdock/shared';
+import type { CommandRunLiveEvent } from '@nautelle/shared';
 
 /** Runs seen on `project:<id>` that have not finished, keyed by run id. */
 export type PendingRuns = Readonly<Record<string, CommandRunLiveEvent>>;

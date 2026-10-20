@@ -4,8 +4,8 @@ import {
   type HandoffUpdatedBy,
   personLinesKept,
   splitPersonMarks,
-} from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 
 /** The `data` keys of `handoff.updated` that carry the note (#449 DA-12). */
 const NOTE_KEYS = ['content', 'personLines'] as const;

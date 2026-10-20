@@ -1,8 +1,8 @@
 import {
   GITHUB_HEALTH_WINDOW_MS,
   type GitHubHealthReason,
-} from '@agentdock/shared';
-import type { GitHubAppHealth } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { GitHubAppHealth } from '@nautelle/shared/protocol';
 import { SIGNATURE_FAILURE_THRESHOLD } from './signature-failure-tracker';
 
 /** What D11 reads about the App. */

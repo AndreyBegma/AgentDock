@@ -1,6 +1,6 @@
-import type { DocsSourceView } from '@agentdock/shared';
-import type { DocsSource } from '@agentdock/shared/protocol';
 import { Badge } from '@andrewbehma/glass-ui/badge';
+import type { DocsSourceView } from '@nautelle/shared';
+import type { DocsSource } from '@nautelle/shared/protocol';
 import { DOCS_KIND_LABEL, DOCS_RULE_LABEL } from '../../../lib/projects/format';
 
 /** What detection and a stored source have in common. */

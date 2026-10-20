@@ -5,7 +5,7 @@ import type {
   CommandResultMessage,
   HelloMessage,
   RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CardStore } from './cards/record';
 import type { PairedConfig } from './config';
 import type { RunnerConnection } from './connection';
@@ -482,7 +482,7 @@ describe('daemon — local socket (spec 201)', () => {
       worktree,
       branch: 'fix/1-x',
       base: 'develop',
-      tmuxSession: 'agentdock-card-abc12345',
+      tmuxSession: 'nautelle-card-abc12345',
       runId: 'run_1',
       phase: 'running',
       sessionId: session,
@@ -495,7 +495,7 @@ describe('daemon — local socket (spec 201)', () => {
     ).mint({ sessionId: session, cwd: worktree });
     await runHook(['user-prompt-submit'], {
       ...hookDeps({ session_id: session, cwd: worktree, prompt: 'go' }, []),
-      env: { AGENTDOCK_SESSION_TOKEN: token },
+      env: { NAUTELLE_SESSION_TOKEN: token },
       cwd: worktree,
     });
     first.controller.abort();

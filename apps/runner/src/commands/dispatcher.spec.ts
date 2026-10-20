@@ -7,7 +7,7 @@ import {
   PLAN_TIMEOUTS_MS,
   SKILL_TIMEOUTS_MS,
   TERMINAL_ATTACH_TIMEOUT_MS,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { permissivePolicy, sameRealpath } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger } from '../testing/fixtures';

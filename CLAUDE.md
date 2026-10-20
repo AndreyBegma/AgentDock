@@ -1,4 +1,4 @@
-# AgentDock
+# Nautelle
 
 Self-hosted control plane for Claude Code and Codex agent fleets driven by the
 Code Sentinel orchestrator. Bun workspaces + Turborepo: `apps/api` (NestJS,

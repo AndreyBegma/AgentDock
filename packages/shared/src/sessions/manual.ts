@@ -10,7 +10,7 @@ import {
 } from '../protocol/events/hooks';
 
 /**
- * Sessions started by hand and seen through the `agentdock` Claude Code plugin
+ * Sessions started by hand and seen through the `nautelle` Claude Code plugin
  * (docs/specs/201-claude-code-integration.md D14, ADR-0021).
  */
 

@@ -13,7 +13,7 @@ import { createExec } from '../detect/exec';
 import { tempDir } from '../testing/fixtures';
 import { EXPORTER_KEYS, type SetupClaudeOptions, setupClaude } from './claude';
 
-describe('agentdock-runner setup claude (spec 201 D21)', () => {
+describe('nautelle-runner setup claude (spec 201 D21)', () => {
   let dir = '';
   let cleanup = () => {};
   let stdout: string[] = [];
@@ -85,10 +85,10 @@ describe('agentdock-runner setup claude (spec 201 D21)', () => {
     expect(await run({ dryRun: true })).toBe(0);
     const text = stdout.join('');
     expect(text).toContain(
-      'claude plugin marketplace add AndreyBegma/AgentDock',
+      'claude plugin marketplace add AndreyBegma/Nautelle',
     );
     expect(text).toContain(
-      'claude plugin install agentdock@agentdock --scope user',
+      'claude plugin install nautelle@nautelle --scope user',
     );
     expect(text).toContain(
       '+  env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4318"',
@@ -103,8 +103,8 @@ describe('agentdock-runner setup claude (spec 201 D21)', () => {
     writeOriginal();
     expect(await run()).toBe(0);
     expect(calls()).toEqual([
-      `${configDir()} plugin marketplace add AndreyBegma/AgentDock`,
-      `${configDir()} plugin install agentdock@agentdock --scope user`,
+      `${configDir()} plugin marketplace add AndreyBegma/Nautelle`,
+      `${configDir()} plugin install nautelle@nautelle --scope user`,
     ]);
     const settings = JSON.parse(readFileSync(settingsPath(), 'utf8'));
     expect(settings.theme).toBe('dark');
@@ -147,8 +147,31 @@ describe('agentdock-runner setup claude (spec 201 D21)', () => {
     expect(await run({ uninstall: true })).toBe(0);
     expect(JSON.parse(readFileSync(settingsPath(), 'utf8'))).toEqual(original);
     expect(calls().slice(2)).toEqual([
+      `${configDir()} plugin uninstall nautelle@nautelle --scope user`,
+      `${configDir()} plugin marketplace remove nautelle`,
+    ]);
+  });
+
+  it('removes the plugin installed under its old name first (ADR-0073)', async () => {
+    writeOriginal();
+    mkdirSync(join(configDir(), 'plugins'), { recursive: true });
+    writeFileSync(
+      join(configDir(), 'plugins', 'installed_plugins.json'),
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          'agentdock@agentdock': [
+            { scope: 'user', version: '0.13.0', installPath: '/x' },
+          ],
+        },
+      }),
+    );
+    expect(await run()).toBe(0);
+    expect(calls()).toEqual([
       `${configDir()} plugin uninstall agentdock@agentdock --scope user`,
       `${configDir()} plugin marketplace remove agentdock`,
+      `${configDir()} plugin marketplace add AndreyBegma/Nautelle`,
+      `${configDir()} plugin install nautelle@nautelle --scope user`,
     ]);
   });
 
@@ -182,7 +205,7 @@ describe('agentdock-runner setup claude (spec 201 D21)', () => {
   });
 
   it('prints when the change shows up, after a successful setup only (#348 D7)', async () => {
-    const line = 'A running agentdock-runner reports this within 15 seconds.';
+    const line = 'A running nautelle-runner reports this within 15 seconds.';
     expect(await run()).toBe(0);
     expect(stdout.join('')).toContain(line);
 

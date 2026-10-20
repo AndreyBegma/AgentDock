@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { CardDraftPullRequest } from '@agentdock/shared/protocol';
+import type { CardDraftPullRequest } from '@nautelle/shared/protocol';
 import { GH_TIMEOUT_MS, gitOk, parsePrUrl, stderrLine } from '../skills/deps';
 import { githubOf } from '../skills/run/collect';
 import {
@@ -87,7 +87,7 @@ const createDraftPullRequest = async (
   deps: GitDeps,
   pr: { github: string; base: string; branch: string } & CardDraftPullRequest,
 ): Promise<{ number: number; url: string }> => {
-  const dir = mkdtempSync(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
+  const dir = mkdtempSync(join(deps.tempRoot ?? tmpdir(), 'nautelle-pr-'));
   try {
     const bodyFile = join(dir, 'body.md');
     writeFileSync(bodyFile, pr.body, { mode: 0o600 });

@@ -6,7 +6,7 @@ import {
   type UiProfileUpdateRequest,
   type UiProfileVersionView,
   uiProfileSnippetSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * The profile editor (spec 223 D14, Settings → Design): a manual version is

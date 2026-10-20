@@ -105,7 +105,7 @@ export interface SessionSummary {
   issue?: number | null;
   ownerId?: string | null;
   liveState?: SessionLiveState | null;
-  /** Set for a session started by `agentdock-runner claude` (D23). */
+  /** Set for a session started by `nautelle-runner claude` (D23). */
   tmuxSession?: string | null;
   /** The session has stored content the caller may read (ADR-0021). */
   hasContent?: boolean;
@@ -191,6 +191,6 @@ export type BackfillResponse = SessionBackfillResult;
 /** Live event on `project:<id>` when that project's sessions changed. */
 export const SESSIONS_CHANGED_LIVE_EVENT = 'sessions.changed';
 export interface SessionsChangedLiveData {
-  /** AgentDock ids of the sessions touched by one runner batch. */
+  /** Nautelle ids of the sessions touched by one runner batch. */
   sessionIds: string[];
 }

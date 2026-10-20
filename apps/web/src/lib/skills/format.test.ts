@@ -3,7 +3,7 @@ import {
   type InstalledSkillView,
   type ProjectRuntimeProfile,
   SKILLS_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   allowedToolsOf,
@@ -316,7 +316,9 @@ describe('errors', () => {
   });
 
   test('skillRunsHref filters History to skill runs', () => {
-    expect(skillRunsHref('p1')).toBe('/projects/p1/history?kind=skill');
+    expect(skillRunsHref('p1')).toBe(
+      '/projects/p1/activity?tab=runs&kind=skill',
+    );
   });
 
   describe('runProfileReason', () => {
@@ -352,7 +354,7 @@ describe('errors', () => {
       new ApiError(503, SKILLS_ERROR.commandUnavailable as never, 'x'),
       'laptop',
     );
-    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).toContain('Update the Nautelle runner on laptop');
     expect(text).not.toContain('yet');
   });
 });

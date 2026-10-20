@@ -92,7 +92,7 @@ describe('card.resume (D10)', () => {
     expect(
       cardResumeResultSchema.safeParse({
         outcome: 'resumed',
-        tmuxSession: 'agentdock-card-abcd1234',
+        tmuxSession: 'nautelle-card-abcd1234',
       }).success,
     ).toBe(true);
     expect(
@@ -117,7 +117,7 @@ describe('digest.compose (#491)', () => {
     profileKey: 'default',
     model: 'haiku',
     trigger: 'daily',
-    projectName: 'AgentDock',
+    projectName: 'Nautelle',
     done: section(2),
     stuck: {
       total: 1,

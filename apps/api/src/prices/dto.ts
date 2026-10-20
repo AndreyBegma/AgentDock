@@ -10,8 +10,8 @@ import {
   type RecomputeRequest,
   type TierCondition,
   type TierPrices,
-} from '@agentdock/shared';
-import type { TokenBuckets } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { TokenBuckets } from '@nautelle/shared/protocol';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,

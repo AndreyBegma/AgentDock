@@ -3,7 +3,7 @@
 import type {
   NotificationPage,
   NotificationReadResult,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, describeErrorHint } from '../api';
 import { useLive } from '../live/use-live';

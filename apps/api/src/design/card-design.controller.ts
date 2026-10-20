@@ -1,7 +1,7 @@
 import type {
   CardDesignApproveResponse,
   TaskDesignView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

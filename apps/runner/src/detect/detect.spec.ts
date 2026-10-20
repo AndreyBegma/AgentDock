@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { capabilitiesSchema } from '@agentdock/shared/protocol';
+import { capabilitiesSchema } from '@nautelle/shared/protocol';
 import { fakeExec, machineWithoutCodex, tempDir } from '../testing/fixtures';
 import {
   detectCapabilities,

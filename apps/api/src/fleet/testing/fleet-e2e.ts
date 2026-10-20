@@ -1,4 +1,4 @@
-import type { EventSource, RunnerEvent } from '@agentdock/shared/protocol';
+import type { EventSource, RunnerEvent } from '@nautelle/shared/protocol';
 import type { PrismaService } from '../../database/prisma.service';
 
 export const ROOT = '/srv/dev/widget';

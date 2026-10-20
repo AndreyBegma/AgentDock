@@ -7,8 +7,8 @@ import {
   plannerOutputContract,
   stackLabel,
   type UiProfileSnippet,
-} from '@agentdock/shared';
-import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 
 /**
  * The design sections of a plan turn's prompt (docs/specs/223-design-stage.md
@@ -299,7 +299,7 @@ export const designTurnSections = (
         ? `Your latest revision of this variant is revision ${previous.revision}: "${previous.title}". Its rationale: ${previous.rationale}`
         : null,
       previous
-        ? `Its frames, in order: ${previous.frames.map((f) => `"${f.name}"`).join(', ')}. Change, add or drop frames as the comments ask. A comment names the frame it was left on in \`leftOn.frame\`. Keep every frame the comments leave alone: name it in \`"kept"\` and give it no design block — AgentDock copies it from revision ${previous.revision} as it is.`
+        ? `Its frames, in order: ${previous.frames.map((f) => `"${f.name}"`).join(', ')}. Change, add or drop frames as the comments ask. A comment names the frame it was left on in \`leftOn.frame\`. Keep every frame the comments leave alone: name it in \`"kept"\` and give it no design block — Nautelle copies it from revision ${previous.revision} as it is.`
         : null,
       'Use one frame unless the task touches several pages or several standalone components; then draw one frame per page, plus one per component that matters on its own.',
       previous
@@ -338,8 +338,8 @@ export const approvedDesignSections = (d: ApprovedDesignContext): string[] => [
   '## Approved design',
   [
     d.frames.length === 1
-      ? `The approved mockup is variant ${d.variant}: "${d.title}". It is published at \`${d.frames[0].path}\` — write that path, with \`<issue>\` as it is, in the document's \`## Design\` section; AgentDock fills in the issue number.`
-      : `The approved design is variant ${d.variant}: "${d.title}", in ${d.frames.length} frames published under \`${d.dir}/\` — list every one of these paths, with \`<issue>\` as it is, in the document's \`## Design\` section; AgentDock fills in the issue number:\n${d.frames.map((f) => `- \`${f.path}\` — ${f.name}`).join('\n')}`,
+      ? `The approved mockup is variant ${d.variant}: "${d.title}". It is published at \`${d.frames[0].path}\` — write that path, with \`<issue>\` as it is, in the document's \`## Design\` section; Nautelle fills in the issue number.`
+      : `The approved design is variant ${d.variant}: "${d.title}", in ${d.frames.length} frames published under \`${d.dir}/\` — list every one of these paths, with \`<issue>\` as it is, in the document's \`## Design\` section; Nautelle fills in the issue number:\n${d.frames.map((f) => `- \`${f.path}\` — ${f.name}`).join('\n')}`,
     `Its rationale: ${d.rationale}`,
   ].join('\n'),
   d.decisions.length > 0

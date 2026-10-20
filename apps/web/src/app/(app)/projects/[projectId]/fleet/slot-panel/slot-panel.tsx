@@ -1,6 +1,5 @@
 'use client';
 
-import { projectRoleAtLeast } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
@@ -9,6 +8,7 @@ import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
+import { projectRoleAtLeast } from '@nautelle/shared';
 import { X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
@@ -33,7 +33,7 @@ import {
   useSlotPanel,
   useSlotWorktree,
 } from '../../../../../../lib/slot/use-slot-panel';
-import { useWide } from '../../../../../../lib/slot/use-wide';
+import { useTabletUp } from '../../../../../../lib/slot/use-wide';
 import { SLOT_PILL_STATUS } from '../../../../../../lib/status/pill';
 import { useTerminalAvailable } from '../../../../../../lib/terminal/use-terminal-available';
 import { useProjectDetail } from '../../use-project-detail';
@@ -62,12 +62,12 @@ export interface SlotPanelProps {
 
 /**
  * The agent panel (#160): one slot's chat, brief, worktree, files, checks,
- * settings and live pane, with its sub-agents and dependencies. From `lg` it
- * is a resizable column — the caller puts it last in a flex row beside the
- * canvas; below `lg` it is a bottom sheet of its own.
+ * settings and live pane, with its sub-agents and dependencies. From the
+ * tablet edge (640 px) it is a resizable column — the caller puts it last in a
+ * flex row beside the list; on a phone it is a bottom sheet of its own.
  */
 export function SlotPanel(props: SlotPanelProps) {
-  const wide = useWide();
+  const wide = useTabletUp();
   // `key`: another slot starts on its own outbox and data. The tab is the
   // URL's, so moving between slots keeps the section in view.
   const body = <SlotPanelBody key={props.slot} {...props} />;
@@ -84,9 +84,9 @@ export function SlotPanel(props: SlotPanelProps) {
         }}
         side="end"
         material="glass-strong"
-        minWidth={360}
+        minWidth={320}
         maxWidth={760}
-        defaultWidth={460}
+        defaultWidth={420}
         // The page scrolls, not the row: the panel holds its place under it,
         // like the rail, so the chat's composer is on screen without
         // scrolling the page to the panel's bottom (#213).

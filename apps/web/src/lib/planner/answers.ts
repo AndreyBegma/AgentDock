@@ -3,7 +3,7 @@ import {
   PLANNER_QUESTION_MAX,
   type PlanAnswer,
   type PlanQuestion,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * A round of question cards (D7) as the person fills it in. For each card:

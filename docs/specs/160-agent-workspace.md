@@ -1,6 +1,6 @@
 # Agent workspace — data contract, runner and API
 
-Issue: [#160](https://github.com/AndreyBegma/AgentDock/issues/160) (slot
+Issue: [#160](https://github.com/AndreyBegma/Nautelle/issues/160) (slot
 `i160-data`, the lead) · Decisions:
 [ADR-0001](../adr/0001-control-plane-and-per-machine-runner.md),
 [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
@@ -19,7 +19,7 @@ slot added for the two web slots (`i160-canvas`, `i160-panel`):
 It also explains why the new command stays within ADR-0001 and ADR-0010.
 No schema change, no new Nest module.
 
-## Shared types (`@agentdock/shared`, `fleet/`)
+## Shared types (`@nautelle/shared`, `fleet/`)
 
 | Type | File | What it is |
 |---|---|---|
@@ -90,7 +90,7 @@ tests) are drawn by the client from a node's `prChecks`.
   is one `slot.message_seen` event.
 
 The message file is written in two ways:
-- **Replaced.** Orchestrator Phase 6.5 overwrites it, and AgentDock's
+- **Replaced.** Orchestrator Phase 6.5 overwrites it, and Nautelle's
   `slot.message` writes it atomically (spec 17 D7).
 - **Appended.** The orchestrator also appends a `##` section to the existing
   file.
@@ -101,7 +101,7 @@ So:
 - otherwise it is the whole file (`mode: replaced`);
 - whitespace-only growth is no entry.
 
-`sender` and `sentAt` come from AgentDock's `From:` / `Date:` header, or from
+`sender` and `sentAt` come from Nautelle's `From:` / `Date:` header, or from
 the skill's `# From <who>:` title.
 
 The event row in `events` is the store; nothing new is projected. The runner

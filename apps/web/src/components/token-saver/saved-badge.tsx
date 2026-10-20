@@ -1,4 +1,4 @@
-import type { TokenSavedView } from '@agentdock/shared';
+import type { TokenSavedView } from '@nautelle/shared';
 import { formatSavedTokens, savedLabel } from '../../lib/token-saver/format';
 
 /**

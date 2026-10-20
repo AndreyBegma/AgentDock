@@ -20,7 +20,9 @@ export const cardBackgroundStalledTitle = (
   }`;
 
 /** D8: the line every card PR body carries, so a PR is traced back to its card. */
-export const CARD_PR_MARKER = 'AgentDock-Card';
+export const CARD_PR_MARKER = 'Nautelle-Card';
+/** The marker of PRs opened before the rename, still recognised (ADR-0073). */
+export const LEGACY_CARD_PR_MARKER = 'AgentDock-Card';
 
 const SLUG_MAX = 40;
 
@@ -132,7 +134,7 @@ export const CARD_ISSUE_BODY_MAX = 20_000;
 
 /** D2: the sentence every issue a card creates ends with. */
 export const cardIssueFooter = (number: number): string =>
-  `Tracked on AgentDock board card ${cardLabel(number)} — worked by a dedicated worker, not queued for the orchestrator.`;
+  `Tracked on Nautelle board card ${cardLabel(number)} — worked by a dedicated worker, not queued for the orchestrator.`;
 
 /**
  * D2: the card body, then the footer. A body too long for the issue is cut
@@ -162,7 +164,7 @@ export interface CardSpecPrBodyInput {
 export const cardSpecPrBody = (pr: CardSpecPrBodyInput): string => {
   const label = cardLabel(pr.number);
   const lines = [
-    `Specification of AgentDock board card ${label}: ${pr.title}`,
+    `Specification of Nautelle board card ${label}: ${pr.title}`,
     '',
     pr.issueNumber !== null
       ? `Code: ${pr.repo}#${pr.issueNumber}`
@@ -189,7 +191,7 @@ export interface CardPullRequestBodyInput {
 export const cardPullRequestBody = (pr: CardPullRequestBodyInput): string => {
   const summary =
     pr.summary?.trim() ||
-    `Work of AgentDock board card ${cardLabel(pr.number)}.`;
+    `Work of Nautelle board card ${cardLabel(pr.number)}.`;
   const parts = [summary];
   if (pr.specPrUrl) parts.push(`Spec: ${pr.specPrUrl}`);
   if (pr.issueNumber !== null) parts.push(`Closes #${pr.issueNumber}`);

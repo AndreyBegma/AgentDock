@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AttachmentView } from '@agentdock/shared';
+import type { AttachmentView } from '@nautelle/shared';
 import type { BoardWorld } from '../../board/testing/board-e2e';
 import type { Session } from '../../test/e2e-app';
 

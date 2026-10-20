@@ -1,4 +1,4 @@
-import type { TextOwnerType } from '@agentdock/shared';
+import type { TextOwnerType } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 

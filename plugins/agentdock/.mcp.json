@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "agentdock": {
-      "command": "agentdock-runner",
-      "args": ["mcp"]
-    }
-  }
-}

@@ -6,7 +6,7 @@ import {
 } from '../protocol/local';
 
 /**
- * The project Board (issue #242, ADR-0024): cards AgentDock owns, each worked
+ * The project Board (issue #242, ADR-0024): cards Nautelle owns, each worked
  * by a dedicated interactive Claude Code worker outside the orchestrator. The
  * enums mirror the Prisma enums of the same names.
  */
@@ -65,7 +65,7 @@ export const isMirroredCardSource = (
   (MIRRORED_CARD_SOURCES as readonly BoardCardSource[]).includes(source);
 
 /**
- * D4: what started a round. `ci_fix` (#359 D6) is AgentDock's own round for a
+ * D4: what started a round. `ci_fix` (#359 D6) is Nautelle's own round for a
  * red check or a merge conflict on the card's PR.
  */
 export const CARD_ROUND_TRIGGERS = ['run', 'feedback', 'ci_fix'] as const;
@@ -184,7 +184,10 @@ export const CARD_CI_MISSING_MS = 5 * 60_000;
  * the head (#484), or auto-merge refused the head the latest round left
  * (#542) — the round failed, pushed no commit, or ended at once — or
  * `card.collect` found commits on `origin/<branch>` the card's branch never
- * had, so nothing was pushed (#630).
+ * had, so nothing was pushed (#630). A stacked PR that merged into a
+ * dependency branch whose own PR had already merged gets a forward PR into
+ * the base (#709): `forward_conflict` when that PR conflicts with the base,
+ * `forward_failed` when it could not be opened.
  */
 export const CARD_NEEDS_PERSON_REASONS = [
   'ci_still_failing',
@@ -193,6 +196,8 @@ export const CARD_NEEDS_PERSON_REASONS = [
   'round_pushed_nothing',
   'round_ended_at_once',
   'branch_diverged',
+  'forward_conflict',
+  'forward_failed',
 ] as const;
 export type CardNeedsPersonReason = (typeof CARD_NEEDS_PERSON_REASONS)[number];
 

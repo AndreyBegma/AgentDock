@@ -4,7 +4,7 @@ import type {
   AuditRecordView,
   AuditVerification,
   AuditVerificationState,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Controller,
   Get,

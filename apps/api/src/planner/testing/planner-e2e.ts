@@ -1,5 +1,6 @@
-import { PLANNER_BLOCK_TAG, type PlanDetail } from '@agentdock/shared';
+import { PLANNER_BLOCK_TAG, type PlanDetail } from '@nautelle/shared';
 import {
+  chunkResultText,
   commandSupport,
   type DocsCommandName,
   type IssueCreateArgs,
@@ -7,9 +8,10 @@ import {
   type PlannerCommandName,
   type RunnerCommands,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { seedProject } from '../../fleet/testing/fleet-e2e';
 import { RunnerEventSinks } from '../../runners/runner-event-sinks';
+import { RunnerIngestService } from '../../runners/runner-ingest.service';
 import { RunnerPresence } from '../../runners/runner-presence';
 import {
   createE2eApp,
@@ -294,6 +296,45 @@ export class PlannerHarness {
         at: (extra.at ?? new Date()).toISOString(),
         exitCode: 0,
         resultText,
+        resultTruncated: false,
+      }),
+    ]);
+  }
+
+  /**
+   * #686: the runner reports the active turn finished with a result too
+   * large for one event — its chunks in batches of their own, the last chunk
+   * beside `plan_turn.finished`, through the real ingest (sinks, then the
+   * `events` table). `drop` leaves chunks of those indexes out.
+   */
+  async finishChunked(
+    planId: string,
+    resultText: string,
+    drop: readonly number[] = [],
+  ): Promise<void> {
+    const turn = await this.activeTurn(planId);
+    const ref = {
+      planId,
+      turnId: turn.id,
+      runId: turn.runId,
+      projectId: this.projectId,
+    };
+    const chunks = chunkResultText(resultText).map((text, index) =>
+      this.event('plan_turn.result_chunk', { ...ref, index, text }),
+    );
+    const kept = chunks.filter((_, index) => !drop.includes(index));
+    const ingest = this.ctx.app.get(RunnerIngestService);
+    for (const chunk of kept.slice(0, -1)) {
+      await ingest.events(this.runnerId, [chunk]);
+    }
+    await ingest.events(this.runnerId, [
+      ...kept.slice(-1),
+      this.event('plan_turn.finished', {
+        ...ref,
+        phase: 'succeeded',
+        at: new Date().toISOString(),
+        exitCode: 0,
+        resultChunks: chunks.length,
         resultTruncated: false,
       }),
     ]);

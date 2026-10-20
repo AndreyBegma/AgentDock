@@ -101,6 +101,9 @@ model UserSettings {
   userId        String   @id
   /// The model New Card and New Plan preselect; null: `PLANNING_MODEL_DEFAULT`.
   planningModel String?
+  /// C-294: the last `APP_VERSION` this person opened What's new on; null:
+  /// never. The shell shows an unread dot while it differs.
+  seenVersion   String?
   updatedAt     DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -158,34 +161,38 @@ enum Runtime {
   codex
 }
 
-/// A machine running the agentdock-runner daemon (docs/specs/6). Status is
+/// A machine running the nautelle-runner daemon (docs/specs/6). Status is
 /// derived from the live socket, never stored. Only hashes of the token live
 /// here; `tokenPrefix` is its first 8 characters, used to find the row.
 model Runner {
-  id              String    @id @default(cuid())
-  name            String
-  hostname        String?
-  version         String?
-  protocolVersion Int?
-  os              String?
-  arch            String?
-  capabilities    Json?
-  tokenHash       String?
-  tokenPrefix     String?   @unique
+  id                 String    @id @default(cuid())
+  name               String
+  hostname           String?
+  version            String?
+  protocolVersion    Int?
+  os                 String?
+  arch               String?
+  capabilities       Json?
+  tokenHash          String?
+  tokenPrefix        String?   @unique
   /// Highest contiguous event seq persisted — `welcome.ackedSeq` / `ack.seq`.
-  ackedSeq        BigInt    @default(0)
-  pairedAt        DateTime?
-  lastSeenAt      DateTime?
-  revokedAt       DateTime?
+  ackedSeq           BigInt    @default(0)
+  pairedAt           DateTime?
+  lastSeenAt         DateTime?
+  revokedAt          DateTime?
   /// Nullable so deleting the admin who created it keeps the runner.
-  createdById     String?
+  createdById        String?
   /// The user a local request (hook or MCP) acts as (spec 201 D8); backfilled
   /// from `createdById`. Null: every local request is `forbidden`.
-  localUserId     String?
+  localUserId        String?
   /// Away mode: permission prompts go to the web app and Telegram (spec 201 D17).
-  awayMode        Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  awayMode           Boolean   @default(false)
+  /// #719: profile keys a person hid from Nautelle on this runner — left out
+  /// of every project's terminal-setup checklist. The runner's local policy
+  /// does not read it.
+  ignoredProfileKeys String[]  @default([])
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   createdBy            User?                 @relation("RunnerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   localUser            User?                 @relation("RunnerLocalUser", fields: [localUserId], references: [id], onDelete: SetNull)
@@ -389,6 +396,11 @@ model Project {
   rootPath                    String
   /// `owner/name` on GitHub — the only forge a project connects on (ADR-0004).
   repo                        String
+  /// GitHub's id of `repo` (spec 27 D7): set by the first App delivery matched
+  /// by name, then deliveries route by it and a rename on GitHub updates
+  /// `repo`. BigInt like `github_installation_repos.repoId`. Cleared when a
+  /// refresh finds a different repository.
+  githubRepoId                BigInt?
   displayName                 String
   baseBranch                  String
   baseSource                  BaseSource
@@ -407,67 +419,72 @@ model Project {
   hasClaudeMd                 Boolean
   hasAgentsMd                 Boolean
   lastInspectedAt             DateTime
+  /// #691: why the runner's local policy refuses to watch this project, as the
+  /// runner worded it in its latest `runner.watch_refused` (ADR-0047). Null
+  /// while the runner watches it.
+  watchRefusal                String?
   /// Nullable so deleting the admin who connected it keeps the project.
   createdById                 String?
   createdAt                   DateTime   @default(now())
   updatedAt                   DateTime   @updatedAt
 
-  runner               Runner                       @relation(fields: [runnerId], references: [id], onDelete: Restrict)
-  defaultProfile       RuntimeProfile?              @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
-  createdBy            User?                        @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  members              ProjectMember[]
-  docsSource           DocsSource?
-  rounds               Round[]
-  slots                Slot[]
-  orchestrator         FleetOrchestrator?
-  sessions             AgentSession[]
-  workflows            SessionWorkflow[]
-  issues               IssueCache[]
-  queueStates          QueueStateRow[]
-  issueFeed            IssueFeed?
-  commandRuns          CommandRun[]
-  orchestratorSettings ProjectOrchestratorSettings?
-  activityItems        ActivityItem[]
-  runs                 Run[]
-  mergeApprovals       MergeApproval[]
-  notifications        Notification[]
-  notificationMutes    NotificationMute[]
-  installedSkills      InstalledSkill[]
-  skillInstallPreviews SkillInstallPreview[]
-  schedules            Schedule[]
-  budgets              Budget[]
-  inboundTriggers      InboundTrigger[]
-  githubAppHealth      GitHubProjectHealth?
-  plannerInstructions  PlannerInstructions[]
-  plannerSettings      PlannerSettings?
-  plans                Plan[]
-  sessionContents      SessionContent[]
-  actionRequests       ActionRequest[]
-  uiProfiles           UiProfile[]
-  designSettings       DesignSettings?
-  boardCards           BoardCard[]
-  boardStacks          BoardStack[]
-  boardSettings        BoardSettings?
-  cardCaptures         CardCapture[]
-  cardDismissals       CardDismissal[]
-  textNormalizations   TextNormalization[]
-  textSettings         TextSettings?
-  attachments          Attachment[]
+  runner                 Runner                       @relation(fields: [runnerId], references: [id], onDelete: Restrict)
+  defaultProfile         RuntimeProfile?              @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
+  createdBy              User?                        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  members                ProjectMember[]
+  docsSource             DocsSource?
+  rounds                 Round[]
+  slots                  Slot[]
+  orchestrator           FleetOrchestrator?
+  sessions               AgentSession[]
+  workflows              SessionWorkflow[]
+  issues                 IssueCache[]
+  queueStates            QueueStateRow[]
+  issueFeed              IssueFeed?
+  commandRuns            CommandRun[]
+  orchestratorSettings   ProjectOrchestratorSettings?
+  activityItems          ActivityItem[]
+  runs                   Run[]
+  mergeApprovals         MergeApproval[]
+  notifications          Notification[]
+  notificationMutes      NotificationMute[]
+  installedSkills        InstalledSkill[]
+  skillInstallPreviews   SkillInstallPreview[]
+  schedules              Schedule[]
+  budgets                Budget[]
+  inboundTriggers        InboundTrigger[]
+  githubAppHealth        GitHubProjectHealth?
+  plannerInstructions    PlannerInstructions[]
+  plannerSettings        PlannerSettings?
+  plans                  Plan[]
+  sessionContents        SessionContent[]
+  actionRequests         ActionRequest[]
+  uiProfiles             UiProfile[]
+  designSettings         DesignSettings?
+  boardCards             BoardCard[]
+  boardStacks            BoardStack[]
+  boardSettings          BoardSettings?
+  cardCaptures           CardCapture[]
+  cardDismissals         CardDismissal[]
+  textNormalizations     TextNormalization[]
+  textSettings           TextSettings?
+  attachments            Attachment[]
   assistantConversations AssistantConversation[]
-  tokenSaverSettings   TokenSaverSettings?
-  tokenSaverStats      TokenSaverStat[]
-  stewardSettings      StewardSettings?
-  stewardIncidents     StewardIncident[]
-  stewardDigests       StewardDigest[]
-  aiDigestSettings     AiDigestSettings?
-  aiDigests            AiDigest[]
-  aiSummaries          AiSummary[]
-  handoffNotes         HandoffNote[]
-  rules                ProjectRule[]
-  telegramLinks        TelegramLink[]
-  telegramIntakes      TelegramIntake[]
+  tokenSaverSettings     TokenSaverSettings?
+  tokenSaverStats        TokenSaverStat[]
+  stewardSettings        StewardSettings?
+  stewardIncidents       StewardIncident[]
+  stewardDigests         StewardDigest[]
+  aiDigestSettings       AiDigestSettings?
+  aiDigests              AiDigest[]
+  aiSummaries            AiSummary[]
+  handoffNotes           HandoffNote[]
+  rules                  ProjectRule[]
+  telegramLinks          TelegramLink[]
+  telegramIntakes        TelegramIntake[]
 
   @@unique([runnerId, rootPath])
+  @@index([githubRepoId])
   @@map("projects")
 }
 
@@ -741,28 +758,28 @@ model AgentSession {
   ownerId         String?
   /// Live state from hooks; null for sessions no hook has reported.
   liveState       SessionLiveState?
-  /// `agentdock-manual-*` tmux session from `agentdock-runner claude` (D23).
+  /// `nautelle-manual-*` tmux session from `nautelle-runner claude` (D23).
   tmuxSession     String?
 
-  runner         Runner               @relation(fields: [runnerId], references: [id], onDelete: Cascade)
-  owner          User?                @relation("SessionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  project        Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  parent         AgentSession?        @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
-  children       AgentSession[]       @relation("SessionParent")
-  turns          Turn[]
-  llmRequests    LlmRequest[]
-  toolCalls      ToolCall[]
-  spawnedBy      ToolCall[]           @relation("ToolCallChild")
-  compactions    SessionCompaction[]
-  errors         SessionError[]
-  workflow       SessionWorkflow?
-  workflowMark   SessionWorkflowMark?
-  contents       SessionContent[]
-  actionRequests ActionRequest[]
+  runner               Runner                @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+  owner                User?                 @relation("SessionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  project              Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent               AgentSession?         @relation("SessionParent", fields: [parentSessionId], references: [id], onDelete: SetNull)
+  children             AgentSession[]        @relation("SessionParent")
+  turns                Turn[]
+  llmRequests          LlmRequest[]
+  toolCalls            ToolCall[]
+  spawnedBy            ToolCall[]            @relation("ToolCallChild")
+  compactions          SessionCompaction[]
+  errors               SessionError[]
+  workflow             SessionWorkflow?
+  workflowMark         SessionWorkflowMark?
+  contents             SessionContent[]
+  actionRequests       ActionRequest[]
   assistantAttachments AssistantAttachment[]
-  cardCaptures   CardCapture[]
-  capturedCards  BoardCard[]          @relation("BoardCardSourceSession")
-  trackedCard    BoardCard?           @relation("BoardCardTrackedSession")
+  cardCaptures         CardCapture[]
+  capturedCards        BoardCard[]           @relation("BoardCardSourceSession")
+  trackedCard          BoardCard?            @relation("BoardCardTrackedSession")
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
@@ -1228,7 +1245,7 @@ model IssueCache {
 }
 
 /// The queue state of each open ready issue, recomputed on every change of its inputs.
-/// `state`/`why`/`clears` are AgentDock's own (D3); `source` says whether the
+/// `state`/`why`/`clears` are Nautelle's own (D3); `source` says whether the
 /// orchestrator's fresher verdict (D4) is the one shown.
 model QueueStateRow {
   id                 String           @id @default(cuid())
@@ -1444,13 +1461,13 @@ model NotificationDelivery {
 
 /// The Telegram private chat a user linked (D9). One chat per user, one user per chat.
 model TelegramLink {
-  userId           String   @id
-  chatId           BigInt   @unique
-  username         String?
-  linkedAt         DateTime @default(now())
+  userId                  String   @id
+  chatId                  BigInt   @unique
+  username                String?
+  linkedAt                DateTime @default(now())
   /// #500: the project the chat's Board commands act on (`/project`). Null
   /// until chosen; a deleted project clears it.
-  currentProjectId String?
+  currentProjectId        String?
   /// #620: the assistant conversation the chat's free text continues. Null
   /// until the chat's first message, after `/newchat`, and once it is deleted.
   assistantConversationId String?
@@ -2240,7 +2257,7 @@ model GitHubApp {
   ownerLogin             String
   privateKey             String
   webhookSecret          String
-  /// Stored, unused: AgentDock does no OAuth (D3).
+  /// Stored, unused: Nautelle does no OAuth (D3).
   clientSecret           String?
   /// False when the manifest had no `PUBLIC_URL` (D14).
   hookActive             Boolean
@@ -2883,7 +2900,7 @@ enum BoardCardSource {
 enum CardRoundTrigger {
   run
   feedback
-  /// #359 D6: started by AgentDock for a red check or a merge conflict.
+  /// #359 D6: started by Nautelle for a red check or a merge conflict.
   ci_fix
 }
 
@@ -2947,7 +2964,7 @@ enum CardEffort {
   high
 }
 
-/// A work item AgentDock owns (ADR-0024), not a GitHub issue. Each Run or
+/// A work item Nautelle owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
   id                      String           @id @default(cuid())
@@ -3119,40 +3136,40 @@ model BoardCard {
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
-  project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  prBaseCard         BoardCard?             @relation("BoardCardPrBase", fields: [prBaseCardId], references: [id], onDelete: SetNull)
+  project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  prBaseCard           BoardCard?             @relation("BoardCardPrBase", fields: [prBaseCardId], references: [id], onDelete: SetNull)
   /// #636: the cards stacked on this one's branch.
-  stackedOn          BoardCard[]            @relation("BoardCardPrBase")
-  plan               Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
-  stage              BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
-  trackedSession     AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
-  createdBy          User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  movedBy            User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
-  completedBy        User?                  @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  capture            CardCapture?           @relation(fields: [captureId], references: [id], onDelete: SetNull)
-  sourceSession      AgentSession?          @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
-  rounds             BoardCardRound[]
-  design             TaskDesign?
-  designTurns        PlanTurn[]
-  textNormalizations TextNormalization[]
-  attachments        Attachment[]
+  stackedOn            BoardCard[]            @relation("BoardCardPrBase")
+  plan                 Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
+  stage                BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  trackedSession       AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
+  createdBy            User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  movedBy              User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
+  completedBy          User?                  @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  capture              CardCapture?           @relation(fields: [captureId], references: [id], onDelete: SetNull)
+  sourceSession        AgentSession?          @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
+  rounds               BoardCardRound[]
+  design               TaskDesign?
+  designTurns          PlanTurn[]
+  textNormalizations   TextNormalization[]
+  attachments          Attachment[]
   assistantAttachments AssistantAttachment[]
   /// #337 D7: the plan task Create cards made this card from.
-  planTasks          PlanTask[]             @relation("PlanTaskCard")
+  planTasks            PlanTask[]             @relation("PlanTaskCard")
   /// #337 D8: the cards this one runs after.
-  dependsOn          BoardCardDependency[]  @relation("BoardCardDependsOn")
+  dependsOn            BoardCardDependency[]  @relation("BoardCardDependsOn")
   /// #337 D8: the cards that run after this one.
-  dependants         BoardCardDependency[]  @relation("BoardCardDependant")
+  dependants           BoardCardDependency[]  @relation("BoardCardDependant")
   /// #359 D8: every PR the card opened; `prUrl` is the latest.
-  pullRequests       BoardCardPullRequest[]
+  pullRequests         BoardCardPullRequest[]
   /// #592: the intake candidate accepted as this card.
-  candidate          PlanCandidate?
+  candidate            PlanCandidate?
   /// #660: the triage hints written when the card was made.
-  triage             BoardCardTriage?
+  triage               BoardCardTriage?
   /// #652: the card's place in its stack's run queue.
-  stackRunEntry      BoardStackRunCard?
+  stackRunEntry        BoardStackRunCard?
   /// #652: the stack runs this card paused.
-  stackRunsPaused    BoardStackRun[]        @relation("BoardStackRunPausedCard")
+  stackRunsPaused      BoardStackRun[]        @relation("BoardStackRunPausedCard")
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3365,7 +3382,7 @@ model BoardCardRound {
   runId               String           @unique
   trigger             CardRoundTrigger
   /// #443: started by Auto-run when ready, after this dependency (`C-<n>`)
-  /// was accepted; `null` for a round a person or AgentDock started.
+  /// was accepted; `null` for a round a person or Nautelle started.
   autoRunAfter        Int?
   /// The person's feedback (D9), at most 8 000 characters.
   feedback            String?
@@ -3379,7 +3396,7 @@ model BoardCardRound {
   /// Nullable so deleting the author keeps the round.
   authorId            String?
   phase               CardRoundPhase   @default(queued)
-  /// `agentdock-card-<shortId>`.
+  /// `nautelle-card-<shortId>`.
   tmuxSession         String?
   /// #367 D3: how the round's session reports (`plugin` | `injected` | `none`),
   /// from `card_run.started`; `null` until that event arrives.
@@ -3477,11 +3494,11 @@ model Attachment {
   expiresAt  DateTime?
   createdAt  DateTime  @default(now())
 
-  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  card     BoardCard?      @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  round    BoardCardRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  plan     Plan?           @relation(fields: [planId], references: [id], onDelete: SetNull)
-  uploader User?           @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  card      BoardCard?           @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  round     BoardCardRound?      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  plan      Plan?                @relation(fields: [planId], references: [id], onDelete: SetNull)
+  uploader  User?                @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
   assistant AssistantAttachment?
 
   @@index([cardId, createdAt])
@@ -3767,7 +3784,7 @@ model TokenSaverStat {
   program       String?
   rawBytes      Int
   keptBytes     Int
-  /// `AGENTDOCK_RAW=1`: the command ran unfiltered.
+  /// `NAUTELLE_RAW=1`: the command ran unfiltered.
   bypassed      Boolean
   /// The filter returned the original output.
   passedThrough Boolean
@@ -4053,16 +4070,16 @@ enum AssistantAttachmentKind {
 
 /// One person's chat with the assistant. Personal: only `userId` reads it.
 model AssistantConversation {
-  id        String       @id @default(cuid())
-  userId    String
+  id          String       @id @default(cuid())
+  userId      String
   /// Null is Auto: the assistant works the project out from the message and
   /// records it here once resolved.
-  projectId String?
+  projectId   String?
   /// Null until the first reply; written by the cheapest enabled model.
-  title     String?
+  title       String?
   /// The model picked for the conversation; null is the instance default.
-  provider  LlmProvider?
-  model     String?
+  provider    LlmProvider?
+  model       String?
   /// English digest of the messages older than the verbatim window; null until
   /// the conversation outgrows it (ADR-0068 §10).
   summary     String?
@@ -4071,8 +4088,8 @@ model AssistantConversation {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project     Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
   messages      AssistantMessage[]
   attachments   AssistantAttachment[]
   telegramLinks TelegramLink[]
@@ -4202,20 +4219,20 @@ enum AiSummarySubject {
 /// language. `sourceHash` fingerprints what it was made from: a summary whose
 /// source changed is made again, an unchanged one is served without a call.
 model AiSummary {
-  id          String           @id @default(cuid())
-  projectId   String
-  subject     AiSummarySubject
+  id         String           @id @default(cuid())
+  projectId  String
+  subject    AiSummarySubject
   /// `board_cards.id` or `sessions.id`; no foreign key, like incidents.
-  subjectId   String
+  subjectId  String
   /// BCP 47 primary language the text is written in, e.g. `en`, `ru`.
-  language    String
-  sourceHash  String
-  text        String
-  provider    LlmProvider
-  model       String
-  costUsd     Decimal          @db.Decimal(14, 6)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  language   String
+  sourceHash String
+  text       String
+  provider   LlmProvider
+  model      String
+  costUsd    Decimal          @db.Decimal(14, 6)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 

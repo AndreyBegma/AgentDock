@@ -1,9 +1,9 @@
-import { BOARD_ERROR } from '@agentdock/shared';
+import { BOARD_ERROR } from '@nautelle/shared';
 import type {
   CardCommandName,
   IssueCreateArgs,
   RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { seedProject } from '../../fleet/testing/fleet-e2e';
 import { RunnerConnectHooks } from '../../runners/runner-connect-hooks';
 import { RunnerEventSinks } from '../../runners/runner-event-sinks';
@@ -32,6 +32,7 @@ type WorldCommand =
   | 'card.ciRetrigger'
   | 'card.prClose'
   | 'card.prRetarget'
+  | 'card.prOpen'
   | 'issue.create'
   | 'pr.inspect'
   | 'docs.publish_specs';
@@ -124,6 +125,8 @@ export class BoardWorld {
   ciRetriggerServed = true;
   /** #636: whether the runner advertises `card.prRetarget`. */
   prRetargetServed = true;
+  /** #709: whether the runner advertises `card.prOpen`. */
+  prOpenServed = true;
   /** #329 D4: the delayed collect retries scheduled so far, oldest first. */
   retries: ScheduledRetry[] = [];
   connectHooks!: RunnerConnectHooks;
@@ -199,6 +202,15 @@ export class BoardWorld {
         this.commands.assertReady(runnerId, 'card.prRetarget');
         return this.answer('card.prRetarget', { ...args });
       });
+    jest
+      .spyOn(this.commands, 'servesPrOpen')
+      .mockImplementation(() => this.prOpenServed);
+    jest
+      .spyOn(this.commands, 'openPr')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.prOpen');
+        return this.answer('card.prOpen', { ...args });
+      });
     this.connectHooks = this.ctx.app.get(RunnerConnectHooks);
     const timer = this.ctx.app.get(CollectRetryTimer);
     jest.spyOn(timer, 'schedule').mockImplementation((cardId, delayMs, run) => {
@@ -228,9 +240,16 @@ export class BoardWorld {
       'card.checks': cardChecks(),
       'card.ciRetrigger': { retriggered: true },
       'card.prRetarget': { retargeted: true, alreadyThere: false },
+      'card.prOpen': {
+        opened: true,
+        prNumber: 91,
+        prUrl: 'https://github.com/acme/widget/pull/91',
+        alreadyOpen: false,
+        mergeable: 'MERGEABLE',
+      },
       'card.run': {
         phase: 'starting',
-        tmuxSession: `agentdock-card-${String(args.shortId)}`,
+        tmuxSession: `nautelle-card-${String(args.shortId)}`,
       },
       'card.stop': { stopped: true },
       'card.collect': {
@@ -282,6 +301,7 @@ export class BoardWorld {
     jest.mocked(this.commands.checks).mockClear();
     jest.mocked(this.commands.ciRetrigger).mockClear();
     jest.mocked(this.commands.retargetPr).mockClear();
+    jest.mocked(this.commands.openPr).mockClear();
     this.handlers = {};
     this.offline = false;
     this.unserved = new Set();
@@ -289,6 +309,7 @@ export class BoardWorld {
     this.checksServed = false;
     this.ciRetriggerServed = true;
     this.prRetargetServed = true;
+    this.prOpenServed = true;
     this.retries = [];
     await resetDatabase(this.ctx.prisma);
     ({ runnerId: this.runnerId, projectId: this.a } = await seedProject(
@@ -377,6 +398,20 @@ export class BoardWorld {
   prRetargets(): Record<string, unknown>[] {
     return jest
       .mocked(this.commands.retargetPr)
+      .mock.calls.map(([, args]) => ({ ...args }));
+  }
+
+  /** #709: the `card.checks` commands sent, oldest first. */
+  checks(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.checks)
+      .mock.calls.map(([, args]) => ({ ...args }));
+  }
+
+  /** #709: the `card.prOpen` commands sent, oldest first. */
+  prOpens(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.openPr)
       .mock.calls.map(([, args]) => ({ ...args }));
   }
 

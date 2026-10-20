@@ -3,7 +3,7 @@ import {
   isActiveRoundPhase,
   type PendingQuestion,
   type SessionMessageInput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { ANONYMOUS_ACTOR, userActor } from '../audit/audit.types';
@@ -58,7 +58,7 @@ type Authorized =
  * #489 M2: a `card.waiting` message on Telegram carries the question's
  * options as buttons and takes a reply as text for the session. As with
  * the PR and action-request buttons, every press and reply is checked from
- * scratch: a private chat linked to an AgentDock user with the one-time
+ * scratch: a private chat linked to a Nautelle user with the one-time
  * code (`/start <code>`), a message sent to that user for this card, an
  * active user who is an operator of the project now. It is then sent as
  * `session.message` through `BoardSessionMessages`, which audits it

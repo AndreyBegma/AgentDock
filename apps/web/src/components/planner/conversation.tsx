@@ -1,9 +1,9 @@
 'use client';
 
-import type { PlanAnswer, PlanQuestion, PlanTurnView } from '@agentdock/shared';
 import { ChatThread } from '@andrewbehma/glass-ui/chat-thread';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { PromptInput } from '@andrewbehma/glass-ui/prompt-input';
+import type { PlanAnswer, PlanQuestion, PlanTurnView } from '@nautelle/shared';
 import { useState } from 'react';
 import { formatDate, pluralize } from '../../lib/format';
 import { roundKey } from '../../lib/planner/answers';

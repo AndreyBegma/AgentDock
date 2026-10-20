@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { AUDIT_ACTIONS, AUDIT_RESULTS } from '@agentdock/shared';
+import { AUDIT_ACTIONS, AUDIT_RESULTS } from '@nautelle/shared';
 import {
   ACTION_LABEL,
   actionGroupLabel,

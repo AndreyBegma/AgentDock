@@ -1,4 +1,4 @@
-import { type PlanTaskIssueView, parseClosingRefs } from '@agentdock/shared';
+import { type PlanTaskIssueView, parseClosingRefs } from '@nautelle/shared';
 import type { PrismaService } from '../database/prisma.service';
 import { readyLabelOf } from '../queue/queue-inputs';
 import { liveStatusOf } from './task-status';

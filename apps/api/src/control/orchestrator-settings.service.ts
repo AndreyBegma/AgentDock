@@ -2,11 +2,11 @@ import type {
   OrchestratorProfileRef,
   OrchestratorSettingsView,
   Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   ORCHESTRATOR_DEFAULTS,
   type OrchestratorPermissionMode,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

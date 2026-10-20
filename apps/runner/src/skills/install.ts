@@ -7,7 +7,7 @@ import type {
   SkillInstallResult,
   SkillProvenance,
   SkillUninstallArgs,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';

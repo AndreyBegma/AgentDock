@@ -1,4 +1,4 @@
-import { WEBHOOK_REQUEST_TIMEOUT_MS } from '@agentdock/shared';
+import { WEBHOOK_REQUEST_TIMEOUT_MS } from '@nautelle/shared';
 import { type HostResolver, systemResolver } from './ssrf-guard';
 
 /** How the webhooks module paces its loops and reaches targets; tests override it. */

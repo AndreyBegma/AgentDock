@@ -187,7 +187,7 @@ const EVENT_RULES: Record<string, EventRule> = {
     title: (ctx) => `Message sent to ${who(ctx)}`,
     keep: [],
   },
-  // Server events of the `agentdock` plugin (spec 201 D7, D19): only from
+  // Server events of the `nautelle` plugin (spec 201 D7, D19): only from
   // source `api`, so a runner can never forge one.
   'manual.note': {
     category: 'fleet',
@@ -451,6 +451,7 @@ const AUDIT_TITLES: Record<string, string> = {
   'project.member_remove': 'Member removed',
   'project.docs_source_override': 'Docs source overridden',
   'project.docs_source_reset': 'Docs source reset',
+  'project.repo_rename': 'Project repository renamed on GitHub',
   'issue.create': 'Issue created',
   'issue.queue': 'Issue queued for the fleet',
   'orchestrator.start': 'Orchestrator start requested',

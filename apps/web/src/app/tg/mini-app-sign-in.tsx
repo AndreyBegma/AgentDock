@@ -1,11 +1,11 @@
 'use client';
 
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Spinner } from '@andrewbehma/glass-ui/spinner';
 import type {
   TelegramSignInRequest,
   TelegramSignInResponse,
-} from '@agentdock/shared';
-import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import { Spinner } from '@andrewbehma/glass-ui/spinner';
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
@@ -108,10 +108,10 @@ function Problem({ problem }: { problem: MiniAppProblem }) {
       return (
         <AuthCard
           title="Link your account first"
-          description="This Telegram account is not linked to AgentDock yet."
+          description="This Telegram account is not linked to Nautelle yet."
         >
           <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm text-ink-2">
-            <li>Sign in to AgentDock in a browser.</li>
+            <li>Sign in to Nautelle in a browser.</li>
             <li>Open Account → Notifications and connect Telegram.</li>
             <li>Come back to the bot and open the app again.</li>
           </ol>
@@ -135,7 +135,7 @@ function Problem({ problem }: { problem: MiniAppProblem }) {
       return (
         <AuthCard
           title="Open this in Telegram"
-          description="This page signs you in from the AgentDock bot. Open it with the bot's menu button in Telegram, or sign in here with your password."
+          description="This page signs you in from the Nautelle bot. Open it with the bot's menu button in Telegram, or sign in here with your password."
         >
           <Link
             href="/login"

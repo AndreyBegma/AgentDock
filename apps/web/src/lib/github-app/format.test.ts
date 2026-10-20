@@ -3,7 +3,7 @@ import {
   GITHUB_APP_EVENTS,
   GITHUB_APP_PERMISSIONS,
   GITHUB_HEALTH_REASONS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   apiCallbackUrl,

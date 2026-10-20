@@ -1,7 +1,7 @@
 import {
   TOKEN_SAVER_MCP_ALLOW_MAX,
   type UpdateTokenSaverSettingsBody,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,

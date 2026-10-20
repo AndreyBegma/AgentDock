@@ -5,8 +5,8 @@ import {
   inboundTriggerActionSchema,
   isValidValuePattern,
   WEBHOOKS_ERROR,
-} from '@agentdock/shared';
-import { isRunnableSkill } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { isRunnableSkill } from '@nautelle/shared/protocol';
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 import { webhooksError } from '../common';

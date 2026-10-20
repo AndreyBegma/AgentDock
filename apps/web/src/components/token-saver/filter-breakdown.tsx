@@ -1,4 +1,4 @@
-import type { TokenSaverFilterSavings } from '@agentdock/shared';
+import type { TokenSaverFilterSavings } from '@nautelle/shared';
 import { formatNumber } from '../../lib/format';
 import {
   filterLabel,

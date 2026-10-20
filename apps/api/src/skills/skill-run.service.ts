@@ -8,7 +8,7 @@ import {
   type SkillRunDetail,
   type SkillRunRequest,
   type SkillRunView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   isRunnableSkill,
   isTerminalSkillRunPhase,
@@ -16,7 +16,7 @@ import {
   SKILL_RUN_DEFAULT_TIMEOUT_SEC,
   type SkillRunArgs,
   skillRunArgsSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service';

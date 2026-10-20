@@ -4,7 +4,7 @@ import {
   type SkillSearchArgs,
   type SkillSearchResult,
   skillCatalogItemSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Clock } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import { errorMessage } from '../log';

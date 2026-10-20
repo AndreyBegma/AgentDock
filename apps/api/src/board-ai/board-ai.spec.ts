@@ -16,7 +16,7 @@ describe('parseAskAnswer', () => {
   it('keeps only values the search knows', () => {
     const parsed = parseAskAnswer({
       language: 'ru',
-      projects: ['AgentDock', 3],
+      projects: ['Nautelle', 3],
       text: ['digest, ', 'x', 'Telegram'],
       columns: ['finished', 'review'],
       kind: 'chore',
@@ -28,7 +28,7 @@ describe('parseAskAnswer', () => {
     expect(parsed).toEqual({
       language: 'ru',
       query: {
-        projects: ['AgentDock'],
+        projects: ['Nautelle'],
         text: ['digest', 'Telegram'],
         columns: ['finished'],
         kind: null,
@@ -65,7 +65,7 @@ describe('parseAskAnswer', () => {
 });
 
 describe('projectsOfQuery', () => {
-  const dock = { id: 'p1', displayName: 'AgentDock', repo: 'acme/agentdock' };
+  const dock = { id: 'p1', displayName: 'Nautelle', repo: 'acme/agentdock' };
   const billing = {
     id: 'p2',
     displayName: 'Billing',

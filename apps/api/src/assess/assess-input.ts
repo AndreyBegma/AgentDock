@@ -4,7 +4,7 @@ import {
   CARD_ASSESS_PROMPT_MAX_BYTES,
   type CardAssessAnswer,
   cardAssessAnswerSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { z } from 'zod';
 
 /**

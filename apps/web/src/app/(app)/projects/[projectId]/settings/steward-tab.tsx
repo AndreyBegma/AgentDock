@@ -1,10 +1,5 @@
 'use client';
 
-import {
-  STEWARD_SILENCE_MINUTES_MAX,
-  STEWARD_SILENCE_MINUTES_MIN,
-  type StewardSettingsView,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
@@ -12,6 +7,11 @@ import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import {
+  STEWARD_SILENCE_MINUTES_MAX,
+  STEWARD_SILENCE_MINUTES_MIN,
+  type StewardSettingsView,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { Time } from '../../../../../lib/format/time';

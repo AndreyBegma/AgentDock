@@ -2,7 +2,7 @@ import {
   CARD_DRAFT_SECTIONS,
   INTAKE_SPLIT_MAX,
   type PlanDetail,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { block, PlannerHarness } from './testing/planner-e2e';
 
 /**

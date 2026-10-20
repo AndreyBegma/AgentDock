@@ -1,10 +1,10 @@
 'use client';
 
-import type { SlotWorktreeView } from '@agentdock/shared';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { SlotWorktreeView } from '@nautelle/shared';
 import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';

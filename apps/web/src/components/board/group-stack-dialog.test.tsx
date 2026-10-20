@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { BOARD_ERROR, STACK_GATE_REASON } from '@agentdock/shared';
+import { BOARD_ERROR, STACK_GATE_REASON } from '@nautelle/shared';
 import { ApiError } from '../../lib/api';
 import { card } from '../../lib/board/fixtures';
 import { planGroup } from '../../lib/board/stacks';

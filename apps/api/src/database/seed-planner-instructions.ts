@@ -9,7 +9,7 @@ import type { PrismaClient } from '@prisma/client';
  * image (which carries `packages/shared` whole).
  */
 export const DEFAULT_PLANNER_INSTRUCTIONS_PATH = resolve(
-  dirname(require.resolve('@agentdock/shared')),
+  dirname(require.resolve('@nautelle/shared')),
   '../src/planner/default-instructions.md',
 );
 

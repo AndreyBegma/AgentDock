@@ -1,4 +1,4 @@
-import { PLANNER_QUESTION_MAX } from '@agentdock/shared';
+import { PLANNER_QUESTION_MAX } from '@nautelle/shared';
 import { Inject, Injectable } from '@nestjs/common';
 
 /** How the bot reaches the speech-to-text service (#594); tests override it. */

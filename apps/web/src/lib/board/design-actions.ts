@@ -1,4 +1,4 @@
-import type { BoardCardView } from '@agentdock/shared';
+import type { BoardCardView } from '@nautelle/shared';
 
 /**
  * A card's design on the board (#243). Approving with "Continue after design"

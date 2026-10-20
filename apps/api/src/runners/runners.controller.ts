@@ -3,8 +3,8 @@ import type {
   AdminRunnerDetail,
   PairingCodeResponse,
   PingResult,
-} from '@agentdock/shared';
-import { PAIRING_PATH, type PairingResponse } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { PAIRING_PATH, type PairingResponse } from '@nautelle/shared/protocol';
 import {
   Body,
   Controller,

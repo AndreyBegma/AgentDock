@@ -14,14 +14,16 @@ import {
   parsePlannerOutput,
   type ReviseOutput,
   type WriteOutput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   isPlanTurnEventType,
   type PlanTurnFinishedData,
   type PlanTurnPhaseChangedData,
+  type PlanTurnResultChunkData,
   planTurnEventDataSchemas,
+  planTurnResultChunkDataSchema,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { Plan, PlanTask, PlanTurn, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
@@ -33,6 +35,7 @@ import {
   designTurnPlanOf,
   withDesign,
 } from '../design/design-rules';
+import { withMockupScriptCheck } from '../design/design-scripts';
 import {
   applySuggestions,
   cardDesignTaskKey,
@@ -155,6 +158,8 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
   }
 
   async handle(runnerId: string, events: RunnerEvent[]): Promise<void> {
+    /** #686: result chunks of this batch, not stored yet. */
+    const chunks: PlanTurnResultChunkData[] = [];
     for (const event of events) {
       if (!isPlanTurnEventType(event.type)) continue;
       const parsed = planTurnEventDataSchemas[event.type].safeParse(event.data);
@@ -169,10 +174,69 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           runnerId,
           parsed.data as PlanTurnPhaseChangedData,
         );
+      } else if (event.type === 'plan_turn.result_chunk') {
+        chunks.push(parsed.data as PlanTurnResultChunkData);
       } else {
-        await this.finished(runnerId, parsed.data as PlanTurnFinishedData);
+        await this.finished(
+          runnerId,
+          await this.joinChunks(
+            runnerId,
+            parsed.data as PlanTurnFinishedData,
+            chunks,
+          ),
+        );
       }
     }
+  }
+
+  /**
+   * #686 (ADR-0070): a result over one event's cap came ahead as
+   * `plan_turn.result_chunk` events — in this batch, or in earlier ones the
+   * events table holds. Joined in `index` order they are the `resultText`;
+   * a missing chunk fails the turn as a truncated result would.
+   */
+  private async joinChunks(
+    runnerId: string,
+    data: PlanTurnFinishedData,
+    batch: PlanTurnResultChunkData[],
+  ): Promise<PlanTurnFinishedData> {
+    const count = data.resultChunks;
+    if (count === undefined) return data;
+    const { resultChunks: _count, ...rest } = data;
+    const mine = (c: PlanTurnResultChunkData) =>
+      c.turnId === data.turnId && c.runId === data.runId;
+    const texts = new Map<number, string>();
+    for (const c of batch) if (mine(c)) texts.set(c.index, c.text);
+    if (texts.size < count) {
+      const stored = await this.prisma.event.findMany({
+        where: {
+          runnerId,
+          type: 'plan_turn.result_chunk',
+          AND: [
+            { data: { path: ['turnId'], equals: data.turnId } },
+            { data: { path: ['runId'], equals: data.runId } },
+          ],
+        },
+        select: { data: true },
+      });
+      for (const row of stored) {
+        const c = planTurnResultChunkDataSchema.safeParse(row.data);
+        if (c.success && mine(c.data) && !texts.has(c.data.index))
+          texts.set(c.data.index, c.data.text);
+      }
+    }
+    const ordered: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const text = texts.get(i);
+      if (text === undefined) {
+        this.logger.warn(
+          `runner ${runnerId}: plan turn ${data.turnId} lost result chunk ${i} of ${count}`,
+        );
+        return { ...rest, resultTruncated: true };
+      }
+      ordered.push(text);
+    }
+    return { ...rest, resultText: ordered.join('') };
   }
 
   /**
@@ -489,13 +553,15 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           'contract_violation: invalid_shape: the design turn lost its variant; generate it again',
         );
       }
-      const parsed = parsePlannerOutput(resultText ?? '', 'design', {
-        contractVersion: CARD_DESIGN_CONTRACT_VERSION,
-        taskKey: host.taskKey,
-        variant: designPlan.variant,
-        openCommentIds: designPlan.comments,
-        previousFrames: await previousFramesOf(tx, owner, designPlan),
-      });
+      const parsed = withMockupScriptCheck(
+        parsePlannerOutput(resultText ?? '', 'design', {
+          contractVersion: CARD_DESIGN_CONTRACT_VERSION,
+          taskKey: host.taskKey,
+          variant: designPlan.variant,
+          openCommentIds: designPlan.comments,
+          previousFrames: await previousFramesOf(tx, owner, designPlan),
+        }),
+      );
       if (!parsed.ok) {
         return fail(
           'failed',
@@ -602,17 +668,19 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
             },
           };
         }
-        return parsePlannerOutput(body, 'design', {
-          contractVersion,
-          taskKey: task.key,
-          variant: designPlan.variant,
-          openCommentIds: designPlan.comments,
-          previousFrames: await previousFramesOf(
-            tx,
-            { planId: plan.id, taskKey: task.key },
-            designPlan,
-          ),
-        });
+        return withMockupScriptCheck(
+          parsePlannerOutput(body, 'design', {
+            contractVersion,
+            taskKey: task.key,
+            variant: designPlan.variant,
+            openCommentIds: designPlan.comments,
+            previousFrames: await previousFramesOf(
+              tx,
+              { planId: plan.id, taskKey: task.key },
+              designPlan,
+            ),
+          }),
+        );
       case 'clarify':
       case 'decompose':
       case 'discuss':

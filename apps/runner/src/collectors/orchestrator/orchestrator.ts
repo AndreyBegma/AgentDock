@@ -6,7 +6,7 @@ import { emitPaneChanges } from '../tmux/sessions';
 import type { TmuxPane } from '../tmux/tmux';
 import { PaneTracker } from '../tmux/tracker';
 
-/** The tmux session AgentDock launches the orchestrator in (D6). */
+/** The tmux session Nautelle launches the orchestrator in (D6). */
 export const ORCHESTRATOR_SESSION = 'agentdock-orchestrator';
 /** The skill the orchestrator runs; found in a pane's command line (D6). */
 export const ORCHESTRATOR_SKILL = 'code-sentinel:orchestrator';

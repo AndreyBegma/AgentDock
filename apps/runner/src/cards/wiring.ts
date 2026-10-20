@@ -1,8 +1,9 @@
 import { join } from 'node:path';
+import { RUNNER_MCP_SERVER } from '@nautelle/shared';
 import type {
   CardRunWiring,
   CardRunWiringReason,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { readProfileAgentdock } from '../detect/capabilities';
 import { claudeConfigDir } from '../detect/profiles';
@@ -11,12 +12,12 @@ import { writeJsonAtomic } from '../skills/run/record';
 
 /** #367 D1: the round's files, beside `run.json`. */
 export const CARD_WIRING_FILES = {
-  settings: 'agentdock-settings.json',
-  mcp: 'agentdock-mcp.json',
+  settings: 'nautelle-settings.json',
+  mcp: 'nautelle-mcp.json',
 } as const;
 
 /** The MCP server's name — the plugin's, so `finish_card` reads the same. */
-export const CARD_MCP_SERVER = 'agentdock';
+export const CARD_MCP_SERVER = RUNNER_MCP_SERVER;
 
 interface HookEntry {
   event: string;
@@ -26,7 +27,7 @@ interface HookEntry {
 }
 
 /**
- * The hooks of `plugins/agentdock/hooks/hooks.json`, in its order and with
+ * The hooks of `plugins/nautelle/hooks/hooks.json`, in its order and with
  * its options (`wiring.spec.ts` holds the two together).
  */
 const HOOKS: readonly HookEntry[] = [
@@ -62,7 +63,7 @@ export interface CardHooksSettings {
 
 /**
  * D1: the plugin's hooks, each calling this runner by its absolute argv
- * instead of `agentdock-runner` on `PATH`. `|| true`: a hook never fails the
+ * instead of `nautelle-runner` on `PATH`. `|| true`: a hook never fails the
  * session, as in the plugin.
  */
 export const cardHooksSettings = (
@@ -90,7 +91,7 @@ export const cardHooksSettings = (
   };
 };
 
-/** D1: the plugin's MCP server (`agentdock-runner mcp`), by absolute argv. */
+/** D1: the plugin's MCP server (`nautelle-runner mcp`), by absolute argv. */
 export const cardMcpConfig = (selfCommand: readonly string[]) => {
   const [command, ...rest] = selfCommand;
   if (command === undefined) throw new Error('the runner has no argv');
@@ -116,7 +117,7 @@ export interface CardWiring {
 }
 
 /**
- * D1, D2: a profile whose plugin report names the agentdock plugin gets
+ * D1, D2: a profile whose plugin report names the nautelle plugin gets
  * nothing (it would fire every hook twice); any other gets the round's two
  * files. A write that fails leaves the round unwired, with the reason —
  * it still starts.

@@ -1,13 +1,5 @@
 'use client';
 
-import {
-  CARD_DRAFT_BODY_MAX,
-  CARD_DRAFT_TITLE_MAX,
-  type CandidateDecidedDetails,
-  type PlanCandidateView,
-  type PlanDetail,
-  type PlanTaskKind,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
@@ -19,6 +11,14 @@ import {
 } from '@andrewbehma/glass-ui/segmented-control';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  CARD_DRAFT_BODY_MAX,
+  CARD_DRAFT_TITLE_MAX,
+  type CandidateDecidedDetails,
+  type PlanCandidateView,
+  type PlanDetail,
+  type PlanTaskKind,
+} from '@nautelle/shared';
 import { useState } from 'react';
 import {
   acceptCandidates,

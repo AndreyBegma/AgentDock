@@ -1,4 +1,4 @@
-import type { LlmProviderId } from '@agentdock/shared';
+import type { LlmProviderId } from '@nautelle/shared';
 import { LlmError } from '../llm-error';
 import { redactSecrets } from '../redact';
 

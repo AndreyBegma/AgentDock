@@ -1,11 +1,11 @@
-import { SCHEDULES_ERROR, type ScheduleTarget } from '@agentdock/shared';
+import { SCHEDULES_ERROR, type ScheduleTarget } from '@nautelle/shared';
 import {
   isRunnableSkill,
   orchestratorModeSchema,
   skillArgsTextSchema,
   skillInvocationSchema,
   skillRunOutputSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { schedulesError } from './schedules-error';
 

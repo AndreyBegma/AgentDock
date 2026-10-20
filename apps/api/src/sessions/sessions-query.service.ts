@@ -4,7 +4,7 @@ import {
   type SessionDetail,
   type SessionListResponse,
   type SessionTotals,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthUser } from '../auth';

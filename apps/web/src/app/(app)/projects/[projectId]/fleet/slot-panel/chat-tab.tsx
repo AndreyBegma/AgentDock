@@ -1,10 +1,10 @@
 'use client';
 
-import type { SlotConversation } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ChatThread } from '@andrewbehma/glass-ui/chat-thread';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { SlotConversation } from '@nautelle/shared';
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { Markdown } from '../../../../../../components/markdown/markdown';
 import { AsyncSection } from '../../../../../../components/prerequisites/async-section';

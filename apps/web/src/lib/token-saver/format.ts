@@ -5,12 +5,13 @@ import {
   FILTER_ID_NONE_OFF,
   FILTER_ID_NONE_UNCOVERED,
   FILTER_ID_READ_REFUSED,
+  isRunnerMcpServer,
   type ProjectRuntimeProfile,
   type TokenSavedView,
   type TokenSaverRunKind,
   type TokenSaverSessionKind,
   type TokenSaverUnmeasuredKind,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import { formatCost, formatNumber, formatTokens } from '../format';
 
@@ -154,20 +155,22 @@ export function keptShare(rawBytes: number, keptBytes: number): number {
 /**
  * What the allowlist offers: every server the runner reports across the
  * project's profiles, plus names already allowed that no profile reports now
- * (kept visible, so saving never drops one silently). `agentdock` is always
- * loaded and is not a choice. Sorted, unique.
+ * (kept visible, so saving never drops one silently). The runner's own server
+ * (`nautelle`, `agentdock` before ADR-0073) is always loaded and is not a
+ * choice. Sorted, unique.
  */
 export function mcpChoices(
   profiles: readonly Pick<ProjectRuntimeProfile, 'mcpServers'>[],
   allowed: readonly string[],
 ): { name: string; reported: boolean }[] {
   const reported = new Set(
-    profiles.flatMap((profile) => profile.mcpServers ?? []),
+    profiles
+      .flatMap((profile) => profile.mcpServers ?? [])
+      .filter((name) => !isRunnerMcpServer(name)),
   );
-  reported.delete('agentdock');
   const names = new Set([...reported, ...allowed]);
-  names.delete('agentdock');
   return [...names]
+    .filter((name) => !isRunnerMcpServer(name))
     .sort((a, b) => a.localeCompare(b))
     .map((name) => ({ name, reported: reported.has(name) }));
 }

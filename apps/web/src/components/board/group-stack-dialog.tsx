@@ -1,5 +1,11 @@
 'use client';
 
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import {
   BOARD_ERROR,
   type BoardCardView,
@@ -7,13 +13,7 @@ import {
   COLUMN_TITLE,
   STACK_BODY_MAX,
   STACK_TITLE_MAX,
-} from '@agentdock/shared';
-import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
-import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
-import { Toggle } from '@andrewbehma/glass-ui/toggle';
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../../lib/api';
 import { createStack } from '../../lib/board/actions';

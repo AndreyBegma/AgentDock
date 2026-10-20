@@ -6,7 +6,7 @@ import {
   type DocsRule,
   type DocsSource,
   type DocsSourceKind,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Exec } from '../detect/exec';
 import { classifyDocs, emptyClassified } from './classify';
 import { isDirectory, type ProjectFs } from './fs';

@@ -281,6 +281,17 @@ describe('cost per round (#663 D5)', () => {
     expect(weeks).toContain('Week of Oct 12');
   });
 
+  test('are stacked rows below desktop, so a tablet cuts no column (C-301)', () => {
+    const rows = [row('2026-10-12', '1.500000')];
+    for (const html of [
+      renderToStaticMarkup(<CostPerRoundTable rows={rows} empty={null} />),
+      renderToStaticMarkup(<CostPerRoundWeeksTable rows={rows} />),
+    ]) {
+      expect(html).toContain('class="max-desktop:hidden"');
+      expect(html).not.toContain('max-tablet:hidden');
+    }
+  });
+
   test('names the launches it cannot measure', () => {
     const html = renderToStaticMarkup(<UnmeasuredKindsNote />);
     expect(html).toContain('skill runs');

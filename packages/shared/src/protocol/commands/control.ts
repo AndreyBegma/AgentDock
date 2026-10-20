@@ -63,7 +63,7 @@ export const ORCHESTRATOR_DEFAULTS = {
   permissionMode: OrchestratorPermissionMode;
 };
 
-export const ORCHESTRATOR_SESSION_PREFIX = 'agentdock-orch-';
+export const ORCHESTRATOR_SESSION_PREFIX = 'nautelle-orch-';
 
 /**
  * D1: the orchestrator's tmux session for a repository `owner/name`. Never a

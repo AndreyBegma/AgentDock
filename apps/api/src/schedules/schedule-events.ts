@@ -6,8 +6,8 @@ import {
   type ScheduleDisabledReason,
   type ScheduleEventData,
   type ScheduleEventType,
-} from '@agentdock/shared';
-import { API_EVENT_SOURCE } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { API_EVENT_SOURCE } from '@nautelle/shared/protocol';
 import type { Prisma, ScheduleFiring } from '@prisma/client';
 import { recordServerEvent } from '../server-events';
 

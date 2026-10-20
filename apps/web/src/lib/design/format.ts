@@ -1,3 +1,4 @@
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import {
   type BoardCardView,
   DESIGN_ERROR,
@@ -6,8 +7,7 @@ import {
   type TaskDesignStatus,
   type TaskDesignSummary,
   type UiProfileStatus,
-} from '@agentdock/shared';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import { ApiError, type Described } from '../api';
 import {
   RUNNER_UPDATE_HREF,

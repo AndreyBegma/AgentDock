@@ -1,4 +1,4 @@
-import type { SessionInfo } from '@agentdock/shared';
+import type { SessionInfo } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { AuthContext } from './auth-request';

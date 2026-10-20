@@ -1,5 +1,5 @@
-/** The product site: what AgentDock is, for someone who has not met it yet. */
-export const PRODUCT_SITE_URL = 'https://agentdock.luna-realm.com/';
+/** The product site: what Nautelle is, for someone who has not met it yet. */
+export const PRODUCT_SITE_URL = 'https://nautelle.luna-realm.com/';
 
 /**
  * The quiet footer line on the pages without a shell (sign in, register,
@@ -8,7 +8,7 @@ export const PRODUCT_SITE_URL = 'https://agentdock.luna-realm.com/';
 export function SiteLink() {
   return (
     <p className="text-center text-sm text-ink-3">
-      New to AgentDock?{' '}
+      New to Nautelle?{' '}
       <a
         href={PRODUCT_SITE_URL}
         target="_blank"

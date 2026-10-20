@@ -1,11 +1,11 @@
 'use client';
 
-import type { BoardAskHit, BoardAskResponse } from '@agentdock/shared';
-import { COLUMN_TITLE } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { ChipButton } from '@andrewbehma/glass-ui/chip';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { BoardAskHit, BoardAskResponse } from '@nautelle/shared';
+import { COLUMN_TITLE } from '@nautelle/shared';
 import { Activity, GitPullRequest, SquareKanban, X } from 'lucide-react';
 import Link from 'next/link';
 import { createContext, type ReactNode, use, useEffect, useState } from 'react';

@@ -1,5 +1,8 @@
 'use client';
 
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import {
   type AcceptSuggestionRequest,
   BOARD_CARD_BODY_MAX,
@@ -7,10 +10,7 @@ import {
   BOARD_CARD_TITLE_MAX,
   type BoardCardDetail,
   type BoardCardKind,
-} from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useState } from 'react';
 import { confidenceLabel, sessionHref } from '../../lib/board/format';

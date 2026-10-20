@@ -3,7 +3,7 @@ import {
   CARD_CONTINUE_PROMPT,
   CARD_WORKER_PROMPT_VERSION,
   cardFeedbackPrompt,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { Feed } from '../budgets/testing/budgets-e2e';
 import { seedPrices } from '../prices/seed-prices';
@@ -45,7 +45,7 @@ describe('board rounds (e2e)', () => {
         round: 1,
         trigger: 'run',
         phase: 'starting',
-        tmuxSession: `agentdock-card-${card.shortId}`,
+        tmuxSession: `nautelle-card-${card.shortId}`,
       });
       const run = await w.ctx.prisma.run.findUniqueOrThrow({
         where: { id: card.rounds[0].runId },
@@ -394,7 +394,7 @@ describe('board rounds (e2e)', () => {
       });
       expect(issue).not.toHaveProperty('readyLabel');
       expect(issue.body).toContain(
-        'Tracked on AgentDock board card C-1 — worked by a dedicated worker, not queued for the orchestrator.',
+        'Tracked on Nautelle board card C-1 — worked by a dedicated worker, not queued for the orchestrator.',
       );
       const card = await w.card(1);
       expect(card).toMatchObject({

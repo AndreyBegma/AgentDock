@@ -1,11 +1,11 @@
 'use client';
 
-import { type BoardCardView, stackRunText } from '@agentdock/shared';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { Progress } from '@andrewbehma/glass-ui/progress';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { type BoardCardView, stackRunText } from '@nautelle/shared';
 import { ChevronDown, Layers, TriangleAlert } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useId, useState } from 'react';

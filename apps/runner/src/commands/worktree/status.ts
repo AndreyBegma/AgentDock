@@ -5,13 +5,13 @@ import type {
   WorktreeFileStatus,
   WorktreeStatusArgs,
   WorktreeStatusResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   WORKTREE_COMMIT_SUBJECT_MAX,
   WORKTREE_FILE_PATH_MAX,
   WORKTREE_STATUS_MAX_COMMITS,
   WORKTREE_STATUS_MAX_FILES,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { parseWorktreeList } from '../../collectors/worktrees/worktrees';
 import { watchedProject } from '../../control/target';
 import type { Exec } from '../../detect/exec';

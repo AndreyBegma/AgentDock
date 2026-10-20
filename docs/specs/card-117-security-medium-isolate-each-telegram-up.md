@@ -6,7 +6,7 @@
 ## Problem
 F-15 (Z2 INT-02). `apps/api/src/telegram/telegram-poller.ts:216-217` awaits `this.handle(update)` and only then `storeOffset(update_id + 1)`. The callback regexes accept up to 19 digits (`approval-actions.ts:33`, `action-request-actions.ts:23`), which can exceed PostgreSQL `int8`; `authorize()` in `telegram-approval.service.ts` throws on such an id before the offset is stored, so the poller re-fetches the same update forever. Z2 INT-11: `markRead` (`notifications/notifications.service.ts:99`) turns an out-of-range id into a 500. Z2 INT-10: approval buttons are offered to viewers, and `press.pr` is not checked against the notification's PR.
 
-**Attacker.** Anyone in a chat linked to AgentDock (a linked user, or whoever controls a linked chat).
+**Attacker.** Anyone in a chat linked to Nautelle (a linked user, or whoever controls a linked chat).
 
 **Scenario.** One crafted callback payload with an oversized id makes the poller throw on every poll.
 

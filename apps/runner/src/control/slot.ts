@@ -6,7 +6,7 @@ import type {
   SlotMessageResult,
   SlotStopArgs,
   StoppedResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { isoNow } from '../clock';
 import { appendSlotMessage } from '../session/messenger';
 import type { ControlDeps } from './deps';
@@ -42,7 +42,7 @@ export const messageFileContent = (
   args: Pick<SlotMessageArgs, 'from' | 'text'>,
   at: string,
 ): string =>
-  `From: ${args.from} via AgentDock\nDate: ${at}\n\n${args.text.replace(/\n*$/, '\n')}`;
+  `From: ${args.from} via Nautelle\nDate: ${at}\n\n${args.text.replace(/\n*$/, '\n')}`;
 
 /**
  * Replaces `path` atomically: a new file beside it (`wx`, so nothing existing

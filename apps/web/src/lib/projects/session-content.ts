@@ -1,4 +1,4 @@
-import { SESSION_CONTENT_RETENTION_DAYS } from '@agentdock/shared';
+import { SESSION_CONTENT_RETENTION_DAYS } from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 
 const { min, max } = SESSION_CONTENT_RETENTION_DAYS;

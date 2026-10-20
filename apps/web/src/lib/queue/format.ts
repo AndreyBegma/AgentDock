@@ -10,7 +10,7 @@ import {
   SPEC_GAP_TEXT,
   type SpecGap,
   specGap,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import { updateRunnerText } from '../control/format';
 import type { FilterCodec } from '../filters/url-filters';
@@ -110,19 +110,19 @@ export function boardColumns(
 }
 
 /**
- * D4: the muted "AgentDock computes X" note, only when the orchestrator's
- * verdict is shown and AgentDock's own differs.
+ * D4: the muted "Nautelle computes X" note, only when the orchestrator's
+ * verdict is shown and Nautelle's own differs.
  */
 export function computedNote(item: QueueItemView): string | null {
   if (item.source !== 'orchestrator' || item.computed === null) return null;
   if (item.computed.state === item.state) return null;
-  return `AgentDock computes ${stateLabel(item.computed.state)}`;
+  return `Nautelle computes ${stateLabel(item.computed.state)}`;
 }
 
 export const sourceLabel = (item: Pick<QueueItemView, 'source'>): string =>
   item.source === 'orchestrator'
     ? 'Verdict from the orchestrator’s latest round'
-    : 'Computed by AgentDock from the issues';
+    : 'Computed by Nautelle from the issues';
 
 /**
  * What fills the queue (rule R3), and how an issue gets in. Before the first
@@ -152,7 +152,7 @@ export function heldForLeadSummary(count: number): string {
 
 /** The footer under the list: whose verdict the dots show. */
 export const roundFooter = (round: { date: string; round: string }): string =>
-  `A green dot marks the orchestrator’s verdict from round ${round.date} ${round.round}. Without one, AgentDock computes the state from the issues.`;
+  `A green dot marks the orchestrator’s verdict from round ${round.date} ${round.round}. Without one, Nautelle computes the state from the issues.`;
 
 /** The banner for a queue the runner could not read (rule R4): the cause and the fix. */
 export function queueUnavailableCopy(

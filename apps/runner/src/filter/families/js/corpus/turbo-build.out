@@ -1,30 +1,30 @@
 • turbo 2.9.5
-• Packages in scope: @agentdock/api, @agentdock/runner, @agentdock/shared, @agentdock/web
+• Packages in scope: @nautelle/api, @nautelle/runner, @nautelle/shared, @nautelle/web
 • Running build in 4 packages
 • Remote caching disabled
-@agentdock/shared:build: cache miss, executing 4f1d0c7a2b9e3a10
-@agentdock/shared:build:
-@agentdock/shared:build: $ tsc
-@agentdock/shared:build:
-@agentdock/runner:build: cache hit, replaying logs 91c3d2f7aa04be55
-@agentdock/runner:build:
-@agentdock/runner:build: $ bun build --compile src/main.ts --outfile dist/agentdock-runner
-@agentdock/runner:build:   [31ms]  bundle  412 modules
-@agentdock/runner:build:  [102ms] compile  dist/agentdock-runner
-@agentdock/api:build: cache miss, executing 77be12c9d0a4f831
-@agentdock/api:build:
-@agentdock/api:build: $ nest build
-@agentdock/api:build:
-@agentdock/web:build: cache miss, executing e0a8b6741c52d9f3
-@agentdock/web:build:
-@agentdock/web:build: $ next build
-@agentdock/web:build: ▲ Next.js 16.2.3 (Turbopack)
-@agentdock/web:build:
-@agentdock/web:build:   Creating an optimized production build ...
-@agentdock/web:build: ✓ Compiled successfully in 12.7s
-@agentdock/web:build:   Running TypeScript ...
-@agentdock/web:build:   Finished TypeScript in 13.1s ...
-@agentdock/web:build:
+@nautelle/shared:build: cache miss, executing 4f1d0c7a2b9e3a10
+@nautelle/shared:build:
+@nautelle/shared:build: $ tsc
+@nautelle/shared:build:
+@nautelle/runner:build: cache hit, replaying logs 91c3d2f7aa04be55
+@nautelle/runner:build:
+@nautelle/runner:build: $ bun build --compile src/main.ts --outfile dist/agentdock-runner
+@nautelle/runner:build:   [31ms]  bundle  412 modules
+@nautelle/runner:build:  [102ms] compile  dist/agentdock-runner
+@nautelle/api:build: cache miss, executing 77be12c9d0a4f831
+@nautelle/api:build:
+@nautelle/api:build: $ nest build
+@nautelle/api:build:
+@nautelle/web:build: cache miss, executing e0a8b6741c52d9f3
+@nautelle/web:build:
+@nautelle/web:build: $ next build
+@nautelle/web:build: ▲ Next.js 16.2.3 (Turbopack)
+@nautelle/web:build:
+@nautelle/web:build:   Creating an optimized production build ...
+@nautelle/web:build: ✓ Compiled successfully in 12.7s
+@nautelle/web:build:   Running TypeScript ...
+@nautelle/web:build:   Finished TypeScript in 13.1s ...
+@nautelle/web:build:
 
  Tasks:    4 successful, 4 total
 Cached:    1 cached, 4 total

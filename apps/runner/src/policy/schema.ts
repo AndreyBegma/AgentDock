@@ -8,7 +8,7 @@ import {
   type PolicyGatedCommand,
   policyCodeDenySchema,
   type RunnerPolicy,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 
 const gatedCommandsShape = Object.fromEntries(
@@ -19,7 +19,7 @@ const gatedCommandsShape = Object.fromEntries(
  * The `policy` block of `runner.json` (ADR-0047). Every field defaults to the
  * safe value: no allowed root, nothing above `auto`, no terminal write, no
  * profile skill install, no gated command, no `code.deny` pattern beyond the
- * secrets every runner refuses. Only `agentdock-runner policy …`
+ * secrets every runner refuses. Only `nautelle-runner policy …`
  * and `pair --allow-root` write it; the daemon only reads it.
  */
 export const policyConfigSchema = z

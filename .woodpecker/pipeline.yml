@@ -83,7 +83,7 @@ services:
       POSTGRES_PASSWORD: ci
       POSTGRES_DB: agentdock
     tmpfs:
-      - /var/lib/postgresql/data:size=1g
+      - /var/lib/postgresql/data:size=2g
     commands:
       - docker-entrypoint.sh postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off
   - name: redis
@@ -127,7 +127,7 @@ steps:
       - event: [push, manual]
     environment: *turbo_env
     commands:
-      - bun run typecheck --filter=@agentdock/web
+      - bun run typecheck --filter=@nautelle/web
 
   - name: build
     image: *ci_image
@@ -139,6 +139,8 @@ steps:
     environment: *turbo_env
     commands:
       - bun run build -- --concurrency=2
+      # C-295: no user-visible "AgentDock" in what the web app serves.
+      - bun scripts/check-brand.ts --web
 
   # `$$` keeps a variable from Woodpecker's own substitution, so the shell
   # expands it.

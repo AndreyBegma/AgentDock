@@ -1,12 +1,12 @@
+import type { CommandPaletteGroup } from '@andrewbehma/glass-ui/command-palette';
 import type {
   PlanSummary,
   ProjectSummary,
   Role,
   RunSummary,
   SessionSummary,
-} from '@agentdock/shared';
-import { BOARD_ASK_QUESTION_MAX } from '@agentdock/shared';
-import type { CommandPaletteGroup } from '@andrewbehma/glass-ui/command-palette';
+} from '@nautelle/shared';
+import { BOARD_ASK_QUESTION_MAX } from '@nautelle/shared';
 import {
   FolderGit2,
   Lightbulb,
@@ -18,6 +18,7 @@ import {
   SquareTerminal,
   User,
 } from 'lucide-react';
+import { runHref } from '../../lib/history/format';
 import { planHref } from '../../lib/planner/href';
 import { planLabel, runLabel, sessionLabel } from './crumbs';
 import { type VisibleSection, visibleNav } from './nav';
@@ -89,7 +90,7 @@ function group(id: string, title: string, items: Item[]) {
   return items.length > 0 ? [{ id, title, items }] : [];
 }
 
-/** The project's own pages, labelled "AgentDock › Fleet". */
+/** The project's own pages, labelled "Nautelle › Fleet". */
 function projectPages(project: ProjectSummary, role: Role): Item[] {
   const section = visibleNav(role, `/projects/${project.id}`).find(
     (candidate) => candidate.id === 'project',
@@ -172,7 +173,7 @@ export function paletteGroups(input: PaletteInput): CommandPaletteGroup[] {
       };
     }
     return {
-      id: `go:/projects/${run.projectId}/history/${run.id}`,
+      id: `go:${runHref(run.projectId, run.id)}`,
       label: runLabel(run),
       hint: ['Run', where].filter(Boolean).join(' · '),
       icon: Play,

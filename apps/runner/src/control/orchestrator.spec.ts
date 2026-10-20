@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { OrchestratorState } from '@agentdock/shared/protocol';
+import type { OrchestratorState } from '@nautelle/shared/protocol';
 import { createDispatcher } from '../commands/dispatcher';
 import { createHandlers } from '../commands/handlers';
 import type { ConfigProfile } from '../config';
@@ -27,7 +27,7 @@ import {
 } from './orchestrator';
 import { CREATED, FAKE_SELF_COMMAND, fakeTmux } from './testing';
 
-const SESSION = 'agentdock-orch-acme-widget';
+const SESSION = 'nautelle-orch-acme-widget';
 const target = { projectId: 'prj_1', root: '/srv/widget' };
 const start = {
   ...target,
@@ -54,7 +54,7 @@ const codex: ConfigProfile = {
 const startedIso = new Date(CREATED * 1000).toISOString();
 
 describe('orchestrator.start', () => {
-  it('creates agentdock-orch-<slug> in the root, running exec-run on a 0600 launch file with D2 argv and the profile env', async () => {
+  it('creates nautelle-orch-<slug> in the root, running exec-run on a 0600 launch file with D2 argv and the profile env', async () => {
     const fake = fakeTmux({ profiles: [claudeWork] });
 
     expect(await startOrchestrator(start, fake.deps)).toEqual({
@@ -94,7 +94,7 @@ describe('orchestrator.start', () => {
       env: { CLAUDE_CONFIG_DIR: '/home/dev/.claude-profiles/work' },
       cwd: '/srv/widget',
       interactive: true,
-      label: 'agentdock orchestrator',
+      label: 'nautelle orchestrator',
     });
     await stopOrchestrator(target, fake.deps);
   });
@@ -236,7 +236,7 @@ describe('orchestrator.start', () => {
   it('names the session after the root basename when there is no origin', async () => {
     const fake = fakeTmux({ profiles: [claudeWork], origin: null });
     expect((await startOrchestrator(start, fake.deps)).session).toBe(
-      'agentdock-orch-widget',
+      'nautelle-orch-widget',
     );
   });
 });
@@ -342,7 +342,7 @@ describe('orchestrator.message', () => {
     expect(name).toMatch(/^msg-2026-10-08T10-00-00-000Z-[0-9a-f]{6}\.md$/);
     const file = join(messageDir(dir), name ?? '');
     expect(readFileSync(file, 'utf8')).toBe(
-      'From: dev@example.com via AgentDock\n' +
+      'From: dev@example.com via Nautelle\n' +
         'Date: 2026-10-08T10:00:00.000Z\n' +
         '\n' +
         'Hold i43 until #188 merges.\n\nThen dispatch it.\n',

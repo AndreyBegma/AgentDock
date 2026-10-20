@@ -3,7 +3,7 @@ import {
   type AiSummaryErrorCode,
   type AiSummarySubject,
   type AiSummaryView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Injectable } from '@nestjs/common';
 import type { AiSummary } from '@prisma/client';
 import { cardNotFound } from '../board/board-error';

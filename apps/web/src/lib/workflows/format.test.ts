@@ -3,7 +3,7 @@ import type {
   WorkflowSankeyNode,
   WorkflowsOrchestrationResponse,
   WorkflowsSummaryResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import { exportFileName, orchestrationCsv, summaryCsv, toCsv } from './export';
 import {

@@ -4,7 +4,7 @@ import type {
   OrchestratorSettingsView,
   OrchestratorStatus,
   ProjectDetail,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useMemo } from 'react';
 import {
   type ControlReason,

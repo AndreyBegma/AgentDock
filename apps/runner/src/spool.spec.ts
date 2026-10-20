@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import {
   SPOOL_TRUNCATED_EVENT,
   spoolTruncatedDataSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Spool } from './spool';
 import { memoryLogger, tempDir, testEvent } from './testing/fixtures';
 

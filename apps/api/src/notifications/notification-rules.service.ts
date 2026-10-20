@@ -10,7 +10,7 @@ import {
   type NotificationRulesUpdate,
   type NotificationRulesView,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit';
 import type { AuditContext } from '../audit/audit.types';

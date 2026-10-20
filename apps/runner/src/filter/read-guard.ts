@@ -13,7 +13,7 @@ import { dirname, extname, isAbsolute, join } from 'node:path';
 import { type StatsTarget, statsTarget, writeStat } from './stats';
 
 /**
- * `agentdock-runner read-hook` (#616): the runner's own guard on `Read`, so a
+ * `nautelle-runner read-hook` (#616): the runner's own guard on `Read`, so a
  * launch with Token saver on has it whether or not the code-sentinel plugin
  * is in the profile. One subcommand serves three hook events:
  *
@@ -175,12 +175,12 @@ export const guardMessage = (
   size: number,
   lines: number,
 ): string =>
-  `AgentDock token saver: ${path} is ${lines.toLocaleString('en-US')} lines (${kib(size)}) — not read whole. ` +
+  `Nautelle token saver: ${path} is ${lines.toLocaleString('en-US')} lines (${kib(size)}) — not read whole. ` +
   'Read the part you need with offset/limit (Grep finds the line), or ask the `scout` agent to search it. ' +
   'Repeat the same call to read it all.';
 
 export const dedupMessage = (path: string, since: number): string =>
-  `AgentDock token saver: ${path} (this range) is already in your context since ${new Date(since).toISOString().slice(11, 19)} UTC and has not changed. ` +
+  `Nautelle token saver: ${path} (this range) is already in your context since ${new Date(since).toISOString().slice(11, 19)} UTC and has not changed. ` +
   'Use what you have; repeat the same call to read it again.';
 
 const statOf = (input: ReadInput) => {

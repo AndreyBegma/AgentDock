@@ -1,0 +1,103 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook session-start || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook permission-request || true",
+            "timeout": 300
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook user-prompt-submit || true",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook post-tool-use || true",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook post-tool-use-failure || true",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook notification || true",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook stop || true",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook pre-compact || true",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook session-end || true",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

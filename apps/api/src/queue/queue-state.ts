@@ -14,7 +14,7 @@ import {
   SPEC_GAP_TEXT,
   specGap,
   type WaveSlot,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** An `issues_cache` row, as the computation reads it. */
 export interface CachedIssue {
@@ -54,7 +54,7 @@ export interface QueueInputs {
 
 export interface ComputedQueueItem {
   number: number;
-  /** AgentDock's own D3 verdict. */
+  /** Nautelle's own D3 verdict. */
   computed: QueueVerdict;
   /** The orchestrator's verdict from the latest round, fresher or not. */
   orchestrator: QueueVerdict | null;

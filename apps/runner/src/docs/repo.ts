@@ -1,5 +1,5 @@
 import { realpathSync } from 'node:fs';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
 import type { Exec } from '../detect/exec';

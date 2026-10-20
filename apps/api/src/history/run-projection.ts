@@ -1,4 +1,4 @@
-import { deriveRunStatus, type RunStatus } from '@agentdock/shared';
+import { deriveRunStatus, type RunStatus } from '@nautelle/shared';
 import type { Prisma, Slot } from '@prisma/client';
 
 const FINISHED: ReadonlySet<RunStatus> = new Set([

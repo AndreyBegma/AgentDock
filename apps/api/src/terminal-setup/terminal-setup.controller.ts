@@ -1,11 +1,14 @@
-import type { TerminalSetupView } from '@agentdock/shared';
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import type { TerminalSetupView } from '@nautelle/shared';
+import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+import type { AuditContext } from '../audit/audit.types';
+import { AuditCtx } from '../audit/audit-context';
 import {
   ProjectAccess,
   ProjectAccessGuard,
   ProjectRole,
   type ResolvedProjectAccess,
 } from '../projects';
+import { IgnoreTerminalSetupProfileDto } from './dto';
 import { TerminalSetupService } from './terminal-setup.service';
 
 /**
@@ -23,5 +26,25 @@ export class TerminalSetupController {
     @ProjectAccess() access: ResolvedProjectAccess,
   ): Promise<TerminalSetupView> {
     return this.setup.view(access.projectId);
+  }
+
+  /**
+   * #719: hide a profile from Nautelle on the project's runner, or show it
+   * again. A project admin's: it changes the checklist of every project on
+   * that runner.
+   */
+  @Put('terminal-setup/ignored-profiles')
+  @ProjectRole('admin')
+  setIgnored(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @Body() dto: IgnoreTerminalSetupProfileDto,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<TerminalSetupView> {
+    return this.setup.setIgnored(
+      access.projectId,
+      dto.profileKey,
+      dto.ignored,
+      ctx,
+    );
   }
 }

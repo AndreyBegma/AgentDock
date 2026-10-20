@@ -16,7 +16,7 @@ import {
   TRIAGE_HINTS,
   type TriageHint,
   type TriageHintRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,

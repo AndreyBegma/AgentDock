@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { SLOT_STATUSES } from '@agentdock/shared';
+import { SLOT_STATUSES } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   attentionBadge,

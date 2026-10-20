@@ -2,7 +2,7 @@ import {
   AUTH_ERROR,
   type LoginDeniedReason,
   type TelegramSignInResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { type HttpException, Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit';
 import {
@@ -93,7 +93,7 @@ export class TelegramWebAppService {
         authError(
           403,
           AUTH_ERROR.telegramNotLinked,
-          'This Telegram account is not linked to AgentDock. Link it in AgentDock → Account → Notifications.',
+          'This Telegram account is not linked to Nautelle. Link it in Nautelle → Account → Notifications.',
         ),
       );
     }

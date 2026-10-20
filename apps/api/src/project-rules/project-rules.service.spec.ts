@@ -1,4 +1,4 @@
-import { textSourceHash } from '@agentdock/shared';
+import { textSourceHash } from '@nautelle/shared';
 import type { HttpException } from '@nestjs/common';
 import type { ProjectRule } from '@prisma/client';
 import type { AuditService } from '../audit/audit.service';

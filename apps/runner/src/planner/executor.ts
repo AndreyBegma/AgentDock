@@ -1,6 +1,10 @@
 import { existsSync } from 'node:fs';
-import type { PlanTurnPhase } from '@agentdock/shared';
+import type { PlanTurnPhase } from '@nautelle/shared';
 import {
+  chunkResultText,
+  jsonStringBytes,
+  PLAN_TURN_RESULT_MAX_BYTES,
+  PLAN_TURN_RESULT_TOTAL_MAX_BYTES,
   type PlanCancelArgs,
   type PlanCancelResult,
   type PlanCloseArgs,
@@ -9,8 +13,9 @@ import {
   type PlanTurnResult,
   planTurnFinishedDataSchema,
   planTurnPhaseChangedDataSchema,
+  planTurnResultChunkDataSchema,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type AttachmentSource, syncAttachments } from '../cards/attachments';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
@@ -51,7 +56,7 @@ export const PLAN_IDLE_MS = 14 * 24 * 60 * 60_000;
 
 export interface PlanExecutorOptions {
   deps: SkillsDeps;
-  /** `$XDG_STATE_HOME/agentdock/plans`, beside the skill runs. */
+  /** `$XDG_STATE_HOME/nautelle/plans`, beside the skill runs. */
   plansDir: string;
   /** The argv that starts this runner: `exec-run <turnDir>` is appended. */
   selfCommand: readonly string[];
@@ -548,6 +553,7 @@ export class PlanTurnExecutor {
           stderr: readTail(this.store.file(turn, 'stderr'), 64 * 1024),
           timeoutSec: turn.timeoutSec,
           fallbackSessionId: turn.startedAt ? turn.session.id : undefined,
+          maxResultBytes: PLAN_TURN_RESULT_TOTAL_MAX_BYTES,
         }),
       );
     } finally {
@@ -572,7 +578,7 @@ export class PlanTurnExecutor {
     try {
       data = planTurnFinishedDataSchema.parse({
         ...this.ref(turn),
-        ...outcome,
+        ...this.sendResult(turn, outcome),
         at,
       });
     } catch (error) {
@@ -588,6 +594,32 @@ export class PlanTurnExecutor {
     // Released after the event, so the API hears the end before the next start.
     this.options.slots.release(slotId(turn));
     this.keepNote(turn, outcome.phase);
+  }
+
+  /**
+   * #686 (ADR-0070): a result that fits one event stays `resultText`; a
+   * larger one goes ahead as ordered `plan_turn.result_chunk` events, and
+   * the finished event names how many.
+   */
+  private sendResult(
+    turn: TurnRecord,
+    outcome: ReturnType<typeof turnOutcome>,
+  ): ReturnType<typeof turnOutcome> & { resultChunks?: number } {
+    const { resultText, ...rest } = outcome;
+    if (
+      resultText === undefined ||
+      jsonStringBytes(resultText) <= PLAN_TURN_RESULT_MAX_BYTES
+    )
+      return outcome;
+    const chunks = chunkResultText(resultText);
+    chunks.forEach((text, index) => {
+      this.emitEvent(
+        turn,
+        'plan_turn.result_chunk',
+        planTurnResultChunkDataSchema.parse({ ...this.ref(turn), index, text }),
+      );
+    });
+    return { ...rest, resultChunks: chunks.length };
   }
 
   /**

@@ -7,8 +7,8 @@ describe('compiled binary', () => {
   const { dir, cleanup } = tempDir();
   afterAll(cleanup);
 
-  it('`bun build --compile` produces an agentdock-runner that prints its version', async () => {
-    const outfile = join(dir, 'agentdock-runner');
+  it('`bun build --compile` produces an nautelle-runner that prints its version', async () => {
+    const outfile = join(dir, 'nautelle-runner');
     const build = Bun.spawnSync(
       [
         process.execPath,

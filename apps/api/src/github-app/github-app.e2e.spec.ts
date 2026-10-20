@@ -3,7 +3,7 @@ import {
   GITHUB_APP_PERMISSIONS,
   type GitHubAppView,
   type GitHubManifestResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Logger } from '@nestjs/common';
 import { ModulesContainer } from '@nestjs/core';
 import { SecretCipher } from '../common/crypto';
@@ -566,6 +566,145 @@ describe('GitHub App (e2e, spec 27)', () => {
       expect(seqs).toHaveLength(3);
       expect(seqs.filter((s) => s < 0n)).toHaveLength(2);
       expect(seqs.at(-1)).toBe(1n);
+    });
+  });
+
+  describe('repository id and renames (D7)', () => {
+    const NEW_NAME = 'AndreyBegma/Nautelle';
+    const REPO_ID = 1000;
+    const labeled = (fullName: string, id: number) => ({
+      ...issuesLabeled(fullName),
+      repository: { id, full_name: fullName },
+    });
+    const stored = (projectId: string) =>
+      ctx.prisma.project.findUniqueOrThrow({
+        where: { id: projectId },
+        select: { repo: true, githubRepoId: true },
+      });
+    const polled = async () => {
+      await ctx.app.get(GitHubHookService).debouncer.flushAll();
+      const ids = ctx.sender.sent.map((s) => s.args.projectId);
+      ctx.sender.sent = [];
+      return ids;
+    };
+
+    it('falls back to the name and stores the repository id it finds', async () => {
+      const { projectId } = await seedRepoProject(ctx.prisma, REPO, '/srv/a');
+      await registerWith();
+      ctx.sender.sent = [];
+
+      expect(
+        (await deliver(ctx, 'issues', labeled(REPO, REPO_ID))).status,
+      ).toBe(200);
+      expect(await polled()).toEqual([projectId]);
+      expect(await stored(projectId)).toEqual({
+        repo: REPO,
+        githubRepoId: BigInt(REPO_ID),
+      });
+      // No id in the payload: the name alone still routes.
+      await deliver(ctx, 'issues', issuesLabeled());
+      expect(await polled()).toEqual([projectId]);
+      expect(await auditOf('project.repo_rename')).toEqual([]);
+    });
+
+    it('routes by id after a rename on GitHub and takes the new name, audited', async () => {
+      const { projectId, runnerId } = await seedRepoProject(
+        ctx.prisma,
+        REPO,
+        '/srv/a',
+      );
+      await registerWith();
+      await deliver(ctx, 'issues', labeled(REPO, REPO_ID));
+      ctx.sender.sent = [];
+
+      const deliveryId = 'renamed-delivery-1';
+      const res = await deliver(ctx, 'issues', labeled(NEW_NAME, REPO_ID), {
+        deliveryId,
+      });
+      expect(res.status).toBe(200);
+      expect(await polled()).toEqual([projectId]);
+      expect(await stored(projectId)).toEqual({
+        repo: NEW_NAME,
+        githubRepoId: BigInt(REPO_ID),
+      });
+      // The renaming delivery's row already carries the new name.
+      const rows = await ctx.prisma.event.findMany({
+        where: { runnerId, source: 'github' },
+        select: { projectRepo: true },
+      });
+      expect(rows.map((r) => r.projectRepo).sort()).toEqual(
+        [REPO, NEW_NAME].sort(),
+      );
+
+      const audits = await auditOf('project.repo_rename');
+      expect(audits).toHaveLength(1);
+      expect(audits[0]).toMatchObject({
+        actorType: 'system',
+        projectId,
+        targetType: 'project',
+        targetId: projectId,
+        before: { repo: REPO },
+        after: { repo: NEW_NAME },
+        result: 'ok',
+      });
+      expect(audits[0].meta).toMatchObject({
+        via: 'github',
+        event: 'issues',
+        deliveryId,
+        repoId: REPO_ID,
+      });
+
+      // A new repository that took the old name is not this project's.
+      await deliver(ctx, 'issues', labeled(REPO, 5555));
+      expect(await polled()).toEqual([]);
+      expect((await stored(projectId)).repo).toBe(NEW_NAME);
+    });
+
+    it('takes the new name from repository renamed, even before the id is known', async () => {
+      const { projectId } = await seedRepoProject(ctx.prisma, REPO, '/srv/a');
+      const other = await seedRepoProject(ctx.prisma, 'acme/other', '/srv/b');
+      await registerWith();
+      ctx.sender.sent = [];
+      ctx.github.calls = [];
+
+      const res = await deliver(ctx, 'repository', {
+        action: 'renamed',
+        changes: { repository: { name: { from: 'AgentDock' } } },
+        repository: {
+          id: REPO_ID,
+          full_name: NEW_NAME,
+          owner: { login: 'AndreyBegma' },
+        },
+        installation: { id: 77 },
+        sender: { login: 'archi' },
+      });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ status: 'accepted' });
+      expect(await stored(projectId)).toEqual({
+        repo: NEW_NAME,
+        githubRepoId: BigInt(REPO_ID),
+      });
+      expect(await stored(other.projectId)).toEqual({
+        repo: 'acme/other',
+        githubRepoId: null,
+      });
+      expect(await polled()).toEqual([]);
+      const delivery = await ctx.prisma.gitHubDelivery.findFirstOrThrow({
+        where: { event: 'repository' },
+      });
+      expect(delivery).toMatchObject({ handled: true, projectsMatched: 1 });
+      expect(await auditOf('project.repo_rename')).toHaveLength(1);
+      // The installation's repositories are listed again under the new name.
+      await eventually(() => ctx.github.calls.length > 0);
+
+      // The next event under the new name reaches the project.
+      await deliver(ctx, 'pull_request', {
+        action: 'opened',
+        pull_request: { number: 3, state: 'open' },
+        repository: { id: REPO_ID, full_name: NEW_NAME },
+        installation: { id: 77 },
+      });
+      expect(await polled()).toEqual([projectId]);
     });
   });
 

@@ -1,4 +1,4 @@
-import type { CardsExtractArgs } from '@agentdock/shared/protocol';
+import type { CardsExtractArgs } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { RunnerCommandService } from '../runners/runner-command.service';

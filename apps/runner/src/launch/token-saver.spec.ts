@@ -36,7 +36,7 @@ import {
   tokenSaverLaunch,
 } from './token-saver';
 
-const SELF = ['/opt/agentdock/bin/agentdock-runner'];
+const SELF = ['/opt/nautelle/bin/nautelle-runner'];
 
 describe('tokenSaverLaunch (#445)', () => {
   let home = '';
@@ -79,7 +79,7 @@ describe('tokenSaverLaunch (#445)', () => {
     runKind: 'card',
     projectId: 'prj_a',
     runId: 'run-1',
-    agentdock: [],
+    runnerMcp: [],
     scout: true,
     ...over,
   });
@@ -156,39 +156,39 @@ describe('tokenSaverLaunch (#445)', () => {
     }
   });
 
-  it('gives an allowlist of [playwright] exactly agentdock and playwright', () => {
+  it('gives an allowlist of [playwright] exactly nautelle and playwright', () => {
     const launch = tokenSaverLaunch(
       input({ config: { enabled: true, mcpAllow: ['playwright'] } }),
     );
     const servers = mcpOf(launch?.mcpFile ?? '');
-    expect(Object.keys(servers).sort()).toEqual(['agentdock', 'playwright']);
+    expect(Object.keys(servers).sort()).toEqual(['nautelle', 'playwright']);
     expect(servers.playwright).toEqual({
       command: 'npx',
       args: ['@playwright/mcp'],
     });
-    expect(servers.agentdock).toEqual({ command: SELF[0], args: ['mcp'] });
+    expect(servers.nautelle).toEqual({ command: SELF[0], args: ['mcp'] });
   });
 
-  it('gives an empty allowlist agentdock only', () => {
+  it('gives an empty allowlist nautelle only', () => {
     const launch = tokenSaverLaunch(input());
-    expect(Object.keys(mcpOf(launch?.mcpFile ?? ''))).toEqual(['agentdock']);
+    expect(Object.keys(mcpOf(launch?.mcpFile ?? ''))).toEqual(['nautelle']);
   });
 
-  it('leaves agentdock out of a launch that does not use it', () => {
+  it('leaves nautelle out of a launch that does not use it', () => {
     const launch = tokenSaverLaunch(
       input({
-        agentdock: false,
+        runnerMcp: false,
         config: { enabled: true, mcpAllow: ['woodpecker'] },
       }),
     );
     expect(Object.keys(mcpOf(launch?.mcpFile ?? ''))).toEqual(['woodpecker']);
   });
 
-  it('starts agentdock with the given arguments after `mcp`', () => {
+  it('starts nautelle with the given arguments after `mcp`', () => {
     const launch = tokenSaverLaunch(
-      input({ agentdock: ['--finish-guard', '--issue', '7'] }),
+      input({ runnerMcp: ['--finish-guard', '--issue', '7'] }),
     );
-    expect(mcpOf(launch?.mcpFile ?? '').agentdock).toEqual({
+    expect(mcpOf(launch?.mcpFile ?? '').nautelle).toEqual({
       command: SELF[0],
       args: ['mcp', '--finish-guard', '--issue', '7'],
     });
@@ -199,7 +199,7 @@ describe('tokenSaverLaunch (#445)', () => {
       input({ config: { enabled: true, mcpAllow: ['glitchtip'] } }),
     );
     expect(launch?.missing).toEqual(['glitchtip']);
-    expect(Object.keys(mcpOf(launch?.mcpFile ?? ''))).toEqual(['agentdock']);
+    expect(Object.keys(mcpOf(launch?.mcpFile ?? ''))).toEqual(['nautelle']);
   });
 
   it('writes the MCP file 0600: it may hold the copied secrets', () => {

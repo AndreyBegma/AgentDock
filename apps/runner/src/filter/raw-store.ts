@@ -64,7 +64,7 @@ export const removeRawDir = (runDir: string): void => {
 };
 
 /** Appended to a raw file cut at the cap. */
-export const RAW_TRUNCATED_MARKER = `\n[agentdock filter: raw output truncated at ${RAW_CAP_BYTES / 1024 / 1024} MB]\n`;
+export const RAW_TRUNCATED_MARKER = `\n[nautelle filter: raw output truncated at ${RAW_CAP_BYTES / 1024 / 1024} MB]\n`;
 
 /**
  * A command's raw output on disk: `<run dir>/raw/<n>.log` (D4a). `n` is the

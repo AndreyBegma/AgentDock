@@ -1,4 +1,4 @@
-import type { ProjectRuntimeProfile } from '@agentdock/shared';
+import type { ProjectRuntimeProfile } from '@nautelle/shared';
 import type { RunProfileReason } from '../skills/format';
 
 /**

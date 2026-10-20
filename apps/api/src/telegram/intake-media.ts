@@ -1,7 +1,7 @@
 import {
   ATTACHMENT_MAX_BYTES,
   ATTACHMENTS_PER_CARD_MAX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { TelegramMessage } from './telegram-client';
 
 /**

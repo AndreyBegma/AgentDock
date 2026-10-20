@@ -1,12 +1,12 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { ProjectSummary } from '@nautelle/shared';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { type ComponentProps, useEffect } from 'react';
 import { GettingStarted } from '../../components/onboarding/getting-started';
 import {
   CONNECT_PATH,
@@ -19,6 +19,18 @@ import { useCurrentUser } from '../../components/shell/user-context';
 import { api } from '../../lib/api';
 import { usePrerequisites } from '../../lib/prerequisites/use-prerequisites';
 import { useSection } from '../../lib/section/use-section';
+
+/** The header's primary action keeps client-side navigation. */
+const NextLink: NonNullable<ComponentProps<typeof PageHeader>['link']> = ({
+  href,
+  className,
+  children,
+  ...rest
+}) => (
+  <Link href={href} className={className} {...rest}>
+    {children}
+  </Link>
+);
 
 /** While the checklist is open, the admin is usually pairing on another screen. */
 const SETUP_POLL_MS = 15_000;
@@ -52,8 +64,14 @@ export default function OverviewPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         className="mb-0"
+        eyebrow="Workspace"
         title="Overview"
-        description="What your fleet is doing now, and what waits on you."
+        description="Every project at a glance, and what needs you first."
+        primaryAction={
+          isAdmin ? { label: 'Connect project', href: CONNECT_PATH } : undefined
+        }
+        primaryActionOnPhone="hidden"
+        link={NextLink}
       />
 
       {isAdmin && runners.state === 'loading' ? (
@@ -78,8 +96,8 @@ export default function OverviewPage() {
         section={projects}
         unavailable={{ title: 'Projects are not answering' }}
         skeleton={
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {['a', 'b', 'c', 'd'].map((key) => (
+          <div className="grid grid-cols-1 gap-3 tablet:grid-cols-3">
+            {['a', 'b', 'c'].map((key) => (
               <Skeleton key={key} className="h-28 w-full" />
             ))}
           </div>

@@ -1,4 +1,4 @@
-import type { BoardView } from '@agentdock/shared';
+import type { BoardView } from '@nautelle/shared';
 import { SYSTEM_ACTOR, userActor } from '../audit/audit.types';
 import { BoardService } from '../board/board.service';
 import { BoardCommands } from '../board/board-commands';
@@ -159,7 +159,7 @@ describe('Telegram Board commands (e2e, #576)', () => {
           name === 'card.run'
             ? {
                 phase: 'starting',
-                tmuxSession: `agentdock-card-${String((args as { shortId: string }).shortId)}`,
+                tmuxSession: `nautelle-card-${String((args as { shortId: string }).shortId)}`,
               }
             : { stopped: true },
       }));

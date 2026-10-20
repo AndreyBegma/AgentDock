@@ -11,6 +11,7 @@ export type CrumbNames = ReadonlyMap<string, string>;
 /** Pages with a label of their own that the nav registry does not hold. */
 const STATIC: Record<string, string> = {
   '/account': 'Account',
+  '/account/about': 'About',
   '/account/notifications': 'Notifications',
   '/admin': 'Admin',
   '/admin/integrations/github': 'GitHub App',
@@ -18,6 +19,7 @@ const STATIC: Record<string, string> = {
   '/admin/integrations/telegram': 'Telegram',
   '/admin/integrations/triggers': 'Triggers',
   '/admin/integrations/webhooks': 'Webhooks',
+  '/whats-new': 'What’s new',
 };
 
 /** Paths in the trail that have no page of their own. */
@@ -57,7 +59,6 @@ function kindOf(segments: readonly string[], index: number): string {
   if (parent === 'projects' && index === 1) return 'Project';
   if (parent === 'sessions') return 'Session';
   if (parent === 'runs' && segments[index - 2] === 'skills') return 'Skill run';
-  if (parent === 'history') return 'Run';
   if (parent === 'planner') return 'Plan';
   return 'Details';
 }
@@ -104,13 +105,13 @@ export function crumbsFor(
 }
 
 /** The product, the second half of every tab title outside a project. */
-export const APP_NAME = 'AgentDock';
+export const APP_NAME = 'Nautelle';
 
 /**
- * The tab title for the trail (#213): `"<Page> · AgentDock"`, and inside a
+ * The tab title for the trail (#213): `"<Page> · Nautelle"`, and inside a
  * project `"<Page> · <Project>"`, so two tabs on Fleet of two projects can be
- * told apart and a project named AgentDock does not read "AgentDock ·
- * AgentDock". `projectName` is the project's real name: until it is known the
+ * told apart and a project named Nautelle does not read "Nautelle ·
+ * Nautelle". `projectName` is the project's real name: until it is known the
  * project half falls back to the product rather than to the crumb's kind.
  */
 export function pageTitleOf(

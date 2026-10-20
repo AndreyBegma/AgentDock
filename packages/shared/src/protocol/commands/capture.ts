@@ -4,6 +4,7 @@ import {
   CAPTURE_MIN_TIMEOUT_SEC,
   CAPTURE_MODELS,
 } from '../../board/capture-limits';
+import { bothEnvNames, readEnv } from '../../legacy-names';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { profileKeySchema, skillRunIdSchema } from './skills';
@@ -13,7 +14,7 @@ import { profileKeySchema, skillRunIdSchema } from './skills';
  * has no model key, so an extraction runs on the project's runner — the
  * machine the content came from — as headless `claude -p` with no tools,
  * `--permission-mode plan`, the prompt on stdin, in a run directory outside
- * every watched root and with `AGENTDOCK_HOOKS=off`, so the extraction never
+ * every watched root and with `NAUTELLE_HOOKS=off`, so the extraction never
  * becomes a session that is itself captured.
  *
  * `captureCommands` is defined and exported here, but entered in the
@@ -32,17 +33,26 @@ export const CAPTURE_PROMPT_MAX_BYTES = 48 * 1024;
 export const CAPTURE_EXTRACT_COMMAND_TIMEOUT_MS = 15_000;
 
 /**
- * Hook suppression (D4). With `AGENTDOCK_HOOKS=off` in its environment,
- * `agentdock-runner hook` exits 0 at once and prints nothing; the runner sets
+ * Hook suppression (D4). With `NAUTELLE_HOOKS=off` in its environment,
+ * `nautelle-runner hook` exits 0 at once and prints nothing; the runner sets
  * it on every extraction process.
  */
-export const AGENTDOCK_HOOKS_ENV = 'AGENTDOCK_HOOKS';
-export const AGENTDOCK_HOOKS_OFF = 'off';
+export const HOOKS_ENV = 'NAUTELLE_HOOKS';
+export const HOOKS_OFF = 'off';
+
+/**
+ * The environment that turns the hooks off, under both names during the
+ * rename window (ADR-0073): a session may still run the old plugin's hooks.
+ */
+export const HOOKS_OFF_ENV: Readonly<Record<string, string>> = bothEnvNames(
+  HOOKS_ENV,
+  HOOKS_OFF,
+);
 
 /** Whether an environment turns the runner's hooks off. */
 export const hooksDisabled = (
   env: Readonly<Record<string, string | undefined>>,
-): boolean => env[AGENTDOCK_HOOKS_ENV] === AGENTDOCK_HOOKS_OFF;
+): boolean => readEnv(env, HOOKS_ENV) === HOOKS_OFF;
 
 const utf8Bytes = (text: string): number =>
   new TextEncoder().encode(text).length;

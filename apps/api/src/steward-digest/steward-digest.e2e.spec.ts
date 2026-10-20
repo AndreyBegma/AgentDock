@@ -1,5 +1,5 @@
-import type { StewardDigestView } from '@agentdock/shared';
-import { digestComposeArgsSchema } from '@agentdock/shared/protocol';
+import type { StewardDigestView } from '@nautelle/shared';
+import { digestComposeArgsSchema } from '@nautelle/shared/protocol';
 import { SYSTEM_ACTOR, userActor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { BotTokenStore } from '../notifications';

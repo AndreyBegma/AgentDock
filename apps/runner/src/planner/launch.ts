@@ -1,5 +1,5 @@
 import { basename, dirname, join } from 'node:path';
-import type { PlanTurnArgs, PlanTurnSession } from '@agentdock/shared/protocol';
+import type { PlanTurnArgs, PlanTurnSession } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { runEnv } from '../skills/run/launch';
@@ -13,7 +13,7 @@ export const planWorktreePath = (root: string, shortId: string): string => {
 
 /** The tmux session of one turn; `plan.cancel` kills it. */
 export const planTurnSessionName = (shortId: string): string =>
-  `agentdock-plan-${shortId}`;
+  `nautelle-plan-${shortId}`;
 
 /**
  * D3: which session the turn runs in.
@@ -95,6 +95,6 @@ export const planTurnTokenSaver = (
     runKind: 'plan',
     projectId: args.projectId,
     runId: args.runId,
-    agentdock: [],
+    runnerMcp: [],
     scout: true,
   });

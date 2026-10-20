@@ -8,7 +8,7 @@ import {
   WEBHOOK_REQUEST_TIMEOUT_MS,
   WEBHOOK_RESPONSE_BODY_MAX_BYTES,
   type WebhookAttemptError,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * The SSRF guard of outbound webhooks (docs/specs/26-webhooks.md D15). A URL

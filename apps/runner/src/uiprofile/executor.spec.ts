@@ -5,7 +5,7 @@ import type {
   UiProfileBuildArgs,
   UiProfileBuildFinishedData,
   UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { HandoffWriter, RunNotes } from '../handoff';
@@ -55,7 +55,7 @@ echo '{"type":"result","subtype":"success","is_error":false,"result":"Profiled.\
 
 const setup = async () => {
   const f = await skillsWorkspace();
-  const server = `agentdock-uiprofile-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const server = `nautelle-uiprofile-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
   teardown.push(async () => {
     await releaseTmuxServer(tmuxServer);

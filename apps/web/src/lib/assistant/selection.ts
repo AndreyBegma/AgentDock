@@ -1,4 +1,4 @@
-import { isLlmProvider, type LlmProviderId } from '@agentdock/shared';
+import { isLlmProvider, type LlmProviderId } from '@nautelle/shared';
 
 /** The model picker's option value; the empty string is the instance default. */
 export const modelKey = (

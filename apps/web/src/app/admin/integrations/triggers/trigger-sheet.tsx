@@ -1,12 +1,5 @@
 'use client';
 
-import {
-  type InboundDryRunResult,
-  type InboundTriggerDetail,
-  type InboundTriggerView,
-  type InboundTriggerWithSecret,
-  WEBHOOK_LIVE_EVENTS,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
@@ -24,6 +17,13 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  type InboundDryRunResult,
+  type InboundTriggerDetail,
+  type InboundTriggerView,
+  type InboundTriggerWithSecret,
+  WEBHOOK_LIVE_EVENTS,
+} from '@nautelle/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
 import { Time } from '../../../../lib/format/time';

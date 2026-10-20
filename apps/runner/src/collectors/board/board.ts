@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import type {
   RoundDecisions,
   SlotDispatchedData,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { FleetEmitter, FleetProject } from '../../fleet/project';
 import type { SlotBook } from '../../fleet/slots';
 import { parseBoard } from './parse-board';

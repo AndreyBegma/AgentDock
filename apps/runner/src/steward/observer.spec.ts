@@ -5,11 +5,11 @@ import {
   STEWARD_OBSERVED_EVENT,
   type StewardObservedData,
   type StewardRunnerConfig,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CardRecord } from '../cards/record';
 import type { ConfigProfile } from '../config';
 import { FakeClock } from '../testing/fake-clock';
@@ -45,7 +45,7 @@ const record = (overrides: Partial<CardRecord> = {}): CardRecord => ({
   worktree: '/home/dev/.wt-widget-card-ab12cd34',
   branch: 'card/c12-export-csv',
   base: 'main',
-  tmuxSession: 'agentdock-card-ab12cd34',
+  tmuxSession: 'nautelle-card-ab12cd34',
   runId: 'run_1',
   phase: 'running',
   sessionId: SESSION,
@@ -70,7 +70,7 @@ const setup = (
   const events: UnsequencedEvent[] = [];
   const records = [record()];
   const panes = new Map<string, string | null>([
-    ['agentdock-card-ab12cd34', IDLE],
+    ['nautelle-card-ab12cd34', IDLE],
   ]);
   const project: WatchedProject = {
     id: 'prj_widget',
@@ -107,7 +107,7 @@ const setup = (
       .filter((e) => e.type === STEWARD_OBSERVED_EVENT)
       .map((e) => e.data as StewardObservedData);
   const setPane = (text: string | null) =>
-    panes.set('agentdock-card-ab12cd34', text);
+    panes.set('nautelle-card-ab12cd34', text);
   const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
   return {
     clock,

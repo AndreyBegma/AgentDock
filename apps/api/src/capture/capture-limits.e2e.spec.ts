@@ -3,7 +3,7 @@ import {
   CAPTURE_MAX_PER_PROJECT_PER_DAY,
   CAPTURE_OFFLINE_BACKOFF_MAX_MS,
   CAPTURE_SESSION_MIN_INTERVAL_MS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BudgetGate } from '../budgets';
 import { CaptureWorld, cardsBlock, LONG_PROMPT } from './testing/capture-e2e';
 

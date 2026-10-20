@@ -1,12 +1,3 @@
-import {
-  type FleetEdgeKind,
-  type FleetGraph,
-  type FleetGraphNode,
-  type FleetNodePill,
-  type FleetStage,
-  type OrchestratorStatus,
-} from '@agentdock/shared';
-import type { PrChecks } from '@agentdock/shared/protocol';
 import type {
   FlowEdge,
   FlowEdgeKind,
@@ -16,6 +7,15 @@ import type {
 import type { Hue } from '@andrewbehma/glass-ui/hue';
 import type { MetaBarCounter } from '@andrewbehma/glass-ui/meta-bar';
 import type { Status } from '@andrewbehma/glass-ui/status-pill';
+import {
+  type FleetEdgeKind,
+  type FleetGraph,
+  type FleetGraphNode,
+  type FleetNodePill,
+  type FleetStage,
+  type OrchestratorStatus,
+} from '@nautelle/shared';
+import type { PrChecks } from '@nautelle/shared/protocol';
 import { slotHue } from '../hue';
 import { ORCHESTRATOR_PILL_STATUS } from '../status/pill';
 import { ORCHESTRATOR_STATUS_LABEL } from './format';

@@ -1,5 +1,10 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   BOARD_MAX_RUNNING_MAX,
   BOARD_MAX_RUNNING_MIN,
@@ -7,12 +12,7 @@ import {
   CARD_BACKGROUND_STALL_MINUTES_MAX,
   CARD_BACKGROUND_STALL_MINUTES_MIN,
   type CaptureModel,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { Card } from '@andrewbehma/glass-ui/card';
-import { Field, Input } from '@andrewbehma/glass-ui/field';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import {
   AutoCollectToggle,

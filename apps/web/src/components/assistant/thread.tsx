@@ -1,15 +1,12 @@
 'use client';
 
-import type {
-  AssistantMessageView,
-  AssistantToolStep,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import {
   type ChatMessage,
   ChatThread,
 } from '@andrewbehma/glass-ui/chat-thread';
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import type { AssistantMessageView, AssistantToolStep } from '@nautelle/shared';
 import { useMemo } from 'react';
 import type { TurnNotice } from '../../lib/assistant/notice';
 import type { LiveTool, LiveTurn } from '../../lib/assistant/turn';

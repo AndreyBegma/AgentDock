@@ -2,8 +2,8 @@ import {
   FILTER_STATS_EVENT,
   type FilterStatRow,
   filterStatsDataSchema,
-} from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

@@ -5,8 +5,8 @@ import {
   type AiDigestSkipReason,
   type AiDigestView,
   type LlmDefaultModel,
-} from '@agentdock/shared';
-import { API_EVENT_SOURCE } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { API_EVENT_SOURCE } from '@nautelle/shared/protocol';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

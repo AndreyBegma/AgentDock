@@ -1,6 +1,6 @@
 # Steward — detect stuck agent work, fix the safe cases, tell the person in one line
 
-Issue: [#447](https://github.com/AndreyBegma/AgentDock/issues/447) · Decision: [ADR-0040](../adr/0040-steward.md)
+Issue: [#447](https://github.com/AndreyBegma/Nautelle/issues/447) · Decision: [ADR-0040](../adr/0040-steward.md)
 
 ## Summary
 

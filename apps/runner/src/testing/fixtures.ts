@@ -1,13 +1,13 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { UnsequencedEvent } from '@agentdock/shared/protocol';
+import type { UnsequencedEvent } from '@nautelle/shared/protocol';
 import type { Exec, ExecResult } from '../detect/exec';
 import { createLogger, type Logger } from '../log';
 
 /** A fresh directory, removed by the returned cleanup. */
 export const tempDir = (): { dir: string; cleanup: () => void } => {
-  const dir = mkdtempSync(join(tmpdir(), 'agentdock-runner-'));
+  const dir = mkdtempSync(join(tmpdir(), 'nautelle-runner-'));
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 };
 

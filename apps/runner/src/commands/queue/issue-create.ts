@@ -1,12 +1,12 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DEFAULT_READY_LABEL, specGap } from '@agentdock/shared';
+import { DEFAULT_READY_LABEL, specGap } from '@nautelle/shared';
 import type {
   IssueCreateArgs,
   IssueCreateResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Exec } from '../../detect/exec';
 import { resolveFleetProject } from '../../fleet/project';
 import { CommandFailure } from '../failure';
@@ -63,9 +63,7 @@ export const issueCreate = async (
   const queued = args.queue && reason === null;
   if (queued) labels.push(readyLabel);
 
-  const dir = await mkdtemp(
-    join(deps.tempRoot ?? tmpdir(), 'agentdock-issue-'),
-  );
+  const dir = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'nautelle-issue-'));
   try {
     const bodyFile = join(dir, 'body.md');
     await writeFile(bodyFile, args.body, { mode: 0o600 });

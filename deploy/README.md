@@ -80,12 +80,12 @@ Nothing is published on the host. The stack runs on its own compose network
    the public hostname `staging-agentdock.luna-realm.com` → `HTTP` `proxy:80`.
    Save the token as `~/.agentdock/cloudflared-staging.env`, mode 600, with one
    line: `TUNNEL_TOKEN=...`.
-2. **Woodpecker.** Activate `AndreyBegma/AgentDock` and apply these settings:
+2. **Woodpecker.** Activate `AndreyBegma/Nautelle` and apply these settings:
    - *Trusted → volumes*: on. The trusted steps mount the Docker socket and
      the stack directory, and the postgres service mounts a tmpfs.
    - *Require approval*: forks (`require_approval: "forks"` in the API). The
      repository is public, so a pull request from a fork must wait for a
-     maintainer. A pull request from a branch of `AndreyBegma/AgentDock`
+     maintainer. A pull request from a branch of `AndreyBegma/Nautelle`
      itself — every board card's — must not: *Pull requests* or *All events*
      gates those too (#504). Check the live value with
      `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`.
@@ -147,12 +147,12 @@ side.
    `CF-Access-Client-Secret` on the pairing request and on every WebSocket
    connect, and keeps them in `runner.json` (mode 600):
    ```sh
-   agentdock-runner pair --server https://staging-agentdock.luna-realm.com/api \
+   nautelle-runner pair --server https://staging-agentdock.luna-realm.com/api \
      --code XXXX-XXXX --access-client-id <id>.access --access-client-secret-stdin
    ```
    Give the secret on stdin (`--access-client-secret-stdin`) or in
-   `AGENTDOCK_ACCESS_CLIENT_SECRET` so that it stays out of the shell history;
-   `--access-client-secret <secret>` also works. `agentdock-runner status`
+   `NAUTELLE_ACCESS_CLIENT_SECRET` so that it stays out of the shell history;
+   `--access-client-secret <secret>` also works. `nautelle-runner status`
    shows `access token: set` and never the secret. A re-pair without the flags
    clears the stored token. Rotate the token by pairing again.
 
@@ -182,6 +182,11 @@ docker run --rm -v "$PWD/deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro" \
 - **Attachments** of board cards (ADR-0031) live in the `attachments`
   volume, not in the database. Back the volume up together with `pgdata`:
   the database alone no longer restores everything.
+- **Volume names are pinned** in `docker-compose.yml` (`name:`):
+  `agentdock-staging_pgdata`, `agentdock-staging_redis` and
+  `agentdock-staging_attachments`. Without it Docker prefixes a volume with
+  the compose project name, and renaming the project would start an empty
+  database. Never change a pinned name without copying the volume first.
 - **Migrations and the seed** run in the API's entrypoint, so a failed
   migration keeps the API unhealthy. The deploy fails after 240 s and prints
   the API log.
@@ -194,22 +199,22 @@ docker run --rm -v "$PWD/deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro" \
   reconnect, and the reconnect succeeds on the first try. It is not
   blue/green: one request may be slow by up to the API's boot time.
 - **A runner** pairs against the API through the proxy:
-  `agentdock-runner pair --server https://staging-agentdock.luna-realm.com/api --code XXXX-XXXX`.
+  `nautelle-runner pair --server https://staging-agentdock.luna-realm.com/api --code XXXX-XXXX`.
 - **A pull request with no pipeline** (#484): open the repository's
   *Settings → Webhooks → Recent Deliveries* and look for the PR's delivery.
   A 500, 502, 530 or a timeout there is a delivery Woodpecker never
-  processed; *Redeliver* it, or close and reopen the PR. AgentDock does the
+  processed; *Redeliver* it, or close and reopen the PR. Nautelle does the
   close/reopen by itself for a board card's PR after 5 minutes (ADR-0043).
 - **A pipeline waits for approval on an own-branch PR** (#504): Woodpecker
   shows "This pipeline is awaiting approval from a maintainer!" for a pull
-  request whose head is a branch of `AndreyBegma/AgentDock`, such as a board
+  request whose head is a branch of `AndreyBegma/Nautelle`, such as a board
   card's. Run `gh pr view <number> --json isCrossRepository`: `false` means
   the PR is not from a fork, so the gate comes from the repository setting.
   `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`
   then answers `"pull_requests"` or `"all_events"` instead of `"forks"`. Set
   *Settings → General → Require approval* to *Forks* (an admin of the
   Woodpecker repository can do it) and approve the pipelines already waiting
-  once; the next pull request starts at once. AgentDock pushes a card's
+  once; the next pull request starts at once. Nautelle pushes a card's
   branch to `origin` and opens the PR with `gh pr create --head <branch>` in
   the same repository, and the close/reopen retrigger (ADR-0043) acts on that
   same PR, so neither one makes a PR look like a fork.
@@ -225,7 +230,7 @@ A tag `runner-v<version>` runs `.woodpecker/release-runner.yml`. The workflow
 tests the runner, builds the four binaries, signs `SHA256SUMS` and creates the
 GitHub Release with the tarballs, `SHA256SUMS` and `SHA256SUMS.sig`. It then
 publishes the npm packages, the four platform packages before
-`agentdock-runner`. Last, it pushes `Formula/agentdock-runner.rb` to
+`nautelle-runner`. Last, it pushes `Formula/nautelle-runner.rb` to
 `AndreyBegma/homebrew-tap`. The npm shim and the formula refuse a binary whose
 checksum is not in a `SHA256SUMS` signed by `apps/runner/release-key.pub`.
 
@@ -245,17 +250,17 @@ that, and both must be in place before the first release.
    `release-key.pub` and in the copies the npm shim and the formula template
    embed, which the runner's tests keep equal. The change lands in a pull
    request before the next tag.
-3. **Woodpecker secrets (P-02).** Add three secrets to `AndreyBegma/AgentDock`,
+3. **Woodpecker secrets (P-02).** Add three secrets to `AndreyBegma/Nautelle`,
    each restricted to the **tag** event only. Do not tick **manual** or any
    other event; a manual run is a dry run and gets no secret.
    - `github_release_token`: a GitHub token with *contents: write* on
      `AgentDock` and on `homebrew-tap`;
    - `npm_token`: an npm automation token for the account that owns
-     `agentdock-runner` and `agentdock-runner-{darwin,linux}-{arm64,x64}`;
+     `nautelle-runner` and `nautelle-runner-{darwin,linux}-{arm64,x64}`;
    - `runner_signing_key`: the PEM private key whose public half is
      `apps/runner/release-key.pub`. A tag run without it fails in
      `build-release`, and a different key is refused.
-4. **GitHub tag ruleset (P-03).** In `AndreyBegma/AgentDock` → Settings →
+4. **GitHub tag ruleset (P-03).** In `AndreyBegma/Nautelle` → Settings →
    Rules → Rulesets, add a tag ruleset, *Active*, that targets the tag pattern
    `runner-v*`. Turn on *Restrict creations*, *Restrict updates* and *Restrict
    deletions*, and give the bypass list only the repository administrators.
@@ -291,10 +296,10 @@ that, and both must be in place before the first release.
        -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig
      sha256sum -c --ignore-missing SHA256SUMS
      ```
-   - `npm view agentdock-runner@<version> optionalDependencies` names the four
+   - `npm view nautelle-runner@<version> optionalDependencies` names the four
      platform packages at that version;
-   - `brew update && brew install andreybegma/tap/agentdock-runner` then
-     `agentdock-runner version` prints `<version> <os>-<arch>`. Check it on
+   - `brew update && brew install andreybegma/tap/nautelle-runner` then
+     `nautelle-runner version` prints `<version> <os>-<arch>`. Check it on
      Apple Silicon for the first release. If Gatekeeper refuses the binary,
      ad-hoc signing (`codesign --sign -`) goes into `build-release.sh`.
 

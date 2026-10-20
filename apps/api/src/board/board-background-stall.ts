@@ -4,7 +4,7 @@ import {
   CARD_BACKGROUND_STALLED_EVENT,
   CARD_BACKGROUND_SWEEP_MS,
   type CardBackgroundStalledEventData,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Injectable,
   Logger,

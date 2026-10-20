@@ -3,7 +3,7 @@ import {
   type ActionRequestDecision,
   type ActionRequestStatus,
   actionRequestStatusSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /** `GET /projects/:projectId/action-requests?status`. */

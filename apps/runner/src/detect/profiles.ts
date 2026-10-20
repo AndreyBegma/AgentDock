@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import {
   type RuntimeProfile,
   reportProfileEnv,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { type Env, expandHome } from '../env';
 

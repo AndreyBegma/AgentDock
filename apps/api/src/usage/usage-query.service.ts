@@ -9,8 +9,8 @@ import {
   type UsageSummaryResponse,
   type UsageTimeseriesResponse,
   type UsageTotals,
-} from '@agentdock/shared';
-import type { Runtime } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { Runtime } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthUser } from '../auth';

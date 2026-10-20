@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { PRICE_SOURCES } from '@agentdock/shared';
+import { PRICE_SOURCES } from '@nautelle/shared';
 import { BUCKET_LABEL, SOURCE_LABEL, TEST_BUCKETS } from './format';
 
 test('every bucket and source reads as words, not a field name or enum (R5)', () => {

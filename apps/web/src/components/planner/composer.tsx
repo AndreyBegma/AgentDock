@@ -1,11 +1,5 @@
 'use client';
 
-import {
-  type CreatePlanRequest,
-  claudeModelOptions,
-  type PlanMode,
-  type ProjectRuntimeProfile,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Field, Select, Textarea } from '@andrewbehma/glass-ui/field';
@@ -13,6 +7,12 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
+import {
+  type CreatePlanRequest,
+  claudeModelOptions,
+  type PlanMode,
+  type ProjectRuntimeProfile,
+} from '@nautelle/shared';
 import { useState } from 'react';
 import {
   initialProfileKey,

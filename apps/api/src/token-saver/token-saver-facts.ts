@@ -3,7 +3,7 @@ import type {
   TokenSaverFilterSavings,
   TokenSaverRunKind,
   TokenSaverUnfilteredProgram,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   estimateUsdSaved,
   FILTER_ID_NONE,
@@ -12,7 +12,7 @@ import {
   FILTER_ID_NONE_UNCOVERED,
   TOKEN_SAVER_BYTES_PER_TOKEN,
   TOKEN_SAVER_UNFILTERED_PROGRAMS_MAX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
 import { sessionModelByRun } from '../history/run-usage';

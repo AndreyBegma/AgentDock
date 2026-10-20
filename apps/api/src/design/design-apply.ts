@@ -2,7 +2,7 @@ import {
   type DesignFrameDraft,
   type DesignOutput,
   designFrameSlugs,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import {
   type DesignTurnPlan,

@@ -1,8 +1,8 @@
-import type { BoardCardView, CardRoundBrief } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { BoardCardView, CardRoundBrief } from '@nautelle/shared';
 import {
   Check,
   Clock,

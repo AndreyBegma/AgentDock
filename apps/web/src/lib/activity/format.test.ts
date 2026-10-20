@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { type ActivityItem, STEWARD_ACTIVITY_TYPES } from '@agentdock/shared';
+import { type ActivityItem, STEWARD_ACTIVITY_TYPES } from '@nautelle/shared';
 import {
   ACTIVITY_FILTER_CODEC,
   activityChipDefs,

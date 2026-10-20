@@ -1,5 +1,5 @@
-import type { PriceTier } from '@agentdock/shared';
-import type { TokenBuckets } from '@agentdock/shared/protocol';
+import type { PriceTier } from '@nautelle/shared';
+import type { TokenBuckets } from '@nautelle/shared/protocol';
 import { convertLangfusePrices } from './langfuse';
 import {
   type CompiledPrice,

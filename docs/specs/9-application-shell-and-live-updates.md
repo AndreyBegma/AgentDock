@@ -1,6 +1,6 @@
 # Application shell and live updates
 
-Issue: [#9](https://github.com/AndreyBegma/AgentDock/issues/9) · Roadmap: M1.8 ·
+Issue: [#9](https://github.com/AndreyBegma/Nautelle/issues/9) · Roadmap: M1.8 ·
 Decisions: [ADR-0008](../adr/0008-local-accounts-with-admin-approved-registration.md),
 [ADR-0011](../adr/0011-glass-ui-is-the-component-library.md),
 [overview.md](../architecture/overview.md), [ui/screens.md](../ui/screens.md),

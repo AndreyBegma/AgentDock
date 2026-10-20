@@ -1,16 +1,17 @@
 'use client';
 
-import type {
-  ProjectSummary,
-  SessionListResponse,
-  SessionSummary,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DataTable } from '@andrewbehma/glass-ui/data-table';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Section } from '@andrewbehma/glass-ui/section';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type {
+  ProjectSummary,
+  SessionListResponse,
+  SessionSummary,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
@@ -257,65 +258,67 @@ function SessionsView() {
         <SessionsFilters url={url} projects={projects} isAdmin={isAdmin} />
       </div>
 
-      <AsyncSection
-        section={section}
-        isEmpty={(page) => page.items.length === 0}
-        unavailable={{
-          title: 'Sessions are not answering',
-          stillWorks: `${describeSessionError(section.error)} The filters above still work.`,
-        }}
-        skeleton={
-          <div className="flex flex-col gap-3" aria-busy="true">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-40 w-full" />
-          </div>
-        }
-        empty={
-          hasSessionFilters(applied) ? (
-            <EmptyState
-              title="No sessions match these filters"
-              description="Widen the date range or clear a filter to see more."
-              action={{ label: 'Clear filters', onClick: clear }}
-            />
-          ) : (
-            <EmptyState
-              title="No sessions yet"
-              description="A session appears here when an agent runs on a paired runner and reports its transcript."
-              link={NextLink}
-              action={{
-                label: isAdmin ? 'Open Runners' : 'Open Projects',
-                href: isAdmin ? '/admin/runners' : '/projects',
-              }}
-            />
-          )
-        }
-      >
-        {(page) => (
-          <>
-            <ScrollX label="Sessions">
-              <DataTable
-                rows={page.items}
-                getRowId={(s) => s.id}
-                columns={columns}
-                onRowActivate={(s) => router.push(`/sessions/${s.id}`)}
-                stickyHeader={false}
-                className="min-w-[62rem]"
+      <Section title="All sessions" surface="none">
+        <AsyncSection
+          section={section}
+          isEmpty={(page) => page.items.length === 0}
+          unavailable={{
+            title: 'Sessions are not answering',
+            stillWorks: `${describeSessionError(section.error)} The filters above still work.`,
+          }}
+          skeleton={
+            <div className="flex flex-col gap-3" aria-busy="true">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-40 w-full" />
+            </div>
+          }
+          empty={
+            hasSessionFilters(applied) ? (
+              <EmptyState
+                title="No sessions match these filters"
+                description="Widen the date range or clear a filter to see more."
+                action={{ label: 'Clear filters', onClick: clear }}
               />
-            </ScrollX>
-            {page.nextCursor ? (
-              <div className="mt-4 flex justify-center">
-                <Button
-                  variant="glass"
-                  disabled={loadingMore}
-                  onClick={loadMore}
-                >
-                  {loadingMore ? 'Loading…' : 'Load more'}
-                </Button>
-              </div>
-            ) : null}
-          </>
-        )}
-      </AsyncSection>
+            ) : (
+              <EmptyState
+                title="No sessions yet"
+                description="A session appears here when an agent runs on a paired runner and reports its transcript."
+                link={NextLink}
+                action={{
+                  label: isAdmin ? 'Open Runners' : 'Open Projects',
+                  href: isAdmin ? '/admin/runners' : '/projects',
+                }}
+              />
+            )
+          }
+        >
+          {(page) => (
+            <>
+              <ScrollX label="Sessions">
+                <DataTable
+                  rows={page.items}
+                  getRowId={(s) => s.id}
+                  columns={columns}
+                  onRowActivate={(s) => router.push(`/sessions/${s.id}`)}
+                  stickyHeader={false}
+                  className="min-w-[62rem]"
+                />
+              </ScrollX>
+              {page.nextCursor ? (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="glass"
+                    disabled={loadingMore}
+                    onClick={loadMore}
+                  >
+                    {loadingMore ? 'Loading…' : 'Load more'}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </AsyncSection>
+      </Section>
     </>
   );
 }

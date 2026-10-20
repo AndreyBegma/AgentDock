@@ -1,3 +1,4 @@
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import {
   PLAN_TASK_KINDS,
   PLAN_TASK_LIVE_STATUSES,
@@ -9,8 +10,7 @@ import {
   type PlanTaskStatus,
   type TaskRow,
   type TasksQuery,
-} from '@agentdock/shared';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
 

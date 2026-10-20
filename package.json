@@ -1,5 +1,5 @@
 {
-  "name": "agentdock",
+  "name": "nautelle",
   "private": true,
   "packageManager": "bun@1.4.0",
   "engines": {
@@ -13,14 +13,14 @@
     "typecheck": "turbo run typecheck",
     "db:up": "docker compose -f docker/docker-compose.yml up -d",
     "db:down": "docker compose -f docker/docker-compose.yml down",
-    "db:migrate": "turbo run db:migrate --filter=@agentdock/api",
-    "db:generate": "turbo run db:generate --filter=@agentdock/api",
-    "db:seed": "turbo run db:seed --filter=@agentdock/api",
+    "db:migrate": "turbo run db:migrate --filter=@nautelle/api",
+    "db:generate": "turbo run db:generate --filter=@nautelle/api",
+    "db:seed": "turbo run db:seed --filter=@nautelle/api",
     "db:studio": "cd apps/api && bunx prisma studio",
     "db:setup": "sh scripts/db-start-docker.sh",
     "admin:create": "bun run --cwd apps/api admin:create",
     "format": "biome format --write .",
-    "check": "biome check . && bun scripts/check-ci.ts && bun scripts/check-images.ts && bun test ./scripts"
+    "check": "biome check . && bun scripts/check-ci.ts && bun scripts/check-images.ts && bun scripts/check-brand.ts && bun test ./scripts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.10",

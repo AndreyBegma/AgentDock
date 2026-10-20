@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { normalizeCodeSentinelLine } from '@agentdock/shared';
-import { sessionMessageArgsSchema } from '@agentdock/shared/protocol';
+import { normalizeCodeSentinelLine } from '@nautelle/shared';
+import { sessionMessageArgsSchema } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { fakeTmux } from '../control/testing';
 import { memoryLogger, tempDir } from '../testing/fixtures';
@@ -107,7 +107,7 @@ describe('session.message to a card round', () => {
       cards: {
         record: () =>
           ({ cardId: 'card_1', projectId: 'prj_1', runId: 'run_2' }) as never,
-        liveSession: () => 'agentdock-card-ab12cd34',
+        liveSession: () => 'nautelle-card-ab12cd34',
       },
       ...fakeTmux().deps,
       log: memoryLogger().log,

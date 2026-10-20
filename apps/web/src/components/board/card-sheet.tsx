@@ -1,15 +1,5 @@
 'use client';
 
-import {
-  type AttachmentView,
-  BOARD_CARD_KINDS,
-  BOARD_CARD_TITLE_MAX,
-  type BoardCardDetail,
-  type BoardCardKind,
-  CARD_FEEDBACK_MAX,
-  type CardRoundView,
-  isActiveRoundPhase,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
@@ -23,6 +13,17 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  type AttachmentView,
+  BOARD_CARD_KINDS,
+  BOARD_CARD_TITLE_MAX,
+  type BoardCardDetail,
+  type BoardCardKind,
+  CARD_FEEDBACK_MAX,
+  type CardPrTarget,
+  type CardRoundView,
+  isActiveRoundPhase,
+} from '@nautelle/shared';
 import { ExternalLink, Move, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -74,6 +75,7 @@ import { boardCardPageHref, boardStackPageHref } from '../../lib/board/href';
 import {
   canCreatePr,
   prChipText,
+  prTargetNotice,
   prTargetText,
 } from '../../lib/board/pull-request';
 import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
@@ -371,6 +373,44 @@ export function cardSheetSide(narrow: boolean): 'bottom' | 'right' {
 }
 
 /**
+ * #636: the card's branch and its PR's actual target — a stacked card's
+ * dependency, else the base. #722: the target is what GitHub says, so a PR a
+ * person retargeted onto the base reads "into develop".
+ */
+export function CardBranchLine({
+  branch,
+  target,
+}: {
+  branch: string | null;
+  target: CardPrTarget | null;
+}) {
+  if (!branch) return null;
+  return (
+    <p className="break-all text-xs text-ink-2">
+      <span className="font-mono">{branch}</span>
+      {target ? (
+        <span title={`The pull request goes into ${target.branch}`}>
+          {' '}
+          → {prTargetText(target)}
+          {target.stackedOn ? (
+            <span className="font-mono"> ({target.branch})</span>
+          ) : null}
+        </span>
+      ) : null}
+    </p>
+  );
+}
+
+/**
+ * #709: a stacked PR's target, prominent on the sheet — and a warning once the
+ * dependency's own PR has merged; nothing for a PR into the base.
+ */
+export function PrTargetBanner({ target }: { target: CardPrTarget | null }) {
+  const notice = prTargetNotice(target);
+  return notice ? <Banner tone={notice.tone}>{notice.text}</Banner> : null;
+}
+
+/**
  * The sheet's footer: the card's actions, and on a phone the shared back bar
  * under them, Close opposite Open card. From `lg` up it is the actions alone,
  * or nothing.
@@ -664,21 +704,8 @@ export function CardDetailBody({
           ) : null}
         </div>
       ) : null}
-      {card.branch ? (
-        <p className="break-all text-xs text-ink-2">
-          <span className="font-mono">{card.branch}</span>
-          {card.prTarget ? (
-            // #636: the PR's actual target — a stacked card's dependency.
-            <span title={`The pull request goes into ${card.prTarget.branch}`}>
-              {' '}
-              → {prTargetText(card.prTarget)}
-              {card.prTarget.stackedOn ? (
-                <span className="font-mono"> ({card.prTarget.branch})</span>
-              ) : null}
-            </span>
-          ) : null}
-        </p>
-      ) : null}
+      <CardBranchLine branch={card.branch} target={card.prTarget} />
+      <PrTargetBanner target={card.prTarget} />
       {card.round?.hooksMissing
         ? (() => {
             const notice = hooksNotice(card, card.round);

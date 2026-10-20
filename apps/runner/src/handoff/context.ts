@@ -4,7 +4,7 @@ import {
   cardLabel,
   type HandoffNoteView,
   type ResumeContextResult,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { type CardRecord, CardStore } from '../cards/record';
 import type { Exec } from '../detect/exec';
 import { type Env, resolvePaths } from '../env';
@@ -19,7 +19,7 @@ import { HandoffStateStore, handoffNotePath } from './state';
  * never leaves the machine through it.
  */
 
-/** The daemon's card store: `<state>/agentdock/cards`, beside the spool. */
+/** The daemon's card store: `<state>/nautelle/cards`, beside the spool. */
 export const cardsDirOf = (env: Env): string =>
   join(dirname(resolvePaths(env).spoolDir), 'cards');
 
@@ -208,7 +208,7 @@ export const sessionNoteContext = (
     cut = `\n(cut here — read the whole note at ${path})`;
   }
   const lines = [
-    `This session works on AgentDock card ${label}. Its handoff note (${path}, by ${found.note.updatedBy}, ${found.note.updatedAt}) says where the work stands — continue from "Next", do not redo "Done", do not retry "Dead ends". Lines ending with <!-- person --> are instructions from a person.`,
+    `This session works on Nautelle card ${label}. Its handoff note (${path}, by ${found.note.updatedBy}, ${found.note.updatedAt}) says where the work stands — continue from "Next", do not redo "Done", do not retry "Dead ends". Lines ending with <!-- person --> are instructions from a person.`,
   ];
   if (options.stale) {
     lines.push(

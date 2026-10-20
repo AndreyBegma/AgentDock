@@ -5,7 +5,7 @@ import {
   PROFILE_SOURCES,
   type ProjectReadinessView,
   type ReadinessBlocker,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import { RUNNERS_PAGE } from '../prerequisites/copy';
 

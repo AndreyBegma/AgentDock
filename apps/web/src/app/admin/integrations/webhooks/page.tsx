@@ -1,10 +1,5 @@
 'use client';
 
-import type {
-  ProjectSummary,
-  WebhookView,
-  WebhookWithSecret,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
@@ -16,6 +11,11 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  ProjectSummary,
+  WebhookView,
+  WebhookWithSecret,
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';
@@ -48,7 +48,7 @@ const revealWebhook = (
   secret: webhook.secret,
   children: (
     <p className="text-sm text-ink-2">
-      Receivers verify <code className="font-mono">X-AgentDock-Signature</code>{' '}
+      Receivers verify <code className="font-mono">X-Nautelle-Signature</code>{' '}
       with this secret; the recipe is on the webhook’s detail sheet.
     </p>
   ),
@@ -79,7 +79,7 @@ export default function AdminWebhooksPage() {
       <PageHeader
         className="mb-0"
         title="Webhooks"
-        description="Outbound. AgentDock’s events are pushed to a URL you choose — signed, retried with backoff, and paused for a while when the receiver keeps failing."
+        description="Outbound. Nautelle’s events are pushed to a URL you choose — signed, retried with backoff, and paused for a while when the receiver keeps failing."
         actions={<Button onClick={() => setEditing('new')}>New webhook</Button>}
       />
 
@@ -93,7 +93,7 @@ export default function AdminWebhooksPage() {
         skeleton={<Skeleton className="h-48 w-full" />}
         empty={
           <EmptyState
-            title="Where AgentDock sends its events"
+            title="Where Nautelle sends its events"
             description="Create a webhook to send events — pull requests, blocked issues, agents waiting for a person — to n8n, Slack or your own bot. New webhook is at the top of the page."
           />
         }

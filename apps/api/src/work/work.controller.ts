@@ -1,4 +1,4 @@
-import type { BoardPlanTasksView, WorkPage } from '@agentdock/shared';
+import type { BoardPlanTasksView, WorkPage } from '@nautelle/shared';
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { type AuthUser, CurrentUser } from '../auth';
 import {

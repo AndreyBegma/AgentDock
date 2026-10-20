@@ -24,7 +24,7 @@ const PLUGIN_HOOKS = join(
   '..',
   '..',
   'plugins',
-  'agentdock',
+  'nautelle',
   'hooks',
   'hooks.json',
 );
@@ -37,7 +37,7 @@ interface PluginHook {
 }
 type Hooks = Record<string, { hooks: PluginHook[] }[]>;
 
-const SELF = ['/opt/agentdock/bin/agentdock-runner'];
+const SELF = ['/opt/nautelle/bin/nautelle-runner'];
 
 let dirs: string[] = [];
 afterEach(() => {
@@ -45,7 +45,7 @@ afterEach(() => {
   dirs = [];
 });
 const temp = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agentdock-wiring-'));
+  const dir = mkdtempSync(join(tmpdir(), 'nautelle-wiring-'));
   dirs.push(dir);
   return dir;
 };
@@ -73,11 +73,11 @@ describe('card wiring (#367 D1, D2)', () => {
       expect(ours.timeout).toBe(theirs.timeout);
       expect(ours.async === true).toBe(theirs.async === true);
       const subcommand = theirs.command.match(
-        /agentdock-runner (hook [a-z-]+) \|\| true$/,
+        /nautelle-runner (hook [a-z-]+) \|\| true$/,
       )?.[1];
       expect(subcommand).toBeDefined();
       expect(ours.command).toBe(
-        `/opt/agentdock/bin/agentdock-runner ${subcommand} || true`,
+        `/opt/nautelle/bin/nautelle-runner ${subcommand} || true`,
       );
     }
   });
@@ -95,7 +95,7 @@ describe('card wiring (#367 D1, D2)', () => {
   it("is the plugin's MCP server under the plugin's name", () => {
     expect(cardMcpConfig(['/usr/bin/bun', '/a/main.ts'])).toEqual({
       mcpServers: {
-        agentdock: { command: '/usr/bin/bun', args: ['/a/main.ts', 'mcp'] },
+        nautelle: { command: '/usr/bin/bun', args: ['/a/main.ts', 'mcp'] },
       },
     });
   });
@@ -127,7 +127,7 @@ describe('card wiring (#367 D1, D2)', () => {
       join(configDir, 'plugins', 'installed_plugins.json'),
       JSON.stringify({
         plugins: {
-          'agentdock@agentdock': [{ version: '0.9.2', installPath: '/x' }],
+          'nautelle@nautelle': [{ version: '0.9.2', installPath: '/x' }],
         },
       }),
     );
@@ -138,6 +138,22 @@ describe('card wiring (#367 D1, D2)', () => {
     expect(() =>
       readFileSync(join(roundDir, CARD_WIRING_FILES.settings)),
     ).toThrow();
+  });
+
+  it('writes nothing for a profile with the plugin under its old name (ADR-0073)', () => {
+    const configDir = temp();
+    mkdirSync(join(configDir, 'plugins'));
+    writeFileSync(
+      join(configDir, 'plugins', 'installed_plugins.json'),
+      JSON.stringify({
+        plugins: {
+          'agentdock@agentdock': [{ version: '0.3.0', installPath: '/x' }],
+        },
+      }),
+    );
+    expect(
+      wireCardRound(profileIn(configDir), '/home/u', temp(), SELF),
+    ).toEqual({ wiring: 'plugin' });
   });
 
   it('is unwired with the reason when the round directory cannot be written', () => {

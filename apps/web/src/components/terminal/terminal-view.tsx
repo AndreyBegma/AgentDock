@@ -1,17 +1,17 @@
 'use client';
 
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
 import {
   TERMINAL_DEFAULT_SIZE,
   type TerminalTicketRequest,
   type TerminalTicketResponse,
   terminalServerFrameSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   TerminalCloseReason,
   TerminalMode,
-} from '@agentdock/shared/protocol';
-import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Button } from '@andrewbehma/glass-ui/button';
+} from '@nautelle/shared/protocol';
 import type { Terminal as XTerm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef, useState } from 'react';

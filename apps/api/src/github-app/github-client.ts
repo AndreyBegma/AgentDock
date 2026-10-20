@@ -208,7 +208,7 @@ export class GitHubAppClient {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': API_VERSION,
-      'User-Agent': 'AgentDock',
+      'User-Agent': 'Nautelle',
     };
     if (authorization) headers.Authorization = authorization;
     let response: Response;

@@ -5,11 +5,11 @@ import {
   type HandoffRejection,
   markPersonEdit,
   validateHandoffNote,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   capabilitiesSchema,
   handoffAvailable,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   BadGatewayException,
   ConflictException,

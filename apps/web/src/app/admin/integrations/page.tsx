@@ -1,15 +1,15 @@
 'use client';
 
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import type {
   GitHubAppView,
   InboundTriggerView,
   TelegramIntegrationStatus,
   WebhookView,
-} from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
-import { buttonClassName } from '@andrewbehma/glass-ui/button';
-import { Card } from '@andrewbehma/glass-ui/card';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+} from '@nautelle/shared';
 import { GitBranch, type LucideIcon, Send, Webhook, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '../../../components/page-header/page-header';
@@ -98,13 +98,13 @@ export default function IntegrationsPage() {
     <div className="flex flex-col gap-2">
       <PageHeader
         title="Integrations"
-        description="How AgentDock talks to the outside world. None is required; each one adds a way in or out."
+        description="How Nautelle talks to the outside world. None is required; each one adds a way in or out."
       />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <IntegrationCard
           icon={GitBranch}
           title="GitHub App"
-          purpose="Tells AgentDock the moment an issue, pull request or check changes."
+          purpose="Tells Nautelle the moment an issue, pull request or check changes."
           href="/admin/integrations/github"
           status={statusOf(github, gitHubAppStatus)}
         />
@@ -118,7 +118,7 @@ export default function IntegrationsPage() {
         <IntegrationCard
           icon={Webhook}
           title="Webhooks"
-          purpose="Outbound: AgentDock’s events pushed to a URL you choose."
+          purpose="Outbound: Nautelle’s events pushed to a URL you choose."
           href="/admin/integrations/webhooks"
           status={statusOf(webhooks, webhooksStatus)}
         />

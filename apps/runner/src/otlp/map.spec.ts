@@ -3,7 +3,7 @@ import { statSync } from 'node:fs';
 import {
   type LlmRequestData,
   parseSessionEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { claudeAdapter } from '../adapters/claude/adapter';
 import { freshState } from '../adapters/types';
 import { decodeJson, decodeProtobuf, type OtlpLogRecord } from './decode';

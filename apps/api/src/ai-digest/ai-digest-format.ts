@@ -2,8 +2,8 @@ import type {
   AiDigestItem,
   AiDigestSections,
   AiDigestView,
-} from '@agentdock/shared';
-import { oneLine } from '@agentdock/shared';
+} from '@nautelle/shared';
+import { oneLine } from '@nautelle/shared';
 import type { AiDigest } from '@prisma/client';
 import {
   escapeLinkUrl,

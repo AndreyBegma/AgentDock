@@ -5,7 +5,7 @@ import {
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 import { ActivityQueryService } from '../../activity/activity-query.service';
@@ -390,7 +390,7 @@ export class AssistantBoardTools implements OnModuleInit {
         { projectId: p.id, role: p.role, ctx: ctx.ctx, meta: auditor.meta },
         {
           title: card.title,
-          body: `${card.body}\n\n---\nHanded off from ${card.label} by the AgentDock assistant.`,
+          body: `${card.body}\n\n---\nHanded off from ${card.label} by the Nautelle assistant.`,
           labels: [],
           queue: true,
         },

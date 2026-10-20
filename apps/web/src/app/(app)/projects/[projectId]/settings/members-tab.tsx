@@ -1,13 +1,5 @@
 'use client';
 
-import {
-  type AddProjectMemberRequest,
-  type AdminUser,
-  type ProjectMemberView,
-  ROLES,
-  type Role,
-  type UpdateProjectMemberRequest,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -20,6 +12,14 @@ import {
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
+import {
+  type AddProjectMemberRequest,
+  type AdminUser,
+  type ProjectMemberView,
+  ROLES,
+  type Role,
+  type UpdateProjectMemberRequest,
+} from '@nautelle/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import { describeProjectError } from '../../../../../lib/projects/format';

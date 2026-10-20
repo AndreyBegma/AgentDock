@@ -2,8 +2,8 @@ import type {
   BudgetExceededBody,
   BudgetRecomputeResult,
   BudgetView,
-} from '@agentdock/shared';
-import type { CommandName } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CommandName } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { SYSTEM_ACTOR } from '../audit/audit.types';

@@ -1,12 +1,13 @@
 'use client';
 
-import type { AssistantToolStep } from '@agentdock/shared';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import type { AssistantToolStep } from '@nautelle/shared';
 import { Check, X } from 'lucide-react';
 import Link from 'next/link';
 import { cardLabelOf } from '../../lib/assistant/tools';
 import type { LiveTool } from '../../lib/assistant/turn';
+import { approvalsHref } from '../../lib/queue/tabs';
 
 const RUNNING_LABEL: Record<string, string> = {
   draft_card: 'Drafting a card',
@@ -65,7 +66,7 @@ export function ToolBlock({
           <Chip tone="warn">Waiting for approval</Chip>
           {cardProject ? (
             <Link
-              href={`/projects/${encodeURIComponent(cardProject)}/approvals`}
+              href={approvalsHref(encodeURIComponent(cardProject))}
               className="text-accent-ink underline"
             >
               Open Approvals

@@ -1,9 +1,9 @@
-import type { PlanTurnView, ProjectDetail } from '@agentdock/shared';
+import type { PlanTurnView, ProjectDetail } from '@nautelle/shared';
 import {
   type CommandSupport,
   commandsSupport,
   RUNNER_FEATURE_COMMANDS,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { isRunnerOnline } from '../prerequisites/facts';
 import {
   isContractViolation,

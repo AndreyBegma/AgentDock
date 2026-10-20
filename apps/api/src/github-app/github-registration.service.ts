@@ -10,7 +10,7 @@ import {
   githubAppHtmlUrl,
   githubAppInstallUrl,
   githubManifestPostUrl,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { GitHubApp } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

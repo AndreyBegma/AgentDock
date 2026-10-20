@@ -2,7 +2,7 @@ import type {
   PaneFrame,
   PaneFullFrame,
   PanePatchFrame,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 
 const bytes = (value: unknown): number =>
   Buffer.byteLength(JSON.stringify(value));

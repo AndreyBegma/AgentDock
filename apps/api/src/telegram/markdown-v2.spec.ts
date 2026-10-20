@@ -77,7 +77,7 @@ describe('formatMessage (D10)', () => {
         '*Dialog waiting*',
         'A launch dialog waits for a person\\.',
         '_widget · i42\\-api · \\#42_',
-        '[Open in AgentDock](https://dock.example.com/projects/p1/fleet)',
+        '[Open in Nautelle](https://dock.example.com/projects/p1/fleet)',
       ].join('\n'),
     );
   });
@@ -95,7 +95,7 @@ describe('formatMessage (D10)', () => {
         'A launch dialog waits for a person\\.',
         '_widget · i42\\-api · \\#42_',
         'Head `a1b2c3d`',
-        '[Open in AgentDock](https://dock.example.com/projects/p1/fleet)',
+        '[Open in Nautelle](https://dock.example.com/projects/p1/fleet)',
       ].join('\n'),
     );
   });

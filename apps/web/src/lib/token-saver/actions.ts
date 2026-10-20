@@ -3,7 +3,7 @@ import type {
   TokenSaverSettingsView,
   TokenSaverSummary,
   UpdateTokenSaverSettingsBody,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { api } from '../api';
 
 /** `/projects/:id/token-saver` (#445 "API"): members read, a project admin writes. */

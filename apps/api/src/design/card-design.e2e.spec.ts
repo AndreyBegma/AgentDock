@@ -1,4 +1,4 @@
-import { BOARD_ERROR } from '@agentdock/shared';
+import { BOARD_ERROR } from '@nautelle/shared';
 import { BoardFailure } from '../board/board-error';
 import { BudgetGate } from '../budgets/budget-gate';
 import { capabilities } from '../runners/testing/runner-e2e';
@@ -136,6 +136,13 @@ describe('card design (e2e, #243)', () => {
         `<!doctype html><html><body><p>${'x'.repeat(161 * 1024)}</p></body></html>`,
       ),
       'design_too_large',
+    ],
+    [
+      designResult(
+        { taskKey: KEY, variant: 1 },
+        '<!doctype html><html><body><script>const top = document.body;</script></body></html>',
+      ),
+      'design_script_invalid',
     ],
   ])('fails a card turn that breaks the contract and stores no revision (%#)', async (result, reason) => {
     await h.seedProfile();

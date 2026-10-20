@@ -5,7 +5,7 @@ import {
   WEBHOOK_DISPATCH_INTERVAL_MS,
   type WebhookEventType,
   webhookEnvelopeId,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Inject,
   Injectable,

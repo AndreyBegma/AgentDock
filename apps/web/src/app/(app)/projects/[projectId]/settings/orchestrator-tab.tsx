@@ -1,18 +1,18 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import type {
   AdminRunnerDetail,
   AdminRuntimeProfile,
   OrchestratorSettingsRequest,
   OrchestratorSettingsView,
   ProjectDetail,
-} from '@agentdock/shared';
-import type { OrchestratorPermissionMode } from '@agentdock/shared/protocol';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { Card } from '@andrewbehma/glass-ui/card';
-import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
+import type { OrchestratorPermissionMode } from '@nautelle/shared/protocol';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import {

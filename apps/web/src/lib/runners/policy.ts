@@ -3,7 +3,7 @@ import {
   policyRuleSchema,
   type RunnerPolicy,
   runnerPolicyOf,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 
 /**
  * ADR-0047: a runner's local security policy refusal, as the runner words it:
@@ -49,7 +49,7 @@ export const POLICY_RULE_LABEL: Record<PolicyRule, string> = {
  */
 export function describePolicyRefusal(
   text: string | null | undefined,
-  fallback = 'The runner’s local security policy refused this. Only the person on that machine can change it, with `agentdock-runner policy`.',
+  fallback = 'The runner’s local security policy refused this. Only the person on that machine can change it, with `nautelle-runner policy`.',
 ): string {
   const refusal = parsePolicyRefusal(text);
   if (!refusal) return fallback;

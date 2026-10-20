@@ -1,21 +1,16 @@
 'use client';
 
-import type {
-  ActivityItem,
-  ActivitySeverity,
-  ProjectSummary,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
-import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import { Section } from '@andrewbehma/glass-ui/section';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { Sparkline } from '@andrewbehma/glass-ui/sparkline';
 import { StatTile } from '@andrewbehma/glass-ui/stat-tile';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { ProjectSummary } from '@nautelle/shared';
 import {
-  ChevronRight,
+  ArrowRight,
   CircleCheck,
   CircleX,
   GitPullRequest,
@@ -24,14 +19,11 @@ import {
   Settings2,
 } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
-import { activityHref, itemTitle } from '../../lib/activity/format';
-import { formatCost, formatDate, pluralize } from '../../lib/format';
+import { type ReactNode, useState } from 'react';
+import { pluralize } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { projectHue } from '../../lib/hue';
 import {
-  approvalsHref,
-  costByProject,
   isAlive,
   mergedPullRequests,
   mergedTodayHref,
@@ -39,25 +31,30 @@ import {
   needsYou,
   OVERVIEW_TILE_HREF,
   orchestratorLabel,
-  roundLabel,
   runningSlots,
-  waitingApprovals,
 } from '../../lib/overview/dashboard';
-import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../lib/runners/format';
-import type { Section } from '../../lib/section/use-section';
+import { lastActivity } from '../../lib/projects/overview';
+import type { Section as SectionState } from '../../lib/section/use-section';
 import {
   type TerminalSetupNeed,
   terminalSetupNeeds,
 } from '../../lib/setup/format';
 import { ORCHESTRATOR_PILL_STATUS } from '../../lib/status/pill';
-import { costOrBlank, sparkValues } from '../../lib/usage/format';
-import { DigestPanel } from '../steward/digest-panel';
+import { costOrBlank } from '../../lib/usage/format';
 import type { ProjectFacts } from './use-dashboard';
 import { useDashboard } from './use-dashboard';
 
+/** How many projects and waiting items the glance shows before "All". */
+const RECENT_PROJECTS = 6;
+const NEEDS_YOU_SHOWN = 5;
+
+/** A project's Board: where every project card on the Workspace pages lands. */
+export const boardHref = (projectId: string): string =>
+  `/projects/${projectId}/board`;
+
 /** A tile's value: the figure, or a dash with the reason — never a false zero. */
 function tileFigure<T>(
-  section: Section<T>,
+  section: SectionState<T>,
   figure: (data: T) => string,
 ): { value: ReactNode; failed: boolean } {
   if (section.data === undefined) {
@@ -77,18 +74,12 @@ const notAnswering = (projects: ProjectSummary[]): string | undefined =>
       : `${projects.length} projects are not answering`;
 
 function Stats({
-  projects,
   facts,
   costToday,
   merged,
-}: Pick<ReturnType<typeof useDashboard>, 'facts' | 'costToday' | 'merged'> & {
-  projects: ProjectSummary[];
-}) {
+}: Pick<ReturnType<typeof useDashboard>, 'facts' | 'costToday' | 'merged'>) {
   const running = tileFigure(facts, (f) =>
     String(runningSlots(f.fleets.values())),
-  );
-  const approvals = tileFigure(facts, (f) =>
-    String(waitingApprovals(f.approvals.values())),
   );
   const cost = tileFigure(
     costToday,
@@ -104,22 +95,20 @@ function Stats({
     return page.nextCursor ? `${count}+` : String(count);
   });
   const partial = facts.data ? notAnswering(facts.data.failed) : undefined;
-  const factsHint = (fine: string) =>
-    facts.error !== null && !facts.data
-      ? 'Projects are not answering'
-      : (partial ?? fine);
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {/* Each tile keeps one hue, echoing the status it counts (#163):
-          running teal, cost amber, merged green, waiting blue. Every tile
-          goes where its figure is explained (#213). */}
+    <div className="grid grid-cols-1 gap-3 tablet:grid-cols-3">
+      {/* Each tile goes where its figure is explained (#213). */}
       <StatTile
         hue={2}
         label="Running slots"
         loading={facts.loading && !facts.data}
         value={running.value}
-        hint={factsHint('Agent sessions alive now')}
+        hint={
+          facts.error !== null && !facts.data
+            ? 'Projects are not answering'
+            : (partial ?? 'Agent sessions alive now')
+        }
         href={OVERVIEW_TILE_HREF.running}
       />
       <StatTile
@@ -144,114 +133,73 @@ function Stats({
         }
         href={mergedTodayHref()}
       />
-      <StatTile
-        hue={1}
-        label="Approvals waiting"
-        loading={facts.loading && !facts.data}
-        value={approvals.value}
-        hint={factsHint('Pull requests waiting for a merge decision')}
-        href={
-          facts.data
-            ? approvalsHref(projects, facts.data.approvals)
-            : '/projects'
-        }
-      />
     </div>
   );
 }
 
+/** A recent project: one tap opens its Board. */
 function ProjectCard({
   project,
   facts,
-  costs,
+  needs,
 }: {
   project: ProjectSummary;
   facts: ProjectFacts | undefined;
-  costs: number[] | undefined;
+  needs: number;
 }) {
   const fleet = facts?.fleets.get(project.id);
   const failed = facts?.failed.some((p) => p.id === project.id) ?? false;
   const live = fleet ? fleet.slots.filter(isAlive).length : null;
-  const round = fleet
-    ? roundLabel(fleet.latestRound, (iso) => formatDate(iso, 'day'))
-    : null;
-  const trend = costs ? sparkValues(costs) : null;
-  const week = costs?.reduce((sum, c) => sum + c, 0);
 
   return (
     <Link
-      href={`/projects/${project.id}`}
-      className="group block rounded-surface"
+      href={boardHref(project.id)}
+      aria-label={`Open the Board of ${project.displayName}`}
+      className="group block min-w-0 rounded-surface"
     >
-      {/* The project's identity hue, the same on every screen (#163). */}
       <Card
         pad="md"
         hue={projectHue(project.id)}
         className="flex h-full flex-col gap-3 transition-colors group-hover:bg-hover"
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="flex min-w-0 items-center gap-2 font-semibold tracking-tight">
-              {/* Identity is square; a round dot means status (#213). */}
-              <Badge
-                shape="square"
-                hue={projectHue(project.id)}
-                aria-hidden="true"
-              />
-              <span className="truncate">{project.displayName}</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-xs text-ink-3">
-              <Badge
-                dot
-                tone={STATUS_TONE[project.runnerStatus]}
-                aria-hidden="true"
-              />
-              {project.runnerName} · {RUNNER_STATUS_LABEL[project.runnerStatus]}
-            </span>
-          </div>
-          <ChevronRight
+        <div className="flex items-center gap-2">
+          {/* Identity is square; a round dot means status (#213). */}
+          <Badge
+            shape="square"
+            hue={projectHue(project.id)}
             aria-hidden="true"
-            className="size-4 shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5"
           />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="min-w-0 flex-1 truncate font-semibold tracking-tight">
+            {project.displayName}
+          </span>
           {fleet ? (
-            <>
-              <StatusPill
-                status={ORCHESTRATOR_PILL_STATUS[fleet.orchestrator.status]}
-                label={orchestratorLabel(fleet.orchestrator.status)}
-              />
-              <span className="num text-ink-2">
-                {pluralize(live ?? 0, 'live slot')}
-              </span>
-            </>
+            <StatusPill
+              status={ORCHESTRATOR_PILL_STATUS[fleet.orchestrator.status]}
+              label={orchestratorLabel(fleet.orchestrator.status)}
+            />
+          ) : null}
+        </div>
+        <p className="num text-sm text-ink-2">
+          {fleet ? (
+            pluralize(live ?? 0, 'live slot')
           ) : failed ? (
             <span className="text-ink-3">Fleet is not answering</span>
           ) : (
-            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-5 w-32" />
           )}
-        </div>
-        {round ? <p className="num text-xs text-ink-3">{round}</p> : null}
-
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-3">
-          <div className="flex flex-col">
-            <span className="text-xs text-ink-3">Cost, 7 days</span>
-            <span className="num text-sm font-medium">
-              {week === undefined ? '—' : formatCost(week)}
-            </span>
-          </div>
-          {trend ? (
-            <div className="max-w-[50%] overflow-hidden">
-              <Sparkline
-                values={trend}
-                width={112}
-                height={28}
-                area
-                label={`${project.displayName}: cost per day, last 7 days`}
-              />
-            </div>
-          ) : null}
+        </p>
+        <div className="mt-auto flex items-center gap-2 border-t border-line pt-3 text-sm">
+          <span className={needs > 0 ? 'text-warn' : 'text-ink-3'}>
+            {needs > 0 ? `${needs} need you` : 'Nothing waiting'}
+          </span>
+          <span className="flex-1" />
+          <span className="inline-flex items-center gap-1 font-medium text-accent-ink">
+            Open Board
+            <ArrowRight
+              aria-hidden="true"
+              className="size-4 transition-transform group-hover:translate-x-0.5"
+            />
+          </span>
         </div>
       </Card>
     </Link>
@@ -284,7 +232,7 @@ function NeedsYou({
     );
   }
   return (
-    <ul className="-mx-2 flex flex-col">
+    <ul className="flex flex-col">
       {setup.map((need) => (
         <li key={need.key}>
           <Link
@@ -326,93 +274,12 @@ function NeedsYou({
     </ul>
   );
 }
-
-const SEVERITY_TONE: Record<
-  ActivitySeverity,
-  'neutral' | 'ok' | 'warn' | 'danger'
-> = { info: 'neutral', ok: 'ok', warn: 'warn', danger: 'danger' };
-
-function RecentActivity({
-  items,
-  projects,
-}: {
-  items: ActivityItem[];
-  projects: ProjectSummary[];
-}) {
-  if (items.length === 0) {
-    return <p className="py-2 text-sm text-ink-2">No activity yet.</p>;
-  }
-  const names = new Map(projects.map((p) => [p.id, p.displayName]));
-  return (
-    <ul className="-mx-2 flex flex-col">
-      {items.map((item) => {
-        // A slot's row opens that slot on its Fleet (#213), and a PR's URL is
-        // not part of the title — Activity's own rules, shared.
-        const href = activityHref(item);
-        const { title } = itemTitle(item);
-        const body = (
-          <>
-            <Badge
-              dot
-              tone={SEVERITY_TONE[item.severity]}
-              aria-hidden="true"
-              className="mt-1.5 shrink-0"
-            />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm">{title}</span>
-              {item.projectId && names.has(item.projectId) ? (
-                <span className="truncate text-xs text-ink-3">
-                  {names.get(item.projectId)}
-                  {item.slot ? ` · ${item.slot}` : ''}
-                </span>
-              ) : null}
-            </span>
-            <Time
-              value={item.ts}
-              className="shrink-0 text-xs whitespace-nowrap text-ink-3"
-            />
-          </>
-        );
-        const row = 'flex items-start gap-3 rounded-md px-2 py-2';
-        return (
-          <li key={item.id}>
-            {href ? (
-              <Link href={href} className={`${row} hover:bg-hover`}>
-                {body}
-              </Link>
-            ) : (
-              <div className={row}>{body}</div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function Panel({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <Card pad="md" className="flex min-w-0 flex-col gap-2">
-      <SectionHeader title={title} {...(action ? { actions: action } : {})} />
-      {children}
-    </Card>
-  );
-}
-
 function Retry({
   title,
   section,
 }: {
   title: string;
-  section: Pick<Section<unknown>, 'retry' | 'loading'>;
+  section: Pick<SectionState<unknown>, 'retry' | 'loading'>;
 }) {
   return (
     <SectionUnavailable
@@ -431,99 +298,110 @@ function Retry({
   );
 }
 
-/** The Overview below Getting started: figures, projects, what waits on you, what happened. */
+/** Most recently active first; a project that has not answered keeps list order. */
+function byRecentActivity(
+  projects: ProjectSummary[],
+  facts: ProjectFacts | undefined,
+): ProjectSummary[] {
+  const at = (p: ProjectSummary): number => {
+    const fleet = facts?.fleets.get(p.id);
+    const iso = fleet ? lastActivity(fleet) : null;
+    return iso ? Date.parse(iso) : 0;
+  };
+  return [...projects].sort((a, b) => at(b) - at(a));
+}
+
+/** The Overview below Getting started: what waits on you, then recent projects. */
 export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
   const dashboard = useDashboard(projects);
-  const { facts, cost7d, recent } = dashboard;
-  const costs = cost7d.data ? costByProject(cost7d.data) : undefined;
+  const { facts } = dashboard;
+  const [showAll, setShowAll] = useState(false);
   const waiting = facts.data
     ? needsYou(projects, facts.data.fleets, facts.data.approvals, {
         failedRuns: facts.data.failedRuns,
         missingProfile: facts.data.missingProfile,
       })
     : undefined;
+  const setup = terminalSetupNeeds(
+    projects,
+    facts.data?.terminalSetup ?? new Map(),
+  );
+  const needsByProject = new Map<string, number>();
+  for (const item of waiting ?? []) {
+    needsByProject.set(
+      item.projectId,
+      (needsByProject.get(item.projectId) ?? 0) + 1,
+    );
+  }
+  const shown =
+    waiting && !showAll ? waiting.slice(0, NEEDS_YOU_SHOWN) : waiting;
+  const hidden = (waiting?.length ?? 0) - (shown?.length ?? 0);
+  const recent = byRecentActivity(projects, facts.data).slice(
+    0,
+    RECENT_PROJECTS,
+  );
 
   return (
     <div className="flex flex-col gap-6">
-      <Stats projects={projects} {...dashboard} />
+      <Stats {...dashboard} />
 
-      <section
-        aria-labelledby="overview-projects"
-        className="flex flex-col gap-3"
+      <Section
+        title="Needs you"
+        description="Across every project, oldest first."
+        pad="none"
+        bodyClassName="px-2 py-1"
       >
-        <SectionHeader
-          title="Projects"
-          headingId="overview-projects"
-          actions={
-            <Link
-              href="/projects"
-              className="text-sm text-ink-2 hover:underline"
-            >
-              All projects
-            </Link>
-          }
-        />
+        {shown ? (
+          <>
+            {facts.data && facts.data.failed.length > 0 ? (
+              <p className="px-2 pt-2 text-xs text-warn">
+                {notAnswering(facts.data.failed)}; what it waits on is not
+                listed.
+              </p>
+            ) : null}
+            <NeedsYou items={shown} setup={setup} />
+            {hidden > 0 ? (
+              <div className="px-2 pb-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAll(true)}
+                >
+                  Show {hidden} more
+                </Button>
+              </div>
+            ) : null}
+          </>
+        ) : facts.error !== null ? (
+          <Retry title="Could not check what waits on you" section={facts} />
+        ) : (
+          <Skeleton className="m-2 h-24" />
+        )}
+      </Section>
+
+      <Section
+        title="Recent projects"
+        surface="none"
+        actions={
+          <Link href="/projects" className="text-sm text-ink-2 hover:underline">
+            All projects
+          </Link>
+        }
+      >
         {facts.error !== null && !facts.data ? (
           <Retry title="Project fleets are not answering" section={facts} />
         ) : null}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project) => (
+        <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-3">
+          {recent.map((project) => (
             <ProjectCard
               key={project.id}
               project={project}
               facts={facts.data}
-              costs={costs?.get(project.id) ?? (cost7d.data ? [] : undefined)}
+              needs={needsByProject.get(project.id) ?? 0}
             />
           ))}
         </div>
-      </section>
-
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <Panel title="Needs you">
-          {waiting ? (
-            <>
-              {facts.data && facts.data.failed.length > 0 ? (
-                <p className="text-xs text-warn">
-                  {notAnswering(facts.data.failed)}; what it waits on is not
-                  listed.
-                </p>
-              ) : null}
-              <NeedsYou
-                items={waiting}
-                setup={terminalSetupNeeds(
-                  projects,
-                  facts.data?.terminalSetup ?? new Map(),
-                )}
-              />
-            </>
-          ) : facts.error !== null ? (
-            <Retry title="Could not check what waits on you" section={facts} />
-          ) : (
-            <Skeleton className="h-24 w-full" />
-          )}
-        </Panel>
-        <Panel
-          title="Recent activity"
-          action={
-            <Link
-              href="/activity"
-              className="text-sm text-ink-2 hover:underline"
-            >
-              All activity
-            </Link>
-          }
-        >
-          {recent.data ? (
-            <RecentActivity items={recent.data.items} projects={projects} />
-          ) : recent.error !== null ? (
-            <Retry title="Activity is not answering" section={recent} />
-          ) : (
-            <Skeleton className="h-24 w-full" />
-          )}
-        </Panel>
-      </div>
-
-      <DigestPanel projects={projects} />
+      </Section>
     </div>
   );
 }

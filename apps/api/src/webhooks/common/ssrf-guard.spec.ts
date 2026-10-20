@@ -230,7 +230,7 @@ describe('guardedPost (D12, D15)', () => {
     guardedPost({
       url,
       body: '{"type":"webhook.test"}',
-      headers: { 'X-AgentDock-Event': 'webhook.test' },
+      headers: { 'X-Nautelle-Event': 'webhook.test' },
       allowlist,
       resolve,
       ...extra,

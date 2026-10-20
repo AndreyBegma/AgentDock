@@ -8,7 +8,7 @@ import {
   type StewardSettings,
   type StewardSubjectKind,
   stewardActionCount,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * The `detail` of an attempt claimed but not answered yet. The runner's

@@ -3,8 +3,8 @@ import {
   type RenameRunnerRequest,
   RUNNER_NAME_MAX_LENGTH,
   type UpdateRunnerSettingsRequest,
-} from '@agentdock/shared';
-import type { PairingRequest } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { PairingRequest } from '@nautelle/shared/protocol';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,

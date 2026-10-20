@@ -10,21 +10,14 @@ import type {
   RunSummary,
   TerminalSetupView,
   UsageSummaryResponse,
-  UsageTimeseriesResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useEffect } from 'react';
 import { api } from '../../lib/api';
-import {
-  lastSevenDays,
-  nextHour,
-  startOfToday,
-} from '../../lib/overview/dashboard';
+import { nextHour, startOfToday } from '../../lib/overview/dashboard';
 import { type Section, useSection } from '../../lib/section/use-section';
-import { browserZone } from '../../lib/usage/format';
 
 /** The dashboard is a glance, not a live view: look again twice a minute. */
 const REFRESH_MS = 30_000;
-const RECENT_LIMIT = 8;
 /** Merges in one day across every project; more than this is not a glance. */
 const MERGED_LIMIT = 200;
 /** The newest failed runs per project; "Needs you" shows the last 24 h of them. */
@@ -111,9 +104,7 @@ async function loadProjectFacts(
 export interface Dashboard {
   facts: Section<ProjectFacts>;
   costToday: Section<UsageSummaryResponse>;
-  cost7d: Section<UsageTimeseriesResponse>;
   merged: Section<ActivityPage>;
-  recent: Section<ActivityPage>;
 }
 
 /** The dashboard's sections, each loading and failing on its own. */
@@ -128,17 +119,6 @@ export function useDashboard(projects: ProjectSummary[]): Dashboard {
     });
     return api<UsageSummaryResponse>(`/usage/summary?${query}`);
   }, []);
-  const cost7d = useSection(() => {
-    const { from, to } = lastSevenDays();
-    const query = new URLSearchParams({
-      from,
-      to,
-      interval: 'day',
-      groupBy: 'project',
-      tz: browserZone(),
-    });
-    return api<UsageTimeseriesResponse>(`/usage/timeseries?${query}`);
-  }, []);
   const merged = useSection(() => {
     const query = new URLSearchParams({
       type: 'pr.merged',
@@ -147,18 +127,8 @@ export function useDashboard(projects: ProjectSummary[]): Dashboard {
     });
     return api<ActivityPage>(`/activity?${query}`);
   }, []);
-  const recent = useSection(
-    () => api<ActivityPage>(`/activity?limit=${RECENT_LIMIT}`),
-    [],
-  );
 
-  const retries = [
-    facts.retry,
-    costToday.retry,
-    cost7d.retry,
-    merged.retry,
-    recent.retry,
-  ];
+  const retries = [facts.retry, costToday.retry, merged.retry];
   // biome-ignore lint/correctness/useExhaustiveDependencies: retry callbacks are stable
   useEffect(() => {
     const timer = setInterval(() => {
@@ -167,5 +137,5 @@ export function useDashboard(projects: ProjectSummary[]): Dashboard {
     return () => clearInterval(timer);
   }, []);
 
-  return { facts, costToday, cost7d, merged, recent };
+  return { facts, costToday, merged };
 }

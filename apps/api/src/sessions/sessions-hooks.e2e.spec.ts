@@ -1,5 +1,5 @@
-import type { SessionContentPage, SessionSummary } from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { SessionContentPage, SessionSummary } from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import {
   adminSession,
@@ -158,7 +158,7 @@ describe('manual sessions: hook ingest (e2e)', () => {
             cwd: '/srv/dev/widget',
             gitBranch: 'feat/184-x',
             permissionMode: 'default',
-            tmuxSession: 'agentdock-manual-0123abcd',
+            tmuxSession: 'nautelle-manual-0123abcd',
           },
           0,
           env,
@@ -172,7 +172,7 @@ describe('manual sessions: hook ingest (e2e)', () => {
         liveState: 'idle',
         parsed: false,
         projectId: p.id,
-        tmuxSession: 'agentdock-manual-0123abcd',
+        tmuxSession: 'nautelle-manual-0123abcd',
         cwd: '/srv/dev/widget',
         endedAt: null,
       });

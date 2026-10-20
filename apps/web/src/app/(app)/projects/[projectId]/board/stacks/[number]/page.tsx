@@ -1,14 +1,5 @@
 'use client';
 
-import {
-  BOARD_CHANGED_EVENT,
-  type BoardStackDetail,
-  DESIGN_LIVE_EVENT,
-  projectRoleAtLeast,
-  STACK_BODY_MAX,
-  type StackCardView,
-  type TaskDesignView,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
@@ -21,6 +12,15 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import {
+  BOARD_CHANGED_EVENT,
+  type BoardStackDetail,
+  DESIGN_LIVE_EVENT,
+  projectRoleAtLeast,
+  STACK_BODY_MAX,
+  type StackCardView,
+  type TaskDesignView,
+} from '@nautelle/shared';
 import { ArrowDown, ArrowLeft, Layers, Play, Square, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';

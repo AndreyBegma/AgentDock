@@ -8,7 +8,7 @@ import {
   canStop,
   cardReviewActions,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { ANONYMOUS_ACTOR, userActor } from '../audit/audit.types';
@@ -64,7 +64,7 @@ const NOTICE_MAX = 190;
 
 const GUARD_TEXT: Record<GuardRefusal, string> = {
   not_linked: LINK_REPLIES.notLinked,
-  inactive_user: 'Your AgentDock account is not active.',
+  inactive_user: 'Your Nautelle account is not active.',
   not_member: 'You are not a member of this project any more.',
   role: BOARD_REPLIES.roleDenied,
 };

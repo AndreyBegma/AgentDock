@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { MOCKUP_MESSAGE_SOURCE, viewerMessageSchema } from '@agentdock/shared';
+import { MOCKUP_MESSAGE_SOURCE, viewerMessageSchema } from '@nautelle/shared';
 import {
   acceptPin,
   frameEscaped,

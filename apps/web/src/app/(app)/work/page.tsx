@@ -1,14 +1,14 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   type ProjectSummary,
   projectRoleAtLeast,
   type WorkPage,
   workCardHref,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+} from '@nautelle/shared';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -123,8 +123,9 @@ function WorkView() {
     <>
       <WorkHeader
         view="list"
-        eyebrow="All projects"
-        description="Cards, plan tasks and suggestions across your projects, from To Do to Completed."
+        title="Work"
+        eyebrow="Workspace"
+        description="Cards, plan tasks and suggestions across every project."
         onSelectList={() => {}}
         onSelectBoard={openBoard}
       >

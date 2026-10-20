@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CARD_PR_DESCRIPTION_FILE } from '@agentdock/shared';
-import type { CardRunArgs } from '@agentdock/shared/protocol';
+import { CARD_PR_DESCRIPTION_FILE } from '@nautelle/shared';
+import type { CardRunArgs } from '@nautelle/shared/protocol';
 
 /**
  * #445 D8: the artifact guard on `finish_card`. A card launched with Token
- * saver on starts its `agentdock` MCP server as `mcp --finish-guard
+ * saver on starts its `nautelle` MCP server as `mcp --finish-guard
  * [--issue <n>]`; that server checks the worker's pull request description
  * and summary before it relays `card.finish`. One MCP process lives as long
  * as one claude process — one round — so the rejections are counted there.

@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import { correlateCwd } from '../adapters/correlate';
 import type { Ancestor } from './types';
 
@@ -11,7 +11,7 @@ interface HookSession {
   cwd: string;
   claudePid: number | null;
   ended: boolean;
-  /** The `agentdock-manual-*` tmux session `SessionStart` reported (D23). */
+  /** The `nautelle-manual-*` tmux session `SessionStart` reported (D23). */
   tmuxSession: string | null;
 }
 

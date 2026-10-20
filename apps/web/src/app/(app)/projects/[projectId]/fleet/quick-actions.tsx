@@ -1,12 +1,12 @@
 'use client';
 
-import type { OrchestratorStatus } from '@agentdock/shared';
 import {
   ActionList,
   type ActionListItem,
 } from '@andrewbehma/glass-ui/action-list';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import type { OrchestratorStatus } from '@nautelle/shared';
 import {
   FilePlus2,
   ListCollapse,
@@ -25,7 +25,7 @@ import type { ControlReasons } from './use-control-reasons';
 type Confirm = 'pause' | 'stop-all' | 'message';
 
 /**
- * Quick actions (#160). AgentDock does not create agents (ADR-0005): "New
+ * Quick actions (#160). Nautelle does not create agents (ADR-0005): "New
  * issue" queues work for the orchestrator to dispatch. Pause all and Stop all
  * are the existing stop commands, each behind a confirmation.
  */

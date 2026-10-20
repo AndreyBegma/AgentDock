@@ -1,5 +1,5 @@
-import type { WebhookEnvelope } from '@agentdock/shared';
-import type { CommandName } from '@agentdock/shared/protocol';
+import type { WebhookEnvelope } from '@nautelle/shared';
+import type { CommandName } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { BudgetClock } from '../budgets/budget-options';
 import { BudgetSweep } from '../budgets/budget-sweep';
@@ -139,10 +139,10 @@ describe('schedule events to outbound webhooks (e2e)', () => {
     const received = await deliver();
     expect(received).toHaveLength(1);
     const [{ request, envelope }] = received;
-    expect(request.headers['x-agentdock-event']).toBe('schedule.failed');
+    expect(request.headers['x-nautelle-event']).toBe('schedule.failed');
     expect(
       verifyOutboundSignature(
-        request.headers['x-agentdock-signature'] as string,
+        request.headers['x-nautelle-signature'] as string,
         request.body,
         hook.secret,
       ),
@@ -195,7 +195,7 @@ describe('schedule events to outbound webhooks (e2e)', () => {
     const disabled = received[5];
     expect(
       verifyOutboundSignature(
-        disabled.request.headers['x-agentdock-signature'] as string,
+        disabled.request.headers['x-nautelle-signature'] as string,
         disabled.request.body,
         hook.secret,
       ),

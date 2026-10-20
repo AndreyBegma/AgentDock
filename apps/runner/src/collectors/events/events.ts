@@ -3,11 +3,11 @@ import { dirname, join } from 'node:path';
 import {
   eventsUnparsedData,
   normalizeCodeSentinelLine,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   codeSentinelStateSchema,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { OffsetStore } from '../../adapters/offsets';
 import type { Cancel } from '../../clock';
 import { resolvePaths } from '../../env';

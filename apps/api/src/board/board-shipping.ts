@@ -13,8 +13,8 @@ import {
   cardLabel,
   failedCardChecks,
   isActiveRoundPhase,
-} from '@agentdock/shared';
-import type { CardChecksResult } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CardChecksResult } from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,
@@ -134,15 +134,14 @@ const WATCHED = {
     },
     { column: { in: ['in_progress', 'finished'] }, ciState: 'pending' },
     // #636: stacked on a dependency that merged — still to be retargeted.
-    {
-      column: { in: ['in_progress', 'finished'] },
-      prBaseCard: { is: { mergedAt: { not: null } } },
-    },
+    // #709: any stacked PR — its dependency, or the PR itself, may merge on
+    // GitHub unseen.
+    { column: { in: ['in_progress', 'finished'] }, prBase: { not: null } },
   ],
 } satisfies Prisma.BoardCardWhereInput;
 
 /**
- * A card ships itself (issue #359, ADR-0035), the API's half: AgentDock
+ * A card ships itself (issue #359, ADR-0035), the API's half: Nautelle
  * watches the checks of a card's PR through the runner (`card.checks`, D5),
  * turns red CI or a conflict into a `ci_fix` round — at most
  * `CARD_CI_FIX_ATTEMPTS_MAX` per PR, then `needsPerson` (D6) — moves the
@@ -156,6 +155,8 @@ export class BoardShipping
 {
   private readonly logger = new Logger(BoardShipping.name);
   private readonly inFlight = new Set<string>();
+  /** #722: merged cards whose stored base the backfill has read on GitHub. */
+  private readonly basesRead = new Set<string>();
   private timer: NodeJS.Timeout | undefined;
   private polling = false;
 
@@ -208,8 +209,46 @@ export class BoardShipping
         if (!this.commands.servesChecks(card.project.runnerId)) continue;
         await this.check(card.id);
       }
+      await this.backfillMergedBases();
     } finally {
       this.polling = false;
+    }
+  }
+
+  /**
+   * #722: the backfill. Every card recorded as merged with a stored base is
+   * read on GitHub once after the API starts — so once per deploy — when
+   * its project's runner serves `card.checks`: one whose PR went into the
+   * project base after a retarget by hand is no longer stacked. A read the
+   * runner could not answer is tried again by the next poll.
+   */
+  async backfillMergedBases(): Promise<void> {
+    const cards = await this.prisma.boardCard.findMany({
+      where: {
+        mergedAt: { not: null },
+        prBase: { not: null },
+        prNumber: { not: null },
+      },
+      select: {
+        id: true,
+        prNumber: true,
+        projectId: true,
+        project: { select: { runnerId: true } },
+      },
+      orderBy: { number: 'asc' },
+    });
+    const projects = new Map<string, BoardProject>();
+    for (const card of cards) {
+      if (this.basesRead.has(card.id)) continue;
+      if (!this.commands.servesChecks(card.project.runnerId)) continue;
+      let project = projects.get(card.projectId);
+      if (!project) {
+        project = await this.work.project(card.projectId);
+        projects.set(card.projectId, project);
+      }
+      if ((await this.work.refreshMergedBase(project, card)) !== null) {
+        this.basesRead.add(card.id);
+      }
     }
   }
 
@@ -253,7 +292,7 @@ export class BoardShipping
   }
 
   private async checkNow(cardId: string): Promise<void> {
-    const card = await this.prisma.boardCard.findUnique({
+    let card = await this.prisma.boardCard.findUnique({
       where: { id: cardId },
       include: { rounds: { orderBy: { round: 'desc' } } },
     });
@@ -262,20 +301,30 @@ export class BoardShipping
     const project = await this.work.project(card.projectId);
     if (!this.work.ships(project, card)) return;
     // #636: a PR stacked on a dependency that has merged since goes onto the
-    // base — the retry of what the merge could not do.
-    if (
-      card.prBase !== null &&
-      !(await this.work.retargetIfDue(project, card))
-    ) {
-      card.prBase = null;
+    // base — the retry of what the merge could not do. #709: the dependency
+    // is read on GitHub, and the retarget may find the PR itself merged —
+    // landed, or carried forward in a new PR the next poll reads.
+    if (card.prBase !== null) {
+      const pr = card.prNumber;
+      await this.work.retargetIfDue(project, card);
+      card = await this.prisma.boardCard.findUnique({
+        where: { id: cardId },
+        include: { rounds: { orderBy: { round: 'desc' } } },
+      });
+      if (!card || card.prNumber !== pr) return;
+      if (card.mergedAt !== null) {
+        if (card.column === 'in_progress') await this.toFinished(project, card);
+        return;
+      }
     }
-    // In Finished, only a merge is left to decide.
-    if (
+    const prNumber = card.prNumber;
+    // In Finished, only a merge is left to decide. #709: a stacked PR, or a
+    // forward PR, is still read — for a merge on GitHub, or a conflict.
+    const mergeOnly =
       card.column === 'finished' &&
-      (card.needsPerson || !(await this.autoMergeOn(project)))
-    ) {
-      return;
-    }
+      (card.needsPerson || !(await this.autoMergeOn(project)));
+    const forward = await this.work.forwarded(card.id, prNumber);
+    if (mergeOnly && card.prBase === null && !forward) return;
 
     const result = boardOutput(
       'card.checks',
@@ -285,7 +334,7 @@ export class BoardShipping
           cardId: card.id,
           projectId: project.id,
           root: project.rootPath,
-          pr: card.prNumber,
+          pr: prNumber,
         },
         { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
       ),
@@ -301,11 +350,33 @@ export class BoardShipping
     const noneSince = await this.store(card, result, state);
 
     if (result.state === 'merged') {
-      await this.mergedOutside(project, card);
+      await this.mergedOutside(project, card, result);
       return;
+    }
+    // #722: a stacked PR a person moved onto the base on GitHub.
+    if (
+      card.prBase !== null &&
+      (await this.work.adoptLiveBase(
+        project,
+        card.id,
+        prNumber,
+        result.base ?? null,
+      ))
+    ) {
+      card = { ...card, prBase: null, prBaseCardId: null };
     }
     // A closed PR is a person's decision; there is nothing to ship.
     if (result.state === 'closed') return;
+    // #709: a forward PR that conflicts in Finished waits for a person.
+    if (
+      forward &&
+      card.column === 'finished' &&
+      result.mergeable === 'CONFLICTING'
+    ) {
+      await this.work.forwardConflict(project, card);
+      return;
+    }
+    if (mergeOnly) return;
     // D6: a fix round waits for the worker's round to be over.
     if (isActiveRoundPhase(card.rounds[0]?.phase) || card.needsPerson) return;
 
@@ -574,13 +645,22 @@ export class BoardShipping
     }
   }
 
-  /** D8: the PR was merged on GitHub — the card is Merged, in Finished. */
+  /**
+   * D8: the PR was merged on GitHub — the card is Merged, in Finished. #709:
+   * with the branch it went into and when, so a stacked PR merged into a
+   * dependency branch that had already merged is carried forward.
+   */
   private async mergedOutside(
     project: BoardProject,
     card: CardWithRounds,
+    result: CardChecksResult,
   ): Promise<void> {
     if (card.prNumber === null) return;
-    await this.work.markMerged(card.id, card.prNumber);
+    await this.work.markMerged(card.id, card.prNumber, {
+      state: 'merged',
+      base: result.base ?? null,
+      mergedAt: result.mergedAt ? new Date(result.mergedAt) : null,
+    });
     this.work.publish(project.id, card.id);
     if (card.column === 'in_progress') await this.toFinished(project, card);
   }

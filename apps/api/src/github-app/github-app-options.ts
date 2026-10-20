@@ -1,7 +1,7 @@
 import {
   GITHUB_HEALTH_INTERVAL_MS,
   GITHUB_POLL_DEBOUNCE_MS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** How the GitHub App module reaches GitHub and paces its loops; tests override it. */
 export interface GitHubAppOptions {

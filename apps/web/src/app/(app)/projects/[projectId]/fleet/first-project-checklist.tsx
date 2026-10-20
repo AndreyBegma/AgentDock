@@ -1,16 +1,16 @@
 'use client';
 
-import type {
-  AdminRunnerDetail,
-  AdminRuntimeProfile,
-  OrchestratorSettingsView,
-  UpdateProjectRequest,
-} from '@agentdock/shared';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Field, Select } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  AdminRunnerDetail,
+  AdminRuntimeProfile,
+  OrchestratorSettingsView,
+  UpdateProjectRequest,
+} from '@nautelle/shared';
 import { Check, Circle } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
@@ -199,7 +199,7 @@ export function FirstProjectChecklist({
     <Card pad="md" className="flex flex-col gap-4">
       <SectionHeader
         title="Get this project running"
-        description="AgentDock does not create agents itself: the orchestrator reads the queue and dispatches a slot per issue."
+        description="Nautelle does not create agents itself: the orchestrator reads the queue and dispatches a slot per issue."
       />
       <ol className="flex flex-col gap-4">
         <Step n={1} title="Set a default runtime profile" done={profileSet}>

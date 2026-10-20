@@ -6,7 +6,7 @@ import type {
   OrchestratorSettingsView,
   ProjectDetail,
   ProjectSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCurrentUser } from '../../components/shell/user-context';
 import { api } from '../api';

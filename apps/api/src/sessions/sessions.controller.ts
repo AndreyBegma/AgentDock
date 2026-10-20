@@ -1,4 +1,4 @@
-import type { SessionDetail, SessionListResponse } from '@agentdock/shared';
+import type { SessionDetail, SessionListResponse } from '@nautelle/shared';
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth-request';
 import { CurrentUser } from '../auth/decorators';

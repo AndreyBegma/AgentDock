@@ -10,7 +10,7 @@ import {
   PLANNER_LIVE_EVENT,
   type TaskDesignPatchRequest,
   type TaskDesignView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { useLive } from '../live/use-live';

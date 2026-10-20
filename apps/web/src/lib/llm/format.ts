@@ -1,4 +1,4 @@
-import type { LlmProviderView } from '@agentdock/shared';
+import type { LlmProviderView } from '@nautelle/shared';
 import { ApiError, type Described } from '../api';
 
 /** Spend at or above this share of the cap shows as a warning. */

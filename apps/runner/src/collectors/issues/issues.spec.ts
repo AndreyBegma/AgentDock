@@ -3,7 +3,7 @@ import {
   issueClosedDataSchema,
   issuesSnapshotDataSchema,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Exec, ExecResult } from '../../detect/exec';
 import { FakeClock } from '../../testing/fake-clock';
 import { memoryLogger } from '../../testing/fixtures';

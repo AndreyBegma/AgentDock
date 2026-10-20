@@ -1,4 +1,9 @@
-/** Exit codes of `agentdock-runner`. */
+/** The systemd user unit's name, and the binary's (ADR-0073). */
+export const SERVICE_NAME = 'nautelle-runner';
+/** The unit before ADR-0073, which `install-service` replaces. */
+export const LEGACY_SERVICE_NAME = 'agentdock-runner';
+
+/** Exit codes of `nautelle-runner`. */
 export const EXIT = {
   ok: 0,
   /** A failure: crash, unreachable server, bad config. systemd restarts it. */
@@ -32,7 +37,7 @@ const environment = (name: string, value: string): string =>
     .replace(/\n/g, '\\n')}"`;
 
 /**
- * The systemd user unit for `agentdock-runner run` (D11). `path` is the PATH
+ * The systemd user unit for `nautelle-runner run` (D11). `path` is the PATH
  * the service runs with: a systemd user manager starts it with a minimal one,
  * so runtimes in `~/.local/bin` would not be found (ADR-0017 §6).
  */
@@ -42,7 +47,7 @@ export const serviceUnit = (
 ): string =>
   [
     '[Unit]',
-    'Description=AgentDock runner',
+    'Description=Nautelle runner',
     'Wants=network-online.target',
     'After=network-online.target',
     '',
@@ -60,7 +65,7 @@ export const serviceUnit = (
   ].join('\n');
 
 /** The launchd label, and the plist's base name (ADR-0017). */
-export const LAUNCH_AGENT_LABEL = 'com.agentdock.runner';
+export const LAUNCH_AGENT_LABEL = 'com.nautelle.runner';
 
 /**
  * Runs its arguments and turns a terminal close (78) into a clean exit.
@@ -78,7 +83,7 @@ const xml = (text: string): string =>
     .replace(/"/g, '&quot;');
 
 /**
- * The launchd user agent for `agentdock-runner run`. `path` is the PATH the
+ * The launchd user agent for `nautelle-runner run`. `path` is the PATH the
  * agent runs with: launchd's default holds only the system directories, so
  * runtimes installed under Homebrew or `~/.local/bin` would not be found.
  */
@@ -91,7 +96,7 @@ export const launchAgentPlist = (
     '/bin/sh',
     '-c',
     TERMINAL_CLOSE_AS_SUCCESS,
-    'agentdock-runner',
+    SERVICE_NAME,
     ...execStart,
   ];
   return [

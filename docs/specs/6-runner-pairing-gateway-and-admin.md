@@ -1,6 +1,6 @@
 # Runner pairing, gateway and runners admin
 
-Issue: [#6](https://github.com/AndreyBegma/AgentDock/issues/6) · Roadmap: M1.3 (part b) ·
+Issue: [#6](https://github.com/AndreyBegma/Nautelle/issues/6) · Roadmap: M1.3 (part b) ·
 Decisions: [ADR-0001](../adr/0001-control-plane-and-per-machine-runner.md),
 [ADR-0006](../adr/0006-runtime-adapters-and-runtime-profiles.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
@@ -68,7 +68,7 @@ Amended at implementation (approved on #6):
 - `runners.createdById` is nullable with `ON DELETE SET NULL`: deleting the admin who created a runner must not fail or take the runner with it.
 - `runtime_profiles.key` and `label` are both the profile `id` — the merged `runtimeProfileSchema` has no label; `binary` is mirrored because the profile carries it.
 - `events.session` and `events.projectRoot` keep the envelope fields the table had dropped; data dropped on ingest cannot be recovered later (M1.5 projections need the session).
-- The admin API's response types live in `@agentdock/shared` (`packages/shared/src/runners/`): `AdminRunner`, `AdminRunnerDetail`, `PairingCodeResponse`, `PingResult`, `RunnerStatus`, `RUNNER_ERROR`.
+- The admin API's response types live in `@nautelle/shared` (`packages/shared/src/runners/`): `AdminRunner`, `AdminRunnerDetail`, `PairingCodeResponse`, `PingResult`, `RunnerStatus`, `RUNNER_ERROR`.
 - A runner never paired reads `offline`, with `pairedAt: null`.
 
 ## API

@@ -1,13 +1,14 @@
 'use client';
 
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Section } from '@andrewbehma/glass-ui/section';
+import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
 import {
   isUnfilteredId,
   LAST_RUNNER_WITHOUT_FILTER_REASONS,
-} from '@agentdock/shared';
-import { Banner } from '@andrewbehma/glass-ui/banner';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
-import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
+} from '@nautelle/shared';
+import { Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -78,6 +79,12 @@ export default function TokenSaverPage() {
       <PageHeader
         title="Token saver"
         description="What this project's rounds cost, measured from usage, and what the runner's filter kept out of what its agents read. Figures marked ≈ are estimates (bytes ÷ 4, priced at the model's input price)."
+        link={Link}
+        primaryAction={{
+          label: 'Settings',
+          href: settingsHref,
+          icon: Settings,
+        }}
         actions={
           <SegmentedControl size="sm" aria-label="Range">
             {PRESETS.map((p) => (
@@ -109,13 +116,22 @@ export default function TokenSaverPage() {
         {(summary) =>
           summary ? (
             <div className="flex flex-col gap-6">
-              <section aria-labelledby="ts-cost-per-round">
-                <SectionHeader
-                  className="mb-2"
-                  headingId="ts-cost-per-round"
-                  title="Cost per round"
-                  description="What a round of each session kind really cost, measured from its requests: the newest week in the range, and how the median moved since the oldest. Peak context is a round's largest request; turns and peak are medians."
-                />
+              <SummaryTiles summary={summary} />
+              {runnerTooOldForReasons(summary) ? (
+                <Banner
+                  tone="info"
+                  title="The runner is too old to say why commands go unfiltered"
+                >
+                  {`This project's runner reports version ${summary.runnerVersion}; runners up to ${LAST_RUNNER_WITHOUT_FILTER_REASONS} record every unfiltered command as a plain “No filter”. Update the runner to see whether a command was compound, uncovered or run in a permission mode that never filters.`}
+                </Banner>
+              ) : null}
+
+              <Section
+                title="Cost per round"
+                description="What a round of each session kind really cost, measured from its requests: the newest week in the range, and how the median moved since the oldest. Peak context is a round's largest request; turns and peak are medians."
+                surface="none"
+                pad="none"
+              >
                 <div className="flex flex-col gap-3">
                   <CostPerRoundTable
                     rows={summary.costPerRound}
@@ -127,47 +143,30 @@ export default function TokenSaverPage() {
                   />
                   <UnmeasuredKindsNote />
                 </div>
-              </section>
+              </Section>
 
               {summary.costPerRound.length > 0 ? (
-                <section aria-labelledby="ts-cost-by-week">
-                  <SectionHeader
-                    className="mb-2"
-                    headingId="ts-cost-by-week"
-                    title="Cost per round by week"
-                    description="Each session kind week by week (ISO weeks, UTC), so a release shows as the week its cost changed."
-                  />
-                  <CostPerRoundWeeksTable rows={summary.costPerRound} />
-                </section>
-              ) : null}
-
-              <SummaryTiles summary={summary} />
-              {runnerTooOldForReasons(summary) ? (
-                <Banner
-                  tone="info"
-                  title="The runner is too old to say why commands go unfiltered"
+                <Section
+                  title="Cost per round by week"
+                  description="Each session kind week by week (ISO weeks, UTC), so a release shows as the week its cost changed."
+                  surface="none"
+                  pad="none"
                 >
-                  {`This project's runner reports version ${summary.runnerVersion}; runners up to ${LAST_RUNNER_WITHOUT_FILTER_REASONS} record every unfiltered command as a plain “No filter”. Update the runner to see whether a command was compound, uncovered or run in a permission mode that never filters.`}
-                </Banner>
+                  <CostPerRoundWeeksTable rows={summary.costPerRound} />
+                </Section>
               ) : null}
 
-              <section aria-labelledby="ts-over-time">
-                <SectionHeader
-                  className="mb-2"
-                  headingId="ts-over-time"
-                  title="Savings over time"
-                />
+              <Section title="Savings over time" surface="none" pad="none">
                 <SavingsChart byDay={summary.byDay} />
-              </section>
+              </Section>
 
               <div className="grid gap-6 lg:grid-cols-2">
-                <section aria-labelledby="ts-by-filter">
-                  <SectionHeader
-                    className="mb-2"
-                    headingId="ts-by-filter"
-                    title="By filter"
-                    description="Most saved first."
-                  />
+                <Section
+                  title="By filter"
+                  description="Most saved first."
+                  surface="none"
+                  pad="none"
+                >
                   <FilterTable
                     label="Savings by filter"
                     passThrough
@@ -180,35 +179,32 @@ export default function TokenSaverPage() {
                       </p>
                     }
                   />
-                </section>
-                <section aria-labelledby="ts-by-kind">
-                  <SectionHeader
-                    className="mb-2"
-                    headingId="ts-by-kind"
-                    title="By run kind"
-                    description="The launch that ran the command."
-                  />
+                </Section>
+                <Section
+                  title="By run kind"
+                  description="The launch that ran the command."
+                  surface="none"
+                  pad="none"
+                >
                   <RunKindTable rows={summary.byRunKind} empty={null} />
-                </section>
+                </Section>
               </div>
 
               <div className="grid gap-6 lg:grid-cols-2">
-                <section aria-labelledby="ts-why-unfiltered">
-                  <SectionHeader
-                    className="mb-2"
-                    headingId="ts-why-unfiltered"
-                    title="Why commands went unfiltered"
-                    description="Every command no filter ran on, by the reason the runner gave."
-                  />
+                <Section
+                  title="Why commands went unfiltered"
+                  description="Every command no filter ran on, by the reason the runner gave."
+                  surface="none"
+                  pad="none"
+                >
                   <UnfilteredReasonTable filters={summary.byFilter} />
-                </section>
-                <section aria-labelledby="ts-unfiltered-programs">
-                  <SectionHeader
-                    className="mb-2"
-                    headingId="ts-unfiltered-programs"
-                    title="Most frequent unfiltered programs"
-                    description="The program and its subcommand, never its arguments."
-                  />
+                </Section>
+                <Section
+                  title="Most frequent unfiltered programs"
+                  description="The program and its subcommand, never its arguments."
+                  surface="none"
+                  pad="none"
+                >
                   <UnfilteredProgramTable
                     programs={summary.unfilteredPrograms}
                     empty={
@@ -219,16 +215,15 @@ export default function TokenSaverPage() {
                       </p>
                     }
                   />
-                </section>
+                </Section>
               </div>
 
-              <section aria-labelledby="ts-prompt-cache">
-                <SectionHeader
-                  className="mb-2"
-                  headingId="ts-prompt-cache"
-                  title="Prompt cache, measured"
-                  description="From the usage of ended runs started in this range — not the filter's estimate. Input counts uncached tokens, cache reads and cache writes."
-                />
+              <Section
+                title="Prompt cache, measured"
+                description="From the usage of ended runs started in this range — not the filter's estimate. Input counts uncached tokens, cache reads and cache writes."
+                surface="none"
+                pad="none"
+              >
                 <div className="grid gap-3 lg:grid-cols-[16rem_1fr]">
                   <PromptCacheTile summary={summary} />
                   <PromptCacheTable
@@ -240,15 +235,14 @@ export default function TokenSaverPage() {
                     }
                   />
                 </div>
-              </section>
+              </Section>
 
-              <section aria-labelledby="ts-original">
-                <SectionHeader
-                  className="mb-2"
-                  headingId="ts-original"
-                  title="Filters that most often returned the original"
-                  description="Output the filter could not safely shorten, so the agent read it whole. The “No filter” reasons are the extreme case. A filter high here is a candidate for improvement."
-                />
+              <Section
+                title="Filters that most often returned the original"
+                description="Output the filter could not safely shorten, so the agent read it whole. The “No filter” reasons are the extreme case. A filter high here is a candidate for improvement."
+                surface="none"
+                pad="none"
+              >
                 <FilterTable
                   label="Filters that returned the original"
                   passThrough
@@ -259,7 +253,7 @@ export default function TokenSaverPage() {
                     </p>
                   }
                 />
-              </section>
+              </Section>
             </div>
           ) : null
         }

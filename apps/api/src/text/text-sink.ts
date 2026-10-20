@@ -2,7 +2,7 @@ import {
   isTextEventType,
   type RunnerEvent,
   textEventDataSchemas,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

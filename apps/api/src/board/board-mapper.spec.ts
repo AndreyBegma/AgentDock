@@ -1,5 +1,5 @@
-import { CARD_HOOKS_GRACE_MS, type StewardCardChip } from '@agentdock/shared';
-import type { ProfileAgentdock } from '@agentdock/shared/protocol';
+import { CARD_HOOKS_GRACE_MS, type StewardCardChip } from '@nautelle/shared';
+import type { ProfileAgentdock } from '@nautelle/shared/protocol';
 import type { BoardCard, BoardCardRound } from '@prisma/client';
 import {
   type CardFacts,

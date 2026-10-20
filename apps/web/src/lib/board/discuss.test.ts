@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { PlanTurnView } from '@agentdock/shared';
+import type { PlanTurnView } from '@nautelle/shared';
 import { plan, turn } from '../planner/fixtures';
 import {
   discussionEntries,

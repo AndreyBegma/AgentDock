@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { InboundTriggerView, WebhookView } from '@agentdock/shared';
+import type { InboundTriggerView, WebhookView } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   circuitReopensIn,
@@ -263,9 +263,9 @@ describe('labels and samples', () => {
     expect(text).toContain("SECRET='s3cret'");
     expect(text).toContain('"%s.%s.%s" "$TS" "$DELIVERY" "$BODY"');
     for (const header of [
-      'X-AgentDock-Timestamp',
-      'X-AgentDock-Delivery',
-      'X-AgentDock-Signature: sha256=',
+      'X-Nautelle-Timestamp',
+      'X-Nautelle-Delivery',
+      'X-Nautelle-Signature: sha256=',
     ])
       expect(text).toContain(header);
   });

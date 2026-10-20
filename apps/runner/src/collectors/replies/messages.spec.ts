@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { SLOT_MESSAGE_SEEN_MAX_BYTES } from '@agentdock/shared/protocol';
+import { SLOT_MESSAGE_SEEN_MAX_BYTES } from '@nautelle/shared/protocol';
 import { messageFileContent } from '../../control/slot';
 import { brief, fleetFixture } from '../../fleet/testing';
 import { tempDir } from '../../testing/fixtures';

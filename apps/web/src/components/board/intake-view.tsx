@@ -1,9 +1,9 @@
 'use client';
 
-import type { BoardCardView, BoardView, PlanAnswer } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { BoardCardView, BoardView, PlanAnswer } from '@nautelle/shared';
 import NextLink from 'next/link';
 import { fetchBoard } from '../../lib/board/actions';
 import { boardStackPageHref } from '../../lib/board/href';
@@ -33,12 +33,15 @@ export function IntakeView({
   projectId,
   planId,
   board,
+  thumbNav = false,
   onOpenCard,
   onClose,
 }: {
   projectId: string;
   planId: string;
   board?: BoardView;
+  /** On a phone: Previous and Next stay at the bottom, in the thumb zone. */
+  thumbNav?: boolean;
   onOpenCard: (number: number) => void;
   onClose: () => void;
 }) {
@@ -129,6 +132,7 @@ export function IntakeView({
             key={roundKey(plan.questions)}
             questions={plan.questions}
             disabled={busy !== null}
+            thumbNav={thumbNav}
             onSubmit={(answers) =>
               actions.planTurn({ answers }).then(() => undefined)
             }

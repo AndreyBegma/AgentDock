@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { CardRunArgs } from '@agentdock/shared/protocol';
+import type { CardRunArgs } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import {
   CARD_PORT_BASE,
@@ -117,7 +117,7 @@ describe('card worker launch (#242 D5)', () => {
   it('#113: carries the session token in the env when the runner minted one', () => {
     expect(
       cardLaunchSpec(profile, args(false), '/wt', null).env
-        .AGENTDOCK_SESSION_TOKEN,
+        .NAUTELLE_SESSION_TOKEN,
     ).toBeUndefined();
     const spec = cardLaunchSpec(
       profile,
@@ -128,15 +128,15 @@ describe('card worker launch (#242 D5)', () => {
       null,
       'tok-round',
     );
-    expect(spec.env.AGENTDOCK_SESSION_TOKEN).toBe('tok-round');
+    expect(spec.env.NAUTELLE_SESSION_TOKEN).toBe('tok-round');
   });
 
   // #367 D1: checked against Claude Code 2.1.301 — hooks from `--settings`
   // and the server from `--mcp-config` load on `--session-id` and `--resume`.
   it('#367 D1: injected wiring adds --settings and --mcp-config before the model, on both rounds', () => {
     const wiring = {
-      settings: '/state/cards/card_1/rounds/run_r2/agentdock-settings.json',
-      mcp: '/state/cards/card_1/rounds/run_r2/agentdock-mcp.json',
+      settings: '/state/cards/card_1/rounds/run_r2/nautelle-settings.json',
+      mcp: '/state/cards/card_1/rounds/run_r2/nautelle-mcp.json',
     };
     for (const resume of [false, true]) {
       const spec = cardLaunchSpec(profile, args(resume), '/wt', null, wiring);
@@ -162,20 +162,20 @@ describe('card worker launch (#242 D5)', () => {
   it('#389: tells the session its card and a port of its own, on every round', () => {
     for (const resume of [false, true]) {
       const spec = cardLaunchSpec(profile, args(resume), '/wt', null);
-      expect(spec.env.AGENTDOCK_CARD).toBe('ab12cd34');
-      expect(spec.env.AGENTDOCK_CARD_PORT).toBe(String(cardPort('ab12cd34')));
+      expect(spec.env.NAUTELLE_CARD).toBe('ab12cd34');
+      expect(spec.env.NAUTELLE_CARD_PORT).toBe(String(cardPort('ab12cd34')));
       expect(spec.env.CLAUDE_CONFIG_DIR).toBe('/home/u/.claude-work');
     }
   });
 
   it("#389: the card's env wins over a profile that sets the same names", () => {
     const spec = cardLaunchSpec(
-      { ...profile, env: { ...profile.env, AGENTDOCK_CARD: 'other' } },
+      { ...profile, env: { ...profile.env, NAUTELLE_CARD: 'other' } },
       args(false),
       '/wt',
       null,
     );
-    expect(spec.env.AGENTDOCK_CARD).toBe('ab12cd34');
+    expect(spec.env.NAUTELLE_CARD).toBe('ab12cd34');
   });
 
   it('#389: a card port is stable, in range, and differs between cards', () => {
@@ -188,6 +188,9 @@ describe('card worker launch (#242 D5)', () => {
     }
     expect(new Set(ports).size).toBe(ids.length);
     expect(cardEnv('h74ymwpx')).toEqual({
+      NAUTELLE_CARD: 'h74ymwpx',
+      NAUTELLE_CARD_PORT: String(cardPort('h74ymwpx')),
+      // ADR-0073: a project whose setup predates the rename reads these.
       AGENTDOCK_CARD: 'h74ymwpx',
       AGENTDOCK_CARD_PORT: String(cardPort('h74ymwpx')),
     });

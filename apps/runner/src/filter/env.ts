@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { TokenSaverRunKind } from '@agentdock/shared';
+import type { TokenSaverRunKind } from '@nautelle/shared';
 
 /**
  * The environment a launch gives its Claude session so the command-output
@@ -13,36 +13,36 @@ import type { TokenSaverRunKind } from '@agentdock/shared';
  */
 
 /** `<run dir>/filter-stats.jsonl`: one row per filtered command (amendment 5). */
-export const FILTER_STATS_ENV = 'AGENTDOCK_FILTER_STATS';
+export const FILTER_STATS_ENV = 'NAUTELLE_FILTER_STATS';
 /** The project the launch runs for — the `filter.stats` envelope's project. */
-export const FILTER_PROJECT_ENV = 'AGENTDOCK_FILTER_PROJECT';
+export const FILTER_PROJECT_ENV = 'NAUTELLE_FILTER_PROJECT';
 /** The launch's run id; unset for the orchestrator session, which has none. */
-export const FILTER_RUN_ENV = 'AGENTDOCK_FILTER_RUN';
+export const FILTER_RUN_ENV = 'NAUTELLE_FILTER_RUN';
 /** The launch's `TokenSaverRunKind`. */
-export const FILTER_RUN_KIND_ENV = 'AGENTDOCK_FILTER_RUN_KIND';
+export const FILTER_RUN_KIND_ENV = 'NAUTELLE_FILTER_RUN_KIND';
 
 /**
  * The `--settings` file the launch passed to Claude. The hook reads its
  * permission rules next to the ones Claude loads from the usual places, so a
  * rewrite never changes what the session allows, asks or denies.
  */
-export const LAUNCH_SETTINGS_ENV = 'AGENTDOCK_LAUNCH_SETTINGS';
+export const LAUNCH_SETTINGS_ENV = 'NAUTELLE_LAUNCH_SETTINGS';
 
 /**
- * The bypass (D4c): `AGENTDOCK_RAW=1 <cmd>`. Mirrors `TOKEN_SAVER_RAW_ENV`
- * from `@agentdock/shared`, which this hot path does not load; a test pins
+ * The bypass (D4c): `NAUTELLE_RAW=1 <cmd>`. Mirrors `TOKEN_SAVER_RAW_ENV`
+ * from `@nautelle/shared`, which this hot path does not load; a test pins
  * the two together.
  */
-export const RAW_ENV = 'AGENTDOCK_RAW';
+export const RAW_ENV = 'NAUTELLE_RAW';
 
 /**
  * #663 D9: the filter families switched off for this launch, comma-separated
  * (`js,ops`; `tool` is the Bash read refusal). The launch sets it from the
  * project's setting. A command of a switched-off family passes through.
  */
-export const FILTER_OFF_ENV = 'AGENTDOCK_FILTER_OFF';
+export const FILTER_OFF_ENV = 'NAUTELLE_FILTER_OFF';
 
-/** The families named in `AGENTDOCK_FILTER_OFF`. */
+/** The families named in `NAUTELLE_FILTER_OFF`. */
 export const switchedOffFamilies = (
   env: Readonly<Record<string, string | undefined>>,
 ): ReadonlySet<string> =>
@@ -92,8 +92,8 @@ export const filterEnv = (launch: FilterLaunch): Record<string, string> => ({
 
 /**
  * The orchestrator session's run dir for one repository:
- * `<state>/agentdock/orchestrator/<owner>__<name>/`. `stateDir` is the
- * runner's `<state>/agentdock` (the spool's parent).
+ * `<state>/nautelle/orchestrator/<owner>__<name>/`. `stateDir` is the
+ * runner's `<state>/nautelle` (the spool's parent).
  */
 export const orchestratorFilterDir = (stateDir: string, repo: string): string =>
   join(

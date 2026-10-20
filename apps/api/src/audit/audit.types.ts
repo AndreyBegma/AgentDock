@@ -1,4 +1,4 @@
-import type { AuditAction, AuditResult } from '@agentdock/shared';
+import type { AuditAction, AuditResult } from '@nautelle/shared';
 
 /**
  * Who did it (spec D5). `anonymous`: no session — failed logins, registration.

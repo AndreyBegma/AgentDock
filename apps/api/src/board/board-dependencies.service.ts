@@ -7,8 +7,8 @@ import {
   isActiveRoundPhase,
   openDependencies,
   type Role,
-} from '@agentdock/shared';
-import { roleAtLeast } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { roleAtLeast } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { BoardColumn, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -39,6 +39,7 @@ const STACK_FACTS = {
   dependsOn: {
     select: {
       id: true,
+      projectId: true,
       number: true,
       column: true,
       branch: true,
@@ -216,10 +217,28 @@ export class BoardDependencies {
    *   dependency only, so it waits until they are merged.
    */
   async assertRunnable(cardId: string): Promise<StackedBase | null> {
-    const rows = await this.prisma.boardCardDependency.findMany({
-      where: { cardId },
-      include: STACK_FACTS,
-    });
+    let rows = await this.stackFacts(cardId);
+    // #709: a dependency's PR the board holds as open may have merged or
+    // closed on GitHub, unseen by the PR poll — it is read live before the
+    // card is stacked on its branch.
+    // #722: one merged into a dependency branch may have been retargeted onto
+    // the base by hand first — GitHub's base counts, not the stored one.
+    const live = rows.filter(
+      (r) =>
+        !landed(r.dependsOn) &&
+        (hasOpenPr(r.dependsOn) || r.dependsOn.mergedAt !== null),
+    );
+    if (live.length > 0) {
+      const project = await this.work.project(live[0].dependsOn.projectId);
+      for (const { dependsOn } of live) {
+        if (dependsOn.mergedAt !== null) {
+          await this.work.refreshMergedBase(project, dependsOn);
+        } else {
+          await this.work.dependencyMergedAt(project, dependsOn.id);
+        }
+      }
+      rows = await this.stackFacts(cardId);
+    }
     const open = openDependencies(
       rows.map((r) => refOf(r.dependsOn)).sort(byNumber),
     );
@@ -247,6 +266,9 @@ export class BoardDependencies {
         { dependencies: pending.map(refOf) },
       );
     }
+    // #709: a dependency whose PR closed unmerged is no branch to build on;
+    // the card starts from the base.
+    if (only.mergedAt === null && only.prState === 'closed') return null;
     if (
       hasOpenPr(only) &&
       only.branch !== null &&
@@ -260,6 +282,13 @@ export class BoardDependencies {
       `${cardLabel(only.number)} is not completed yet and has no open pull request to build on`,
       { dependencies: [refOf(only)] },
     );
+  }
+
+  private stackFacts(cardId: string) {
+    return this.prisma.boardCardDependency.findMany({
+      where: { cardId },
+      include: STACK_FACTS,
+    });
   }
 
   private async viewOf(cardId: string): Promise<CardDependenciesView> {

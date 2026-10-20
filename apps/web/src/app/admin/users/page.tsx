@@ -1,13 +1,5 @@
 'use client';
 
-import {
-  type AdminUser,
-  type RegistrationState,
-  ROLES,
-  type Role,
-  USER_STATUSES,
-  type UserStatus,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -21,6 +13,14 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
+import {
+  type AdminUser,
+  type RegistrationState,
+  ROLES,
+  type Role,
+  USER_STATUSES,
+  type UserStatus,
+} from '@nautelle/shared';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';

@@ -1,13 +1,13 @@
 'use client';
 
-import {
-  DESIGN_VIEWPORT_MAX_PX,
-  DESIGN_VIEWPORT_MIN_PX,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import {
+  DESIGN_VIEWPORT_MAX_PX,
+  DESIGN_VIEWPORT_MIN_PX,
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { uiProfilePreviewSrc } from '../../../../../../lib/design/href';
 

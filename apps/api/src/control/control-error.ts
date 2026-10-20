@@ -1,4 +1,4 @@
-import type { ControlErrorBody, ControlErrorCode } from '@agentdock/shared';
+import type { ControlErrorBody, ControlErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the control routes, shaped like every other API error. */

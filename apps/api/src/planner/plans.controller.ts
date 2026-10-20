@@ -10,7 +10,7 @@ import {
   type PlanTaskVersionsView,
   type PlanTurnInput,
   planTurnInputSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

@@ -1,15 +1,15 @@
 'use client';
 
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import {
   CLAUDE_MODELS,
   type InstalledSkillView,
   type ProjectRuntimeProfile,
   type SkillRunView,
-} from '@agentdock/shared';
-import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
+} from '@nautelle/shared';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';

@@ -4,7 +4,7 @@
 > Do not create a public GitHub issue before the fix is merged (the repository is public).
 
 ## Problem
-**F-28.** A mockup runs in `iframe sandbox="allow-scripts"` (`apps/web/src/components/design/mockup-frame.tsx:94`). The validator forbids only `top/parent.location` and `postMessage` (`packages/shared/src/design/validate.ts:48-65`), so a mockup can still navigate its own frame (`location.assign`, `self.location`, a meta refresh) to any page, which then renders inside the AgentDock design viewer. UI-profile kit and snippets saved through `PUT /projects/:id/ui-profile` skip the validator. **L-48.** The viewer accepts the frame's `pin` message while pin mode is off (`design-viewer.tsx`, `pinMode` at :107), so a mockup can open the pin composer and plant a `selector`.
+**F-28.** A mockup runs in `iframe sandbox="allow-scripts"` (`apps/web/src/components/design/mockup-frame.tsx:94`). The validator forbids only `top/parent.location` and `postMessage` (`packages/shared/src/design/validate.ts:48-65`), so a mockup can still navigate its own frame (`location.assign`, `self.location`, a meta refresh) to any page, which then renders inside the Nautelle design viewer. UI-profile kit and snippets saved through `PUT /projects/:id/ui-profile` skip the validator. **L-48.** The viewer accepts the frame's `pin` message while pin mode is off (`design-viewer.tsx`, `pinMode` at :107), so a mockup can open the pin composer and plant a `selector`.
 
 **Attacker.** Whoever controls mockup HTML: a prompt-injected design run, or a project member editing the UI profile.
 

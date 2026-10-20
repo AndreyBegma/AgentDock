@@ -1,4 +1,4 @@
-import type { GitGithubAuth } from '@agentdock/shared/protocol';
+import type { GitGithubAuth } from '@nautelle/shared/protocol';
 import type { Exec } from './detect/exec';
 
 /**

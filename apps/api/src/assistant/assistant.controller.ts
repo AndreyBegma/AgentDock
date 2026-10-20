@@ -5,7 +5,7 @@ import {
   type AssistantModelsView,
   type AssistantStreamEvent,
   ATTACHMENT_UPLOAD_FIELD,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   applyDecorators,
   Body,

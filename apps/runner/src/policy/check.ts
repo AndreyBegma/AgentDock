@@ -5,11 +5,12 @@ import {
   permissionModeAllowed,
   policyAllowsCommand,
   policyFixHint,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
 import { notMainCheckout, type Realpath, rootOutsideAllowed } from './roots';
 import type { PolicyConfig } from './schema';
+import { shellWord } from './upgrade';
 
 export interface PolicyRefusal {
   rule: PolicyRule;
@@ -54,7 +55,13 @@ export const rootRefusal = (
   realpath: Realpath,
 ): PolicyRefusal | null => {
   const why = rootOutsideAllowed(root, policy.allowedRoots, realpath);
-  return why === null ? null : policyRefusal('allowedRoots', why);
+  if (why === null) return null;
+  // #691: the exact line for this root; a relative one gets the placeholder.
+  return policyRefusal(
+    'allowedRoots',
+    why,
+    root.startsWith('/') ? shellWord(root) : undefined,
+  );
 };
 
 /** Why the policy refuses a launch in `mode`, or null. */

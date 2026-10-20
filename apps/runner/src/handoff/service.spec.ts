@@ -8,11 +8,11 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { HANDOFF_PERSON_MARK } from '@agentdock/shared';
+import { HANDOFF_PERSON_MARK } from '@nautelle/shared';
 import type {
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CaptureSpawn } from '../capture/executor';
 import type { ConfigProfile } from '../config';
 import { isolatedGit } from '../skills/testing';
@@ -90,7 +90,7 @@ const setup = async (
     sessionId: OLD_SESSION,
     profileKey: 'claude',
     startedAt: new Date(Date.now() - 60_000).toISOString(),
-    tmuxSession: 'agentdock-card-ab12cd34',
+    tmuxSession: 'nautelle-card-ab12cd34',
   };
   const cardsDir = join(ws, 'cards');
   const state = new HandoffStateStore((id) => join(cardsDir, id));

@@ -28,6 +28,7 @@ export * from './events/fleet';
 export * from './events/hooks';
 export * from './events/planner';
 export * from './events/queue';
+export * from './events/runner';
 export * from './events/sessions';
 export * from './events/skills';
 export * from './events/text';

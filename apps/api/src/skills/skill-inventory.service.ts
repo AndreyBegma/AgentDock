@@ -1,5 +1,5 @@
-import type { InstalledSkillsView, Role } from '@agentdock/shared';
-import type { InstalledSkill } from '@agentdock/shared/protocol';
+import type { InstalledSkillsView, Role } from '@nautelle/shared';
+import type { InstalledSkill } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { AuditContext } from '../audit/audit.types';

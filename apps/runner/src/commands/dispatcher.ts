@@ -10,7 +10,7 @@ import {
   DEFAULT_COMMAND_TIMEOUT_MS,
   isCommandName,
   parseCommand,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Clock } from '../clock';
 import { errorMessage, type Logger } from '../log';
 import { commandRefusal } from '../policy/check';

@@ -12,7 +12,7 @@ import {
   skillNameSchema,
   skillProvenanceSchema,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import type { ConfigProfile } from '../config';
 import { watchedProject } from '../control/target';

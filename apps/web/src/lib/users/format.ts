@@ -1,4 +1,4 @@
-import type { AdminUser, Role, UserStatus } from '@agentdock/shared';
+import type { AdminUser, Role, UserStatus } from '@nautelle/shared';
 
 /**
  * The tab the Users page opens on: Active, or the first tab that has rows.

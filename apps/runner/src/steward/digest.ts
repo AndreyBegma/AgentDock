@@ -1,16 +1,15 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DIGEST_PROSE_MAX, oneLine } from '@agentdock/shared';
+import { DIGEST_PROSE_MAX, oneLine } from '@nautelle/shared';
 import {
-  AGENTDOCK_HOOKS_ENV,
-  AGENTDOCK_HOOKS_OFF,
   DIGEST_COMPOSE_TIMEOUT_SEC,
   type DigestComposeArgs,
   type DigestComposeItem,
   type DigestComposeResult,
   type DigestComposeSection,
+  HOOKS_OFF_ENV,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   bunSpawn,
   CAPTURE_CLAUDE_FLAGS,
@@ -76,7 +75,7 @@ export const proseOf = (text: string): string =>
   oneLine(text.trim().replace(/^["'`]+|["'`]+$/g, ''), DIGEST_PROSE_MAX);
 
 export interface StewardDigestOptions {
-  /** `$XDG_STATE_HOME/agentdock/steward`: one directory per call, deleted at its end. */
+  /** `$XDG_STATE_HOME/nautelle/steward`: one directory per call, deleted at its end. */
   dir: string;
   env: Env;
   clock: Clock;
@@ -92,7 +91,7 @@ export interface StewardDigestOptions {
  * #491 (#447 D3, D14): `digest.compose` — haiku writes the digest's summary
  * as one headless `claude -p --tools "" --permission-mode plan` on the named
  * profile, the prompt on stdin, in a directory of its own, with
- * `AGENTDOCK_HOOKS=off`, as the stall classifier runs. The call carries the
+ * `NAUTELLE_HOOKS=off`, as the stall classifier runs. The call carries the
  * API's `steward` run, so its spend counts against the project budget (D16).
  * Any failure is a command error: the API then keeps the template digest.
  */
@@ -139,7 +138,7 @@ export class StewardDigestWriter {
         env,
         runEnv(profile, args, this.options.otlpPort?.() ?? null),
       );
-      env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
+      Object.assign(env, HOOKS_OFF_ENV);
       const proc = (this.options.spawn ?? bunSpawn)({
         command: [
           profile.binary ?? profile.runtime,

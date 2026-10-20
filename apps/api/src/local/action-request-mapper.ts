@@ -6,7 +6,7 @@ import {
   type PrApproveBoundArgs,
   prDiffUrl,
   shortHeadSha,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { ActionRequest } from '@prisma/client';
 
 /**
@@ -115,14 +115,16 @@ export const actionRequestBody = (
 };
 
 /**
- * The notification's link. It also carries the request's id back to the
- * Telegram buttons: a notification row has no other reference to it.
+ * The notification's link: the Queue page's Approvals tab (C-284). It also
+ * carries the request's id back to the Telegram buttons: a notification row
+ * has no other reference to it.
  */
 export const actionRequestLink = (projectId: string, id: string): string =>
-  `/projects/${projectId}/approvals?actionRequest=${encodeURIComponent(id)}`;
+  `/projects/${projectId}/queue?tab=approvals&actionRequest=${encodeURIComponent(id)}`;
 
+/** Rows written before C-284 still link to the old `/approvals` page. */
 const LINK =
-  /^\/projects\/[^/?]+\/approvals\?actionRequest=([A-Za-z0-9_-]{1,64})$/;
+  /^\/projects\/[^/?]+\/(?:queue\?tab=approvals&|approvals\?)actionRequest=([A-Za-z0-9_-]{1,64})$/;
 
 /** The request id of an `action.requested` notification's link; null otherwise. */
 export const actionRequestIdOfLink = (link: string | null): string | null => {

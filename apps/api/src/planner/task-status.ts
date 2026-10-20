@@ -1,4 +1,4 @@
-import type { PlanTaskLiveStatus } from '@agentdock/shared';
+import type { PlanTaskLiveStatus } from '@nautelle/shared';
 
 /** What the issue cache (#19) holds about an issued task's issue. */
 export interface CachedIssueFacts {

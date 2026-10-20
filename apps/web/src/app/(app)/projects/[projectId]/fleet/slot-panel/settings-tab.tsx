@@ -1,7 +1,7 @@
 'use client';
 
-import type { OrchestratorSettingsView, SlotDetail } from '@agentdock/shared';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
+import type { OrchestratorSettingsView, SlotDetail } from '@nautelle/shared';
 import Link from 'next/link';
 import type { Section } from '../../../../../../lib/section/use-section';
 

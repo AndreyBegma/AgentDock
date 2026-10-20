@@ -1,4 +1,4 @@
-import { BOARD_ERROR } from '@agentdock/shared';
+import { BOARD_ERROR } from '@nautelle/shared';
 import { BoardFailure } from './board-error';
 import { BoardWorld, HEAD_SHA, ok, prInspection } from './testing/board-e2e';
 
@@ -148,7 +148,7 @@ describe('board accept with merge (e2e, #273)', () => {
           headSha: HEAD_SHA,
           method: 'squash',
           issue: 41,
-          comment: 'Completed as C-1 on the AgentDock board; merged in #77.',
+          comment: 'Completed as C-1 on the Nautelle board; merged in #77.',
         },
       ]);
       await w.work.settled();
@@ -231,7 +231,8 @@ describe('board accept with merge (e2e, #273)', () => {
 
     it('an empty body is the move only: no card.merge, merge null', async () => {
       await finished();
-      const response = await post(1, 'accept');
+      // #709: the open PR #77 has not landed; the person confirms.
+      const response = await post(1, 'accept', { confirmUnlanded: true });
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({ column: 'completed', merge: null });
       expect(w.sent('card.merge')).toEqual([]);
@@ -387,7 +388,7 @@ describe('board accept with merge (e2e, #273)', () => {
           pr: 77,
           deleteBranch: true,
           issue: null,
-          comment: 'Closed from the AgentDock Board (C-1)',
+          comment: 'Closed from the Nautelle Board (C-1)',
         },
       ]);
       expect(w.sent('card.merge')).toEqual([]);
@@ -443,7 +444,8 @@ describe('board accept with merge (e2e, #273)', () => {
 
     it('leave the PR open: nothing is sent to GitHub', async () => {
       await finished();
-      const response = await post(1, 'accept');
+      // #709: the open PR #77 has not landed; the person confirms.
+      const response = await post(1, 'accept', { confirmUnlanded: true });
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
         column: 'completed',

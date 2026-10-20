@@ -7,7 +7,7 @@ import type {
   ProjectSummary,
   RunSummary,
   SlotSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   approvalsHref,
   costByProject,
@@ -35,6 +35,7 @@ const project = (id: string): ProjectSummary => ({
   base: 'main',
   docsKind: null,
   role: 'operator',
+  watchRefusal: null,
 });
 
 const slot = (over: Partial<SlotSummary>): SlotSummary => ({
@@ -245,7 +246,7 @@ describe('needsYou', () => {
       ['prompt', 'Slot i1'],
       ['blocked', 'Slot i4 · #4'],
     ]);
-    expect(items[0]?.href).toBe('/projects/p1/approvals');
+    expect(items[0]?.href).toBe('/projects/p1/queue?tab=approvals');
     expect(items[2]?.projectName).toBe('Project p1');
   });
 
@@ -297,7 +298,7 @@ describe('needsYou', () => {
     expect(items[0]?.href).toBe('/projects/p2/settings?tab=orchestrator');
     expect(items[0]?.since).toBeNull();
     expect(items[1]?.title).toBe('Slot i7 · #7');
-    expect(items[1]?.href).toBe('/projects/p1/history/fresh');
+    expect(items[1]?.href).toBe('/projects/p1/activity?tab=runs&run=fresh');
     expect(items[2]?.title).toBe('Nightly audit');
   });
 });
@@ -321,7 +322,7 @@ describe('tile links (#213)', () => {
           ['p2', waiting],
         ]),
       ),
-    ).toBe('/projects/p2/approvals');
+    ).toBe('/projects/p2/queue?tab=approvals');
     expect(approvalsHref([project('p1')], new Map([['p1', decided]]))).toBe(
       '/projects',
     );

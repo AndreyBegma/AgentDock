@@ -5,8 +5,8 @@ import {
   CARD_PR_DESCRIPTION_FILE,
   cardDraftPullRequest,
   cardPullRequestBody,
-} from '@agentdock/shared';
-import type { CardCollectArgs } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CardCollectArgs } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import {
@@ -50,7 +50,7 @@ const setup = async () => {
     worktree: cardWorktreePath(f.root, 'ab12cd34'),
     branch: BRANCH,
     base: 'main',
-    tmuxSession: 'agentdock-card-ab12cd34',
+    tmuxSession: 'nautelle-card-ab12cd34',
     runId: 'run_1',
     phase: 'running',
     startedAt: '2026-10-16T12:00:00.000Z',
@@ -142,7 +142,7 @@ describe('push and draft PR (#359 D1)', () => {
     expect(created?.body).toStartWith(
       `Spec: [${SPEC}](https://github.com/acme/widget/blob/card/c12-export-csv/docs/specs/card-12-export-csv.md)`,
     );
-    expect(created?.body).toContain('AgentDock-Card: C-12');
+    expect(created?.body).toContain('Nautelle-Card: C-12');
   });
 
   it('pushes only the committed HEAD — never the index or the working tree — and a known head is not pushed again', async () => {

@@ -1,5 +1,5 @@
-import { PLANNER_DESIGN_BLOCK_TAG } from '@agentdock/shared';
-import type { UiProfileCommandName } from '@agentdock/shared/protocol';
+import { PLANNER_DESIGN_BLOCK_TAG } from '@nautelle/shared';
+import type { UiProfileCommandName } from '@nautelle/shared/protocol';
 import type { PlannerSendResult } from '../../planner/planner-commands';
 import {
   block,

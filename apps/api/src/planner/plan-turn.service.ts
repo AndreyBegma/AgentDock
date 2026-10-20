@@ -12,13 +12,13 @@ import {
   type Role,
   textAnswerField,
   withRecommendations,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   PLAN_TURN_DEFAULT_TIMEOUT_SEC,
   type PlanTurnArgs,
   type PlanTurnSession,
   planTurnArgsSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Plan, PlanTask, Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -64,6 +64,8 @@ interface TurnSpec {
   normalize?: boolean;
   /** #337 D10: pending uploads the turn claims onto its plan, checked already. */
   claim?: readonly string[];
+  /** #687: the stored error of the failed turn a retry runs again. */
+  previousFailure?: string;
 }
 
 /**
@@ -379,7 +381,17 @@ export class PlanTurnService {
       turn.action === 'design'
         ? await retriedDesign(this.prisma, plan.id, turn.runId, task)
         : undefined;
-    return this.run(plan, { action: turn.action, task, input, design }, caller);
+    return this.run(
+      plan,
+      {
+        action: turn.action,
+        task,
+        input,
+        design,
+        previousFailure: turn.error ?? undefined,
+      },
+      caller,
+    );
   }
 
   /**
@@ -600,6 +612,7 @@ export class PlanTurnService {
               ? questionsOf(spec.task.questions)
               : [],
       input: spec.input,
+      previousFailure: spec.previousFailure,
     });
     // #445 D11: only a runner that advertises the token saver gets the field.
     const saver = await this.tokenSaver.launch(plan.projectId);

@@ -3,7 +3,7 @@ import type {
   QueueIssueDetail,
   QueueRefreshResult,
   QueueView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

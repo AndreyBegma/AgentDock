@@ -1,4 +1,4 @@
-import { DESIGN_ERROR, type DesignProgressStage } from '@agentdock/shared';
+import { DESIGN_ERROR, type DesignProgressStage } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Plan } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

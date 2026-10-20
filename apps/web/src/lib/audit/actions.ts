@@ -1,4 +1,4 @@
-import type { AuditAction, AuditResult } from '@agentdock/shared';
+import type { AuditAction, AuditResult } from '@nautelle/shared';
 
 /** Rule R5: every audited action in words. A new action fails the type here. */
 export const ACTION_LABEL: Record<AuditAction, string> = {
@@ -31,6 +31,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'project.member_remove': 'Removed a project member',
   'project.docs_source_override': 'Set a project’s docs source',
   'project.docs_source_reset': 'Reset a project’s docs source',
+  'project.repo_rename': 'Followed a repository rename on GitHub',
   'prices.version_create': 'Created a price version',
   'prices.recompute': 'Re-priced requests',
   'issue.create': 'Created an issue',
@@ -140,7 +141,9 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.ci_retriggered':
     "Reopened a card's pull request because CI reported no checks",
   'card.pr_retargeted':
-    "Moved a stacked card's pull request onto the base after its dependency merged",
+    "Moved a stacked card's pull request onto the base after its dependency merged, or found it moved there on GitHub",
+  'card.pr_forwarded':
+    'Opened a forward pull request for a card merged into a dependency branch that had already merged',
   'card.auto_run_toggled': 'Switched Auto-run when ready on a card',
   'card.message': 'Messaged a card session',
   'slot.session_message': 'Messaged a worker session',

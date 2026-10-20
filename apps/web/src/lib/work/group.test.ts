@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { BoardColumn, WorkCardItem, WorkItem } from '@agentdock/shared';
+import type { BoardColumn, WorkCardItem, WorkItem } from '@nautelle/shared';
 import { workRowId } from './format';
 import { displayRows, groupWorkItems } from './group';
 
@@ -13,7 +13,7 @@ const slot = (
 ): WorkCardItem => ({
   source: 'fleet',
   projectId,
-  projectName: 'AgentDock',
+  projectName: 'Nautelle',
   cardId: `card${number}`,
   number,
   label: `C-${number}`,

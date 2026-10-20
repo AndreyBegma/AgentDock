@@ -1,6 +1,5 @@
 'use client';
 
-import { PAIRING_CODE_TTL_MS, type PublicUser } from '@agentdock/shared';
 import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import {
@@ -11,6 +10,7 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
+import { PAIRING_CODE_TTL_MS, type PublicUser } from '@nautelle/shared';
 import {
   FolderLock,
   GitBranch,
@@ -72,7 +72,7 @@ const VALUE: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: FolderLock,
     title: 'Your code stays put',
-    text: 'AgentDock never reads your files. The runner does, on its own machine.',
+    text: 'Nautelle never reads your files. The runner does, on its own machine.',
   },
   {
     icon: ShieldCheck,
@@ -241,12 +241,12 @@ export function InstallGuide() {
         className="mx-auto flex w-full max-w-3xl flex-col gap-12 px-4 pb-16 pt-6 sm:px-6 sm:pt-8"
       >
         <nav
-          aria-label="AgentDock"
+          aria-label="Nautelle"
           className="flex items-center justify-between gap-3"
         >
           <Link
             href={viewer === 'signed-out' ? '/login' : '/'}
-            aria-label="AgentDock"
+            aria-label="Nautelle"
           >
             <Wordmark size="md" />
           </Link>
@@ -263,13 +263,13 @@ export function InstallGuide() {
               href="/"
               className={buttonClassName({ variant: 'glass', size: 'sm' })}
             >
-              Back to AgentDock
+              Back to Nautelle
             </Link>
           ) : null}
         </nav>
 
         <header className="flex flex-col items-start gap-5 sm:pt-6">
-          <p className="text-sm font-medium text-ink-3">The AgentDock runner</p>
+          <p className="text-sm font-medium text-ink-3">The Nautelle runner</p>
           <h1 className="text-[34px] leading-[1.1] font-semibold tracking-tight text-ink sm:text-[44px]">
             Run your agents on your own machine.
           </h1>

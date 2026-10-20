@@ -1,4 +1,4 @@
-import { NOTIFICATION_NEW_EVENT } from '@agentdock/shared';
+import { NOTIFICATION_NEW_EVENT } from '@nautelle/shared';
 import { LiveService } from '../live/live.service';
 import { NotificationMatcher } from './notification-matcher';
 import {

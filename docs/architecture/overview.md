@@ -34,7 +34,7 @@
 1. **The control plane never touches a project's filesystem.** Everything it
    knows came from a runner; everything it changes goes through a runner
    command. Local mode is the same runner on the same machine (ADR-0001).
-2. **Observe the orchestrator, do not replace it.** AgentDock starts the
+2. **Observe the orchestrator, do not replace it.** Nautelle starts the
    `cs-orchestrator` skill in a session and reads what it writes (ADR-0005).
 3. **Structured first, scraped second.** Code Sentinel emits
    `events.jsonl`; markdown parsing exists for old rounds and older plugin
@@ -57,7 +57,7 @@
 |---|---|
 | `apps/api` | NestJS; REST for the UI, `/runner` WebSocket gateway, `/live` WebSocket for live updates (session cookie + origin check, authorized topics — [spec 9](../specs/9-application-shell-and-live-updates.md)), webhook endpoints, schedulers |
 | `apps/web` | Next.js App Router; talks only to `apps/api` |
-| `apps/runner` | Bun daemon; compiled with `bun build --compile`; config in `~/.config/agentdock/runner.json` |
+| `apps/runner` | Bun daemon; compiled with `bun build --compile`; config in `~/.config/nautelle/runner.json` |
 | `packages/shared` | protocol types: runner messages, event schema, command schema (zod), shared enums |
 
 ## Live data path

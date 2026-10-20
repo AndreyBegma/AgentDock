@@ -96,7 +96,7 @@ export interface CardRoundBrief {
   wiringReason?: CardRunWiringReason | null;
   /**
    * #443: Auto-run when ready started the round, after this dependency's
-   * number reached Finished (#638) or was accepted; `null` for a round a person or AgentDock started.
+   * number reached Finished (#638) or was accepted; `null` for a round a person or Nautelle started.
    * Optional so older fixtures stay valid.
    */
   autoRunAfter?: number | null;
@@ -152,8 +152,12 @@ export interface CardFleetView {
  */
 export interface CardPrTarget {
   branch: string;
-  /** The dependency whose branch it is; `null` for the project base. */
-  stackedOn: { number: number; label: string } | null;
+  /**
+   * The dependency whose branch it is; `null` for the project base. #709:
+   * `merged` — that dependency's own PR has merged, so the branch is dead and
+   * a merge into it would never reach the base.
+   */
+  stackedOn: { number: number; label: string; merged: boolean } | null;
 }
 
 /** One card on the board. */
@@ -638,7 +642,8 @@ export const BULK_CARDS_MAX = 100;
 /**
  * `POST /board/cards/bulk` (#452): one action for several cards. `complete`
  * is Accept with neither `merge` nor `closePr` — the PRs are left as they
- * are; `todo` is the person's move; `finished` is Mark finished; `delete`
+ * are, and a card whose work has not landed in the base is that card's
+ * `not_landed` error (#709: it is accepted one at a time, confirmed); `todo` is the person's move; `finished` is Mark finished; `delete`
  * never stops a worker.
  */
 export interface BulkBoardCardsRequest {
@@ -808,8 +813,17 @@ export const BOARD_ERROR = {
   captureNeedsContent: 'capture_needs_content',
   /** 422 (#272 D2): no usable runtime profile; `reason`, `source`, `profileKey`. */
   noProfile: 'no_profile',
-  /** 409 (#273 D13): the runner refused the merge, with `reason` (`CardMergeFailReason`). */
+  /**
+   * 409 (#273 D13): the runner refused the merge, with `reason`
+   * (`CardMergeFailReason`, or #709 `base_merged`: the PR goes into a
+   * dependency branch whose own PR has merged).
+   */
   mergeFailed: 'merge_failed',
+  /**
+   * 409 (#709): Accept of a card whose work has not landed in the project
+   * base, without `confirmUnlanded`; the message names what is missing.
+   */
+  notLanded: 'not_landed',
   /** 409 / 404 (#273 D13): the card has no pull request. */
   noPullRequest: 'no_pull_request',
   /** 422 (#282 D3): `autoCollect` on a card that is not a `terminal` card. */
@@ -978,6 +992,13 @@ export interface AcceptBoardCardRequest {
     /** Close the linked issue as `not planned`; off in the dialog by default. */
     closeIssue: boolean;
   };
+  /**
+   * #709 (ADR-0064): Completed means landed. Accept with neither `merge` nor
+   * `closePr`, of a card with work whose pull request has not merged into the
+   * project base, is refused with 409 `not_landed` — its message names the
+   * missing landing — unless this is `true`: the person confirmed it.
+   */
+  confirmUnlanded?: boolean;
 }
 
 /** #273 D13: how the merge on Accept went. */

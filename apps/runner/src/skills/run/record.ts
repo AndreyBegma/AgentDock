@@ -12,10 +12,10 @@ import {
   skillRunIdSchema,
   skillRunPhaseSchema,
   skillRunShortIdSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 
-/** Files of a run directory, `$XDG_STATE_HOME/agentdock/runs/<runId>/` (D7). */
+/** Files of a run directory, `$XDG_STATE_HOME/nautelle/runs/<runId>/` (D7). */
 export const RUN_FILES = {
   /** The executor's record of the run; it survives a runner restart. */
   state: 'state.json',

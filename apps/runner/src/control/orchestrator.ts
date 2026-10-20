@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { legacySessionName } from '@nautelle/shared/legacy-names';
 import {
   type OrchestratorMessageArgs,
   type OrchestratorMessageResult,
@@ -13,7 +14,7 @@ import {
   type OrchestratorTargetArgs,
   orchestratorSessionName,
   type StoppedResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { isoNow } from '../clock';
 import { ORCHESTRATOR_SKILL } from '../collectors/orchestrator/orchestrator';
 import { classifyPane } from '../collectors/tmux/classify';
@@ -76,7 +77,7 @@ export const orchestratorArgv = (
   `/${ORCHESTRATOR_SKILL} ${args.mode}`,
 ];
 
-/** #445: `<state>/agentdock/orchestrator`, beside the spool. */
+/** #445: `<state>/nautelle/orchestrator`, beside the spool. */
 export const defaultOrchestratorDir = (): string =>
   join(dirname(resolvePaths(process.env).spoolDir), 'orchestrator');
 
@@ -111,7 +112,7 @@ export const orchestratorTokenSaver = async (
     runKind: 'orchestrator',
     projectId: args.projectId,
     runId: null,
-    agentdock: [],
+    runnerMcp: [],
     scout: true,
   });
 };
@@ -132,17 +133,36 @@ const orchestratorLaunch = async (
   return [...(deps.selfCommand ?? defaultSelfCommand()), 'exec-run', dir];
 };
 
+const tmuxOf = (deps: ControlDeps) =>
+  new TmuxControl(deps.exec, deps.tmuxServer);
+
+/**
+ * The repository's live orchestrator session, or null. ADR-0073: one an older
+ * runner started under the `agentdock-orch-` name still counts.
+ */
+export const findOrchestratorSession = async (
+  tmux: Pick<TmuxControl, 'find'>,
+  repo: string,
+): Promise<string | null> => {
+  const name = orchestratorSessionName(repo);
+  for (const candidate of [name, legacySessionName(name)]) {
+    if (candidate !== null && (await tmux.find(candidate))) return candidate;
+  }
+  return null;
+};
+
+/** The live session of the target's orchestrator, else the name it would get. */
 const sessionOf = async (
   deps: ControlDeps,
   args: OrchestratorTargetArgs,
 ): Promise<string> => {
   const project = watchedProject(args, deps.watchedProjects());
   const fleet = await resolveFleetProject(deps.exec, project);
-  return orchestratorSessionName(fleet.repo);
+  return (
+    (await findOrchestratorSession(tmuxOf(deps), fleet.repo)) ??
+    orchestratorSessionName(fleet.repo)
+  );
 };
-
-const tmuxOf = (deps: ControlDeps) =>
-  new TmuxControl(deps.exec, deps.tmuxServer);
 
 /**
  * `orchestrator.start` (D1, D2). The tmux session name is the lock: a live
@@ -180,7 +200,13 @@ export const startOrchestrator = async (
   const tmux = tmuxOf(deps);
   const alreadyRunning = () =>
     new CommandFailure('already_running', `${session} is already running`);
-  if (await tmux.find(session)) throw alreadyRunning();
+  const running = await findOrchestratorSession(tmux, fleet.repo);
+  if (running) {
+    throw new CommandFailure(
+      'already_running',
+      `${running} is already running`,
+    );
+  }
 
   const tokenSaver = await orchestratorTokenSaver(args, deps, profile, session);
   const [binary, ...binaryArgs] = orchestratorArgv(
@@ -198,7 +224,7 @@ export const startOrchestrator = async (
       env: { ...profile.env, ...(tokenSaver?.env ?? {}) },
       cwd: project.root,
       interactive: true,
-      label: 'agentdock orchestrator',
+      label: 'nautelle orchestrator',
     }),
   );
   // Lost a race with a concurrent start: the other one holds the name.
@@ -239,7 +265,7 @@ export const ORCHESTRATOR_MESSAGE_DIR = join('cs-orchestrator', 'agentdock');
 
 /** The poke typed into the orchestrator's pane; the body is never typed. */
 export const orchestratorMessagePrompt = (file: string): string =>
-  `Read ${file}: a message from the person via AgentDock`;
+  `Read ${file}: a message from the person via Nautelle`;
 
 /**
  * The repository's common git dir, absolute — inside `.git`, so nothing put
@@ -276,10 +302,11 @@ export const messageOrchestrator = async (
 ): Promise<OrchestratorMessageResult> => {
   const project = watchedProject(args, deps.watchedProjects());
   const fleet = await resolveFleetProject(deps.exec, project);
-  const session = orchestratorSessionName(fleet.repo);
   const tmux = tmuxOf(deps);
-  const text = (await tmux.find(session)) ? await tmux.capture(session) : null;
-  if (text === null) return { delivered: false, reason: 'absent' };
+  const session = await findOrchestratorSession(tmux, fleet.repo);
+  const text = session ? await tmux.capture(session) : null;
+  if (session === null || text === null)
+    return { delivered: false, reason: 'absent' };
   if (stateOf(text) === 'prompt') return { delivered: false, reason: 'prompt' };
 
   const at = isoNow(deps.clock);

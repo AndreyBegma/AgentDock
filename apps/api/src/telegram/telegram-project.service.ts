@@ -1,4 +1,4 @@
-import { effectiveProjectRole, type Role } from '@agentdock/shared';
+import { effectiveProjectRole, type Role } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { userActor } from '../audit/audit.types';
@@ -58,10 +58,10 @@ export const boardReply = (project: { displayName: string }, text: string) =>
 
 const REFUSALS: Record<GuardRefusal | 'no_project' | 'choose', string> = {
   not_linked: LINK_REPLIES.notLinked,
-  inactive_user: 'Your AgentDock account is not active.',
+  inactive_user: 'Your Nautelle account is not active.',
   not_member: 'You are not a member of this project any more.',
   role: 'Your role on this project does not allow that, so nothing changed.',
-  no_project: 'You are not a member of any AgentDock project yet.',
+  no_project: 'You are not a member of any Nautelle project yet.',
   choose: 'Pick the project for this chat first: send /project.',
 };
 

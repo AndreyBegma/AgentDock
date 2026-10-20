@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { PlanSummary } from '@agentdock/shared';
+import type { PlanSummary } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { type PlanRetry, planColumns } from './plan-list';
 
@@ -49,5 +49,14 @@ describe('PlanList', () => {
   test('a plan that merely needs attention has no Retry', () => {
     const html = planCell(plan({ ...failed, kind: 'attention' }), retry(true));
     expect(html).not.toContain('Retry');
+  });
+
+  test('the plan column takes the slack and lets a long title wrap (C-301)', () => {
+    const [first] = planColumns();
+    expect(first?.width).toBe('100%');
+    const html = planCell({ ...plan(null), title: 'x'.repeat(200) });
+    expect(html).toContain('whitespace-normal');
+    expect(html).toContain('wrap-anywhere');
+    expect(html).not.toContain('truncate');
   });
 });

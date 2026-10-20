@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PROFILE_ENV_VALUE_NAMES } from '@agentdock/shared/protocol';
+import { PROFILE_ENV_VALUE_NAMES } from '@nautelle/shared/protocol';
 import { Client } from 'pg';
 import { createE2eApp, type E2eContext } from '../test/e2e-app';
 import { withoutParams } from '../test/reset-database';

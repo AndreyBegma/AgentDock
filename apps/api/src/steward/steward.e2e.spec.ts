@@ -4,8 +4,8 @@ import {
   STEWARD_NUDGE_TEXT,
   type StewardIncidentView,
   type StewardSettingsView,
-} from '@agentdock/shared';
-import type { StewardCommandName } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { StewardCommandName } from '@nautelle/shared/protocol';
 import { UnprocessableEntityException } from '@nestjs/common';
 import { BoardWorld, ROOT_B } from '../board/testing/board-e2e';
 import { NotificationMatcher } from '../notifications/notification-matcher';
@@ -40,7 +40,7 @@ describe('Steward (e2e)', () => {
           'session.dismiss': { dismissed: true },
           'card.resume': {
             outcome: 'resumed',
-            tmuxSession: 'agentdock-card-abcd1234',
+            tmuxSession: 'nautelle-card-abcd1234',
           },
           'digest.compose': { prose: 'Nothing happened.' },
         };
@@ -503,7 +503,7 @@ describe('Steward (e2e)', () => {
         projectId: w.a,
         at: new Date().toISOString(),
         phase: 'running',
-        tmuxSession: 'agentdock-card-abcd1234',
+        tmuxSession: 'nautelle-card-abcd1234',
       });
       expect(
         (

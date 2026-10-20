@@ -1,4 +1,3 @@
-import type { HeldForLeadRow } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import {
   Table,
@@ -6,6 +5,7 @@ import {
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
+import type { HeldForLeadRow } from '@nautelle/shared';
 import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import {
   HELD_FOR_LEAD_HINT,

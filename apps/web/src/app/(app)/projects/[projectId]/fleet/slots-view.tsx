@@ -1,16 +1,17 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { Section } from '@andrewbehma/glass-ui/section';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import {
   SLOT_STATUSES,
   type SlotPage,
   type SlotStatus,
   type SlotSummary,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { Toggle } from '@andrewbehma/glass-ui/toggle';
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { type ReactNode, useState } from 'react';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
@@ -22,19 +23,20 @@ import {
   slotsQuery,
 } from '../../../../../lib/fleet/format';
 import { useSection } from '../../../../../lib/section/use-section';
-import { SlotsTable } from './slots-table';
+import { SlotList } from './slot-list';
 
 const PAGE_SIZE = 50;
 
 /**
- * The table view of the workspace (the view menu's "All slots"): the active
- * slots, or every slot with filters and paging once "Show ended" is on.
+ * The Fleet's slot list: the active slots, or every slot with filters and
+ * paging once "Show ended" is on.
  */
 export function SlotsView({
   projectId,
   active,
   version,
   nobodyYet,
+  focus,
   onSelect,
 }: {
   projectId: string;
@@ -44,6 +46,8 @@ export function SlotsView({
   version: number;
   /** What an empty fleet shows. */
   nobodyYet: ReactNode;
+  /** The slot whose panel is open. */
+  focus?: string | null;
   onSelect: (slot: string) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
@@ -96,11 +100,17 @@ export function SlotsView({
   };
 
   const slotsList = (slots: SlotSummary[]) => (
-    <SlotsTable slots={slots} onSelect={(s) => onSelect(s.name)} />
+    <Section title="Agents" pad="none">
+      <SlotList
+        slots={slots}
+        focus={focus ?? null}
+        onSelect={(s) => onSelect(s.name)}
+      />
+    </Section>
   );
 
   return (
-    <section className="flex flex-col gap-4" aria-label="Slots">
+    <div className="flex min-w-0 flex-col gap-4">
       <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="flex items-center gap-2 text-sm">
           <Toggle
@@ -200,6 +210,6 @@ export function SlotsView({
       ) : (
         slotsList(active)
       )}
-    </section>
+    </div>
   );
 }

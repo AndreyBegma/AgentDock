@@ -1,10 +1,10 @@
 'use client';
 
-import type { PlanCandidateView, PlanDetail } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { Chip } from '@andrewbehma/glass-ui/chip';
+import type { PlanCandidateView, PlanDetail } from '@nautelle/shared';
 import { Check, Paperclip, X } from 'lucide-react';
 import {
   acceptAllLabel,

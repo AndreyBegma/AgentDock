@@ -56,6 +56,7 @@ describe('HandoffWriter (#449 D2)', () => {
     expect(note).toBe('## Goal\nx');
     expect(calls[0]?.command).toContain(HANDOFF_WRITER_MODEL);
     expect(calls[0]?.command).toContain('-p');
+    expect(calls[0]?.env.NAUTELLE_HOOKS).toBe('off');
     expect(calls[0]?.env.AGENTDOCK_HOOKS).toBe('off');
     expect(calls[0]?.prompt).toContain('[user] build it');
     expect(calls[0]?.prompt).toContain('old <!-- person -->');

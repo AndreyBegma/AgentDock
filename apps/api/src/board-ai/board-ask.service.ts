@@ -5,7 +5,7 @@ import {
   type BoardAskResponse,
   type BoardSearchResponse,
   cardLabel,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { AuthUser } from '../auth';

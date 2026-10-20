@@ -4,7 +4,7 @@ import type {
   PriceVersionListResponse,
   PriceVersionSummary,
   RecomputeProgress,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import { AuditCtx } from '../audit/audit-context';

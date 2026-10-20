@@ -5,7 +5,7 @@ import type {
   TextNormalizeArgs,
   TextNormalizeFinishedData,
   UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CaptureProcess, CaptureSpawn } from '../capture/executor';
 import { CAPTURE_CLAUDE_FLAGS } from '../capture/executor';
 import { CommandFailure } from '../commands/failure';
@@ -98,7 +98,7 @@ const setup = (script: Script = { stdout: resultLine('ok') }) => {
     log: memoryLogger().log,
     spawn,
     home: dir,
-    selfCommand: ['/opt/agentdock-runner'],
+    selfCommand: ['/opt/nautelle-runner'],
   });
   const args = (over: Partial<TextNormalizeArgs> = {}): TextNormalizeArgs => ({
     runId: 'run_1',
@@ -184,6 +184,7 @@ describe('NormalizeExecutor (#271 D4)', () => {
     expect(call.cwd).toBe(join(t.normalizeDir, 'run_1'));
     expect(call.cwd.startsWith(`${t.root}/`)).toBe(false);
     // The profile's own AGENTDOCK_HOOKS=on cannot win.
+    expect(call.env.NAUTELLE_HOOKS).toBe('off');
     expect(call.env.AGENTDOCK_HOOKS).toBe('off');
     expect(call.env.CLAUDE_CONFIG_DIR).toBe('/profile');
     expect(call.env.OTEL_RESOURCE_ATTRIBUTES).toContain('agentdock.run=run_1');

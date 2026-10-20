@@ -1,7 +1,7 @@
 import type {
   SessionMessageRequest,
   SessionMessageView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { api } from '../api';
 
 /** #489: a send function for one session — a card round or a fleet slot. */

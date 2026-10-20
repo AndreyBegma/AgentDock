@@ -2,9 +2,15 @@ import {
   BOARD_ERROR,
   type BoardCardDetail,
   type BoardStackDetail,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BoardShipping } from './board-shipping';
-import { BoardWorld, HEAD_SHA, ok } from './testing/board-e2e';
+import {
+  BoardWorld,
+  cardChecks,
+  failed,
+  HEAD_SHA,
+  ok,
+} from './testing/board-e2e';
 
 /**
  * #636 (docs/specs/636-branch-a-dependent-card-from-its-depende.md,
@@ -94,7 +100,7 @@ describe('stacked card branches (e2e, #636)', () => {
     });
     expect((response.body as BoardCardDetail).prTarget).toEqual({
       branch: C1_BRANCH,
-      stackedOn: { number: c1.number, label: `C-${c1.number}` },
+      stackedOn: { number: c1.number, label: `C-${c1.number}`, merged: false },
     });
 
     // The round's collect opens the PR into C-1's branch too.
@@ -325,7 +331,558 @@ describe('stacked card branches (e2e, #636)', () => {
     });
     expect(byNumber.get(c2.number)?.prTarget).toEqual({
       branch: C1_BRANCH,
-      stackedOn: { number: c1.number, label: `C-${c1.number}` },
+      stackedOn: { number: c1.number, label: `C-${c1.number}`, merged: false },
+    });
+  });
+  describe('the base read from GitHub (#709)', () => {
+    const C2_BRANCH = 'feat/2-the-dependant';
+    /** When C-1's PR merged on GitHub, and C-2's after it. */
+    const C1_MERGED = '2026-10-20T10:00:00.000Z';
+    const C2_MERGED = '2026-10-20T11:00:00.000Z';
+
+    /** `card.checks` answers by PR number; any other PR is open. */
+    const prs = (byPr: Record<number, Record<string, unknown>>) => {
+      w.checksServed = true;
+      w.handlers['card.checks'] = (args) =>
+        ok(cardChecks(byPr[Number(args.pr)] ?? {}));
+    };
+
+    /** C-1 with an open PR #77, and C-2 stacked on its branch with PR #78. */
+    const stacked = async () => {
+      const c1 = await withOpenPr('Dependency', C1_BRANCH, 77);
+      const c2 = await withOpenPr('Dependant', C2_BRANCH, 78, {
+        prBase: C1_BRANCH,
+        prBaseCardId: c1.id,
+      });
+      await link(c2.number, c1.number);
+      return { c1, c2 };
+    };
+
+    it('Run reads the dependency PR on GitHub: merged there unseen, the card starts from the base', async () => {
+      const c1 = await withOpenPr('Dependency', C1_BRANCH, 77);
+      const c2 = await w.createCard({ title: 'Dependant', specOnRun: false });
+      await link(c2.number, c1.number);
+      prs({ 77: { state: 'merged', base: BASE, mergedAt: C1_MERGED } });
+
+      expect((await w.runCard(c2.number)).status).toBe(200);
+      expect(runBase()).toBe(BASE);
+      expect(await w.card(c2.number)).toMatchObject({
+        prBase: null,
+        prBaseCardId: null,
+      });
+      expect(w.checks()).toContainEqual(expect.objectContaining({ pr: 77 }));
+      // The merge the poll missed is recorded on C-1.
+      expect(await w.card(c1.number)).toMatchObject({
+        prState: 'merged',
+        mergedAt: new Date(C1_MERGED),
+        prBase: null,
+      });
+    });
+
+    it('Run on a dependency whose PR closed on GitHub starts from the base', async () => {
+      const c1 = await withOpenPr('Dependency', C1_BRANCH, 77);
+      const c2 = await w.createCard({ title: 'Dependant', specOnRun: false });
+      await link(c2.number, c1.number);
+      prs({ 77: { state: 'closed' } });
+
+      expect((await w.runCard(c2.number)).status).toBe(200);
+      expect(runBase()).toBe(BASE);
+      expect((await w.card(c1.number)).prState).toBe('closed');
+      expect((await w.card(c2.number)).prBase).toBeNull();
+    });
+
+    it('a dependency still open on GitHub stacks the card as before', async () => {
+      const c1 = await withOpenPr('Dependency', C1_BRANCH, 77);
+      const c2 = await w.createCard({ title: 'Dependant', specOnRun: false });
+      await link(c2.number, c1.number);
+      prs({});
+
+      expect((await w.runCard(c2.number)).status).toBe(200);
+      expect(runBase()).toBe(C1_BRANCH);
+      expect((await w.card(c1.number)).mergedAt).toBeNull();
+    });
+
+    it('a stacked PR merged into a dependency branch that had already merged gets a forward PR into the base', async () => {
+      const { c1, c2 } = await stacked();
+      prs({
+        77: { state: 'merged', base: BASE, mergedAt: C1_MERGED },
+        78: { state: 'merged', base: C1_BRANCH, mergedAt: C2_MERGED },
+      });
+      // GitHub refuses to retarget a PR that is no longer open.
+      w.handlers['card.prRetarget'] = () =>
+        ok({ retargeted: false, error: 'not_open', message: 'merged' });
+
+      await w.ctx.app.get(BoardShipping).poll();
+
+      expect(w.prOpens()).toEqual([
+        expect.objectContaining({
+          cardId: c2.id,
+          branch: C2_BRANCH,
+          base: BASE,
+          title: `C-${c2.number}: Dependant`,
+        }),
+      ]);
+      expect(String(w.prOpens()[0]?.body)).toContain('#78');
+      expect(await w.card(c2.number)).toMatchObject({
+        prNumber: 91,
+        prUrl: 'https://github.com/acme/widget/pull/91',
+        prState: 'open',
+        mergedAt: null,
+        prBase: null,
+        prBaseCardId: null,
+        ciState: 'pending',
+        needsPerson: false,
+      });
+      expect(await w.card(c1.number)).toMatchObject({
+        prState: 'merged',
+        mergedAt: new Date(C1_MERGED),
+      });
+      const [audit] = await w.audit('card.pr_forwarded');
+      expect(audit.after).toEqual({
+        number: c2.number,
+        pr: 91,
+        mergedPr: 78,
+        into: C1_BRANCH,
+        base: BASE,
+        dependency: c1.number,
+        alreadyOpen: false,
+        conflict: false,
+      });
+      expect(
+        await w.ctx.prisma.boardCardPullRequest.findMany({
+          where: { cardId: c2.id },
+          select: { number: true, state: true },
+          orderBy: { number: 'asc' },
+        }),
+      ).toEqual([{ number: 91, state: 'open' }]);
+    });
+
+    it('a merge into the dead branch the poll reads itself is carried forward, and a conflicting forward PR needs a person', async () => {
+      const { c1, c2 } = await stacked();
+      // C-1 merged; C-2's retarget failed, so it is still stacked.
+      w.handlers['card.prRetarget'] = () =>
+        ok({ retargeted: false, error: 'gh_failed', message: 'HTTP 502' });
+      await w.ctx.prisma.boardCard.update({
+        where: { id: c1.id },
+        data: { prState: 'merged', mergedAt: new Date(C1_MERGED) },
+      });
+      w.handlers['card.prOpen'] = () =>
+        ok({
+          opened: true,
+          prNumber: 92,
+          prUrl: 'https://github.com/acme/widget/pull/92',
+          alreadyOpen: false,
+          mergeable: 'CONFLICTING',
+        });
+      prs({ 78: { state: 'merged', base: C1_BRANCH, mergedAt: C2_MERGED } });
+      // The retry of the retarget meets the merged PR.
+      w.handlers['card.prRetarget'] = () =>
+        ok({ retargeted: false, error: 'not_open', message: 'merged' });
+
+      await w.ctx.app.get(BoardShipping).poll();
+
+      expect(w.prOpens()).toHaveLength(1);
+      expect(await w.card(c2.number)).toMatchObject({
+        prNumber: 92,
+        prState: 'open',
+        prBase: null,
+        needsPerson: true,
+        needsPersonReason: 'forward_conflict',
+      });
+      const [audit] = await w.audit('card.pr_forwarded');
+      expect(audit.after).toMatchObject({ pr: 92, conflict: true });
+    });
+
+    it('a stacked PR that merged before its dependency lands with it — no forward PR', async () => {
+      const { c1, c2 } = await stacked();
+      // C-2 merged into C-1's live branch; C-1 merges after.
+      await w.work.markMerged(c2.id, 78, {
+        state: 'merged',
+        base: C1_BRANCH,
+        mergedAt: new Date(C1_MERGED),
+      });
+      expect((await w.card(c2.number)).prBase).toBe(C1_BRANCH);
+      await w.work.markMerged(c1.id, 77, {
+        state: 'merged',
+        base: BASE,
+        mergedAt: new Date(C2_MERGED),
+      });
+      expect(w.prOpens()).toHaveLength(0);
+      expect(await w.card(c2.number)).toMatchObject({
+        prState: 'merged',
+        prBase: null,
+        prBaseCardId: null,
+      });
+    });
+
+    it('a merge on Accept retargets a stacked PR whose dependency merged on GitHub first, or refuses', async () => {
+      const { c2 } = await stacked();
+      prs({ 77: { state: 'merged', base: BASE, mergedAt: C1_MERGED } });
+      w.handlers['card.prRetarget'] = () =>
+        ok({ retargeted: false, error: 'gh_failed', message: 'HTTP 502' });
+
+      const refused = await w.operator.send(
+        'post',
+        `${w.path()}/board/cards/${c2.number}/accept`,
+        { merge: { headSha: HEAD_SHA } },
+      );
+      expect(refused.status).toBe(409);
+      expect(refused.body).toMatchObject({
+        error: BOARD_ERROR.mergeFailed,
+        reason: 'base_merged',
+      });
+      expect(w.sent('card.merge')).toHaveLength(0);
+      expect((await w.card(c2.number)).column).toBe('finished');
+
+      w.handlers['card.prRetarget'] = undefined;
+      const accepted = await w.operator.send(
+        'post',
+        `${w.path()}/board/cards/${c2.number}/accept`,
+        { merge: { headSha: HEAD_SHA } },
+      );
+      expect(accepted.status).toBe(200);
+      expect(w.prRetargets().at(-1)).toMatchObject({ pr: 78, base: BASE });
+      expect(w.sent('card.merge')).toEqual([
+        expect.objectContaining({ pr: 78 }),
+      ]);
+      expect(await w.card(c2.number)).toMatchObject({
+        column: 'completed',
+        prBase: null,
+      });
+    });
+  });
+
+  /**
+   * #722 (docs/specs/722-read-a-merged-pr-s-real-base-from-github.md): a
+   * stacked PR a person retargeted onto the base on GitHub
+   * (`gh pr edit --base develop`) and merged there has landed, whatever the
+   * stored base said.
+   */
+  describe('the real base of a retargeted PR (#722)', () => {
+    const STACK_BRANCH = 'feat/696-the-shell';
+    const MERGED = '2026-10-20T12:00:00.000Z';
+
+    /** `card.checks` answers by PR number; any other PR is open. */
+    const prs = (byPr: Record<number, Record<string, unknown>>) => {
+      w.checksServed = true;
+      w.handlers['card.checks'] = (args) =>
+        ok(cardChecks(byPr[Number(args.pr)] ?? {}));
+    };
+
+    /** C-282's analogue: an open PR whose branch the others were stacked on. */
+    const shell = () => withOpenPr('Shell', STACK_BRANCH, 70);
+
+    /** A card the Board recorded as merged into the shell's branch. */
+    const mergedIntoShell = (
+      title: string,
+      branch: string,
+      pr: number,
+      shellId: string,
+    ) =>
+      withOpenPr(title, branch, pr, {
+        column: 'completed',
+        prState: 'merged',
+        mergedAt: new Date(MERGED),
+        prBase: STACK_BRANCH,
+        prBaseCardId: shellId,
+      });
+
+    const retargetedByGithub = async () =>
+      (await w.audit('card.pr_retargeted')).filter(
+        (a) => (a.after as Record<string, unknown>).by === 'github',
+      );
+
+    it('dependencies merged into develop after a retarget by hand count as landed; the dependant runs', async () => {
+      const c282 = await shell();
+      const c283 = await mergedIntoShell('Page A', 'feat/a', 81, c282.id);
+      const c284 = await mergedIntoShell('Page B', 'feat/b', 82, c282.id);
+      const c295 = await w.createCard({
+        title: 'After pages',
+        specOnRun: false,
+      });
+      await link(c295.number, c283.number);
+      await link(c295.number, c284.number);
+
+      // Before the fix the stored base alone refused the Run. GitHub still
+      // has #82 into the shell's branch: refused, naming only C-284.
+      prs({
+        81: { state: 'merged', base: BASE, mergedAt: MERGED },
+        82: { state: 'merged', base: STACK_BRANCH, mergedAt: MERGED },
+      });
+      const refused = await w.runCard(c295.number);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toBe(BOARD_ERROR.dependencyOpen);
+      expect(refused.body.dependencies).toEqual([
+        {
+          number: c284.number,
+          label: `C-${c284.number}`,
+          column: 'completed',
+        },
+      ]);
+      expect(await w.card(c283.number)).toMatchObject({
+        prBase: null,
+        prBaseCardId: null,
+      });
+
+      prs({
+        81: { state: 'merged', base: BASE, mergedAt: MERGED },
+        82: { state: 'merged', base: BASE, mergedAt: MERGED },
+      });
+      expect((await w.runCard(c295.number)).status).toBe(200);
+      expect(runBase()).toBe(BASE);
+      expect((await w.card(c295.number)).prBase).toBeNull();
+      expect((await detail(c284.number)).prTarget).toEqual({
+        branch: BASE,
+        stackedOn: null,
+      });
+      const audits = await retargetedByGithub();
+      expect(audits.map((a) => a.after)).toEqual(
+        expect.arrayContaining([
+          {
+            number: c283.number,
+            pr: 81,
+            from: STACK_BRANCH,
+            base: BASE,
+            dependency: c282.number,
+            by: 'github',
+          },
+          {
+            number: c284.number,
+            pr: 82,
+            from: STACK_BRANCH,
+            base: BASE,
+            dependency: c282.number,
+            by: 'github',
+          },
+        ]),
+      );
+      expect(audits).toHaveLength(2);
+    });
+
+    it('the PR poll finds an open stacked PR moved onto develop and stores the real base', async () => {
+      const c1 = await shell();
+      const c2 = await withOpenPr('Page', 'feat/page', 78, {
+        prBase: STACK_BRANCH,
+        prBaseCardId: c1.id,
+      });
+      prs({ 78: { base: BASE } });
+
+      await w.ctx.app.get(BoardShipping).poll();
+
+      expect(await w.card(c2.number)).toMatchObject({
+        prBase: null,
+        prBaseCardId: null,
+      });
+      expect((await detail(c2.number)).prTarget).toEqual({
+        branch: BASE,
+        stackedOn: null,
+      });
+      expect(w.prRetargets()).toHaveLength(0);
+      // No longer stacked, its green PR ships like any other (ADR-0064 §4).
+      expect(w.sent('card.merge')).toEqual([
+        expect.objectContaining({ pr: 78 }),
+      ]);
+      const [audit] = await retargetedByGithub();
+      expect(audit.after).toEqual({
+        number: c2.number,
+        pr: 78,
+        from: STACK_BRANCH,
+        base: BASE,
+        dependency: c1.number,
+        by: 'github',
+      });
+    });
+
+    it('a merge into develop the poll finds lands the stacked card; its dependant runs from develop', async () => {
+      const c1 = await shell();
+      const c2 = await withOpenPr('Page', 'feat/page', 78, {
+        prBase: STACK_BRANCH,
+        prBaseCardId: c1.id,
+      });
+      prs({ 78: { state: 'merged', base: BASE, mergedAt: MERGED } });
+
+      await w.ctx.app.get(BoardShipping).poll();
+
+      expect(await w.card(c2.number)).toMatchObject({
+        prState: 'merged',
+        mergedAt: new Date(MERGED),
+        prBase: null,
+        prBaseCardId: null,
+      });
+      expect(w.prOpens()).toHaveLength(0);
+      expect(await retargetedByGithub()).toHaveLength(1);
+
+      const c3 = await w.createCard({ title: 'After page', specOnRun: false });
+      await link(c3.number, c2.number);
+      expect((await w.runCard(c3.number)).status).toBe(200);
+      expect(runBase()).toBe(BASE);
+    });
+
+    it('Accept of a stacked PR moved onto develop on GitHub merges it there', async () => {
+      const c1 = await shell();
+      const c2 = await withOpenPr('Page', 'feat/page', 78, {
+        prBase: STACK_BRANCH,
+        prBaseCardId: c1.id,
+      });
+      await link(c2.number, c1.number);
+      prs({ 78: { base: BASE } });
+
+      const accepted = await w.operator.send(
+        'post',
+        `${w.path()}/board/cards/${c2.number}/accept`,
+        { merge: { headSha: HEAD_SHA } },
+      );
+      expect(accepted.status).toBe(200);
+      expect(w.prRetargets()).toHaveLength(0);
+      expect(w.sent('card.merge')).toEqual([
+        expect.objectContaining({ pr: 78 }),
+      ]);
+      expect(await w.card(c2.number)).toMatchObject({
+        column: 'completed',
+        prState: 'merged',
+        prBase: null,
+      });
+      expect(await retargetedByGithub()).toHaveLength(1);
+    });
+
+    it('the backfill reads every merged card with a stored base once and clears the ones GitHub has on develop', async () => {
+      const c282 = await shell();
+      const retargeted = await mergedIntoShell('A', 'feat/a', 81, c282.id);
+      const stacked = await mergedIntoShell('B', 'feat/b', 82, c282.id);
+      const unread = await mergedIntoShell('C', 'feat/c', 83, c282.id);
+      prs({
+        81: { state: 'merged', base: BASE, mergedAt: MERGED },
+        82: { state: 'merged', base: STACK_BRANCH, mergedAt: MERGED },
+      });
+      // The runner cannot answer for #83 yet.
+      const answer = w.handlers['card.checks'];
+      w.handlers['card.checks'] = (args) =>
+        Number(args.pr) === 83
+          ? failed('internal', 'gh failed')
+          : answer?.(args);
+      const shipping = w.ctx.app.get(BoardShipping);
+
+      await shipping.backfillMergedBases();
+
+      expect((await w.card(retargeted.number)).prBase).toBeNull();
+      // Merged into a branch whose own PR is still open: it lands with it.
+      expect(await w.card(stacked.number)).toMatchObject({
+        prBase: STACK_BRANCH,
+        prBaseCardId: c282.id,
+      });
+      expect((await w.card(unread.number)).prBase).toBe(STACK_BRANCH);
+      expect(w.checks().map((c) => c.pr)).toEqual([81, 82, 83]);
+      expect(await retargetedByGithub()).toHaveLength(1);
+
+      // Later passes read only what the runner could not answer.
+      w.handlers['card.checks'] = (args) =>
+        ok(
+          cardChecks({
+            state: 'merged',
+            base: Number(args.pr) === 83 ? BASE : STACK_BRANCH,
+            mergedAt: MERGED,
+          }),
+        );
+      await shipping.backfillMergedBases();
+      await shipping.backfillMergedBases();
+      expect(w.checks().map((c) => c.pr)).toEqual([81, 82, 83, 83]);
+      expect((await w.card(unread.number)).prBase).toBeNull();
+      expect((await w.card(stacked.number)).prBase).toBe(STACK_BRANCH);
+      expect(await retargetedByGithub()).toHaveLength(2);
+    });
+  });
+
+  describe('Completed means landed (#709)', () => {
+    const accept = (number: number, body: object = {}) =>
+      w.operator.send('post', `${w.path()}/board/cards/${number}/accept`, body);
+
+    it('Accept of a card whose PR has not merged into the base asks for confirmation', async () => {
+      const card = await withOpenPr('Open PR', 'feat/1-open', 77);
+
+      const refused = await accept(card.number);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toBe(BOARD_ERROR.notLanded);
+      expect(refused.body.message).toBe(
+        `C-${card.number}'s pull request #77 into ${BASE} has not merged, so its work is not in ${BASE} yet`,
+      );
+      expect((await w.card(card.number)).column).toBe('finished');
+
+      const confirmed = await accept(card.number, { confirmUnlanded: true });
+      expect(confirmed.status).toBe(200);
+      expect((await w.card(card.number)).column).toBe('completed');
+    });
+
+    it('names a merge into a dependency branch that had already merged', async () => {
+      const c1 = await withOpenPr('Dependency', C1_BRANCH, 77, {
+        prState: 'merged',
+        mergedAt: new Date('2026-10-20T10:00:00.000Z'),
+      });
+      const c2 = await withOpenPr('Dependant', 'feat/2-the-dependant', 78, {
+        prState: 'merged',
+        mergedAt: new Date('2026-10-20T11:00:00.000Z'),
+        prBase: C1_BRANCH,
+        prBaseCardId: c1.id,
+      });
+      const refused = await accept(c2.number);
+      expect(refused.status).toBe(409);
+      expect(refused.body.message).toBe(
+        `C-${c2.number}'s pull request #78 merged into ${C1_BRANCH} after C-${c1.number}'s own pull request had merged, so its work is not in ${BASE}`,
+      );
+    });
+
+    it('a landed card, one with nothing to land, or closing the PR is accepted at once', async () => {
+      const merged = await withOpenPr('Merged', 'feat/1-merged', 77, {
+        prState: 'merged',
+        mergedAt: new Date(),
+      });
+      expect((await accept(merged.number)).status).toBe(200);
+
+      const nothing = await w.createCard({
+        title: 'Nothing',
+        specOnRun: false,
+      });
+      await w.ctx.prisma.boardCard.update({
+        where: { id: nothing.id },
+        data: { column: 'finished', collectState: 'no_changes' },
+      });
+      expect((await accept(nothing.number)).status).toBe(200);
+
+      // Merged into a dependency branch that is still open: it lands with it.
+      const c1 = await withOpenPr('Dependency', C1_BRANCH, 79);
+      const c2 = await withOpenPr('Dependant', 'feat/2-the-dependant', 78, {
+        prState: 'merged',
+        mergedAt: new Date(),
+        prBase: C1_BRANCH,
+        prBaseCardId: c1.id,
+      });
+      expect((await accept(c2.number)).status).toBe(200);
+
+      const open = await withOpenPr('Open', 'feat/3-open', 80);
+      expect(
+        (
+          await accept(open.number, {
+            closePr: { deleteBranch: false, closeIssue: false },
+          })
+        ).status,
+      ).toBe(200);
+    });
+
+    it('a PR the board holds as open but GitHub has merged into the base counts as landed', async () => {
+      const card = await withOpenPr('Merged unseen', 'feat/1-unseen', 77);
+      w.checksServed = true;
+      w.handlers['card.checks'] = () =>
+        ok(
+          cardChecks({
+            state: 'merged',
+            base: BASE,
+            mergedAt: '2026-10-20T10:00:00.000Z',
+          }),
+        );
+      expect((await accept(card.number)).status).toBe(200);
+      expect(await w.card(card.number)).toMatchObject({
+        column: 'completed',
+        prState: 'merged',
+      });
     });
   });
 });

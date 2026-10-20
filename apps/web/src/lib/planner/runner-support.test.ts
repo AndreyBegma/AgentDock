@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { RunnerCommands } from '@agentdock/shared/protocol';
+import type { RunnerCommands } from '@nautelle/shared/protocol';
 import { turn } from './fixtures';
 import { RUNNER_TOO_OLD_TEXT } from './format';
 import {

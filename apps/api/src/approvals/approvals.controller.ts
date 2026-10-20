@@ -2,7 +2,7 @@ import type {
   ApprovalDetail,
   ApprovalItemView,
   ApprovalsView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

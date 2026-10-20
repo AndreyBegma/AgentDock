@@ -1,6 +1,6 @@
 # Webhooks — inbound triggers and outbound deliveries
 
-Issue: [#26](https://github.com/AndreyBegma/AgentDock/issues/26) · Roadmap: M3.3 ·
+Issue: [#26](https://github.com/AndreyBegma/Nautelle/issues/26) · Roadmap: M3.3 ·
 Decisions: [ADR-0007](../adr/0007-postgresql-only.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
 [security.md](../architecture/security.md), [data-model.md](../architecture/data-model.md),
@@ -11,7 +11,7 @@ Decisions: [ADR-0007](../adr/0007-postgresql-only.md),
 PRD feature area *Webhooks*, both directions. **Inbound triggers** let an
 outside system start work: a signed `POST /hooks/<id>` runs a skill or
 `orchestrator next` on one project — a CI failure starts `cs-debug`, a deploy
-starts `cs-ux-test`. **Outbound webhooks** push AgentDock's own events to a URL
+starts `cs-ux-test`. **Outbound webhooks** push Nautelle's own events to a URL
 the admin chooses (n8n, Slack, a custom bot): signed, retried with backoff, held
 by a circuit breaker when the target is down, with a delivery log, redeliver and
 test. Both are admin-managed, audited, and built on PostgreSQL tables with
@@ -33,7 +33,7 @@ test. Both are admin-managed, audited, and built on PostgreSQL tables with
 - GitHub App events — #27. It reuses this item's raw-body capture, not its signature scheme.
 - Telegram — #22 (its own channel).
 - Per-project management by operators. Admin only in this item (D16).
-- Outbound payload templating (custom JSON shapes per target). The payload is AgentDock's fixed envelope.
+- Outbound payload templating (custom JSON shapes per target). The payload is Nautelle's fixed envelope.
 - Inbound triggers that run arbitrary runner commands. Only the two targets of D3.
 
 ## Decisions

@@ -69,7 +69,7 @@ const git = async (
 
 const tempCheckout = async (deps: SourceDeps) => {
   const base = await mkdtemp(
-    join(deps.tempRoot ?? tmpdir(), 'agentdock-skill-'),
+    join(deps.tempRoot ?? tmpdir(), 'nautelle-skill-'),
   );
   return {
     base,

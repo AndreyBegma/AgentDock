@@ -2,7 +2,7 @@ import { localRequest } from './client';
 import type { LocalCommandDeps } from './subcommand';
 
 /**
- * `agentdock-runner away on|off` (spec 201 D17): sets the runner's away mode
+ * `nautelle-runner away on|off` (spec 201 D17): sets the runner's away mode
  * through the daemon (`away.set`). Exit 0 on success, 1 when the daemon or
  * the server refused, 2 on a usage error.
  */
@@ -12,7 +12,7 @@ export const runAway = async (
 ): Promise<number> => {
   const [value, ...rest] = args;
   if ((value !== 'on' && value !== 'off') || rest.length > 0) {
-    deps.stderr('Usage: agentdock-runner away on|off\n');
+    deps.stderr('Usage: nautelle-runner away on|off\n');
     return 2;
   }
   const result = await localRequest(

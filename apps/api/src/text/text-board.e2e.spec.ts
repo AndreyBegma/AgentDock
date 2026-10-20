@@ -1,4 +1,4 @@
-import { captureFingerprint } from '@agentdock/shared';
+import { captureFingerprint } from '@nautelle/shared';
 import { RU_BODY, RU_TITLE, TextWorld, textBlock } from './testing/text-e2e';
 
 describe('text normalization of board cards (e2e)', () => {

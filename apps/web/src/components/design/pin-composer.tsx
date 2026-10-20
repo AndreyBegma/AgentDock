@@ -1,6 +1,5 @@
 'use client';
 
-import { DESIGN_COMMENT_MAX } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Textarea } from '@andrewbehma/glass-ui/field';
 import {
@@ -9,6 +8,7 @@ import {
   PopoverRoot,
 } from '@andrewbehma/glass-ui/popover';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { DESIGN_COMMENT_MAX } from '@nautelle/shared';
 import { useState } from 'react';
 import { anchorAt } from '../../lib/design/zoom';
 import type { FramePin } from './mockup-frame';

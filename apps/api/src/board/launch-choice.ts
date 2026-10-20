@@ -2,8 +2,8 @@ import {
   CARD_CI_FIX_EFFORT,
   CARD_CI_FIX_MODEL,
   type CardEffort,
-} from '@agentdock/shared';
-import { ORCHESTRATOR_DEFAULTS } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { ORCHESTRATOR_DEFAULTS } from '@nautelle/shared/protocol';
 
 /**
  * #322 D2: a card's model when nothing on the card overrides it — the

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ProjectRuntimeProfile } from '@agentdock/shared';
+import type { ProjectRuntimeProfile } from '@nautelle/shared';
 import { api } from '../api';
 import { useSection } from '../section/use-section';
 import { skillRunProfiles } from '../skills/format';

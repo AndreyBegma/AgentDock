@@ -405,7 +405,7 @@ const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
 /**
  * A new message to the worker in its `.orchestrator-msg.md`
  * (docs/specs/160-agent-workspace.md). The file is either replaced (the
- * skill's Phase 6.5, AgentDock's `slot.message`) or grown by appending a
+ * skill's Phase 6.5, Nautelle's `slot.message`) or grown by appending a
  * section: an append is the new suffix, anything else the whole file.
  */
 export const slotMessageSeenDataSchema = z.object({

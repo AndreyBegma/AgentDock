@@ -1,8 +1,8 @@
 'use client';
 
-import type { AdminUser, ProjectSummary } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { AdminUser, ProjectSummary } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { BudgetFormDialog } from '../../../components/budgets/budget-form-dialog';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';

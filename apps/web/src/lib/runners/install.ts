@@ -1,4 +1,4 @@
-import { pairCommand } from '@agentdock/shared';
+import { pairCommand } from '@nautelle/shared';
 
 /**
  * The commands a first-time admin runs on the machine that holds the
@@ -9,19 +9,19 @@ import { pairCommand } from '@agentdock/shared';
 export const INSTALL_COMMANDS = [
   {
     label: 'Homebrew',
-    command: 'brew install andreybegma/tap/agentdock-runner',
+    command: 'brew install andreybegma/tap/nautelle-runner',
   },
-  { label: 'npm', command: 'npm i -g agentdock-runner' },
+  { label: 'npm', command: 'npm i -g nautelle-runner' },
 ] as const;
 
 /** The npm package installed with Bun instead; shown on `/install` only. */
-export const BUN_INSTALL_COMMAND = 'bun add -g agentdock-runner';
+export const BUN_INSTALL_COMMAND = 'bun add -g nautelle-runner';
 
 /** Where npm puts global packages; their commands are in its `bin`. */
 export const NPM_PREFIX_COMMAND = 'npm prefix -g';
 
 /** Prints the version and the target, e.g. `0.1.0 darwin-arm64`. */
-export const VERSION_COMMAND = 'agentdock-runner version';
+export const VERSION_COMMAND = 'nautelle-runner version';
 
 /** The prebuilt targets (ADR-0017). */
 export const RUNNER_PLATFORMS = [
@@ -56,24 +56,24 @@ export const PAIRING_CODE_PLACEHOLDER = 'XXXX-XXXX';
 
 /** Building from source, for a machine with neither. */
 export const RUNNER_README_URL =
-  'https://github.com/AndreyBegma/AgentDock/blob/main/apps/runner/README.md';
+  'https://github.com/AndreyBegma/Nautelle/blob/main/apps/runner/README.md';
 
 /** The foreground daemon. */
-export const RUN_COMMAND = 'agentdock-runner run';
+export const RUN_COMMAND = 'nautelle-runner run';
 
 /** Proposes runtime profiles from `~/.claude-profiles`, `~/.claude` and `~/.codex`. */
 export const PROFILES_DETECT_COMMAND =
-  'agentdock-runner profiles --detect --write';
+  'nautelle-runner profiles --detect --write';
 
 /** The anchor of "Connect Claude Code sessions" on `/install` (#281 D6). */
 export const CLAUDE_CODE_PATH = `${INSTALL_PATH}#claude-code`;
 
 /** Lists the runtime profiles; the first column is the key `setup` takes. */
-export const PROFILES_LIST_COMMAND = 'agentdock-runner profiles';
+export const PROFILES_LIST_COMMAND = 'nautelle-runner profiles';
 
 /** Installs the agentdock plugin into one Claude profile (spec 201 D21). */
 export const SETUP_CLAUDE_COMMAND =
-  'agentdock-runner setup claude --profile <key>';
+  'nautelle-runner setup claude --profile <key>';
 
 /** What `setup claude` would change, without changing it. */
 export const SETUP_CLAUDE_DRY_RUN_COMMAND = `${SETUP_CLAUDE_COMMAND} --dry-run`;
@@ -82,7 +82,7 @@ export const SETUP_CLAUDE_DRY_RUN_COMMAND = `${SETUP_CLAUDE_COMMAND} --dry-run`;
 export const SETUP_CLAUDE_UNINSTALL_COMMAND = `${SETUP_CLAUDE_COMMAND} --uninstall`;
 
 /** Shows the runner's config, connectivity and spool. */
-export const RUNNER_STATUS_COMMAND = 'agentdock-runner status';
+export const RUNNER_STATUS_COMMAND = 'nautelle-runner status';
 
 /**
  * How to keep the daemon running across logouts and reboots. It depends on how
@@ -93,11 +93,11 @@ export const RUNNER_STATUS_COMMAND = 'agentdock-runner status';
 export const KEEP_ONLINE_COMMANDS = [
   {
     label: 'Installed with Homebrew',
-    command: 'brew services start agentdock-runner',
+    command: 'brew services start nautelle-runner',
   },
   {
     label: 'Installed with npm',
-    command: 'agentdock-runner install-service',
+    command: 'nautelle-runner install-service',
   },
 ] as const;
 

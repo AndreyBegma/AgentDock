@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  DESIGN_TOTAL_MAX_BYTES,
   extractPlannerBlocks,
   PLAN_TURN_ACTIONS,
   PLANNER_DESIGN_CONTRACT,
@@ -622,12 +623,46 @@ describe('parsePlannerOutput — design', () => {
     );
   });
 
-  it('caps the frames together, and names the frame that breaks a rule', () => {
-    const half = `<p>${'x'.repeat(90 * 1024)}</p>`;
-    expectViolation(
-      parsePlannerOutput(framed(['A', 'B'], [half, half]), 'design', ctx),
-      'design_too_large',
+  it('#686: takes frames over 160 KiB together, each under it', () => {
+    const big = `<p>${'x'.repeat(90 * 1024)}</p>`;
+    const r = parsePlannerOutput(framed(['A', 'B'], [big, big]), 'design', ctx);
+    expect(r.ok).toBe(true);
+  });
+
+  it('#686: caps one frame at 160 KiB and names it', () => {
+    const r = parsePlannerOutput(
+      framed(['Page', 'Tile'], [html, `<p>${'x'.repeat(160 * 1024)}</p>`]),
+      'design',
+      ctx,
     );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.reason).toBe('design_too_large');
+      expect(r.error.message).toContain('frame "Tile"');
+    }
+  });
+
+  it('#686: caps the frames together at the total limit', () => {
+    const frame = `<p>${'x'.repeat(150 * 1024)}</p>`;
+    const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+    const r = parsePlannerOutput(
+      framed(
+        names,
+        names.map(() => frame),
+      ),
+      'design',
+      ctx,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.reason).toBe('design_too_large');
+      expect(r.error.message).toContain(
+        `at most ${DESIGN_TOTAL_MAX_BYTES} for all frames`,
+      );
+    }
+  });
+
+  it('names the frame that breaks a rule', () => {
     const r = parsePlannerOutput(
       framed(['Page', 'Tile'], [html, '<script>fetch("/x")</script>']),
       'design',
@@ -728,6 +763,10 @@ describe('the fixed contract and the default instructions', () => {
     for (const host of ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net/npm/']) {
       expect(PLANNER_DESIGN_CONTRACT).toContain(host);
     }
+    // #686: the per-frame and the total limit.
+    expect(PLANNER_DESIGN_CONTRACT).toContain(
+      'At most 160 KiB of HTML per frame, and 1024 KiB for all frames together.',
+    );
   });
 
   it('a v1 plan keeps the v1 text: no design anywhere', () => {

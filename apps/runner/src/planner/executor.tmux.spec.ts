@@ -6,14 +6,16 @@ import {
   ATTACHMENTS_WORKTREE_DIR,
   type AttachmentRef,
   attachmentFileName,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   PLAN_TURN_RESULT_MAX_BYTES,
+  PLAN_TURN_RESULT_TOTAL_MAX_BYTES,
   type PlanTurnArgs,
   type PlanTurnFinishedData,
+  type PlanTurnResultChunkData,
   planTurnArgsSchema,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { HandoffWriter, RunNotes } from '../handoff';
@@ -74,6 +76,7 @@ case "$FAKE_MODE" in
     sleep 60 ;;
   fail) echo 'Error: No conversation found with session ID' >&2; exit 2 ;;
   big) printf '{"type":"result","subtype":"success","is_error":false,"result":"%s"}\\n' "$(head -c 200000 /dev/zero | tr '\\0' a)"; exit 0 ;;
+  huge) printf '{"type":"result","subtype":"success","is_error":false,"result":"%s"}\\n' "$(head -c 2200000 /dev/zero | tr '\\0' a)"; exit 0 ;;
 esac
 echo '{"type":"result","subtype":"success","is_error":false,"result":"Planned.\\n\`\`\`agentdock-plan\\n{}\\n\`\`\`"}'
 `;
@@ -83,7 +86,7 @@ const S2 = '22222222-2222-4222-8222-222222222222';
 
 const setup = async (options: { cap?: number } = {}) => {
   const f = await skillsWorkspace();
-  const server = `agentdock-plan-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const server = `nautelle-plan-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
   teardown.push(async () => {
     await releaseTmuxServer(tmuxServer);
@@ -110,6 +113,7 @@ const setup = async (options: { cap?: number } = {}) => {
     profile('claude-slow', 'sleep'),
     profile('claude-fail', 'fail'),
     profile('claude-big', 'big'),
+    profile('claude-huge', 'huge'),
     profile('claude-talkslow', 'talksleep'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
@@ -227,6 +231,17 @@ const setup = async (options: { cap?: number } = {}) => {
         e.type === 'plan_turn.finished' &&
         (e.data as PlanTurnFinishedData).turnId === turnId,
     )?.data as PlanTurnFinishedData | undefined;
+  /** #686: the turn's result chunks, joined in `index` order. */
+  const chunked = (turnId: string) =>
+    events
+      .filter(
+        (e) =>
+          e.type === 'plan_turn.result_chunk' &&
+          (e.data as PlanTurnResultChunkData).turnId === turnId,
+      )
+      .map((e) => e.data as PlanTurnResultChunkData)
+      .sort((a, b) => a.index - b.index)
+      .map((c) => c.text);
   const phases = (turnId: string) =>
     events
       .filter(
@@ -277,6 +292,7 @@ const setup = async (options: { cap?: number } = {}) => {
     args,
     until,
     finished,
+    chunked,
     phases,
     call,
     calls,
@@ -570,7 +586,7 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     const t = await setup();
     await t.executor.run(t.args({ profileKey: 'claude-slow' }));
     for (let i = 0; i < 200 && t.calls() === 0; i++) await Bun.sleep(25);
-    expect(await t.sessions()).toEqual(['agentdock-plan-pln00001']);
+    expect(await t.sessions()).toEqual(['nautelle-plan-pln00001']);
 
     expect(
       await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' }),
@@ -662,7 +678,7 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     expect(existsSync(t.notesDir)).toBe(false);
   });
 
-  it('fails a turn over its timeout, a turn the CLI refuses, and cuts an oversized result', async () => {
+  it('fails a turn over its timeout, a turn the CLI refuses, and chunks a large result', async () => {
     const t = await setup();
     await t.executor.run(t.args({ profileKey: 'claude-slow', timeoutSec: 60 }));
     for (let i = 0; i < 200 && t.calls() === 0; i++) await Bun.sleep(25);
@@ -697,9 +713,32 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
       }),
     );
     expect(await t.until('turn_3', ['failed', 'succeeded'])).toBe('succeeded');
+    // #686: over one event's cap, the result goes ahead in chunks, whole.
     const big = t.finished('turn_3');
-    expect(big?.resultTruncated).toBe(true);
-    expect(big?.resultText?.length).toBe(PLAN_TURN_RESULT_MAX_BYTES);
+    expect(big?.resultTruncated).toBe(false);
+    expect(big?.resultText).toBeUndefined();
+    const chunks = t.chunked('turn_3');
+    expect(big?.resultChunks).toBe(chunks.length);
+    expect(chunks.length).toBe(2);
+    expect(chunks.join('')).toBe('a'.repeat(200_000));
+    const at = (type: string) =>
+      t.events.findIndex(
+        (e) =>
+          e.type === type && (e.data as { turnId: string }).turnId === 'turn_3',
+      );
+    expect(at('plan_turn.result_chunk')).toBeLessThan(at('plan_turn.finished'));
+    expect(PLAN_TURN_RESULT_MAX_BYTES).toBeLessThan(200_000);
+  });
+
+  it('#686: cuts a result over the total cap, chunked', async () => {
+    const t = await setup();
+    await t.executor.run(t.args({ profileKey: 'claude-huge' }));
+    expect(await t.until('turn_1', ['failed', 'succeeded'])).toBe('succeeded');
+    const huge = t.finished('turn_1');
+    expect(huge?.resultTruncated).toBe(true);
+    const text = t.chunked('turn_1').join('');
+    expect(text.length).toBe(PLAN_TURN_RESULT_TOTAL_MAX_BYTES);
+    expect(huge?.resultChunks).toBe(t.chunked('turn_1').length);
   });
 
   it('plan.close removes the worktree and the plan state; the idle cleanup does so after 14 days', async () => {

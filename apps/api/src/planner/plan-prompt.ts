@@ -13,8 +13,8 @@ import {
   type PlanTurnAction,
   type PlanTurnInput,
   plannerOutputContract,
-} from '@agentdock/shared';
-import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 import {
   type ApprovedDesignContext,
   approvedDesignSections,
@@ -71,7 +71,30 @@ export interface PromptInput {
   attachments?: readonly string[];
   /** #590: a discussion turn's skills — the installed ones of those it chose. */
   discussion?: DiscussPromptState;
+  /** #687: the stored error of the failed turn this one retries. */
+  previousFailure?: string;
 }
+
+/** #687: the characters of a failure reason a retried prompt carries. */
+export const FAILURE_NOTE_MAX_CHARS = 600;
+
+/**
+ * #687: what a retried turn is told of the failure before it — one line, so a
+ * runner's multi-line error reads as a reason, and capped so it cannot push a
+ * prompt past its byte cap. Nothing for a turn that stored no error.
+ */
+const failureSections = (input: PromptInput): string[] => {
+  const reason = input.previousFailure?.replace(/\s+/g, ' ').trim();
+  if (!reason) return [];
+  const clipped =
+    reason.length > FAILURE_NOTE_MAX_CHARS
+      ? `${reason.slice(0, FAILURE_NOTE_MAX_CHARS - 1)}…`
+      : reason;
+  return [
+    '## Previous attempt',
+    `The previous attempt failed: ${clipped}. Fix this in your answer.`,
+  ];
+};
 
 export interface DiscussPromptState {
   skills: readonly string[];
@@ -269,7 +292,7 @@ const assembleIntake = (input: PromptInput): string => {
       input.attachments.map((path) => `- \`${path}\``).join('\n'),
     );
   }
-  sections.push(...inputSections(input));
+  sections.push(...inputSections(input), ...failureSections(input));
   return `${sections.join('\n\n')}\n`;
 };
 
@@ -308,6 +331,7 @@ const assembleDiscuss = (input: PromptInput): string => {
   } else {
     sections.push('Answer the opening message above.');
   }
+  sections.push(...failureSections(input));
   return `${sections.join('\n\n')}\n`;
 };
 
@@ -369,6 +393,6 @@ const assembleWith = (input: PromptInput, design: string[]): string => {
         : 'None.',
     );
   }
-  sections.push(...inputSections(input));
+  sections.push(...inputSections(input), ...failureSections(input));
   return `${sections.join('\n\n')}\n`;
 };

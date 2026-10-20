@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { filterProgramSchema } from '@agentdock/shared';
+import { filterProgramSchema } from '@nautelle/shared';
 import type { HookCommand } from './shell';
 
 /**

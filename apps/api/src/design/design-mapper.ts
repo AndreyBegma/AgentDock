@@ -10,7 +10,7 @@ import {
   type TaskDesignView,
   type ViewportPreset,
   viewportPresetsSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { userRef, userSelect } from '../planner/plan-mapper';
 import { frameNameSelect, frameNamesOf } from './design-store';

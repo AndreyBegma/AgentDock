@@ -1,6 +1,6 @@
 # A card always reaches a pull request, and Accept cleans up its branch
 
-Issue: [#329](https://github.com/AndreyBegma/AgentDock/issues/329)
+Issue: [#329](https://github.com/AndreyBegma/Nautelle/issues/329)
 
 ## Summary
 
@@ -123,7 +123,7 @@ The product owner asked (2026-10-15) for these outcomes:
 - **D8 — Accept without merging can close the PR.**
   - A new typed command `card.prClose` (ADR-0010, advertised per ADR-0023)
     takes `{ cardId, projectId, root, pr, deleteBranch }`. It runs `gh pr close
-    <pr> --repo <o/r> --comment "Closed from the AgentDock Board (C-<n>)"`,
+    <pr> --repo <o/r> --comment "Closed from the Nautelle Board (C-<n>)"`,
     then deletes the branch as in D7.
   - The Accept dialog's *Accept without merging* gets a choice:
     - **Leave the PR open** (default);

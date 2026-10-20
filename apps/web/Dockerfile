@@ -1,4 +1,4 @@
-# AgentDock web image (ADR-0016). Built from the repository root:
+# Nautelle web image (ADR-0016). Built from the repository root:
 #
 #   docker build -t agentdock-web:staging -f apps/web/Dockerfile \
 #     --build-arg NEXT_PUBLIC_LIVE_URL=wss://dock.example.com/api/live .
@@ -54,7 +54,7 @@ COPY tsconfig.json turbo.json ./
 COPY packages/shared/ packages/shared/
 COPY apps/web/ apps/web/
 
-RUN bunx turbo run build --filter=@agentdock/web...
+RUN bunx turbo run build --filter=@nautelle/web...
 
 # ─── runtime ─────────────────────────────────────────────────────────────────
 FROM ${NODE_IMAGE} AS runtime

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { TERMINAL_CLOSE_CODES } from '@agentdock/shared';
-import { TERMINAL_MAX_DATA_BYTES } from '@agentdock/shared/protocol';
+import { TERMINAL_CLOSE_CODES } from '@nautelle/shared';
+import { TERMINAL_MAX_DATA_BYTES } from '@nautelle/shared/protocol';
 import { ApiError } from '../api';
 import {
   clampSize,

@@ -5,7 +5,7 @@ import {
   BOARD_CARD_KINDS,
   BOARD_COLUMNS,
   type BoardAskQuery,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { z } from 'zod';
 
 /** Words of a query, at most; more only dilute it. */

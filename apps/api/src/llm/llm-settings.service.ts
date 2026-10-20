@@ -8,7 +8,7 @@ import {
   llmKeySuffix,
   llmMonthStart,
   llmNextReset,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

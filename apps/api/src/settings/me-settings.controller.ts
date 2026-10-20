@@ -1,8 +1,9 @@
 import type {
   UpdateUserSettingsRequest,
   UserSettingsView,
-} from '@agentdock/shared';
-import { Body, Controller, Get, Put } from '@nestjs/common';
+  WhatsNewView,
+} from '@nautelle/shared';
+import { Body, Controller, Get, HttpCode, Post, Put } from '@nestjs/common';
 import { IsDefined, IsString, MaxLength, ValidateIf } from 'class-validator';
 import type { AuditContext } from '../audit/audit.types';
 // From their own files: the barrels load `AuditModule` and `AuthModule`,
@@ -41,5 +42,18 @@ export class MeSettingsController {
     @Body() dto: UpdateUserSettingsDto,
   ): Promise<UserSettingsView> {
     return this.settings.update(user.id, dto.planningModel, ctx);
+  }
+
+  /** C-294: the version and the unread dot of What's new. */
+  @Get('whats-new')
+  whatsNew(@CurrentUser() user: AuthUser): Promise<WhatsNewView> {
+    return this.settings.whatsNew(user.id);
+  }
+
+  /** C-294: the caller opened What's new; the dot clears. */
+  @Post('whats-new/seen')
+  @HttpCode(200)
+  markWhatsNewSeen(@CurrentUser() user: AuthUser): Promise<WhatsNewView> {
+    return this.settings.markWhatsNewSeen(user.id);
   }
 }

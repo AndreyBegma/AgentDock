@@ -7,7 +7,7 @@ import {
   type RunnerEvent,
   SPOOL_TRUNCATED_EVENT,
   spoolTruncatedDataSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

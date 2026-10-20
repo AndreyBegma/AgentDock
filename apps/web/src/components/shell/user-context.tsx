@@ -1,6 +1,6 @@
 'use client';
 
-import type { PublicUser } from '@agentdock/shared';
+import type { PublicUser } from '@nautelle/shared';
 import { createContext, useContext } from 'react';
 
 const UserContext = createContext<PublicUser | null>(null);

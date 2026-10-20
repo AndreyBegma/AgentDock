@@ -2,7 +2,7 @@ import type {
   CommandArgs,
   CommandResult,
   UiProfileCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { SkillsDeps } from '../skills/deps';
 import type { UiProfileBuildExecutor } from './executor';
 import { fingerprint } from './fingerprint';

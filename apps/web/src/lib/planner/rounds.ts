@@ -3,7 +3,7 @@ import {
   type PlanAnswer,
   type PlanQuestion,
   type PlanTurnView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * Earlier rounds of a conversation (#184), as read-only cards. A round is

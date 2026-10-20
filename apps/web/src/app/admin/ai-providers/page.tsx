@@ -1,10 +1,5 @@
 'use client';
 
-import type {
-  LlmProviderId,
-  LlmProviderView,
-  LlmSettingsView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
@@ -21,6 +16,11 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  LlmProviderId,
+  LlmProviderView,
+  LlmSettingsView,
+} from '@nautelle/shared';
 import { useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
@@ -76,7 +76,7 @@ export default function AiProvidersPage() {
       <PageHeader
         className="mb-0"
         title="AI providers"
-        description="Keys and monthly caps for the models AgentDock calls directly: the assistant, the digest, summaries, Board search and triage hints. Spend resets on the 1st at 00:00 UTC."
+        description="Keys and monthly caps for the models Nautelle calls directly: the assistant, the digest, summaries, Board search and triage hints. Spend resets on the 1st at 00:00 UTC."
       />
 
       <AsyncSection

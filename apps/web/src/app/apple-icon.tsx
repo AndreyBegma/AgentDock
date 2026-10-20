@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { LOGOMARK_PATH } from '../components/brand/logomark';
+import { LOGOMARK_DOT, LOGOMARK_PATH } from '../components/brand/logomark';
 
 export const size = { width: 180, height: 180 };
 export const contentType = 'image/png';
@@ -24,7 +24,7 @@ export default function AppleIcon() {
     >
       <svg width="118" height="118" viewBox="0 0 32 32" aria-hidden="true">
         <path fill="#f2f2f6" fillRule="evenodd" d={LOGOMARK_PATH} />
-        <circle cx="21.25" cy="21.25" r="2.75" fill="#5b5bf6" />
+        <circle {...LOGOMARK_DOT} fill="#5b5bf6" />
       </svg>
     </div>,
     size,

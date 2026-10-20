@@ -44,9 +44,9 @@ describe('parseSimpleCommand (#445 amendment 3)', () => {
   });
 
   it('takes leading assignments apart, unquoted', () => {
-    expect(parseSimpleCommand(`AGENTDOCK_RAW=1 CI='a b'  bun test`)).toEqual({
+    expect(parseSimpleCommand(`NAUTELLE_RAW=1 CI='a b'  bun test`)).toEqual({
       assignments: [
-        { name: 'AGENTDOCK_RAW', value: '1' },
+        { name: 'NAUTELLE_RAW', value: '1' },
         { name: 'CI', value: 'a b' },
       ],
       argv: ['bun', 'test'],
@@ -168,7 +168,7 @@ describe('parseSimpleCommand (#445 amendment 3)', () => {
       ...parsed.argv,
     ];
     expect(bashWords(command)).toEqual(words);
-    const self = ['/opt/a b/agentdock-runner'];
+    const self = ['/opt/a b/nautelle-runner'];
     const rewrite = wrappedCommand(
       { pipelines: [[{ command: parsed, mergeStderr: false }]], operators: [] },
       self,
@@ -475,8 +475,8 @@ describe('parseHookCommand (#445 amendment 11, #610)', () => {
 
 describe('shellQuote', () => {
   it('leaves a plain word alone and quotes the rest', () => {
-    expect(shellQuote('/usr/bin/agentdock-runner')).toBe(
-      '/usr/bin/agentdock-runner',
+    expect(shellQuote('/usr/bin/nautelle-runner')).toBe(
+      '/usr/bin/nautelle-runner',
     );
     expect(shellQuote('/home/a b/bun')).toBe(`'/home/a b/bun'`);
     expect(shellQuote(`it's`)).toBe(`'it'\\''s'`);

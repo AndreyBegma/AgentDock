@@ -5,13 +5,13 @@ import {
   cardRecommendationOf,
   DESIGN_ERROR,
   PLANNER_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   PLAN_TURN_DEFAULT_TIMEOUT_SEC,
   type PlanTurnArgs,
   type PlanTurnSession,
   planTurnArgsSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { BoardCard, Prisma } from '@prisma/client';
 import { z } from 'zod';

@@ -1,10 +1,10 @@
 import { lstatSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkpointFromHeading } from '@agentdock/shared';
+import { checkpointFromHeading } from '@nautelle/shared';
 import {
   CHECKPOINT_SUMMARY_MAX_BYTES,
   type SlotCheckpointData,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { FleetEmitter } from '../../fleet/project';
 import type { SlotBook } from '../../fleet/slots';
 import {

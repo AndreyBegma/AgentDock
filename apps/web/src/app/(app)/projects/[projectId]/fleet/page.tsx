@@ -1,5 +1,9 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   FLEET_LIVE_EVENT,
   type FleetGraph,
@@ -7,11 +11,7 @@ import {
   type OrchestratorSettingsView,
   projectRoleAtLeast,
   type QueueView,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+} from '@nautelle/shared';
 import { CirclePlus } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -57,6 +57,7 @@ import { useLive } from '../../../../../lib/live/use-live';
 import { allowedLabels } from '../../../../../lib/queue/format';
 import { useSection } from '../../../../../lib/section/use-section';
 import { slotSessionMessenger } from '../../../../../lib/session-message/actions';
+import { useTabletUp } from '../../../../../lib/slot/use-wide';
 import { useTerminalAvailable } from '../../../../../lib/terminal/use-terminal-available';
 import { NewIssueDialog } from '../queue/new-issue-dialog';
 import { useProjectDetail } from '../use-project-detail';
@@ -67,6 +68,7 @@ import { DependenciesPanel } from './dependencies-panel';
 import { FirstProjectChecklist } from './first-project-checklist';
 import { FleetHeader } from './fleet-header';
 import { OrchestratorCard } from './orchestrator-card';
+import { OrchestratorRow } from './orchestrator-row';
 import { QuickActions } from './quick-actions';
 import { SlotPanel } from './slot-panel';
 import { SlotsView } from './slots-view';
@@ -117,6 +119,7 @@ function FleetWorkspace() {
   }>();
 
   const desktop = useDesktop();
+  const tabletUp = useTabletUp();
   const detail = useProjectDetail(projectId);
   const project = detail.data;
   // The effective role only decides which buttons are drawn; the API checks it.
@@ -272,7 +275,7 @@ function FleetWorkspace() {
   const queueEmpty = (
     <EmptyState
       title="The queue is empty"
-      description={`${EMPTY_FLEET_DESCRIPTION} AgentDock does not create agents itself: queue an issue and the orchestrator dispatches it.`}
+      description={`${EMPTY_FLEET_DESCRIPTION} Nautelle does not create agents itself: queue an issue and the orchestrator dispatches it.`}
       action={
         <div className="flex flex-wrap items-center justify-center gap-3">
           {canOperate ? (
@@ -299,7 +302,7 @@ function FleetWorkspace() {
     <div className="flex flex-col gap-4">
       <FleetHeader
         projectId={projectId}
-        title={project?.displayName ?? 'Fleet'}
+        projectName={project?.displayName}
         orchestrator={orchestratorStatus}
         counts={counts}
         view={workspace.view}
@@ -334,20 +337,29 @@ function FleetWorkspace() {
           >
             {(view) =>
               workspace.view === 'list' ? (
-                <SlotsView
-                  projectId={projectId}
-                  active={view.slots}
-                  version={version}
-                  nobodyYet={emptyView(view)}
-                  onSelect={open}
-                />
+                <>
+                  {showChecklist ? null : (
+                    <OrchestratorRow
+                      fleet={view}
+                      selected={workspace.focus === ORCHESTRATOR_KEY}
+                      onOpen={() => open(ORCHESTRATOR_KEY)}
+                    />
+                  )}
+                  <SlotsView
+                    projectId={projectId}
+                    active={view.slots}
+                    version={version}
+                    nobodyYet={emptyView(view)}
+                    focus={workspace.focus}
+                    onSelect={open}
+                  />
+                </>
               ) : (
                 <AsyncSection
                   section={graph}
                   unavailable={{
                     title: 'The agent tree could not be loaded',
-                    stillWorks:
-                      'The table view (View → All slots) still lists every slot.',
+                    stillWorks: 'The Slots view still lists every slot.',
                   }}
                   isEmpty={(g) => g.nodes.length <= 1}
                   empty={emptyView(view)}
@@ -436,7 +448,10 @@ function FleetWorkspace() {
           if (!isOpen) update(blur);
         }}
       >
-        <SheetContent side={desktop ? 'right' : 'bottom'} title="Orchestrator">
+        <SheetContent
+          side={tabletUp === false ? 'bottom' : 'right'}
+          title="Orchestrator"
+        >
           {fleet.data ? orchestratorCard(fleet.data) : null}
         </SheetContent>
       </SheetRoot>
@@ -468,6 +483,7 @@ function FleetWorkspace() {
         target={attach?.target}
         title={attach?.title ?? ''}
         onClose={() => setAttach(undefined)}
+        backTo="Fleet"
         message={
           canOperate && attach?.target.kind === 'slot'
             ? { send: slotSessionMessenger(projectId, attach.target.slot) }

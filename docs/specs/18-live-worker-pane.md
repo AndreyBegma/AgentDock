@@ -1,6 +1,6 @@
 # Live read-only worker pane
 
-Issue: [#18](https://github.com/AndreyBegma/AgentDock/issues/18) · Roadmap: M2.3 ·
+Issue: [#18](https://github.com/AndreyBegma/Nautelle/issues/18) · Roadmap: M2.3 ·
 Decisions: [ADR-0001](../adr/0001-control-plane-and-per-machine-runner.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
 [runner-protocol.md](../architecture/runner-protocol.md) (`subscribe` / `pane`), [security.md](../architecture/security.md)

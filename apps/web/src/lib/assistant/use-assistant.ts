@@ -6,7 +6,7 @@ import type {
   AssistantMessageView,
   AssistantModelOption,
   LlmProviderId,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, describeError } from '../api';
 import { assistantApi, attachFile, streamTurn } from './client';

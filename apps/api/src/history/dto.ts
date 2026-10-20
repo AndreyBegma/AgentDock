@@ -5,7 +5,7 @@ import {
   type RunKind,
   type RunListQuery,
   type RunStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Type } from 'class-transformer';
 import {
   IsIn,

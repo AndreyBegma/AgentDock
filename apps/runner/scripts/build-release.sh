@@ -1,12 +1,12 @@
 #!/bin/sh
 # Builds the runner's release assets (ADR-0017) into apps/runner/release/:
 #
-#   bin/<os>-<arch>/agentdock-runner                  one binary per target
-#   agentdock-runner-<version>-<os>-<arch>.tar.gz     what the GitHub Release carries
+#   bin/<os>-<arch>/nautelle-runner                  one binary per target
+#   nautelle-runner-<version>-<os>-<arch>.tar.gz     what the GitHub Release carries
 #   SHA256SUMS                                        checksums of the tarballs and binaries
 #   SHA256SUMS.sig                                    its Ed25519 signature (ADR-0049)
-#   npm/agentdock-runner{,-<os>-<arch>}/              the packages npm publishes
-#   agentdock-runner.rb                               the Homebrew formula
+#   npm/nautelle-runner{,-<os>-<arch>}/              the packages npm publishes
+#   nautelle-runner.rb                               the Homebrew formula
 #
 # Needs only Bun and the usual POSIX tools: every target is cross-compiled
 # from this machine. Publishes nothing.
@@ -34,9 +34,9 @@ if [ -n "${RUNNER_TAG:-}" ] && [ -z "${RUNNER_SIGNING_KEY:-}" ]; then
   exit 1
 fi
 
-# The runner imports @agentdock/shared's built output, so build it first; on a
+# The runner imports @nautelle/shared's built output, so build it first; on a
 # clean checkout nothing else has.
-(cd "$runner/../.." && bunx turbo run build --filter=@agentdock/shared)
+(cd "$runner/../.." && bunx turbo run build --filter=@nautelle/shared)
 
 targets="darwin-arm64 darwin-x64 linux-x64 linux-arm64"
 out="$runner/release"
@@ -49,16 +49,16 @@ for target in $targets; do
   echo "build-release: $version $target"
   # --splitting keeps `filter` / `filter-hook` from parsing the whole runner
   # at start-up (#445 D3: p95 <= 50 ms per command); still one binary.
-  bun build --compile --splitting --format=esm --target="bun-$target" src/main.ts --outfile "$dir/agentdock-runner"
-  tar -C "$dir" -czf "$out/agentdock-runner-$version-$target.tar.gz" agentdock-runner
+  bun build --compile --splitting --format=esm --target="bun-$target" src/main.ts --outfile "$dir/nautelle-runner"
+  tar -C "$dir" -czf "$out/nautelle-runner-$version-$target.tar.gz" nautelle-runner
 done
 
 # The binaries are listed too: the npm shim checks the one it runs.
 cd "$out"
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum agentdock-runner-*.tar.gz bin/*/agentdock-runner >SHA256SUMS
+  sha256sum nautelle-runner-*.tar.gz bin/*/nautelle-runner >SHA256SUMS
 else
-  shasum -a 256 agentdock-runner-*.tar.gz bin/*/agentdock-runner >SHA256SUMS
+  shasum -a 256 nautelle-runner-*.tar.gz bin/*/nautelle-runner >SHA256SUMS
 fi
 cd "$runner"
 
@@ -70,7 +70,7 @@ else
 fi
 
 bun scripts/npm-packages.ts "$out"
-sh scripts/render-formula.sh "$version" "$out/SHA256SUMS" "$out/SHA256SUMS.sig" >"$out/agentdock-runner.rb"
+sh scripts/render-formula.sh "$version" "$out/SHA256SUMS" "$out/SHA256SUMS.sig" >"$out/nautelle-runner.rb"
 
 echo "build-release: $version ready in $out"
 cat "$out/SHA256SUMS"

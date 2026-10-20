@@ -1,6 +1,5 @@
 'use client';
 
-import type { BoardPlanTaskView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
@@ -8,6 +7,7 @@ import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { BoardPlanTaskView } from '@nautelle/shared';
 import Link from 'next/link';
 import { COLUMN_TITLE } from '../../lib/board/format';
 import { planTaskDesignChip, planTaskPill } from '../../lib/board/plan-tasks';

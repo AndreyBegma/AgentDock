@@ -1,6 +1,6 @@
 # Skills — skills.sh catalog, install, run on a project
 
-Issue: [#24](https://github.com/AndreyBegma/AgentDock/issues/24) · Roadmap: M3.1 ·
+Issue: [#24](https://github.com/AndreyBegma/Nautelle/issues/24) · Roadmap: M3.1 ·
 Decisions: [ADR-0006](../adr/0006-runtime-adapters-and-runtime-profiles.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
 [runner-protocol.md](../architecture/runner-protocol.md), [security.md](../architecture/security.md)
@@ -8,7 +8,7 @@ Decisions: [ADR-0006](../adr/0006-runtime-adapters-and-runtime-profiles.md),
 ## Summary
 
 Skills are run by hand today, project by project, with no record (PRD,
-*Problem*). This item lets operators do three things from AgentDock:
+*Problem*). This item lets operators do three things from Nautelle:
 - search the public [skills.sh](https://skills.sh) catalog;
 - install a skill into a project or into a runtime profile;
 - run any installed skill on a project, choosing the runtime profile and the model.

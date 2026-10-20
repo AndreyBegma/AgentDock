@@ -1,10 +1,10 @@
 'use client';
 
-import type { BoardErrorView } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { BoardErrorView } from '@nautelle/shared';
 import { useState } from 'react';
 import { boardErrorView } from '../../../../../lib/fleet/format';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';

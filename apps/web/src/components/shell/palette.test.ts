@@ -4,14 +4,14 @@ import type {
   ProjectSummary,
   RunSummary,
   SessionSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { visibleNav } from './nav';
 import { askItem, type PaletteInput, paletteGroups } from './palette';
 
 const project = (id: string, displayName: string) =>
   ({ id, displayName, repo: `acme/${id}` }) as ProjectSummary;
 
-const PROJECTS = [project('p1', 'AgentDock'), project('p2', 'Glass')];
+const PROJECTS = [project('p1', 'Nautelle'), project('p2', 'Glass')];
 
 function input(overrides: Partial<PaletteInput> = {}): PaletteInput {
   const path = overrides.projectId ? `/projects/${overrides.projectId}` : '/';
@@ -89,7 +89,7 @@ describe('paletteGroups', () => {
 
   test('inside a project, its pages read "Project › Page"', () => {
     const groups = paletteGroups(input({ projectId: 'p1' }));
-    expect(labelsIn(groups, 'project-pages')).toContain('AgentDock › Fleet');
+    expect(labelsIn(groups, 'project-pages')).toContain('Nautelle › Fleet');
     expect(labelsIn(groups, 'project-pages').join()).not.toContain('Glass');
   });
 
@@ -111,7 +111,7 @@ describe('paletteGroups', () => {
               id: 's1',
               title: 'Fix the login loop',
               slotName: null,
-              projectName: 'AgentDock',
+              projectName: 'Nautelle',
             } as SessionSummary,
           ],
           runs: [
@@ -129,7 +129,7 @@ describe('paletteGroups', () => {
     const recent = groups.find((group) => group.id === 'recent');
     expect(recent?.items.map((item) => [item.id, item.label])).toEqual([
       ['go:/sessions/s1', 'Fix the login loop'],
-      ['go:/projects/p1/history/r1', '#155 · i155'],
+      ['go:/projects/p1/activity?tab=runs&run=r1', '#155 · i155'],
     ]);
   });
 
@@ -168,7 +168,7 @@ describe('paletteGroups', () => {
     const groups = paletteGroups(input({ query: 'settings', projectId: 'p1' }));
     expect(labelsIn(groups, 'admin')).toEqual(['Settings']);
     expect(labelsIn(groups, 'project-pages')).toEqual([
-      'AgentDock › Settings',
+      'Nautelle › Settings',
       'Glass › Settings',
     ]);
     expect(labelsIn(groups, 'pages')).not.toContain('Settings');

@@ -27,7 +27,7 @@ import {
   projectRulesBlock,
   stackDesignPath,
   stackLabel,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardRunArgs,
   type CardRunFile,
@@ -38,7 +38,7 @@ import {
   ISSUE_TITLE_MAX,
   ORCHESTRATOR_DEFAULTS,
   type OrchestratorPermissionMode,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   BadRequestException,
   ForbiddenException,
@@ -260,7 +260,7 @@ export class BoardRoundsService {
   }
 
   /**
-   * #359 D6: AgentDock's own round for a red check or a merge conflict on
+   * #359 D6: Nautelle's own round for a red check or a merge conflict on
    * the card's PR — the system actor, the card's session resumed, the
    * `ci_fix` prompt. Counts one of the PR's `ci_fix` attempts. Refused like
    * any round (running, no room, budget); the poller tries again.
@@ -458,9 +458,17 @@ export class BoardRoundsService {
       (card.prNumber === null ||
         card.mergedAt !== null ||
         card.prState === 'closed');
+    // #709: a kept base whose dependency has merged — on GitHub, unseen —
+    // is moved onto the project base first.
+    const keptBase =
+      !choosesBase &&
+      card.prBaseCardId !== null &&
+      !(await this.work.retargetIfDue(project, card))
+        ? null
+        : card.prBase;
     const base = choosesBase
       ? (stacked?.branch ?? project.base)
-      : (card.prBase ?? project.base);
+      : (keptBase ?? project.base);
     // A session is resumed once Claude has run in it (D5); a round 1 that
     // never started is started again.
     const resume =

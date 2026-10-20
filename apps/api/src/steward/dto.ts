@@ -4,7 +4,7 @@ import {
   STEWARD_SILENCE_MINUTES_MIN,
   type StewardIncidentStatus,
   type UpdateStewardSettingsBody,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,

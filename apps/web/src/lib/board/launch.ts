@@ -8,7 +8,7 @@ import {
   claudeModelOptions,
   type ProjectRuntimeProfile,
   RECOMMENDED_SUFFIX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * The launch popover (#322 D1–D3, D7): which action it launches, what it

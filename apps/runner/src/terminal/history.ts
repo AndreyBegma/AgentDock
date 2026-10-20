@@ -4,7 +4,7 @@ import {
   TERMINAL_HISTORY_LINE_MAX_CHARS,
   TERMINAL_HISTORY_LINES,
   TERMINAL_HISTORY_MAX_BYTES,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { splitCapture } from '../pane/frame';
 
 /**

@@ -1,4 +1,4 @@
-import { hasClaudeTrailer } from '@agentdock/shared';
+import { hasClaudeTrailer } from '@nautelle/shared';
 import { CommandFailure } from '../commands/failure';
 import { gitOk, gitSucceeds } from '../skills/deps';
 import type { GitDeps } from './git';
@@ -77,7 +77,7 @@ const listed = (commits: readonly TrailerCommit[]): string => {
  * commits, and to rewrite them without pushing.
  */
 export const trailerMessage = (commits: readonly TrailerCommit[]): string =>
-  `AgentDock did not push this branch: ${commits.length === 1 ? 'this commit carries' : 'these commits carry'} a Claude attribution trailer (Co-Authored-By: Claude / Claude-Session: / Generated with Claude Code): ${listed(commits)}. Rewrite ${commits.length === 1 ? 'its message' : 'their messages'} without it, keeping the changes (git commit --amend for the newest; a non-interactive rebase for older ones), and do not push — AgentDock pushes once no commit carries one.`;
+  `Nautelle did not push this branch: ${commits.length === 1 ? 'this commit carries' : 'these commits carry'} a Claude attribution trailer (Co-Authored-By: Claude / Claude-Session: / Generated with Claude Code): ${listed(commits)}. Rewrite ${commits.length === 1 ? 'its message' : 'their messages'} without it, keeping the changes (git commit --amend for the newest; a non-interactive rebase for older ones), and do not push — Nautelle pushes once no commit carries one.`;
 
 /**
  * `card.collect` with a held push: nothing was pushed and no pull request

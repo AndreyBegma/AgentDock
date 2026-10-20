@@ -1,4 +1,4 @@
-import { STEWARD_DEFAULTS } from '@agentdock/shared';
+import { STEWARD_DEFAULTS } from '@nautelle/shared';
 import type { PrismaService } from '../database/prisma.service';
 import type { RunnerConnections } from './runner-connections';
 import { RunnerWatchList } from './runner-watch-list';

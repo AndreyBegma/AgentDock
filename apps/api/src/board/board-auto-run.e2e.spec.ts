@@ -3,7 +3,7 @@ import {
   type BoardCardDetail,
   type BoardCardView,
   type BoardView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { userActor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { BoardAutoRun } from './board-auto-run';

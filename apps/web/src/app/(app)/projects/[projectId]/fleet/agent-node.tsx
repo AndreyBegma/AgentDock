@@ -1,9 +1,9 @@
 'use client';
 
-import type { FleetGraphNode } from '@agentdock/shared';
 import type { ContextMenuAction } from '@andrewbehma/glass-ui/context-menu';
 import { NodeCard } from '@andrewbehma/glass-ui/node-card';
 import { PromptInput } from '@andrewbehma/glass-ui/prompt-input';
+import type { FleetGraphNode } from '@nautelle/shared';
 import {
   Bot,
   GitBranch,

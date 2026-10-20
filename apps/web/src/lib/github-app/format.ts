@@ -7,7 +7,7 @@ import {
   type GitHubAppCredentialsRequest,
   type GitHubAppView,
   type GitHubHealthReason,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import {
   ENCRYPTION_KEY_REMEDY,
@@ -181,6 +181,7 @@ export const EVENT_LABEL: Record<(typeof GITHUB_APP_EVENTS)[number], string> = {
   check_run: 'Check run',
   status: 'Status',
   push: 'Push',
+  repository: 'Repository',
 };
 
 export const toCredentialsRequest = (

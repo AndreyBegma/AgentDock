@@ -12,7 +12,7 @@ import {
   planCandidateStackSchema,
   stackLabel,
   type UpdatePlanCandidateRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type {
   BoardCard,

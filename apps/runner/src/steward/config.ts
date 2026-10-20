@@ -1,5 +1,5 @@
-import type { StewardRunnerConfig } from '@agentdock/shared';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { StewardRunnerConfig } from '@nautelle/shared';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 
 export type StewardProjectConfig = StewardRunnerConfig & {
   project: WatchedProject;

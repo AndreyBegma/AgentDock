@@ -1,4 +1,4 @@
-import type { StewardDigestView } from '@agentdock/shared';
+import type { StewardDigestView } from '@nautelle/shared';
 import { TELEGRAM_TEXT_MAX } from '../telegram/markdown-v2';
 import { boundedProse, digestTelegramText } from './steward-digest-format';
 

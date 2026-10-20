@@ -25,8 +25,8 @@ import {
   type WebhookEventType,
   type WebhookUpdateRequest,
   type WebhookView,
-} from '@agentdock/shared';
-import type { OrchestratorPermissionMode } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { OrchestratorPermissionMode } from '@nautelle/shared/protocol';
 import { ApiError, describeError } from '../api';
 import { ENCRYPTION_KEY_REMEDY } from '../prerequisites/copy';
 
@@ -471,9 +471,9 @@ export function curlExample(url: string, secret: string): string {
     '  | openssl dgst -sha256 -hmac "$SECRET" -hex | sed \'s/^.* //\')',
     'curl -X POST "$URL" \\',
     '  -H "Content-Type: application/json" \\',
-    '  -H "X-AgentDock-Timestamp: $TS" \\',
-    '  -H "X-AgentDock-Delivery: $DELIVERY" \\',
-    '  -H "X-AgentDock-Signature: sha256=$SIG" \\',
+    '  -H "X-Nautelle-Timestamp: $TS" \\',
+    '  -H "X-Nautelle-Delivery: $DELIVERY" \\',
+    '  -H "X-Nautelle-Signature: sha256=$SIG" \\',
     '  --data "$BODY"',
   ].join('\n');
 }
@@ -481,7 +481,7 @@ export function curlExample(url: string, secret: string): string {
 /** How a receiver verifies an outbound delivery (D13). The secret is never inlined. */
 export const VERIFY_SAMPLE = `import { createHmac, timingSafeEqual } from 'node:crypto';
 
-// header: X-AgentDock-Signature: t=<unix>,v1=<hex>
+// header: X-Nautelle-Signature: t=<unix>,v1=<hex>
 export function verify(rawBody, header, secret) {
   const parts = Object.fromEntries(header.split(',').map((p) => p.split('=')));
   const expected = createHmac('sha256', secret)

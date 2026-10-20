@@ -3,7 +3,7 @@ import {
   WEBHOOKS_ALLOWED_PRIVATE_TARGETS_KEY,
   WEBHOOKS_ALLOWED_PRIVATE_TARGETS_MAX,
   WEBHOOKS_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../../audit/audit.service';
 import type { AuditContext } from '../../audit/audit.types';

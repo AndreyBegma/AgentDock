@@ -1,11 +1,5 @@
 'use client';
 
-import type {
-  ProjectDetail,
-  ProjectMemberView,
-  SessionDetail,
-  SessionTotals,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -18,6 +12,12 @@ import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { TraceTree } from '@andrewbehma/glass-ui/trace-tree';
+import type {
+  ProjectDetail,
+  ProjectMemberView,
+  SessionDetail,
+  SessionTotals,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -264,7 +264,7 @@ export default function SessionPage() {
 
   const name = detail ? sessionName(detail.session) : null;
   useEffect(() => {
-    if (name) document.title = `${name} · Sessions · AgentDock`;
+    if (name) document.title = `${name} · Sessions · Nautelle`;
   }, [name]);
 
   if (missing) {

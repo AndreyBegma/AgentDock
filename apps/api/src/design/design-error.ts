@@ -2,7 +2,7 @@ import type {
   DesignErrorBody,
   DesignErrorCode,
   NoProfileDetails,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /**

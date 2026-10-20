@@ -1,4 +1,4 @@
-import { RUNNER_STALE_AFTER_MS } from '@agentdock/shared';
+import { RUNNER_STALE_AFTER_MS } from '@nautelle/shared';
 
 /** Timings of the runners module; tests override the provider to run fast. */
 export interface RunnerOptions {

@@ -1,6 +1,6 @@
 # Projects — connect by path, detect docs source, membership
 
-Issue: [#10](https://github.com/AndreyBegma/AgentDock/issues/10) · Roadmap: M1.4 ·
+Issue: [#10](https://github.com/AndreyBegma/Nautelle/issues/10) · Roadmap: M1.4 ·
 Decisions: [ADR-0004](../adr/0004-github-issues-are-the-task-queue.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
 [ADR-0012](../adr/0012-detect-where-a-projects-documentation-lives.md),

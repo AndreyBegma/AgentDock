@@ -31,8 +31,11 @@ import {
   RUN_UPDATED_LIVE_EVENT,
   type RunLiveChange,
   rebalancedPositions,
-} from '@agentdock/shared';
-import { API_EVENT_SOURCE } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import {
+  API_EVENT_SOURCE,
+  type CardPrOpenResult,
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { type BoardCard, Prisma, type RunStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -163,6 +166,30 @@ export const PUSHED_WITHOUT_PR =
  */
 export const BRANCH_DIVERGED =
   'branch_diverged' satisfies CardNeedsPersonReason;
+
+/** #709: the forward PR of a merge into a dead dependency branch conflicts. */
+const FORWARD_CONFLICT = 'forward_conflict' satisfies CardNeedsPersonReason;
+/** #709: the forward PR could not be opened. */
+const FORWARD_FAILED = 'forward_failed' satisfies CardNeedsPersonReason;
+
+/** #709: `merge_failed`'s reason for a PR into a dependency branch that merged. */
+const BASE_MERGED = 'base_merged';
+
+/** #709: a card PR as GitHub has it now (`card.checks`). */
+export interface LivePr {
+  state: 'open' | 'draft' | 'merged' | 'closed';
+  /** The branch it goes (or went) into; null from a runner before #709. */
+  base: string | null;
+  mergedAt: Date | null;
+}
+
+/** #709: why a forward PR exists, leading its body. */
+const forwardSummary = (
+  card: Pick<BoardCard, 'number' | 'prNumber'>,
+  into: string | null,
+  base: string,
+): string =>
+  `${cardLabel(card.number)} merged in #${card.prNumber} into \`${into ?? 'its dependency branch'}\` after that branch's own pull request had merged, so its work never reached \`${base}\`. This pull request carries it forward.`;
 
 const failedCollect = (error: string): CardCollectOutcome => ({
   state: 'failed',
@@ -673,6 +700,7 @@ export class BoardWork implements OnModuleInit {
         `${cardLabel(card.number)} has no pull request to merge`,
       );
     }
+    await this.assertLiveBase(project, card.id);
     const output = boardOutput(
       'card.merge',
       await this.commands.send(
@@ -686,7 +714,7 @@ export class BoardWork implements OnModuleInit {
           headSha,
           method: mergeMethodOf(project.codeSentinelConfig),
           issue: card.issueNumber,
-          comment: `Completed as ${cardLabel(card.number)} on the AgentDock board; merged in #${pr}.`,
+          comment: `Completed as ${cardLabel(card.number)} on the Nautelle board; merged in #${pr}.`,
           // #329 D9: an older runner refuses the arg; it is sent only when asked.
           ...(deleteBranch ? { deleteBranch } : {}),
         },
@@ -768,29 +796,274 @@ export class BoardWork implements OnModuleInit {
     });
   }
 
-  /** #359 D8: the card's PR `pr` merged — the card's state and its PR row. */
-  async markMerged(cardId: string, pr: number): Promise<void> {
-    const now = new Date();
-    await this.prisma.$transaction([
+  /**
+   * #709: a stacked PR is never merged into a dependency branch whose own PR
+   * has merged — its work would never reach the project base. A dependency
+   * merged on GitHub is recorded first, and the PR moved onto the base; one
+   * that cannot be moved is refused, 409 `merge_failed` with the reason
+   * `base_merged`. A PR into a live dependency branch merges as before.
+   */
+  private async assertLiveBase(
+    project: BoardProject,
+    cardId: string,
+  ): Promise<void> {
+    const card = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      include: { rounds: { orderBy: { round: 'desc' } } },
+    });
+    if (!card || card.prBaseCardId === null) return;
+    // #722: a PR a person moved onto the base on GitHub merges into the base.
+    const live = await this.livePr(project, card);
+    if (
+      card.prNumber !== null &&
+      (await this.adoptLiveBase(
+        project,
+        card.id,
+        card.prNumber,
+        live?.base ?? null,
+      ))
+    ) {
+      return;
+    }
+    if (!(await this.retargetIfDue(project, card))) return;
+    const fresh = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      select: { prBase: true, prBaseCard: { select: { mergedAt: true } } },
+    });
+    if (!fresh?.prBaseCard?.mergedAt) return;
+    throw boardError(
+      409,
+      BOARD_ERROR.mergeFailed,
+      `${cardLabel(card.number)}'s pull request goes into ${fresh.prBase}, whose own pull request has merged, and it could not be moved onto ${project.base}`,
+      { reason: BASE_MERGED },
+    );
+  }
+
+  /**
+   * #359 D8: the card's PR `pr` merged — the card's state and its PR row.
+   * #709: `facts` is what GitHub says of the merge, when it was read: the
+   * branch it went into and when. A stacked PR that went into the project
+   * base itself (GitHub moved it there) is no longer stacked; one that went
+   * into its dependency's branch after that branch's own PR merged is
+   * carried forward (`retarget`).
+   */
+  async markMerged(
+    cardId: string,
+    pr: number,
+    facts: LivePr | null = null,
+  ): Promise<void> {
+    const card = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      select: { projectId: true, prBaseCardId: true },
+    });
+    if (!card) return;
+    const project = await this.project(card.projectId);
+    const intoBase = facts?.base === project.base;
+    const [{ count }] = await this.prisma.$transaction([
       this.prisma.boardCard.updateMany({
         where: { id: cardId, prNumber: pr },
-        data: { prState: 'merged', mergedAt: now },
+        data: { prState: 'merged', mergedAt: facts?.mergedAt ?? new Date() },
       }),
       this.prisma.boardCardPullRequest.updateMany({
         where: { cardId, number: pr },
         data: { state: 'merged' },
       }),
     ]);
+    // #722: a stacked PR that went into the base is no longer stacked.
+    if (count > 0 && intoBase) {
+      await this.adoptLiveBase(project, cardId, pr, facts?.base ?? null);
+    }
+    if (count > 0 && !intoBase && card.prBaseCardId !== null) {
+      await this.settleStacked(project, cardId, card.prBaseCardId);
+    }
+    this.publish(project.id, cardId);
     await this.restack(cardId);
+  }
+
+  /**
+   * #722: GitHub's base of the card's PR `pr`, read through `card.checks`. A
+   * stacked card whose PR goes (or went) into the project base — a person
+   * retargeted it there by hand, or GitHub did when the dependency's branch
+   * was deleted — is no longer stacked: its stored base is cleared and the
+   * change audited as `card.pr_retargeted` `by: github`. Returns whether it
+   * was.
+   */
+  async adoptLiveBase(
+    project: BoardProject,
+    cardId: string,
+    pr: number,
+    base: string | null,
+  ): Promise<boolean> {
+    if (base === null || base !== project.base) return false;
+    const card = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      select: {
+        number: true,
+        prNumber: true,
+        prBase: true,
+        prBaseCard: { select: { number: true } },
+      },
+    });
+    if (!card || card.prBase === null || card.prNumber !== pr) return false;
+    const { count } = await this.prisma.boardCard.updateMany({
+      where: { id: cardId, prNumber: pr, prBase: card.prBase },
+      data: { prBase: null, prBaseCardId: null },
+    });
+    if (count === 0) return false;
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.pr_retargeted',
+      target: { type: 'board_card', id: cardId },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        pr,
+        from: card.prBase,
+        base,
+        dependency: card.prBaseCard?.number ?? null,
+        by: 'github',
+      },
+      result: 'ok',
+    });
+    this.publish(project.id, cardId);
+    return true;
+  }
+
+  /**
+   * #722: a card recorded as merged with a stored base is read on GitHub
+   * again — its PR may have been retargeted onto the project base by hand
+   * before it merged, so its work is in the base whatever the stored base
+   * says. Returns whether the stored base was cleared, or null when the
+   * runner could not answer.
+   */
+  async refreshMergedBase(
+    project: BoardProject,
+    card: { id: string; prNumber: number | null },
+  ): Promise<boolean | null> {
+    if (card.prNumber === null) return false;
+    const live = await this.livePr(project, card);
+    if (live === null) return null;
+    if (live.state !== 'merged') return false;
+    return this.adoptLiveBase(project, card.id, card.prNumber, live.base);
+  }
+
+  /**
+   * #709: the stacked card `cardId` merged into its dependency's branch. If
+   * the dependency has merged too — on GitHub, when the board has not seen it
+   * — the card is settled now: landed with the dependency, or carried
+   * forward. Otherwise it lands when the dependency does (`restack`).
+   */
+  private async settleStacked(
+    project: BoardProject,
+    cardId: string,
+    dependencyId: string,
+  ): Promise<void> {
+    if ((await this.dependencyMergedAt(project, dependencyId)) === null) return;
+    const card = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      include: { rounds: { orderBy: { round: 'desc' } } },
+    });
+    // Recording the dependency's merge restacked the card already.
+    if (!card || card.prBaseCardId !== dependencyId) return;
+    try {
+      await this.retarget(project, card);
+    } catch (error) {
+      if (!(error instanceof BoardFailure)) throw error;
+      this.logger.warn(
+        `${cardLabel(card.number)} not settled onto ${project.base}: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * #709: a card PR as GitHub has it now, read through `card.checks`; null
+   * when the runner does not serve it or cannot answer.
+   */
+  async livePr(
+    project: BoardProject,
+    card: { id: string; prNumber: number | null },
+  ): Promise<LivePr | null> {
+    if (card.prNumber === null) return null;
+    if (!this.commands.servesChecks(project.runnerId)) return null;
+    try {
+      const result = await this.commands.checks(
+        project.runnerId,
+        {
+          cardId: card.id,
+          projectId: project.id,
+          root: project.rootPath,
+          pr: card.prNumber,
+        },
+        { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
+      );
+      if (result.status !== 'ok') return null;
+      const { state, base, mergedAt } = result.output;
+      return {
+        state,
+        base: base ?? null,
+        mergedAt: mergedAt ? new Date(mergedAt) : null,
+      };
+    } catch (error) {
+      if (error instanceof BoardFailure) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * #709: when the dependency's PR merged, or null while it has not. A
+   * dependency the board holds as open is read on GitHub: a merge the PR
+   * poll missed is recorded (`markMerged`, which restacks its dependants),
+   * and a closed PR as closed.
+   */
+  async dependencyMergedAt(
+    project: BoardProject,
+    dependencyId: string,
+  ): Promise<Date | null> {
+    const dependency = await this.prisma.boardCard.findUnique({
+      where: { id: dependencyId },
+      select: { id: true, prNumber: true, prState: true, mergedAt: true },
+    });
+    if (!dependency) return null;
+    if (dependency.mergedAt !== null) return dependency.mergedAt;
+    const pr = dependency.prNumber;
+    if (pr === null || dependency.prState === 'closed') return null;
+    const live = await this.livePr(project, dependency);
+    if (live?.state === 'closed') {
+      await this.prisma.$transaction([
+        this.prisma.boardCard.updateMany({
+          where: { id: dependency.id, prNumber: pr },
+          data: { prState: 'closed' },
+        }),
+        this.prisma.boardCardPullRequest.updateMany({
+          where: { cardId: dependency.id, number: pr },
+          data: { state: 'closed' },
+        }),
+      ]);
+      this.publish(project.id, dependency.id);
+      return null;
+    }
+    if (live?.state !== 'merged') return null;
+    await this.markMerged(dependency.id, pr, live);
+    const merged = await this.prisma.boardCard.findUnique({
+      where: { id: dependency.id },
+      select: { mergedAt: true },
+    });
+    return merged?.mergedAt ?? null;
   }
 
   /**
    * #636 (ADR-0064): the card merged — every card stacked on its branch goes
    * onto the project base: an open PR through `card.prRetarget`, then the
    * stored base is cleared. Never throws; what it could not do the PR poll
-   * tries again (`retargetIfDue`).
+   * tries again (`retargetIfDue`). #709: a card carried forward has not
+   * merged after all — what is stacked on its branch waits for its forward PR.
    */
   async restack(mergedCardId: string): Promise<void> {
+    const merged = await this.prisma.boardCard.findUnique({
+      where: { id: mergedCardId },
+      select: { mergedAt: true },
+    });
+    if (merged?.mergedAt == null) return;
     const stacked = await this.prisma.boardCard.findMany({
       where: { prBaseCardId: mergedCardId },
       include: { rounds: { orderBy: { round: 'desc' } } },
@@ -811,20 +1084,26 @@ export class BoardWork implements OnModuleInit {
 
   /**
    * #636: the PR poll's retry — a card stacked on a dependency that has
-   * merged since goes onto the base. Returns whether it is still stacked.
+   * merged since goes onto the base. #709: a dependency the board holds as
+   * open is read on GitHub first. Returns whether it is still stacked.
    */
   async retargetIfDue(
     project: BoardProject,
     card: CardWithRounds,
   ): Promise<boolean> {
     if (card.prBaseCardId === null) return card.prBase !== null;
-    const base = await this.prisma.boardCard.findUnique({
-      where: { id: card.prBaseCardId },
-      select: { mergedAt: true },
+    if ((await this.dependencyMergedAt(project, card.prBaseCardId)) === null) {
+      return true;
+    }
+    // Recording the dependency's merge may have restacked the card already.
+    const fresh = await this.prisma.boardCard.findUnique({
+      where: { id: card.id },
+      include: { rounds: { orderBy: { round: 'desc' } } },
     });
-    if (base?.mergedAt === null) return true;
+    if (!fresh) return false;
+    if (fresh.prBaseCardId === null) return fresh.prBase !== null;
     try {
-      return !(await this.retarget(project, card));
+      return !(await this.retarget(project, fresh));
     } catch (error) {
       if (!(error instanceof BoardFailure)) throw error;
       this.logger.warn(
@@ -835,16 +1114,28 @@ export class BoardWork implements OnModuleInit {
   }
 
   /**
-   * #636: one stacked card onto the base. A card with an open PR is
-   * retargeted first; one whose round is still running without a PR keeps
-   * its base — the PR it opens is retargeted by the poll. Returns whether
-   * the card's base is the project base now.
+   * #636: one stacked card onto the base, its dependency merged. A card with
+   * an open PR is retargeted first; one whose round is still running without
+   * a PR keeps its base — the PR it opens is retargeted by the poll. #709: a
+   * card whose PR merged into the dependency's branch before the dependency
+   * merged landed with it; one that merged there after (or whose PR GitHub
+   * reports merged when the retarget comes) is carried forward. Returns
+   * whether the card's base is the project base now.
    */
   private async retarget(
     project: BoardProject,
     card: CardWithRounds,
   ): Promise<boolean> {
     const from = card.prBase;
+    if (card.mergedAt !== null && card.prBaseCardId !== null) {
+      const dependency = await this.prisma.boardCard.findUnique({
+        where: { id: card.prBaseCardId },
+        select: { mergedAt: true },
+      });
+      if (dependency?.mergedAt && card.mergedAt >= dependency.mergedAt) {
+        return this.forward(project, card);
+      }
+    }
     const openPr =
       card.prNumber !== null &&
       card.mergedAt === null &&
@@ -876,7 +1167,12 @@ export class BoardWork implements OnModuleInit {
         );
         return false;
       }
-      if (!result.retargeted) notOpen = true;
+      if (!result.retargeted) {
+        // #709: a PR that merged into the dead branch is carried forward.
+        const settled = await this.settleClosedPr(project, card);
+        if (settled !== null) return settled;
+        notOpen = true;
+      }
     }
     const { count } = await this.prisma.boardCard.updateMany({
       where: { id: card.id, prBaseCardId: card.prBaseCardId },
@@ -906,6 +1202,273 @@ export class BoardWork implements OnModuleInit {
     }
     this.publish(project.id, card.id);
     return true;
+  }
+
+  /**
+   * #709: a stacked PR `card.prRetarget` found no longer open, read on
+   * GitHub. A merge is recorded — `markMerged` carries it forward when it went
+   * into the dead branch — and answers whether the card's base is the project
+   * base now. A closed PR, or one the runner cannot read, answers null: the
+   * stored base is simply cleared.
+   */
+  private async settleClosedPr(
+    project: BoardProject,
+    card: CardWithRounds,
+  ): Promise<boolean | null> {
+    const live = await this.livePr(project, card);
+    if (live?.state !== 'merged' || card.prNumber === null) return null;
+    await this.markMerged(card.id, card.prNumber, live);
+    const fresh = await this.prisma.boardCard.findUnique({
+      where: { id: card.id },
+      select: { prBaseCardId: true },
+    });
+    return fresh?.prBaseCardId === null;
+  }
+
+  /**
+   * #709 (ADR-0064): the card's PR merged into its dependency's branch after
+   * that branch's own PR had merged, so its work never reached the project
+   * base. `card.prOpen` opens a forward PR of the card's branch into the
+   * base, and the card ships it like any PR; a forward PR that conflicts, or
+   * one that could not be opened, needs a person. A branch with nothing the
+   * base lacks has landed after all. Returns whether the card's base is the
+   * project base now.
+   */
+  private async forward(
+    project: BoardProject,
+    card: CardWithRounds,
+  ): Promise<boolean> {
+    const into = card.prBase;
+    const stacked = { id: card.id, prBaseCardId: card.prBaseCardId };
+    const failed = async (message: string): Promise<boolean> => {
+      const { count } = await this.prisma.boardCard.updateMany({
+        where: stacked,
+        data: { needsPerson: true, needsPersonReason: FORWARD_FAILED },
+      });
+      if (count > 0 && card.needsPersonReason !== FORWARD_FAILED) {
+        await this.audit.record({
+          actor: SYSTEM_ACTOR,
+          action: 'card.auto_run_failed',
+          target: { type: 'board_card', id: card.id },
+          projectId: project.id,
+          after: {
+            number: card.number,
+            reason: FORWARD_FAILED,
+            pr: card.prNumber,
+            into,
+          },
+          result: 'error',
+          meta: { message },
+        });
+      }
+      this.logger.warn(
+        `${cardLabel(card.number)}: no forward PR into ${project.base} — ${message}`,
+      );
+      this.publish(project.id, card.id);
+      return false;
+    };
+    if (card.branch === null) return failed('the card has no branch');
+    if (!this.commands.servesPrOpen(project.runnerId)) {
+      return failed('the runner does not serve card.prOpen; update it');
+    }
+    let output: CardPrOpenResult;
+    try {
+      output = boardOutput(
+        'card.prOpen',
+        await this.commands.openPr(
+          project.runnerId,
+          {
+            cardId: card.id,
+            projectId: project.id,
+            root: project.rootPath,
+            branch: card.branch,
+            base: project.base,
+            title: `${cardLabel(card.number)}: ${card.title}`.slice(0, 256),
+            body: cardPullRequestBody({
+              number: card.number,
+              summary: forwardSummary(card, into, project.base),
+              issueNumber: card.issueNumber,
+              specPrUrl: card.specPrUrl,
+            }),
+          },
+          { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
+        ),
+      );
+    } catch (error) {
+      if (!(error instanceof BoardFailure)) throw error;
+      return failed(error.message);
+    }
+    if (!output.opened) {
+      if (output.error !== 'no_commits') return failed(output.message);
+      // Nothing to carry: the branch's work is in the base already.
+      await this.prisma.boardCard.updateMany({
+        where: stacked,
+        data: { prBase: null, prBaseCardId: null },
+      });
+      this.publish(project.id, card.id);
+      return true;
+    }
+    const conflict = output.mergeable === 'CONFLICTING';
+    const { count } = await this.prisma.boardCard.updateMany({
+      where: stacked,
+      data: {
+        prNumber: output.prNumber,
+        prUrl: output.prUrl,
+        prState: 'open',
+        mergedAt: null,
+        prBase: null,
+        prBaseCardId: null,
+        ciState: 'pending',
+        ciFixAttempts: 0,
+        needsPerson: false,
+        needsPersonReason: null,
+      },
+    });
+    if (count === 0) return false;
+    await this.recordPullRequest(card.id, {
+      number: output.prNumber,
+      url: output.prUrl,
+      branch: card.branch,
+      state: 'open',
+      round: card.rounds[0]?.round ?? 1,
+    });
+    const dependency = card.prBaseCardId
+      ? await this.prisma.boardCard.findUnique({
+          where: { id: card.prBaseCardId },
+          select: { number: true },
+        })
+      : null;
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.pr_forwarded',
+      target: { type: 'board_card', id: card.id },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        pr: output.prNumber,
+        mergedPr: card.prNumber,
+        into,
+        base: project.base,
+        dependency: dependency?.number ?? null,
+        alreadyOpen: output.alreadyOpen,
+        conflict,
+      },
+      result: 'ok',
+    });
+    if (conflict) {
+      await this.forwardConflict(project, {
+        id: card.id,
+        number: card.number,
+        prNumber: output.prNumber,
+      });
+    }
+    this.publish(project.id, card.id);
+    return true;
+  }
+
+  /**
+   * #709 (ADR-0064, C-278): Completed means landed. What is missing for the
+   * card's work to be in the project base, in one sentence — or null when it
+   * is there, or there is none: no PR and no failed collect, a PR merged into
+   * the base, or one merged into a dependency branch that has not merged yet
+   * (it lands with it). An open PR is read on GitHub first, so a merge the
+   * poll has not seen counts — and one into a dead branch is carried forward.
+   */
+  async missingLanding(
+    project: BoardProject,
+    cardId: string,
+  ): Promise<string | null> {
+    let card = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      include: { prBaseCard: { select: { number: true, mergedAt: true } } },
+    });
+    if (!card) return null;
+    const pr = card.prNumber;
+    if (pr !== null && card.mergedAt === null && card.prState !== 'closed') {
+      const live = await this.livePr(project, card);
+      if (live?.state === 'merged') {
+        await this.markMerged(card.id, pr, live);
+        card = await this.prisma.boardCard.findUnique({
+          where: { id: cardId },
+          include: {
+            prBaseCard: { select: { number: true, mergedAt: true } },
+          },
+        });
+        if (!card) return null;
+      }
+    } else if (card.mergedAt !== null && card.prBase !== null) {
+      // #722: merged into the base after a retarget by hand on GitHub.
+      if (await this.refreshMergedBase(project, card)) {
+        card = await this.prisma.boardCard.findUnique({
+          where: { id: cardId },
+          include: {
+            prBaseCard: { select: { number: true, mergedAt: true } },
+          },
+        });
+        if (!card) return null;
+      }
+    }
+    const label = cardLabel(card.number);
+    if (card.prNumber === null) {
+      return card.collectState === 'failed'
+        ? `${label} has work on its branch that never went into a pull request into ${project.base}`
+        : null;
+    }
+    const dependency = card.prBaseCard;
+    if (card.mergedAt !== null) {
+      if (card.prBase === null) return null;
+      if (!dependency?.mergedAt || card.mergedAt < dependency.mergedAt) {
+        return null;
+      }
+      return `${label}'s pull request #${card.prNumber} merged into ${card.prBase} after ${cardLabel(dependency.number)}'s own pull request had merged, so its work is not in ${project.base}`;
+    }
+    const into = card.prBase ?? project.base;
+    return card.prState === 'closed'
+      ? `${label}'s pull request #${card.prNumber} into ${into} was closed without merging, so its work is not in ${project.base}`
+      : `${label}'s pull request #${card.prNumber} into ${into} has not merged, so its work is not in ${project.base} yet`;
+  }
+
+  /** #709: whether the card's PR `pr` is a forward PR (`card.pr_forwarded`). */
+  async forwarded(cardId: string, pr: number): Promise<boolean> {
+    const record = await this.prisma.auditRecord.findFirst({
+      where: {
+        action: 'card.pr_forwarded',
+        targetType: 'board_card',
+        targetId: cardId,
+        after: { path: ['pr'], equals: pr },
+      },
+      select: { seq: true },
+    });
+    return record !== null;
+  }
+
+  /**
+   * #709: the card's forward PR conflicts with the project base — a person
+   * resolves it; nothing merges it meanwhile.
+   */
+  async forwardConflict(
+    project: BoardProject,
+    card: Pick<BoardCard, 'id' | 'number' | 'prNumber'>,
+  ): Promise<void> {
+    const { count } = await this.prisma.boardCard.updateMany({
+      where: { id: card.id, prNumber: card.prNumber, needsPerson: false },
+      data: { needsPerson: true, needsPersonReason: FORWARD_CONFLICT },
+    });
+    if (count === 0) return;
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.auto_run_failed',
+      target: { type: 'board_card', id: card.id },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        reason: FORWARD_CONFLICT,
+        pr: card.prNumber,
+        base: project.base,
+      },
+      result: 'error',
+    });
+    this.publish(project.id, card.id);
   }
 
   /** The position for `index` in `column`, rebalancing it when it is too tight. */

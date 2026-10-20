@@ -1,4 +1,4 @@
-import { DESIGN_ERROR } from '@agentdock/shared';
+import { DESIGN_ERROR } from '@nautelle/shared';
 import { Controller, Get, Param, ParseIntPipe, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { type AuthUser, CurrentUser } from '../auth';

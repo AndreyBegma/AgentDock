@@ -5,7 +5,7 @@ import {
   type InboundTriggerAction,
   type InboundTriggerCreateRequest,
   type InboundTriggerUpdateRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   ArrayMaxSize,
   IsArray,

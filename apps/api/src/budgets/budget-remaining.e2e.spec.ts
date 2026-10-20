@@ -1,4 +1,4 @@
-import { localBudgetRemainingResultSchema } from '@agentdock/shared/protocol';
+import { localBudgetRemainingResultSchema } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { seedProject } from '../fleet/testing/fleet-e2e';
 import { seedPrices } from '../prices/seed-prices';

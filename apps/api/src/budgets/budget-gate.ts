@@ -1,4 +1,4 @@
-import type { BudgetScope } from '@agentdock/shared';
+import type { BudgetScope } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { BudgetExceededError } from './budget-error';
@@ -8,7 +8,7 @@ export interface BudgetGateInput {
   projectId: string;
   /**
    * The person starting it — for a schedule firing, its principal (D-10);
-   * null for a webhook or AgentDock's own work (D3).
+   * null for a webhook or Nautelle's own work (D3).
    */
   userId: string | null;
 }

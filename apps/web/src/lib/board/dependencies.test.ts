@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { CardDependencyRef } from '@agentdock/shared';
+import type { CardDependencyRef } from '@nautelle/shared';
 import {
   autoRunNote,
   dependencyChip,

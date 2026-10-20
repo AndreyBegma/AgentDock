@@ -6,7 +6,7 @@ import {
   type WebhookDeliveryView,
   type WebhookView,
   type WebhookWithSecret,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { decodeKeyset, encodeKeyset } from '../../activity';
@@ -34,7 +34,7 @@ import {
   webhookAuditState,
 } from './webhook-mapper';
 
-const TEST_MESSAGE = 'Test delivery from AgentDock';
+const TEST_MESSAGE = 'Test delivery from Nautelle';
 
 /** A webhook's columns for a view, with its newest delivery. */
 const VIEW_SELECT = {

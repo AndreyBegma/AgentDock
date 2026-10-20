@@ -9,7 +9,7 @@ import { httpsGithubUrl } from './github-url';
 
 /**
  * Runner-initiated requests (ADR-0020 §4, docs/specs/201-claude-code-integration.md
- * D6–D8). The `agentdock` plugin's hook and MCP processes ask the daemon over
+ * D6–D8). The `nautelle` plugin's hook and MCP processes ask the daemon over
  * its local socket; the daemon relays as `local.request` and the server
  * answers `local.response`. The mirror of the command allowlist (ADR-0010):
  * the server answers only the methods here, with validated args, and only

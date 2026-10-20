@@ -1,8 +1,8 @@
 'use client';
 
-import type { NotificationView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
+import type { NotificationView } from '@nautelle/shared';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import {

@@ -3,7 +3,7 @@ import {
   DEFAULT_VIEWPORTS,
   DESIGN_VIEWPORT_MAX_PX,
   DESIGN_VIEWPORT_MIN_PX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { design, framesOf, revision } from './fixtures';
 import {
   applyViewerChange,

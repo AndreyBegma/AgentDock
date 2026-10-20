@@ -1,5 +1,5 @@
-import type { GitHubHookAnswer } from '@agentdock/shared';
-import type { PollableCollector } from '@agentdock/shared/protocol';
+import type { GitHubHookAnswer } from '@nautelle/shared';
+import type { PollableCollector } from '@nautelle/shared/protocol';
 import {
   BadRequestException,
   Inject,
@@ -9,6 +9,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { nextServerEventSeq } from '../server-events';
 import { parseRawJson } from '../webhooks/common';
@@ -21,6 +23,7 @@ import { GITHUB_APP_ROW_ID, GitHubAppStore } from './github-app-store';
 import { GitHubHealthService } from './github-health.service';
 import { GitHubInstallationsService } from './github-installations.service';
 import {
+  type GitHubPayloadFacts,
   type GitHubRouting,
   githubEventData,
   githubEventType,
@@ -62,6 +65,15 @@ interface MatchedProject {
   repo: string;
   baseBranch: string;
   baseOverride: string | null;
+  githubRepoId: bigint | null;
+}
+
+/** D7: what a delivery changes on a matched project — its id, its new name. */
+interface ProjectKeying {
+  projectId: string;
+  githubRepoId?: bigint;
+  /** The repository was renamed (or transferred) on GitHub. */
+  rename?: { from: string; to: string };
 }
 
 /**
@@ -83,6 +95,7 @@ export class GitHubHookService implements OnApplicationShutdown {
     private readonly health: GitHubHealthService,
     private readonly failures: SignatureFailureTracker,
     private readonly sender: CollectorPollSender,
+    private readonly audit: AuditService,
     @Inject(GITHUB_APP_OPTIONS) options: GitHubAppOptions,
   ) {
     this.debouncer = new PollDebouncer({
@@ -138,7 +151,22 @@ export class GitHubHookService implements OnApplicationShutdown {
     const facts = payloadFacts(event, body.value);
     const routing = routeGitHubEvent(event, facts);
     const matched =
-      routing.kind === 'poll' ? await this.projectsFor(routing.fullName) : [];
+      routing.kind === 'poll' || routing.kind === 'rename'
+        ? await this.projectsFor(
+            facts,
+            routing.kind === 'rename' ? routing.previousFullName : null,
+          )
+        : [];
+    const keyings = keyingsFor(facts, matched);
+    // Events rows carry the name the project has after this delivery.
+    for (const keying of keyings)
+      if (keying.rename) {
+        const project = matched.find((p) => p.id === keying.projectId);
+        if (project) project.repo = keying.rename.to;
+      }
+    const renames = keyings.flatMap((k) =>
+      k.rename ? [{ projectId: k.projectId, ...k.rename }] : [],
+    );
     const polls = routing.kind === 'poll' ? pollsFor(routing, matched) : [];
     const now = new Date();
     this.failures.clear();
@@ -154,8 +182,10 @@ export class GitHubHookService implements OnApplicationShutdown {
             installationId: facts.installationId,
             receivedAt: now,
             handled:
-              routing.kind !== 'ignore' &&
-              (routing.kind !== 'poll' || polls.length > 0),
+              routing.kind === 'rename'
+                ? matched.length > 0
+                : routing.kind !== 'ignore' &&
+                  (routing.kind !== 'poll' || polls.length > 0),
             projectsMatched: matched.length,
           },
         });
@@ -163,6 +193,16 @@ export class GitHubHookService implements OnApplicationShutdown {
           where: { id: GITHUB_APP_ROW_ID },
           data: { lastDeliveryAt: now },
         });
+        for (const keying of keyings)
+          await tx.project.update({
+            where: { id: keying.projectId },
+            data: {
+              ...(keying.githubRepoId !== undefined
+                ? { githubRepoId: keying.githubRepoId }
+                : {}),
+              ...(keying.rename ? { repo: keying.rename.to } : {}),
+            },
+          });
         for (const poll of polls) {
           const project = poll.project;
           // D9 (spec notes), ADR-0014: a negative seq; the ack cursor never sees it.
@@ -191,6 +231,21 @@ export class GitHubHookService implements OnApplicationShutdown {
       throw error;
     }
     this.health.recomputeSoon();
+    for (const rename of renames) {
+      this.logger.log(
+        `project ${rename.projectId}: repository renamed on GitHub, ${rename.from} → ${rename.to}`,
+      );
+      await this.audit.record({
+        actor: SYSTEM_ACTOR,
+        action: 'project.repo_rename',
+        target: { type: 'project', id: rename.projectId },
+        projectId: rename.projectId,
+        before: { repo: rename.from },
+        after: { repo: rename.to },
+        meta: { via: 'github', event, deliveryId, repoId: facts.repoId },
+        result: 'ok',
+      });
+    }
 
     return {
       answer: {
@@ -201,7 +256,12 @@ export class GitHubHookService implements OnApplicationShutdown {
           projectId: p.project.id,
           collectors: p.collectors,
         })),
-        resync: routing.kind === 'resync',
+        // A rename also renames the installation's repository: coverage (D10)
+        // reads it by name.
+        resync:
+          routing.kind === 'resync' ||
+          routing.kind === 'rename' ||
+          renames.length > 0,
       },
     };
   }
@@ -213,10 +273,29 @@ export class GitHubHookService implements OnApplicationShutdown {
     if (work.resync) this.installations.resyncInBackground();
   }
 
-  /** D7: projects on this repository, case-insensitively. */
-  private projectsFor(fullName: string): Promise<MatchedProject[]> {
+  /**
+   * D7: projects on this repository — by GitHub's repository id where a
+   * project has one, else by name, case-insensitively. A project keyed to
+   * another id is never matched by name: its repository was renamed away and
+   * this is a different one under the old name. `previousFullName` (a
+   * `renamed` delivery) also finds projects not yet keyed under the old name.
+   */
+  private projectsFor(
+    facts: GitHubPayloadFacts,
+    previousFullName: string | null,
+  ): Promise<MatchedProject[]> {
+    const repoId = facts.repoId === null ? null : BigInt(facts.repoId);
+    const byName = (name: string): Prisma.ProjectWhereInput => ({
+      repo: { equals: name, mode: 'insensitive' },
+      ...(repoId === null ? {} : { githubRepoId: null }),
+    });
+    const where: Prisma.ProjectWhereInput[] = [];
+    if (repoId !== null) where.push({ githubRepoId: repoId });
+    if (facts.fullName) where.push(byName(facts.fullName));
+    if (previousFullName) where.push(byName(previousFullName));
+    if (where.length === 0) return Promise.resolve([]);
     return this.prisma.project.findMany({
-      where: { repo: { equals: fullName, mode: 'insensitive' } },
+      where: { OR: where },
       select: {
         id: true,
         runnerId: true,
@@ -224,6 +303,7 @@ export class GitHubHookService implements OnApplicationShutdown {
         repo: true,
         baseBranch: true,
         baseOverride: true,
+        githubRepoId: true,
       },
     });
   }
@@ -245,6 +325,32 @@ export class GitHubHookService implements OnApplicationShutdown {
       this.logger.debug(`collector.poll for ${poll.projectId}: not delivered`);
   }
 }
+
+/**
+ * D7: a project matched by name learns the repository's id; one whose stored
+ * name is not the delivery's (a rename or transfer on GitHub) takes the new
+ * name, as GitHub spells it.
+ */
+const keyingsFor = (
+  facts: GitHubPayloadFacts,
+  matched: MatchedProject[],
+): ProjectKeying[] => {
+  const repoId = facts.repoId === null ? null : BigInt(facts.repoId);
+  const keyings: ProjectKeying[] = [];
+  for (const project of matched) {
+    const keying: ProjectKeying = { projectId: project.id };
+    if (repoId !== null && project.githubRepoId === null)
+      keying.githubRepoId = repoId;
+    if (
+      facts.repoName !== null &&
+      project.repo.toLowerCase() !== facts.repoName.toLowerCase()
+    )
+      keying.rename = { from: project.repo, to: facts.repoName };
+    if (keying.githubRepoId !== undefined || keying.rename)
+      keyings.push(keying);
+  }
+  return keyings;
+};
 
 /** D8: the polls a routing asks of each matched project; a push only on its base branch. */
 const pollsFor = (

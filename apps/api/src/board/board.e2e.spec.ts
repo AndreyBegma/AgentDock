@@ -1,4 +1,4 @@
-import type { BoardCardDetail, BoardView } from '@agentdock/shared';
+import type { BoardCardDetail, BoardView } from '@nautelle/shared';
 import { BoardWorld } from './testing/board-e2e';
 
 describe('board (e2e)', () => {
@@ -249,9 +249,11 @@ describe('board (e2e)', () => {
       await w.createCard();
       await w.runCard(1);
       await w.operator.send('post', `${w.path()}/board/cards/1/finish`);
+      // #709: its open PR #77 has not landed; the person confirms.
       const accepted = await w.operator.send(
         'post',
         `${w.path()}/board/cards/1/accept`,
+        { confirmUnlanded: true },
       );
       expect(accepted.status).toBe(200);
       expect(accepted.body).toMatchObject({
@@ -292,7 +294,9 @@ describe('board (e2e)', () => {
       await w.work.settled();
       expect((await w.card(1)).column).toBe('finished');
 
-      await w.operator.send('post', `${w.path()}/board/cards/1/accept`);
+      await w.operator.send('post', `${w.path()}/board/cards/1/accept`, {
+        confirmUnlanded: true,
+      });
       await w.deliver('card_run.phase_changed', {
         cardId: card.id,
         runId: round.runId,
@@ -352,7 +356,9 @@ describe('board (e2e)', () => {
       text: 'Rename the button.',
     });
     await w.operator.send('post', `${w.path()}/board/cards/1/finish`);
-    await w.operator.send('post', `${w.path()}/board/cards/1/accept`);
+    await w.operator.send('post', `${w.path()}/board/cards/1/accept`, {
+      confirmUnlanded: true,
+    });
     await w.admin.send('put', `${w.path()}/board-settings`, {
       issueOnRun: false,
       specOnRun: false,

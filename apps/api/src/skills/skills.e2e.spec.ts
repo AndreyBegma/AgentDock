@@ -5,12 +5,12 @@ import {
   type SkillInspectView,
   type SkillRunDetail,
   type SkillRunView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   InstalledSkill,
   RunnerEvent,
   SkillCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { seedProject } from '../fleet/testing/fleet-e2e';
 import { allowedLiveOrigin } from '../live/live-options';
 import {
@@ -839,7 +839,7 @@ describe('skills (e2e)', () => {
           projectId: a,
           phase: 'running',
           at: '2026-10-09T12:00:10.000Z',
-          tmuxSession: 'agentdock-run-abc123',
+          tmuxSession: 'nautelle-run-abc123',
           worktree: '/srv/dev/.wt-widget-run-abc123',
           branch: 'run/abc123-estimate',
         }),
@@ -848,7 +848,7 @@ describe('skills (e2e)', () => {
       expect(running).toMatchObject({
         phase: 'running',
         status: 'running',
-        tmuxSession: 'agentdock-run-abc123',
+        tmuxSession: 'nautelle-run-abc123',
         worktree: '/srv/dev/.wt-widget-run-abc123',
       });
 

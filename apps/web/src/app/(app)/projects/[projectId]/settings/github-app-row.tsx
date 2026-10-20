@@ -1,9 +1,9 @@
 'use client';
 
-import type { GitHubProjectAppStatus } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { GitHubProjectAppStatus } from '@nautelle/shared';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';

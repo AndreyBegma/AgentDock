@@ -12,15 +12,21 @@ const BASE =
 describe('test databases of a board card (#389)', () => {
   const saved = {
     url: process.env.TEST_DATABASE_URL,
-    card: process.env.AGENTDOCK_CARD,
+    card: process.env.NAUTELLE_CARD,
+    legacy: process.env.AGENTDOCK_CARD,
   };
   const restore = (key: string, value: string | undefined) => {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   };
+  beforeEach(() => {
+    delete process.env.NAUTELLE_CARD;
+    delete process.env.AGENTDOCK_CARD;
+  });
   afterEach(() => {
     restore('TEST_DATABASE_URL', saved.url);
-    restore('AGENTDOCK_CARD', saved.card);
+    restore('NAUTELLE_CARD', saved.card);
+    restore('AGENTDOCK_CARD', saved.legacy);
   });
 
   it('keeps the URL as it is outside a card', () => {
@@ -39,7 +45,7 @@ describe('test databases of a board card (#389)', () => {
   // connections — a card's pools are bounded, its workers' databases too.
   it("bounds a card's pool, on its database and every worker's", () => {
     process.env.TEST_DATABASE_URL = BASE;
-    process.env.AGENTDOCK_CARD = 'h74ymwpx';
+    process.env.NAUTELLE_CARD = 'h74ymwpx';
     for (const url of [testDatabaseUrl(), workerDatabaseUrl(1)]) {
       const params = new URL(url).searchParams;
       expect(params.get('connection_limit')).toBe(
@@ -63,7 +69,7 @@ describe('test databases of a board card (#389)', () => {
 
   it('refuses a card id that is not a short id', () => {
     expect(() => cardTestDatabaseUrl(BASE, 'x"; DROP')).toThrow(
-      /AGENTDOCK_CARD/,
+      /NAUTELLE_CARD/,
     );
   });
 
@@ -72,7 +78,7 @@ describe('test databases of a board card (#389)', () => {
   it('two cards that share one TEST_DATABASE_URL never share a database', () => {
     process.env.TEST_DATABASE_URL = BASE;
     const names = (card: string) => {
-      process.env.AGENTDOCK_CARD = card;
+      process.env.NAUTELLE_CARD = card;
       return [testDatabaseUrl(), workerDatabaseUrl(1), workerDatabaseUrl(2)];
     };
     const first = names('h74ymwpx');
@@ -84,7 +90,20 @@ describe('test databases of a board card (#389)', () => {
     ]);
     for (const url of first) expect(second).not.toContain(url);
 
-    delete process.env.AGENTDOCK_CARD;
+    delete process.env.NAUTELLE_CARD;
     expect(new URL(testDatabaseUrl()).pathname).toBe('/agentdock_test');
+  });
+
+  // ADR-0073: a session a runner started before the rename has only the old name.
+  it('reads AGENTDOCK_CARD when NAUTELLE_CARD is unset, the new name first', () => {
+    process.env.TEST_DATABASE_URL = BASE;
+    process.env.AGENTDOCK_CARD = 'h74ymwpx';
+    expect(new URL(testDatabaseUrl()).pathname).toBe(
+      '/agentdock_card_h74ymwpx_test',
+    );
+    process.env.NAUTELLE_CARD = 'ab12cd34';
+    expect(new URL(testDatabaseUrl()).pathname).toBe(
+      '/agentdock_card_ab12cd34_test',
+    );
   });
 });

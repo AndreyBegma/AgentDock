@@ -13,7 +13,7 @@ type WordmarkProps = {
   className?: string;
 };
 
-/** The mark and the name, as one accessible "AgentDock". */
+/** The mark and the name, as one accessible "Nautelle". */
 export function Wordmark({
   size = 'md',
   accent = true,
@@ -25,9 +25,7 @@ export function Wordmark({
       className={`inline-flex items-center ${s.gap} font-semibold tracking-tight text-ink ${s.text} ${className}`}
     >
       <Logomark size={s.mark} accent={accent} className="shrink-0" />
-      <span>
-        Agent<span className="text-ink-2">Dock</span>
-      </span>
+      <span>Nautelle</span>
     </span>
   );
 }

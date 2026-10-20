@@ -1,16 +1,12 @@
 'use client';
 
-import {
-  type ProjectDetail,
-  RUN_UPDATED_LIVE_EVENT,
-  type SkillRunDetail,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
+import { Section } from '@andrewbehma/glass-ui/section';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import {
@@ -20,6 +16,11 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  type ProjectDetail,
+  RUN_UPDATED_LIVE_EVENT,
+  type SkillRunDetail,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -135,6 +136,11 @@ export default function SkillRunPage() {
       <EmptyState
         title="Run not found"
         description="It does not exist, or you are not a member of this project."
+        link={Link}
+        action={{
+          label: 'Open Skills',
+          href: `/projects/${encodeURIComponent(projectId)}/skills`,
+        }}
       />
     );
   }
@@ -151,6 +157,9 @@ export default function SkillRunPage() {
   const canOperate = role !== undefined && role !== 'viewer';
   const prUrl = safeHttpsUrl(run.prUrl);
   const files = run.changedFiles ?? [];
+  // The runner resolves a run's session only while it is running.
+  const attachable = run.phase === 'running' && canAttach;
+  const cancellable = active && canOperate;
 
   return (
     <div className="flex flex-col gap-8">
@@ -166,20 +175,25 @@ export default function SkillRunPage() {
               label={sentenceCase(SKILL_PHASE_LABEL[run.phase])}
             />
           }
-          actions={
-            <>
-              {/* The runner resolves a run's session only while it is running. */}
-              {run.phase === 'running' && canAttach ? (
-                <Button variant="glass" onClick={() => setAttaching(true)}>
-                  Attach
-                </Button>
-              ) : null}
-              {active && canOperate ? (
-                <Button variant="glass" onClick={() => setConfirming(true)}>
-                  Cancel run
-                </Button>
-              ) : null}
-            </>
+          link={Link}
+          primaryAction={
+            attachable
+              ? { label: 'Attach', onClick: () => setAttaching(true) }
+              : cancellable
+                ? { label: 'Cancel run', onClick: () => setConfirming(true) }
+                : undefined
+          }
+          overflow={
+            attachable && cancellable
+              ? [
+                  {
+                    id: 'cancel',
+                    label: 'Cancel run',
+                    tone: 'danger',
+                    onSelect: () => setConfirming(true),
+                  },
+                ]
+              : undefined
           }
         />
         <div className="mt-3">
@@ -193,8 +207,7 @@ export default function SkillRunPage() {
         </Banner>
       ) : null}
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">Summary</h2>
+      <Section title="Summary">
         <KeyValueList
           items={[
             {
@@ -263,11 +276,10 @@ export default function SkillRunPage() {
             },
           ]}
         />
-      </section>
+      </Section>
 
       {active ? (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold">Live log</h2>
+        <Section title="Live log" surface="none" pad="none">
           {run.phase === 'queued' ? (
             <p className="mb-2 text-sm text-ink-2">
               Waiting for a free slot on the runner. The log starts when the run
@@ -275,11 +287,10 @@ export default function SkillRunPage() {
             </p>
           ) : null}
           <RunLogPanel projectId={projectId} runId={runId} onEnded={load} />
-        </section>
+        </Section>
       ) : (
         <>
-          <section>
-            <h2 className="mb-2 text-sm font-semibold">Report</h2>
+          <Section title="Report" surface="none" pad="none">
             {run.reportText ? (
               <>
                 <CodeBlock code={run.reportText} defaultWrap maxHeight={480} />
@@ -296,22 +307,21 @@ export default function SkillRunPage() {
                 description="The run ended without a final message."
               />
             )}
-          </section>
+          </Section>
 
-          <section>
-            <h2 className="mb-2 text-sm font-semibold">
-              Changed files{' '}
-              <span className="font-normal text-ink-3">
-                ({run.changedFilesTotal ?? files.length})
-              </span>
-            </h2>
+          <Section
+            title="Changed files"
+            description={`${run.changedFilesTotal ?? files.length} in total`}
+            surface="none"
+            pad="none"
+          >
             {files.length === 0 ? (
               <EmptyState
                 title="No changes"
                 description="The run did not change any file."
               />
             ) : (
-              <Table scroll>
+              <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell head>Change</TableCell>
@@ -323,7 +333,9 @@ export default function SkillRunPage() {
                     <TableRow key={`${file.status}:${file.path}`}>
                       <TableCell>{FILE_STATUS_LABEL(file.status)}</TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm">{file.path}</span>
+                        <span className="break-all font-mono text-sm">
+                          {file.path}
+                        </span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -336,11 +348,10 @@ export default function SkillRunPage() {
                 Showing {files.length} of {run.changedFilesTotal} files.
               </p>
             ) : null}
-          </section>
+          </Section>
 
           {run.patch ? (
-            <section>
-              <h2 className="mb-2 text-sm font-semibold">Patch</h2>
+            <Section title="Patch" surface="none" pad="none">
               <CodeBlock code={run.patch} language="diff" maxHeight={560} />
               {run.patchTruncated ? (
                 <p className="mt-1 text-xs text-ink-3">
@@ -348,15 +359,14 @@ export default function SkillRunPage() {
                   runner.
                 </p>
               ) : null}
-            </section>
+            </Section>
           ) : null}
         </>
       )}
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">Sessions and usage</h2>
+      <Section title="Sessions and usage" surface="none" pad="none">
         {run.run.sessions.length > 0 ? (
-          <Table scroll>
+          <Table>
             <TableHead>
               <TableRow>
                 <TableCell head>Session</TableCell>
@@ -385,13 +395,14 @@ export default function SkillRunPage() {
             description="This run’s sessions, tokens and cost are not linked to it yet, so none are shown. That is not a zero."
           />
         )}
-      </section>
+      </Section>
 
       <TerminalSheet
         projectId={projectId}
         target={attaching ? { kind: 'skill_run', runId } : undefined}
         title={`/${run.skill}`}
         onClose={() => setAttaching(false)}
+        backTo="Run"
       />
 
       <DialogRoot

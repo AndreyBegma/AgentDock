@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import {
   skillInspectArgsSchema,
   skillInstallMinRole,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import { sha256 } from './discover';

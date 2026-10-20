@@ -1,5 +1,5 @@
-import type { LlmProviderId } from '@agentdock/shared';
-import type { TokenBuckets } from '@agentdock/shared/protocol';
+import type { LlmProviderId } from '@nautelle/shared';
+import type { TokenBuckets } from '@nautelle/shared/protocol';
 import { LlmError } from '../llm-error';
 import {
   DEFAULT_MAX_TOKENS,
@@ -45,7 +45,7 @@ export const OPENROUTER_PROFILE: OpenAiCompatibleProfile = {
   provider: 'openrouter',
   baseUrl: 'https://openrouter.ai/api/v1',
   maxTokensField: 'max_tokens',
-  headers: { 'X-Title': 'AgentDock' },
+  headers: { 'X-Title': 'Nautelle' },
   testPath: '/key',
 };
 

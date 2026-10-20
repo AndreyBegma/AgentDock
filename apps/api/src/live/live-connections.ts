@@ -3,7 +3,7 @@ import {
   type LiveServerMessage,
   type LiveTopic,
   MAX_LIVE_CONNECTIONS_PER_SESSION,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { WebSocket } from 'ws';
 import type { AuthUser } from '../auth';

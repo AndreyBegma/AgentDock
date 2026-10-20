@@ -32,7 +32,7 @@ describe('Bash read refusal (#663 D8)', () => {
         runKind: 'card',
       }),
       filters: [demoFilter],
-      selfCommand: ['/opt/agentdock/agentdock-runner'],
+      selfCommand: ['/opt/agentdock/nautelle-runner'],
       home: '/home/u',
       os: 'linux',
       now: () => Date.parse('2026-10-19T12:00:00.000Z'),
@@ -176,7 +176,7 @@ describe('filter family switch (#663 D9)', () => {
   });
 });
 
-describe('agentdock-runner register (#663 D3)', () => {
+describe('nautelle-runner register (#663 D3)', () => {
   it('prints the shared register', async () => {
     const stdout: string[] = [];
     const deps = {
@@ -185,7 +185,7 @@ describe('agentdock-runner register (#663 D3)', () => {
       stderr: () => {},
     } as unknown as CliDeps;
     expect(await runCli(['register'], deps)).toBe(0);
-    const { TERSE_REGISTER } = await import('@agentdock/shared');
+    const { TERSE_REGISTER } = await import('@nautelle/shared');
     expect(stdout.join('')).toBe(`${TERSE_REGISTER}\n`);
   });
 });

@@ -1,13 +1,5 @@
 'use client';
 
-import {
-  type AdminUser,
-  BUDGET_SCOPES,
-  BUDGET_STATES,
-  type BudgetRecomputeResult,
-  type BudgetView,
-  type ProjectSummary,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -22,6 +14,14 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import {
+  type AdminUser,
+  BUDGET_SCOPES,
+  BUDGET_STATES,
+  type BudgetRecomputeResult,
+  type BudgetView,
+  type ProjectSummary,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { BudgetFormDialog } from '../../../components/budgets/budget-form-dialog';

@@ -1,13 +1,13 @@
 # Audit log with hash chain
 
-Issue: [#8](https://github.com/AndreyBegma/AgentDock/issues/8) · Roadmap: M1.2 ·
+Issue: [#8](https://github.com/AndreyBegma/Nautelle/issues/8) · Roadmap: M1.2 ·
 Decisions: [ADR-0008](../adr/0008-local-accounts-with-admin-approved-registration.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
 [security.md](../architecture/security.md), [data-model.md](../architecture/data-model.md)
 
 ## Summary
 
-Every privileged action in AgentDock — who logged in, who approved whom, who
+Every privileged action in Nautelle — who logged in, who approved whom, who
 revoked a runner, who sent a command to a machine — must leave a record that
 cannot be quietly rewritten. This adds an append-only audit log whose rows form
 a hash chain, a service every module calls to write it, a verification job that
@@ -163,6 +163,7 @@ CREATE TRIGGER audit_records_no_truncate
 | `project.member_remove` | remove a member | user (admin) | user | before: `{ userId, roleOverride }` |
 | `project.docs_source_override` | manual docs source | user (admin) | project | `{ kind, localPath, repo, manual }` |
 | `project.docs_source_reset` | restore detection | user (admin) | project | `{ kind, localPath, repo, manual }` |
+| `project.repo_rename` | a GitHub App delivery names the project's repository (by id) differently ([#27](27-github-app.md) D7) | system | project | `repo`; `meta: { via: "github", event, deliveryId, repoId }` |
 
 Every `project.*` record carries `projectId`. `project.inspect` and
 `project.refresh` are runner commands, recorded as `runner.command` /

@@ -1,14 +1,5 @@
 'use client';
 
-import type {
-  AdminRunnerDetail,
-  InstalledSkillsView,
-  ProjectSummary,
-  SkillCatalogView,
-  SkillInspectView,
-  SkillPreviewView,
-} from '@agentdock/shared';
-import type { SkillCatalogItem } from '@agentdock/shared/protocol';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -19,6 +10,15 @@ import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  AdminRunnerDetail,
+  InstalledSkillsView,
+  ProjectSummary,
+  SkillCatalogView,
+  SkillInspectView,
+  SkillPreviewView,
+} from '@nautelle/shared';
+import type { SkillCatalogItem } from '@nautelle/shared/protocol';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';

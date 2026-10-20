@@ -4,12 +4,12 @@ import {
   type LiveErrorCode,
   type LiveTopic,
   MAX_LIVE_MESSAGE_BYTES,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   PANE_LIVE_EVENTS,
   PANE_MAX_VIEWERS_PER_SLOT,
   type PaneFrame,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Inject,
   Injectable,

@@ -8,7 +8,7 @@ import {
   MANUAL_STACK_CARDS_MIN,
   stackStageText,
   stageName,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { formatCost } from '../format';
 import type { BoardItem } from './format';
 import type { WorkBoardItem } from './plan-tasks';

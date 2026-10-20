@@ -1,4 +1,4 @@
-import type { ProjectReadinessView } from '@agentdock/shared';
+import type { ProjectReadinessView } from '@nautelle/shared';
 import { PlannerHarness } from '../planner/testing/planner-e2e';
 
 /** #272 D3, D4: `GET /projects/:projectId/readiness`. */

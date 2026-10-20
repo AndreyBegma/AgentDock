@@ -7,11 +7,11 @@ import {
   TERMINAL_CLOSE_AS_SUCCESS,
 } from './service';
 
-const LOG = '/Users/ada/Library/Logs/agentdock-runner.log';
+const LOG = '/Users/ada/Library/Logs/nautelle-runner.log';
 
 describe('launchAgentPlist', () => {
   const plist = launchAgentPlist(
-    ['/opt/homebrew/bin/agentdock-runner', 'run'],
+    ['/opt/homebrew/bin/nautelle-runner', 'run'],
     LOG,
     '/opt/homebrew/bin:/usr/bin:/bin',
   );
@@ -24,8 +24,8 @@ describe('launchAgentPlist', () => {
         '    <string>/bin/sh</string>',
         '    <string>-c</string>',
         `    <string>&quot;$@&quot;; c=$?; [ &quot;$c&quot; -eq 78 ] &amp;&amp; exit 0; exit &quot;$c&quot;</string>`,
-        '    <string>agentdock-runner</string>',
-        '    <string>/opt/homebrew/bin/agentdock-runner</string>',
+        '    <string>nautelle-runner</string>',
+        '    <string>/opt/homebrew/bin/nautelle-runner</string>',
         '    <string>run</string>',
         '  </array>',
       ].join('\n'),
@@ -55,7 +55,7 @@ describe('launchAgentPlist', () => {
 });
 
 describe('serviceUnit', () => {
-  const EXEC = ['/home/ada/.local/bin/agentdock-runner', 'run'];
+  const EXEC = ['/home/ada/.local/bin/nautelle-runner', 'run'];
 
   it("carries the installing shell's PATH", () => {
     const unit = serviceUnit(EXEC, '/home/ada/.local/bin:/usr/bin:/bin');
@@ -86,7 +86,7 @@ describe('TERMINAL_CLOSE_AS_SUCCESS', () => {
       '/bin/sh',
       '-c',
       TERMINAL_CLOSE_AS_SUCCESS,
-      'agentdock-runner',
+      'nautelle-runner',
       '/bin/sh',
       '-c',
       `exit ${code}`,

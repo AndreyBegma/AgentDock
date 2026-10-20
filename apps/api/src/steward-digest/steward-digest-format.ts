@@ -2,7 +2,7 @@ import type {
   StewardDigestItem,
   StewardDigestTrigger,
   StewardDigestView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { StewardDigest } from '@prisma/client';
 import {
   escapeLinkUrl,

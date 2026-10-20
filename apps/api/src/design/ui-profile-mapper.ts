@@ -4,7 +4,7 @@ import {
   type UiProfileStatus,
   type UiProfileVersionSummary,
   type UiProfileVersionView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { userRef, userSelect } from '../planner/plan-mapper';

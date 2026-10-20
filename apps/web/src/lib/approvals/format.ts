@@ -1,12 +1,12 @@
+import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
 import {
   APPROVALS_ERROR,
   type ApprovalItemView,
   type ApprovalSource,
   type ApprovalStatus,
   type MergeApprovalFlags,
-} from '@agentdock/shared';
-import { APPROVAL_NOTE_MAX_BYTES } from '@agentdock/shared/protocol';
-import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
+} from '@nautelle/shared';
+import { APPROVAL_NOTE_MAX_BYTES } from '@nautelle/shared/protocol';
 import { ApiError, describeError, type ErrorHint } from '../api';
 import { updateRunnerText } from '../control/format';
 
@@ -38,7 +38,7 @@ export const SOURCE_LABEL: Record<ApprovalSource, string> = {
 export const SOURCE_TOOLTIP: Record<ApprovalSource, string> = {
   orchestrator: 'The orchestrator announced that this pull request waits.',
   derived:
-    'The orchestrator did not announce it: AgentDock inferred it from a slot with green checks and an open, mergeable pull request.',
+    'The orchestrator did not announce it: Nautelle inferred it from a slot with green checks and an open, mergeable pull request.',
 };
 
 /** The rail's count on Approvals while PRs wait; nothing at zero. */
@@ -82,10 +82,10 @@ export function mismatchSentence(
   if (!mismatch) return null;
   if (flags.agentdock && flags.config !== true) {
     return flags.config === null
-      ? 'AgentDock expects approval, but the project config could not be read, so the orchestrator may merge on its own. Set orchestrator.mergeApproval to true in .code-analyzer-config.json.'
-      : 'AgentDock expects approval, but the project config does not ask for it, so the orchestrator will merge on its own. Set orchestrator.mergeApproval to true in .code-analyzer-config.json.';
+      ? 'Nautelle expects approval, but the project config could not be read, so the orchestrator may merge on its own. Set orchestrator.mergeApproval to true in .code-analyzer-config.json.'
+      : 'Nautelle expects approval, but the project config does not ask for it, so the orchestrator will merge on its own. Set orchestrator.mergeApproval to true in .code-analyzer-config.json.';
   }
-  return 'The project config asks the orchestrator to wait for approval, but AgentDock’s merge approval is off. Turn it on in the project settings so the queue is not forgotten.';
+  return 'The project config asks the orchestrator to wait for approval, but Nautelle’s merge approval is off. Turn it on in the project settings so the queue is not forgotten.';
 }
 
 /** Where merge approval is switched on and off. */
@@ -120,7 +120,7 @@ export function decisionDisabledReason(
   runnerName?: string | null,
 ): string | null {
   if (inspection === null) {
-    return `AgentDock has not seen this pull request’s latest commit yet. A decision applies to exactly the commit you reviewed, so it waits until the runner${runnerName ? ` on ${runnerName}` : ''} reports it. If this stays, check that the runner is online.`;
+    return `Nautelle has not seen this pull request’s latest commit yet. A decision applies to exactly the commit you reviewed, so it waits until the runner${runnerName ? ` on ${runnerName}` : ''} reports it. If this stays, check that the runner is online.`;
   }
   return inspection.state === 'open'
     ? null

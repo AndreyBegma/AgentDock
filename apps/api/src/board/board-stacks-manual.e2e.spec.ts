@@ -2,7 +2,7 @@ import {
   BOARD_ERROR,
   type BoardStackDetail,
   type BoardView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BoardWorld } from './testing/board-e2e';
 
 /**

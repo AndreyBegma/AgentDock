@@ -6,8 +6,7 @@ import type {
   TokenSaverPromptCache,
   TokenSaverSummary,
   TokenSaverUnfilteredProgram,
-} from '@agentdock/shared';
-import { DataTable } from '@andrewbehma/glass-ui/data-table';
+} from '@nautelle/shared';
 import type { ReactNode } from 'react';
 import { formatCost, formatNumber, formatTokens } from '../../lib/format';
 import {
@@ -22,7 +21,7 @@ import {
   UNFILTERED_HINT,
 } from '../../lib/token-saver/format';
 import { costChange, unfilteredReasons } from '../../lib/token-saver/summary';
-import { ScrollX } from '../scroll-x/scroll-x';
+import { ResponsiveRows } from '../responsive-rows/responsive-rows';
 
 const num = (text: string) => <span className="num">{text || '—'}</span>;
 
@@ -80,14 +79,14 @@ export function FilterTable({
       : []),
   ];
   return (
-    <ScrollX label={label}>
-      <DataTable
-        rows={[...filters]}
-        getRowId={(f) => f.filter}
-        columns={columns}
-        className="min-w-[30rem]"
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label={label}
+      // Five columns are too wide for a tablet (C-301).
+      stackBelow={passThrough ? 'desktop' : 'tablet'}
+      rows={[...filters]}
+      getRowId={(f) => f.filter}
+      columns={columns}
+    />
   );
 }
 
@@ -131,14 +130,13 @@ export function BeforeAfterTable({
     },
   ];
   return (
-    <ScrollX label="Cost per run, before and after Token saver">
-      <DataTable
-        rows={shown}
-        getRowId={(r) => r.runKind}
-        columns={columns}
-        className="min-w-[32rem]"
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Cost per run, before and after Token saver"
+      stackBelow="desktop"
+      rows={shown}
+      getRowId={(r) => r.runKind}
+      columns={columns}
+    />
   );
 }
 
@@ -174,14 +172,12 @@ export function RunKindTable({
     },
   ];
   return (
-    <ScrollX label="Savings by run kind">
-      <DataTable
-        rows={[...rows]}
-        getRowId={(r) => r.runKind}
-        columns={columns}
-        className="min-w-[24rem]"
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Savings by run kind"
+      rows={[...rows]}
+      getRowId={(r) => r.runKind}
+      columns={columns}
+    />
   );
 }
 
@@ -198,7 +194,8 @@ export function UnfilteredReasonTable({
       id: 'reason',
       header: 'Reason',
       cell: (r: ReasonRow) => (
-        <span className="flex flex-col">
+        // The cell is `nowrap`; the hint wraps so it is not cut (C-301).
+        <span className="flex flex-col whitespace-normal">
           <span>{filterLabel(r.filter)}</span>
           <span className="text-ink-3 text-xs">
             {UNFILTERED_HINT[r.filter]}
@@ -220,14 +217,12 @@ export function UnfilteredReasonTable({
     },
   ];
   return (
-    <ScrollX label="Why commands went unfiltered">
-      <DataTable
-        rows={unfilteredReasons(filters)}
-        getRowId={(r) => r.filter}
-        columns={columns}
-        className="min-w-[30rem]"
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Why commands went unfiltered"
+      rows={unfilteredReasons(filters)}
+      getRowId={(r) => r.filter}
+      columns={columns}
+    />
   );
 }
 
@@ -257,14 +252,12 @@ export function UnfilteredProgramTable({
     },
   ];
   return (
-    <ScrollX label="Most frequent unfiltered programs">
-      <DataTable
-        rows={[...programs]}
-        getRowId={(p) => p.program}
-        columns={columns}
-        className="min-w-[20rem]"
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Most frequent unfiltered programs"
+      rows={[...programs]}
+      getRowId={(p) => p.program}
+      columns={columns}
+    />
   );
 }
 
@@ -304,13 +297,12 @@ export function PromptCacheTable({
     },
   ];
   return (
-    <ScrollX label="Prompt cache by run kind">
-      <DataTable
-        rows={[...rows]}
-        getRowId={(r) => r.runKind}
-        columns={columns}
-        className="min-w-[28rem]"
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Prompt cache by run kind"
+      stackBelow="desktop"
+      rows={[...rows]}
+      getRowId={(r) => r.runKind}
+      columns={columns}
+    />
   );
 }

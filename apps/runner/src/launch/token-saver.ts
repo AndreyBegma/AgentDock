@@ -1,7 +1,12 @@
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { TokenSaverConfig, TokenSaverRunKind } from '@agentdock/shared';
+import {
+  isRunnerMcpServer,
+  RUNNER_MCP_SERVER,
+  type TokenSaverConfig,
+  type TokenSaverRunKind,
+} from '@nautelle/shared';
 import type { ConfigProfile } from '../config';
 import {
   FILTER_RAW_DIR,
@@ -22,9 +27,6 @@ export const TOKEN_SAVER_FILES = {
   run: FILTER_RUN_FILE,
   raw: FILTER_RAW_DIR,
 } as const;
-
-/** The MCP server's name — the plugin's, so `finish_card` reads the same. */
-export const AGENTDOCK_MCP_SERVER = 'agentdock';
 
 /**
  * D10, amendment 12: the context size, in tokens, at which a Token saver
@@ -184,7 +186,7 @@ export interface TextCallLaunchOptions {
 
 /**
  * #445: a headless text call's Token saver. These run `--tools ""`, so
- * neither `agentdock` nor the scout could be called: only the strict MCP
+ * neither `nautelle` nor the scout could be called: only the strict MCP
  * list (the allowlist), the hook and compaction. `null` when off.
  */
 export const textCallTokenSaver = (
@@ -203,7 +205,7 @@ export const textCallTokenSaver = (
     runKind,
     projectId: args.projectId,
     runId: args.runId,
-    agentdock: false,
+    runnerMcp: false,
     scout: false,
   });
 
@@ -220,7 +222,7 @@ export interface LaunchSettings {
 
 /**
  * D3: the PreToolUse hook that rewrites a Bash call into
- * `agentdock-runner filter -- <argv…>`, by the runner's absolute argv; and
+ * `nautelle-runner filter -- <argv…>`, by the runner's absolute argv; and
  * #616's `read-hook` on `Read` (before and after) and on compaction, which
  * guards whole reads of big files and repeated reads.
  * `|| true`: the hooks fail open — an exit code 2 would block the tool.
@@ -266,10 +268,10 @@ export interface TokenSaverLaunchInput {
   /** `null` for the orchestrator session only. */
   runId: string | null;
   /**
-   * The `agentdock` server: `false` for a launch that does not use it, else
+   * The runner's own `nautelle` server: `false` for a launch that does not use it, else
    * the arguments after `mcp` (the card's artifact guard).
    */
-  agentdock: false | readonly string[];
+  runnerMcp: false | readonly string[];
   /**
    * D9: whether the launch gets the scout, and with it the haiku `Explore`
    * (#663); a launch without tools can call neither.
@@ -297,7 +299,7 @@ export interface TokenSaverLaunch {
  * not at all.
  *
  * On: `--settings` (the filter hook and the prefix settings of #663),
- * `--strict-mcp-config` with `agentdock` (where the launch uses it) and the
+ * `--strict-mcp-config` with `nautelle` (where the launch uses it) and the
  * allowed servers copied from the profile's own config (D6), the scout and
  * the haiku `Explore` on `--agents` (D9, #663), and the env for compaction
  * (D10), the plugin's eco hooks off (#616) and the filter's stats and raw
@@ -314,15 +316,16 @@ export const tokenSaverLaunch = (
 
   const defined = readProfileMcpServers(input.profile, input.home);
   const servers: Record<string, unknown> = {};
-  if (input.agentdock !== false) {
-    servers[AGENTDOCK_MCP_SERVER] = {
+  if (input.runnerMcp !== false) {
+    servers[RUNNER_MCP_SERVER] = {
       command,
-      args: [...rest, 'mcp', ...input.agentdock],
+      args: [...rest, 'mcp', ...input.runnerMcp],
     };
   }
   const missing: string[] = [];
   for (const name of config.mcpAllow) {
-    if (name === AGENTDOCK_MCP_SERVER && input.agentdock !== false) continue;
+    // ADR-0073: an allowlist from before the rename names `agentdock`.
+    if (isRunnerMcpServer(name) && input.runnerMcp !== false) continue;
     const definition = defined[name];
     if (definition === undefined) missing.push(name);
     else servers[name] = definition;

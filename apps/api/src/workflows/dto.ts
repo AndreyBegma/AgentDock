@@ -9,12 +9,12 @@ import {
   type WorkflowStatus,
   type WorkflowsQuery,
   type WorkflowsToolsQuery,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type Runtime,
   runtimeSchema,
   SESSION_NAME_MAX_LENGTH,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Transform, Type } from 'class-transformer';
 import {
   IsIn,

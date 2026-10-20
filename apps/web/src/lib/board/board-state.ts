@@ -7,7 +7,7 @@ import {
   boardMoveRule,
   isBoardColumn,
   type MoveBoardCardRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { findCard, MOVE_REFUSAL_TEXT } from './format';
 import { isPlanTaskItemId } from './plan-tasks';
 

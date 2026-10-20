@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import {
   SKILL_PROVENANCE_FILE,
   type SkillProvenance,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { claudeConfigDir, codexHome } from '../detect/profiles';
 import { copySkillFiles, type DiscoveredSkill } from './discover';

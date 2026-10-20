@@ -121,10 +121,17 @@ services:
     logging: *logging
     networks: [staging]
 
+# Pinned names: Docker would otherwise prefix them with the compose project
+# name, so renaming the project (`name:` above) would start an empty database.
+# These are the names the live volumes have had since the project was
+# `agentdock-staging`; never change them without copying the data first.
 volumes:
   pgdata:
+    name: agentdock-staging_pgdata
   redis:
+    name: agentdock-staging_redis
   attachments:
+    name: agentdock-staging_attachments
 
 networks:
   staging:

@@ -1,15 +1,15 @@
 'use client';
 
-import {
-  AI_DIGEST_TIME_PATTERN,
-  type AiDigestSettingsView,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import {
+  AI_DIGEST_TIME_PATTERN,
+  type AiDigestSettingsView,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import {
   type FormEvent,

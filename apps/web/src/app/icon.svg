@@ -3,6 +3,6 @@
     .tile { fill: #18181b; }
     @media (prefers-color-scheme: dark) { .tile { fill: #f2f2f6; } }
   </style>
-  <path class="tile" fill-rule="evenodd" d="M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H10a8 8 0 0 1-8-8V10a8 8 0 0 1 8-8zM9.75 9h12.5a1.75 1.75 0 0 1 0 3.5H9.75a1.75 1.75 0 0 1 0-3.5zM9.75 14.25h7.5a1.75 1.75 0 0 1 0 3.5h-7.5a1.75 1.75 0 0 1 0-3.5zM9.75 19.5h3.5a1.75 1.75 0 0 1 0 3.5h-3.5a1.75 1.75 0 0 1 0-3.5zM18.5 21.25a2.75 2.75 0 1 0 5.5 0a2.75 2.75 0 1 0-5.5 0z"/>
-  <circle cx="21.25" cy="21.25" r="2.75" fill="#5b5bf6"/>
+  <path class="tile" fill-rule="evenodd" d="M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H10a8 8 0 0 1-8-8V10a8 8 0 0 1 8-8zM14.5 6v14H7zM16.5 9.5V20h6zM7 22h18l-2.5 3.5h-13zM20 8.25a2.25 2.25 0 1 0 4.5 0a2.25 2.25 0 1 0-4.5 0z"/>
+  <circle cx="22.25" cy="8.25" r="2.25" fill="#5b5bf6"/>
 </svg>

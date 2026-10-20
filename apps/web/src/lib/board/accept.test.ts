@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { CardMergeOutcome, CardPullRequestView } from '@agentdock/shared';
+import type { CardMergeOutcome, CardPullRequestView } from '@nautelle/shared';
 import { acceptChoice, acceptedMessage, mergeMethodText } from './accept';
 
 const SHA = 'a'.repeat(40);

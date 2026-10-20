@@ -2,8 +2,8 @@ import {
   type AdminRunner,
   RUNNER_ERROR,
   type RunnerStatus,
-} from '@agentdock/shared';
-import type { Capabilities } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { Capabilities } from '@nautelle/shared/protocol';
 import { ApiError, describeError } from '../api';
 import { RUN_COMMAND } from './install';
 

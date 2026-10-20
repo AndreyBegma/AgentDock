@@ -1,4 +1,4 @@
-import type { WorkflowErrorBody, WorkflowErrorCode } from '@agentdock/shared';
+import type { WorkflowErrorBody, WorkflowErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the workflows routes, shaped like every other API error. */

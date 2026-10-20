@@ -1,4 +1,4 @@
-import type { ModelPriceInput } from '@agentdock/shared';
+import type { ModelPriceInput } from '@nautelle/shared';
 
 /** Provider by the name's family; the price list itself carries no provider. */
 const PROVIDERS: { provider: string; pattern: RegExp }[] = [

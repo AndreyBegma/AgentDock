@@ -1,4 +1,4 @@
-import type { CardHandoffView, PutCardHandoffBody } from '@agentdock/shared';
+import type { CardHandoffView, PutCardHandoffBody } from '@nautelle/shared';
 import { api } from '../api';
 
 const base = (projectId: string, card: number) =>

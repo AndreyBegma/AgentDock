@@ -1,11 +1,11 @@
 'use client';
 
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import type {
   PlanTaskVersionsView,
   PlanTaskView,
   PlanTurnView,
-} from '@agentdock/shared';
-import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import { type ReactNode, useState } from 'react';
 import { api } from '../../lib/api';
 import { Time } from '../../lib/format/time';

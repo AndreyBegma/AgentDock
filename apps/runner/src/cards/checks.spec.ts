@@ -4,7 +4,7 @@ import {
   type CardChecksArgs,
   cardChecksResultSchema,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ExecResult } from '../detect/exec';
 import { cardChecks } from './checks';
@@ -57,6 +57,8 @@ const setup = (fake: Fake) => {
           isDraft: true,
           headRefOid: HEAD,
           mergeable: 'MERGEABLE',
+          baseRefName: 'develop',
+          mergedAt: null,
         })
       );
     }
@@ -97,6 +99,8 @@ describe('card.checks (#359 D5)', () => {
       state: 'draft',
       headSha: HEAD,
       mergeable: 'MERGEABLE',
+      base: 'develop',
+      mergedAt: null,
       checks: [
         {
           name: 'ci/woodpecker/pr/pipeline',
@@ -114,7 +118,7 @@ describe('card.checks (#359 D5)', () => {
         '--repo',
         'acme/widget',
         '--json',
-        'state,isDraft,headRefOid,mergeable',
+        'state,isDraft,headRefOid,mergeable,baseRefName,mergedAt',
       ],
       [
         'pr',
@@ -175,6 +179,26 @@ describe('card.checks (#359 D5)', () => {
         mergeable: 'UNKNOWN',
       });
     }
+  });
+
+  it('reports the branch a merged PR went into and when it merged (#709)', async () => {
+    const t = setup({
+      view: ok({
+        state: 'MERGED',
+        isDraft: false,
+        headRefOid: HEAD,
+        mergeable: 'UNKNOWN',
+        baseRefName: 'feat/1-the-dependency',
+        mergedAt: '2026-10-20T09:30:00Z',
+      }),
+    });
+    const result = await t.run();
+    expect(cardChecksResultSchema.safeParse(result).success).toBe(true);
+    expect(result).toMatchObject({
+      state: 'merged',
+      base: 'feat/1-the-dependency',
+      mergedAt: '2026-10-20T09:30:00Z',
+    });
   });
 
   it('drops rows the contract cannot carry, and keeps at most CARD_CHECKS_MAX', async () => {

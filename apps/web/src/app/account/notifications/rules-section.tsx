@@ -1,13 +1,13 @@
 'use client';
 
-import type {
-  NotificationChannel,
-  NotificationRulesView,
-} from '@agentdock/shared';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import type {
+  NotificationChannel,
+  NotificationRulesView,
+} from '@nautelle/shared';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { api, describeErrorHint } from '../../../lib/api';
 import {

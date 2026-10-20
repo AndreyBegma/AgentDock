@@ -2,7 +2,7 @@ import type {
   FleetGraph,
   FleetGraphNode,
   FleetNodePill,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** A slot the panel links to: another node of the fleet graph. */
 export interface SlotLink {

@@ -1,8 +1,8 @@
 'use client';
 
-import type { SlotConversation, SlotDetail } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
+import type { SlotConversation, SlotDetail } from '@nautelle/shared';
 import { Markdown } from '../../../../../../components/markdown/markdown';
 import {
   CHECKS_LABEL,

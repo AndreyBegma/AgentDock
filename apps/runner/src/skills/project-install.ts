@@ -6,7 +6,7 @@ import {
   type SkillInstallResult,
   type SkillProvenance,
   skillInstallBranch,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
 import { resolveFleetProject } from '../fleet/project';
@@ -145,7 +145,7 @@ export const installProjectSkill = async (
     base,
   ]);
   const bodyDir = await mkdtemp(
-    join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'),
+    join(deps.tempRoot ?? tmpdir(), 'nautelle-pr-'),
   );
   try {
     writeSkillDir(

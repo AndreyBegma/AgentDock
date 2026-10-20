@@ -1,7 +1,7 @@
-import type { PollableCollector } from '@agentdock/shared/protocol';
+import type { PollableCollector } from '@nautelle/shared/protocol';
 
 /**
- * D8: what a verified GitHub delivery asks AgentDock to do. Pure — the hook
+ * D8: what a verified GitHub delivery asks Nautelle to do. Pure — the hook
  * service maps it to projects (D7) and sends the polls after the response.
  */
 export type GitHubRouting =
@@ -13,6 +13,16 @@ export type GitHubRouting =
       /** `push` only: the branch pushed; polled only where it is the project's base. */
       branch: string | null;
     }
+  | {
+      /**
+       * `repository` `renamed`: projects on this repository take the new
+       * name (D7), and the installations are resynced so coverage (D10)
+       * sees it too.
+       */
+      kind: 'rename';
+      /** Lower-cased `owner/old-name`, for projects not yet keyed by id. */
+      previousFullName: string | null;
+    }
   | { kind: 'resync' }
   | { kind: 'ping' }
   | { kind: 'ignore'; reason: string };
@@ -21,6 +31,12 @@ export type GitHubRouting =
 export interface GitHubPayloadFacts {
   action: string | null;
   fullName: string | null;
+  /** `repository.full_name` as GitHub spells it — what `projects.repo` stores. */
+  repoName: string | null;
+  /** `repository.id`: stable across renames and transfers. */
+  repoId: number | null;
+  /** `repository` `renamed` only: lower-cased `owner/old-name`. */
+  previousFullName: string | null;
   installationId: number | null;
   number: number | null;
   sender: string | null;
@@ -71,12 +87,30 @@ const int = (value: unknown): number | null =>
 const field = (value: unknown, key: string): unknown =>
   isRecord(value) ? value[key] : undefined;
 
+/** `repository` `renamed`: `owner/<changes.repository.name.from>`, lower-cased. */
+const previousName = (
+  event: string,
+  payload: unknown,
+  repository: unknown,
+): string | null => {
+  if (event !== 'repository') return null;
+  const owner = str(field(field(repository, 'owner'), 'login'));
+  const from = str(
+    field(
+      field(field(field(payload, 'changes'), 'repository'), 'name'),
+      'from',
+    ),
+  );
+  return owner && from ? `${owner}/${from}`.toLowerCase() : null;
+};
+
 /** The few fields D8–D10 read; anything missing or mistyped is null. */
 export const payloadFacts = (
   event: string,
   payload: unknown,
 ): GitHubPayloadFacts => {
-  const fullName = str(field(field(payload, 'repository'), 'full_name'));
+  const repository = field(payload, 'repository');
+  const fullName = str(field(repository, 'full_name'));
   const subject =
     event === 'issues'
       ? field(payload, 'issue')
@@ -98,6 +132,9 @@ export const payloadFacts = (
   return {
     action: str(field(payload, 'action')),
     fullName: fullName?.toLowerCase() ?? null,
+    repoName: fullName,
+    repoId: int(field(repository, 'id')),
+    previousFullName: previousName(event, payload, repository),
     installationId: int(field(field(payload, 'installation'), 'id')),
     number: int(field(subject, 'number')),
     sender: str(field(field(payload, 'sender'), 'login')),
@@ -125,6 +162,10 @@ export const routeGitHubEvent = (
   ): GitHubRouting => ({ kind: 'poll', fullName, collectors, branch });
 
   switch (event) {
+    case 'repository':
+      return action === 'renamed'
+        ? { kind: 'rename', previousFullName: facts.previousFullName }
+        : { kind: 'ignore', reason: 'action' };
     case 'issues':
       return action && ISSUE_ACTIONS.has(action)
         ? poll(['issues'])

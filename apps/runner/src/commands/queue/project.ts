@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../failure';
 
 /** The watched project a queue command names; anything else is refused (spec 10 D10). */

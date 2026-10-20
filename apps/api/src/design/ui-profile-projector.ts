@@ -1,11 +1,11 @@
-import { parseUiProfileOutput } from '@agentdock/shared';
+import { parseUiProfileOutput } from '@nautelle/shared';
 import {
   isUiProfileBuildEventType,
   type RunnerEvent,
   type UiProfileBuildFinishedData,
   type UiProfileBuildPhaseChangedData,
   uiProfileBuildEventDataSchemas,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   HttpException,
   Injectable,

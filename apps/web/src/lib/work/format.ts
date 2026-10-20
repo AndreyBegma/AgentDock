@@ -1,3 +1,4 @@
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import {
   type BoardCardKind,
   isWorkSource,
@@ -9,8 +10,7 @@ import {
   type WorkSource,
   type WorkStatus,
   workStatusOfTaskStatus,
-} from '@agentdock/shared';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
 
 /** The filters of `/work`, all kept in the URL (D10). */

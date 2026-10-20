@@ -11,8 +11,8 @@ import {
   type WorkflowSankeyNode,
   type WorkflowStatus,
   type WorkflowToolFlow,
-} from '@agentdock/shared';
-import type { Runtime } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { Runtime } from '@nautelle/shared/protocol';
 import { ApiError, describeError } from '../api';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
 import { APP_LOCALE, formatDuration, formatNumber } from '../format';

@@ -4,7 +4,7 @@ import type {
   NotificationPage,
   NotificationReadResult,
   NotificationRulesView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

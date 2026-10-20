@@ -1,5 +1,5 @@
-import type { BoardCardDetail, TaskDesignView } from '@agentdock/shared';
-import type { CardCommandName } from '@agentdock/shared/protocol';
+import type { BoardCardDetail, TaskDesignView } from '@nautelle/shared';
+import type { CardCommandName } from '@nautelle/shared/protocol';
 import {
   BoardCommands,
   type BoardSendResult,
@@ -62,7 +62,7 @@ export class CardDesignHarness extends DesignHarness {
     const defaults: Record<string, unknown> = {
       'card.run': {
         phase: 'starting',
-        tmuxSession: `agentdock-card-${String(args.shortId)}`,
+        tmuxSession: `nautelle-card-${String(args.shortId)}`,
       },
       'card.close': {
         stopped: false,

@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { ATTACHMENTS_PROJECT_QUOTA_DEFAULT_BYTES } from '@agentdock/shared';
+import { ATTACHMENTS_PROJECT_QUOTA_DEFAULT_BYTES } from '@nautelle/shared';
 import type { ConfigService } from '@nestjs/config';
 
 export const ATTACHMENTS_OPTIONS = Symbol('ATTACHMENTS_OPTIONS');

@@ -1,6 +1,6 @@
 # Runner daemon and runner protocol
 
-Issue: [#5](https://github.com/AndreyBegma/AgentDock/issues/5) · Roadmap: M1.3 (part a) ·
+Issue: [#5](https://github.com/AndreyBegma/Nautelle/issues/5) · Roadmap: M1.3 (part a) ·
 Decisions: [ADR-0001](../adr/0001-control-plane-and-per-machine-runner.md),
 [ADR-0006](../adr/0006-runtime-adapters-and-runtime-profiles.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
@@ -8,7 +8,7 @@ Decisions: [ADR-0001](../adr/0001-control-plane-and-per-machine-runner.md),
 
 ## Summary
 
-The runner is the only part of AgentDock that touches a machine: it will
+The runner is the only part of Nautelle that touches a machine: it will
 observe fleets and execute commands. This item builds its skeleton and the
 contract it speaks — the protocol schemas shared with the API, a Bun daemon that
 pairs, connects out over WebSocket, announces its capabilities and runtime
@@ -22,7 +22,7 @@ server. It runs in parallel with #3.
 
 - `packages/shared/src/protocol/` — zod schemas and TypeScript types for every
   message, the command allowlist, the event envelope, capabilities, profiles,
-  and the pairing HTTP contract; exported as `@agentdock/shared/protocol`.
+  and the pairing HTTP contract; exported as `@nautelle/shared/protocol`.
 - `apps/runner` — the daemon: CLI, config, pairing client, WebSocket client
   with reconnect and resume, capability and profile detection, heartbeat, event
   spool, command dispatcher, systemd user unit installer, compiled binary.
@@ -68,7 +68,7 @@ taken, with its source.
 
 ## Acceptance criteria
 
-- [ ] `@agentdock/shared/protocol` exports schemas that parse every example message in runner-protocol.md and reject a message with an unknown `type` at the top level.
+- [ ] `@nautelle/shared/protocol` exports schemas that parse every example message in runner-protocol.md and reject a message with an unknown `type` at the top level.
 - [ ] `agentdock-runner pair` against a mock server stores `runnerId` and `token` in a 0600 config file; the token never appears in stdout, stderr or logs (asserted by a test capturing output).
 - [ ] `agentdock-runner run` connects to a mock WebSocket server, sends `hello` with protocol version, capabilities and profiles, and sends `heartbeat` every 15 s (test with an injected clock).
 - [ ] Killing the mock server and restarting it: the runner reconnects with backoff and, after `welcome`, resends every spooled event with `seq` above the last acked one — no gaps, no duplicates above the ack.

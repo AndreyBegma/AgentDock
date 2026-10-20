@@ -1,7 +1,7 @@
 import type {
   CardHandoffSetArgs,
   CardHandoffSetResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { HandoffService } from './service';
 
 export { HandoffWriter } from './haiku';

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { AUTH_ERROR } from '@agentdock/shared';
+import { AUTH_ERROR } from '@nautelle/shared';
 import {
   ApiError,
   ApiUnreachableError,
@@ -144,7 +144,7 @@ describe('surviving an API restart (spec 353)', () => {
     expect(sleeps).toEqual([]);
     expect(error).toBeInstanceOf(ApiUnreachableError);
     expect(describeError(error)).toBe(
-      'AgentDock was restarting — nothing was changed. Try again',
+      'Nautelle was restarting — nothing was changed. Try again',
     );
   });
 

@@ -14,7 +14,7 @@ import { profileKeySchema, skillRunIdSchema } from './skills';
  * API has no model key, so a translation runs on the project's runner as
  * headless `claude -p` with no tools, `--permission-mode plan`, the prompt on
  * stdin, in a run directory outside every watched root and with
- * `AGENTDOCK_HOOKS=off` — exactly as `cards.extract` does (ADR-0026).
+ * `NAUTELLE_HOOKS=off` — exactly as `cards.extract` does (ADR-0026).
  *
  * `textCommands` is defined and exported here, but entered in the `commands`
  * allowlist only together with its runner handler: the runner's

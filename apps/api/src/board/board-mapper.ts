@@ -36,7 +36,7 @@ import {
   type StewardCardChip,
   type TaskDesignSummary,
   type TokenSavedView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardRunWiring,
   type CardRunWiringReason,
@@ -47,7 +47,7 @@ import {
   type PaneDialog,
   type ProfileAgentdock,
   paneDialogSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   type BoardCard,
   type BoardCardPullRequest,
@@ -115,12 +115,12 @@ const pullRequestsOf = (
 
 /**
  * #636: where a card's PR goes — the dependency's branch it is stacked on
- * (`stackedOn` its number, when known), else the project base; `null` before
- * the card has a branch.
+ * (`stackedOn` that card, when known, and whether its own PR has merged —
+ * #709), else the project base; `null` before the card has a branch.
  */
 export const prTargetOf = (
   card: Pick<BoardCard, 'branch' | 'prBase'>,
-  stackedOn: number | null,
+  stackedOn: Pick<BoardCard, 'number' | 'mergedAt'> | null,
   projectBase: string,
 ): CardPrTarget | null => {
   if (card.branch === null) return null;
@@ -130,7 +130,11 @@ export const prTargetOf = (
     stackedOn:
       stackedOn === null
         ? null
-        : { number: stackedOn, label: cardLabel(stackedOn) },
+        : {
+            number: stackedOn.number,
+            label: cardLabel(stackedOn.number),
+            merged: stackedOn.mergedAt !== null,
+          },
   };
 };
 

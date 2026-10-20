@@ -1,4 +1,4 @@
-import { STEWARD_REASON_MAX } from '@agentdock/shared';
+import { STEWARD_REASON_MAX } from '@nautelle/shared';
 import { sanitizeReason } from './steward-reason';
 
 const ch = (codePoint: number): string => String.fromCodePoint(codePoint);

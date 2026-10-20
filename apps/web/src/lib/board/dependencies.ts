@@ -4,7 +4,7 @@ import {
   type CardReadiness,
   isDependencySatisfied,
   openDependencies,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * Card dependencies (#337 D8): "after C-12" on the face, the list in the

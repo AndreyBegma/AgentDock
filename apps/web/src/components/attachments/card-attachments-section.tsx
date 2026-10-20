@@ -1,8 +1,8 @@
 'use client';
 
-import type { AttachmentView } from '@agentdock/shared';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { AttachmentView } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../../lib/api';
 import { describeUploadFailure } from '../../lib/attachments/format';

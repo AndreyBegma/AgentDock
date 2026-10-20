@@ -74,7 +74,7 @@ describe('note prompt', () => {
 
   it('finds no target in other text', () => {
     expect(parseNotePrompt(undefined)).toBeNull();
-    expect(parseNotePrompt('Linked to AgentDock.')).toBeNull();
+    expect(parseNotePrompt('Linked to Nautelle.')).toBeNull();
     expect(parseNotePrompt(`Ref 1/0/${SHA}`)).toBeNull();
     expect(parseNotePrompt(`Ref 1/2/${SHA.slice(1)}`)).toBeNull();
   });
@@ -83,10 +83,10 @@ describe('note prompt', () => {
 describe('serviceErrorText', () => {
   it('names a moved head as in the UI, and never echoes an unknown code', () => {
     expect(serviceErrorText('head_moved', 7)).toBe(
-      'PR #7 has new commits since this message. Review the new head in AgentDock.',
+      'PR #7 has new commits since this message. Review the new head in Nautelle.',
     );
     expect(serviceErrorText('<script>', 7)).toBe(
-      'The decision could not be recorded. Try again, or decide in AgentDock.',
+      'The decision could not be recorded. Try again, or decide in Nautelle.',
     );
   });
 });

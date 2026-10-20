@@ -98,6 +98,14 @@ say no, and today it never does.
   projects that are now outside, and the runner page and every refusal name
   the command to run. Messaging a running session (#489) is off until turned
   on.
+  That step was easy to miss (#691), so a runner whose `runner.json` has no
+  `policy` block prints and logs a notice with the cached roots on every
+  start (the daemon writes no default block into that file), `policy
+  allow-root --watched` allows those roots after asking, and the runner
+  reports the projects it refuses (`runner.watch_refused`) so the web app
+  shows the refusal and its command on each project. The runner still allows
+  nothing by itself, and the report goes one way: the server cannot answer it
+  with a policy change.
 - `policy_refused` is a new enum value on the wire. An API older than it drops
   the `command.result` and the caller sees a timeout, so the API is deployed
   before the runners.

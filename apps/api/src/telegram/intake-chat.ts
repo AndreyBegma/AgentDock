@@ -6,7 +6,7 @@ import {
   type PlanIntakeSplitView,
   type PlanQuestion,
   type PlanTaskKind,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { callbackCodec } from './callback-data';
 import { appLink, escapeLinkUrl, escapeMarkdownV2 } from './markdown-v2';
 import type { InlineKeyboardButton } from './telegram-client';
@@ -16,7 +16,7 @@ import type { InlineKeyboardButton } from './telegram-client';
  * the messages and buttons the bot shows for it. Pure:
  * `TelegramIntakeService` does the checks, the planner calls and the sends.
  * Spec 22 D10: only the questions, their options and recommendations, and
- * the cards' titles and summaries leave AgentDock — never the brief, the
+ * the cards' titles and summaries leave Nautelle — never the brief, the
  * prompt, a turn's error or its raw output.
  */
 

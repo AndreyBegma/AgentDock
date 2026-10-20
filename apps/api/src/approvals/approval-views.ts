@@ -1,4 +1,4 @@
-import type { ApprovalItemView } from '@agentdock/shared';
+import type { ApprovalItemView } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {

@@ -1,11 +1,13 @@
-import type {
-  AcceptBoardCardRequest,
-  BoardCardView,
-  CardMergeOutcome,
-  CardPrCloseOutcome,
-  CardPullRequestView,
-} from '@agentdock/shared';
-import type { RunnerCommands } from '@agentdock/shared/protocol';
+import {
+  type AcceptBoardCardRequest,
+  BOARD_ERROR,
+  type BoardCardView,
+  type CardMergeOutcome,
+  type CardPrCloseOutcome,
+  type CardPullRequestView,
+} from '@nautelle/shared';
+import type { RunnerCommands } from '@nautelle/shared/protocol';
+import { ApiError } from '../api';
 
 // `CardMergeMethod` is not exported from the package root; it is the view's.
 type CardMergeMethod = NonNullable<CardPullRequestView['method']>;
@@ -238,3 +240,18 @@ export function noMergeRequest(
     },
   };
 }
+
+/**
+ * #709: Accept refused because the card's work has not landed in the base —
+ * the API's sentence naming the missing landing; null for any other error.
+ */
+export function notLandedReason(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
+  const code: string | undefined = error.code;
+  return code === BOARD_ERROR.notLanded ? error.message : null;
+}
+
+/** #709: the same Accept, sent again once the person confirms it. */
+export const confirmUnlanded = (
+  request: AcceptBoardCardRequest,
+): AcceptBoardCardRequest => ({ ...request, confirmUnlanded: true });

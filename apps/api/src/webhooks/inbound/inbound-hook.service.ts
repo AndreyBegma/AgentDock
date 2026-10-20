@@ -4,7 +4,7 @@ import {
   type InboundTemplateError,
   renderArgsTemplate,
   WEBHOOKS_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import {
   type InboundDelivery,

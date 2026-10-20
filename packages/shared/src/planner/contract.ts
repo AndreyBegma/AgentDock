@@ -7,6 +7,7 @@ import {
 } from '../design/frames';
 import {
   DESIGN_HTML_MAX_BYTES,
+  DESIGN_TOTAL_MAX_BYTES,
   DESIGN_VARIANTS_MAX,
   designBytes,
 } from '../design/limits';
@@ -93,7 +94,10 @@ export const PLANNER_VIOLATION_REASONS = [
    * are design blocks, or names one frame twice.
    */
   'frame_mismatch',
-  /** Design: the HTML of every frame together is over `DESIGN_HTML_MAX_BYTES`. */
+  /**
+   * Design: one frame's HTML is over `DESIGN_HTML_MAX_BYTES`, or every frame's
+   * together over `DESIGN_TOTAL_MAX_BYTES`.
+   */
   'design_too_large',
   /** Design: a resource from a host that is not on the CDN allowlist. */
   'design_host_not_allowed',
@@ -101,6 +105,12 @@ export const PLANNER_VIOLATION_REASONS = [
   'design_unpinned_version',
   /** Design: network calls, a form submit, top navigation. */
   'design_forbidden_feature',
+  /**
+   * Design (#690): an inline script that does not parse as a classic script,
+   * or declares a top-level name the window already holds — the browser
+   * refuses the whole script. Checked by the API, which has a JS compiler.
+   */
+  'design_script_invalid',
   /** Design: `variant` is not the variant the turn was asked for. */
   'variant_mismatch',
   /** Design: `addressed` names a comment that is not open on the design. */
@@ -417,8 +427,9 @@ const intakeBranchSchema = (json: unknown) => {
 
 /**
  * Spec 223 D7, #441: the design blocks, one per frame `names` lists — or the
- * one block of a turn that names no frames — each validated against D6, and
- * together at most `DESIGN_HTML_MAX_BYTES`. #628: a frame named in `kept`
+ * one block of a turn that names no frames — each validated against D6 — at
+ * most `DESIGN_HTML_MAX_BYTES` apiece — and together at most
+ * `DESIGN_TOTAL_MAX_BYTES` (#686). #628: a frame named in `kept`
  * has no block; it is the previous revision's frame of that name, as drawn.
  */
 const parseDesignBlocks = (
@@ -506,10 +517,10 @@ const parseDesignBlocks = (
     total += designBytes(html);
     frames.push({ name, html });
   }
-  if (total > DESIGN_HTML_MAX_BYTES) {
+  if (total > DESIGN_TOTAL_MAX_BYTES) {
     return violation(
       'design_too_large',
-      `the frames are ${total} bytes together; at most ${DESIGN_HTML_MAX_BYTES} — draw fewer frames or move styling to an allowlisted CDN`,
+      `the frames are ${total} bytes together; at most ${DESIGN_TOTAL_MAX_BYTES} for all frames — draw fewer frames or move styling to an allowlisted CDN`,
     );
   }
   return { ok: true, frames };
@@ -782,14 +793,15 @@ Frames:
 
 - Draw one frame unless the task touches several pages or several standalone components. Then draw one frame per page, plus one per component that matters on its own (its states side by side).
 - \`"frames"\` lists a short name per frame (at most ${DESIGN_FRAME_NAME_MAX} characters, distinct), in the order of the design blocks: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out; the frame is then named "${DESIGN_LEGACY_FRAME_NAME}".
-- On a revision, \`"kept"\` names the frames of \`"frames"\` you leave exactly as the previous revision drew them, by their previous names. A kept frame has no design block — AgentDock copies it; every other frame of \`"frames"\` has one, in order.
+- On a revision, \`"kept"\` names the frames of \`"frames"\` you leave exactly as the previous revision drew them, by their previous names. A kept frame has no design block — Nautelle copies it; every other frame of \`"frames"\` has one, in order.
 
 The mockup's rules — a frame that breaks one fails the turn:
 
-- At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML, all frames together. Inline CSS and JS are allowed.
+- At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML per frame, and ${DESIGN_TOTAL_MAX_BYTES / 1024} KiB for all frames together. Inline CSS and JS are allowed.
 - External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS. No other host, and no relative URL: inline it or use a \`data:\` URL (images and fonts only).
 - Every script or package URL names an exact version: \`react@18.3.1\`, never \`react@18\` or \`latest\`.
 - No network calls (\`fetch\`, \`XMLHttpRequest\`, \`WebSocket\`, \`EventSource\`, \`sendBeacon\`), no form that submits, no navigation of the top or parent window, no \`window.open\`, no \`<iframe>\`, \`<object>\`, \`<embed>\` or \`<base>\`, no link to another site.
+- Wrap inline scripts in an IIFE; never declare a top-level name after a window global (\`top\`, \`window\`, \`self\`, \`name\`, …).
 - The theme switches through \`:root[data-theme="light"]\` and \`:root[data-theme="dark"]\`.
 - \`variant\` is the variant the turn names (1–${DESIGN_VARIANTS_MAX}); \`addressed\` lists only ids of the open comments the turn gave you.
 `;

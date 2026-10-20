@@ -1,4 +1,4 @@
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { BoardFleetService } from '../fleet/board-fleet.service';
 import { EventStream, ROOT } from '../fleet/testing/fleet-e2e';
 import {

@@ -7,7 +7,7 @@ import {
   type RunStatus,
   type RunSummary,
   type RunUsage,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {

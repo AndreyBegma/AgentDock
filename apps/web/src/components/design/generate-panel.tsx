@@ -1,5 +1,12 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Field } from '@andrewbehma/glass-ui/field';
+import {
+  SegmentedControl,
+  SegmentedControlItem,
+} from '@andrewbehma/glass-ui/segmented-control';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   type CardDesignLaunchRequest,
   claudeModelLabel,
@@ -11,14 +18,7 @@ import {
   type TaskDesignPatchRequest,
   type TaskDesignView,
   type UiProfileView,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { Field } from '@andrewbehma/glass-ui/field';
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from '@andrewbehma/glass-ui/segmented-control';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { api, errorText } from '../../lib/api';
 import {

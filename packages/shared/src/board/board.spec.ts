@@ -126,7 +126,7 @@ describe('naming', () => {
     const body = cardIssueBody('Do it.', 12);
     expect(body).toStartWith('Do it.');
     expect(body).toEndWith(
-      'Tracked on AgentDock board card C-12 — worked by a dedicated worker, not queued for the orchestrator.',
+      'Tracked on Nautelle board card C-12 — worked by a dedicated worker, not queued for the orchestrator.',
     );
     const long = cardIssueBody('x'.repeat(BOARD_CARD_BODY_MAX), 12);
     expect(long.length).toBeLessThanOrEqual(CARD_ISSUE_BODY_MAX);
@@ -143,7 +143,7 @@ describe('naming', () => {
     ).toBe(`Added login.\n\nCloses #41\n\n${CARD_PR_MARKER}: C-12`);
     expect(
       cardPullRequestBody({ number: 12, summary: null, issueNumber: null }),
-    ).toBe('Work of AgentDock board card C-12.\n\nAgentDock-Card: C-12');
+    ).toBe('Work of Nautelle board card C-12.\n\nNautelle-Card: C-12');
   });
 
   it('links the spec pull request of a docs repository (#379)', () => {
@@ -165,7 +165,7 @@ describe('naming', () => {
         issueNumber: 41,
       }),
     ).toBe(
-      `Specification of AgentDock board card C-12: Add login\n\nCode: acme/app#41\n\n${CARD_PR_MARKER}: C-12\n`,
+      `Specification of Nautelle board card C-12: Add login\n\nCode: acme/app#41\n\n${CARD_PR_MARKER}: C-12\n`,
     );
   });
 
@@ -243,7 +243,7 @@ describe('worker prompt', () => {
   };
 
   it('is versioned', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(19);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(21);
   });
 
   it('names the card, branch, base and spec, and how to finish', () => {
@@ -285,8 +285,8 @@ describe('worker prompt', () => {
     expect(work).toContain('Never wait for another process with `pgrep -f');
     expect(work).toContain('lock file');
     expect(work).toContain("pgrep -f '[j]est'");
-    expect(CARD_ENV_ID).toBe('AGENTDOCK_CARD');
-    expect(CARD_ENV_PORT).toBe('AGENTDOCK_CARD_PORT');
+    expect(CARD_ENV_ID).toBe('NAUTELLE_CARD');
+    expect(CARD_ENV_PORT).toBe('NAUTELLE_CARD_PORT');
   });
 
   it('fits card.run at the largest title and body', () => {

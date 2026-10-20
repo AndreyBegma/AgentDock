@@ -1,13 +1,13 @@
 'use client';
 
+import { SearchField, Select } from '@andrewbehma/glass-ui/field';
+import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import {
   type ProjectSummary,
   WORK_QUERY_TEXT_MAX,
   WORK_SOURCES,
   WORK_STATUSES,
-} from '@agentdock/shared';
-import { SearchField, Select } from '@andrewbehma/glass-ui/field';
-import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+} from '@nautelle/shared';
 import { useMemo } from 'react';
 import {
   type UrlFilters,

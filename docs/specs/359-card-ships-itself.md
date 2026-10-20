@@ -1,12 +1,12 @@
 # A card ships itself: draft PR while working, CI watched and fixed, auto-merge at Finished
 
-Issue: [#359](https://github.com/AndreyBegma/AgentDock/issues/359) ·
+Issue: [#359](https://github.com/AndreyBegma/Nautelle/issues/359) ·
 Decision: [ADR-0035](../adr/0035-a-card-ships-itself.md) (amends ADR-0024 §6 and ADR-0029)
 
 ## Summary
 
 Card C-6's pull request (#355) showed what a card ships today:
-- a one-line description ("Work of AgentDock board card C-6");
+- a one-line description ("Work of Nautelle board card C-6");
 - no link to its spec, although the spec file was in the branch;
 - nobody watching its CI, which went red on a lint of the committed mockup;
 - no merge until a person clicks Accept.
@@ -27,7 +27,7 @@ orchestrator fleet works:
 - A PR description: spec link, Closes #issue for bugs, what changed and why,
   and the acceptance checklist.
 - A spec file for every card, and an issue only for bugs.
-- CI watched by AgentDock: a red run becomes an automatic fix round (at most
+- CI watched by Nautelle: a red run becomes an automatic fix round (at most
   3); a merge conflict does too.
 - Finished means the worker is done and CI is green, and then **auto-merge**
   (a per-project switch).
@@ -101,7 +101,7 @@ orchestrator fleet works:
     kind: on for `bug`, off for `feature`; a person can still override it per
     card). The PR then says `Closes #<n>`.
   - Since PRs target a non-default base (develop), `Closes` does not close the
-    issue. AgentDock closes it after the merge, as the fleet does.
+    issue. Nautelle closes it after the merge, as the fleet does.
 - **D5 — CI watched.** While a card's PR is open, the API reads its checks
   through the runner (`gh pr checks --json`).
   - It polls every 60 s while the PR has pending checks, and on every
@@ -109,7 +109,7 @@ orchestrator fleet works:
   - It stores `ciState`: `none | pending | green | red`, plus the failed
     checks (name and link). The card face shows a CI dot next to the PR chip.
 - **D6 — Red CI is an automatic round.** When `ciState` turns `red` on the
-  card's current head, and the worker's round is over, AgentDock starts a
+  card's current head, and the worker's round is over, Nautelle starts a
   round with the trigger `ci_fix`. Its prompt says:
 
   > "CI failed on <head>: <check> — <link> (and the rest). Reproduce it with
@@ -210,7 +210,7 @@ orchestrator fleet works:
   - Without the file, the body still has the spec link and the summary.
 - [ ] **Bugs and features:**
   - A `bug` card gets an issue at Run and `Closes #n` in its PR. The issue is
-    closed by AgentDock after the merge.
+    closed by Nautelle after the merge.
   - A `feature` card gets no issue, but does get the spec file.
 - [ ] **No plugin needed:** with a profile that has no agentdock plugin,
   `finish_card` is available in the card session (the launch args carry

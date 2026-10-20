@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { mcpServerNameSchema } from '@agentdock/shared';
-import { PROFILE_MCP_SERVERS_MAX } from '@agentdock/shared/protocol';
+import { mcpServerNameSchema } from '@nautelle/shared';
+import { PROFILE_MCP_SERVERS_MAX } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import type { ConfigProfile } from '../config';
 import { expandHome } from '../env';

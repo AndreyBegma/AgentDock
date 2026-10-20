@@ -1,4 +1,4 @@
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Events } from '../../usage/testing/usage-e2e';
 
 /** Seeded Sonnet input price is $3 / MTok: 500 000 input tokens cost $1.50. */

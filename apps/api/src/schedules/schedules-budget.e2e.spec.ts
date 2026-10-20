@@ -1,5 +1,5 @@
-import type { BudgetExceededBody } from '@agentdock/shared';
-import type { CommandName } from '@agentdock/shared/protocol';
+import type { BudgetExceededBody } from '@nautelle/shared';
+import type { CommandName } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { BudgetClock } from '../budgets/budget-options';
 import { BudgetSweep } from '../budgets/budget-sweep';

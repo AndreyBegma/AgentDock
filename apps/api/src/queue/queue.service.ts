@@ -6,8 +6,8 @@ import {
   type QueueRefreshResult,
   type Role,
   specGap,
-} from '@agentdock/shared';
-import { issueCreateArgsSchema } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { issueCreateArgsSchema } from '@nautelle/shared/protocol';
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';

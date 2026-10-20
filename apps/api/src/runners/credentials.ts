@@ -3,7 +3,7 @@ import {
   PAIRING_CODE_ALPHABET,
   PAIRING_CODE_GROUP_LENGTH,
   pairingCodeSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Algorithm, hash, verify } from '@node-rs/argon2';
 
 /** `XXXX-XXXX` from the unambiguous alphabet; `randomInt` is uniform (spec D1). */

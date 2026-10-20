@@ -1,5 +1,5 @@
-import type { BoardErrorView } from '@agentdock/shared';
-import type { RoundDecisions } from '@agentdock/shared/protocol';
+import type { BoardErrorView } from '@nautelle/shared';
+import type { RoundDecisions } from '@nautelle/shared/protocol';
 import { type OrchestratorStatus, Prisma } from '@prisma/client';
 import { mayWrite, type RoundSources, readSources } from './field-sources';
 import type { Applied, Changes, EventOf, ProjectRef, Tx } from './projection';

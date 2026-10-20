@@ -17,13 +17,14 @@ import {
   CARD_PR_MARKER,
   cardWipCommitMessage,
   divergedBranchMessage,
-} from '@agentdock/shared';
+  LEGACY_CARD_PR_MARKER,
+} from '@nautelle/shared';
 import type {
   CardCollectArgs,
   CardCollectPrState,
   CardCollectResult,
   CardRunFile,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { CommandFailure } from '../commands/failure';
 import {
@@ -439,11 +440,17 @@ export const readPullRequestDescription = (worktree: string): string | null => {
   }
 };
 
-const isMarkerLine = (line: string): boolean =>
-  line.trimStart().startsWith(`${CARD_PR_MARKER}:`);
+/** ADR-0073: a body written before the rename carries the old marker. */
+const isMarkerLine = (line: string): boolean => {
+  const text = line.trimStart();
+  return (
+    text.startsWith(`${CARD_PR_MARKER}:`) ||
+    text.startsWith(`${LEGACY_CARD_PR_MARKER}:`)
+  );
+};
 
 /**
- * #359 D3: the worker's description, with the API's `AgentDock-Card:` line —
+ * #359 D3: the worker's description, with the API's `Nautelle-Card:` line —
  * the one the API traces the PR by — as its only marker. A marker the worker
  * wrote is dropped, so a PR never names another card.
  */
@@ -495,7 +502,7 @@ export const editPullRequestBody = async (
   number: number,
   body: string,
 ): Promise<void> => {
-  const dir = mkdtempSync(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
+  const dir = mkdtempSync(join(deps.tempRoot ?? tmpdir(), 'nautelle-pr-'));
   try {
     const file = join(dir, 'body.md');
     writeFileSync(file, body, { mode: 0o600 });
@@ -703,9 +710,7 @@ export const collectBranch = async (
       `branch ${branch} is neither on the runner nor on origin`,
     );
   }
-  const dir = mkdtempSync(
-    join(deps.tempRoot ?? tmpdir(), 'agentdock-collect-'),
-  );
+  const dir = mkdtempSync(join(deps.tempRoot ?? tmpdir(), 'nautelle-collect-'));
   const worktree = join(dir, 'worktree');
   try {
     await gitOk(deps.exec, [

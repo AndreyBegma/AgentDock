@@ -17,7 +17,7 @@ import {
   type AttachmentRef,
   attachmentFileName,
   runnerAttachmentPath,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { CommandFailure } from '../commands/failure';
 import { errorMessage } from '../log';
 import { normalizeServer } from '../server-url';

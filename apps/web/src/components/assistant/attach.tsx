@@ -1,11 +1,5 @@
 'use client';
 
-import type {
-  AssistantAttachmentView,
-  BoardView,
-  ProjectDetail,
-  SessionListResponse,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { Select } from '@andrewbehma/glass-ui/field';
@@ -16,6 +10,12 @@ import {
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import type {
+  AssistantAttachmentView,
+  BoardView,
+  ProjectDetail,
+  SessionListResponse,
+} from '@nautelle/shared';
 import { FileText, Paperclip, SquareKanban, Terminal, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';

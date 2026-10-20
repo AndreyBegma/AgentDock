@@ -1,4 +1,4 @@
-import type { QueueVerdict } from '@agentdock/shared';
+import type { QueueVerdict } from '@nautelle/shared';
 import {
   type CachedIssue,
   computeQueue,

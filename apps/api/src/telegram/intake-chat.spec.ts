@@ -1,4 +1,4 @@
-import type { PlanDetail, PlanQuestion } from '@agentdock/shared';
+import type { PlanDetail, PlanQuestion } from '@nautelle/shared';
 import { CALLBACK_DATA_MAX } from './callback-data';
 import {
   chatAnswers,

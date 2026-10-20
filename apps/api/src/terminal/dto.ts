@@ -1,10 +1,10 @@
-import type { TerminalTicketRequest } from '@agentdock/shared';
+import type { TerminalTicketRequest } from '@nautelle/shared';
 import {
   SLOT_NAME_MAX_LENGTH,
   type TerminalMode,
   type TerminalTargetKind,
   terminalModeSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   IsIn,
   IsNotEmpty,
@@ -60,7 +60,7 @@ export class TerminalTicketDto implements TerminalTicketRequest {
   })
   runId?: string;
 
-  /** Required for `manual`: the Claude session of `agentdock-runner claude` (spec 201 D23). Another kind with it is 400. */
+  /** Required for `manual`: the Claude session of `nautelle-runner claude` (spec 201 D23). Another kind with it is 400. */
   @ValidateIf(
     (dto: TerminalTicketDto) =>
       dto.kind === 'manual' || dto.sessionId !== undefined,

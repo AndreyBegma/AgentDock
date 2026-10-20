@@ -15,13 +15,13 @@ import {
   STEWARD_OBSERVED_EVENT,
   STEWARD_RESUME_TEXT,
   type StewardRunnerConfig,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CardRunArgs,
   CardRunPhaseChangedData,
   CardRunPushedData,
   UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import type { Exec } from '../detect/exec';
@@ -310,12 +310,12 @@ describe.skipIf(!tmuxInstalled)(
           profileKey: 'claude-quoted',
         }),
       );
-      await t.paneShows('agentdock-card-ab12cd34', '│ >');
+      await t.paneShows('nautelle-card-ab12cd34', '│ >');
       for (let i = 0; i < 3; i++) await t.executor.poll();
       expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
       expect(
         await t.executor.dismissDialog(
-          'agentdock-card-ab12cd34',
+          'nautelle-card-ab12cd34',
           'teach-auto-mode',
         ),
       ).toBe(false);
@@ -326,7 +326,7 @@ describe.skipIf(!tmuxInstalled)(
       expect(
         existsSync(keyFile) ? readFileSync(keyFile, 'utf8').trim() : '',
       ).toBe('');
-      await t.tmux('kill-session', '-t', '=agentdock-card-ab12cd34');
+      await t.tmux('kill-session', '-t', '=nautelle-card-ab12cd34');
     });
 
     it('reports a question on screen once, and the next question again (#473)', async () => {
@@ -338,7 +338,7 @@ describe.skipIf(!tmuxInstalled)(
           profileKey: 'claude-question',
         }),
       );
-      const session = 'agentdock-card-ab12cd34';
+      const session = 'nautelle-card-ab12cd34';
       const questions = () =>
         t.events.filter((e) => e.type === 'card_run.question');
       await t.paneShows(session, 'Enter to select');
@@ -376,7 +376,7 @@ describe.skipIf(!tmuxInstalled)(
             profileKey: 'claude-question-tall',
           }),
         );
-        const session = 'agentdock-card-ab12cd34';
+        const session = 'nautelle-card-ab12cd34';
         const screens = () =>
           t.events
             .filter((e) => e.type === 'card_run.pending_question')
@@ -437,7 +437,7 @@ describe.skipIf(!tmuxInstalled)(
         hasTrustDialogAccepted: true,
       });
 
-      const session = 'agentdock-card-ab12cd34';
+      const session = 'nautelle-card-ab12cd34';
       const dialogs = () =>
         t.events.filter((e) => e.type === 'card_run.dialog');
       await t.paneShows(session, 'Do you trust the files');
@@ -473,10 +473,10 @@ describe.skipIf(!tmuxInstalled)(
       await Bun.sleep(300);
       for (let i = 0; i < 3; i++) await t.executor.poll();
       expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
-      await t.tmux('kill-session', '-t', '=agentdock-card-ab12cd34');
+      await t.tmux('kill-session', '-t', '=nautelle-card-ab12cd34');
     });
 
-    it('creates .wt-<repo>-card-<shortid> and tmux agentdock-card-<shortid>, commits files first, launches argv only, emits ended when tmux exits', async () => {
+    it('creates .wt-<repo>-card-<shortid> and tmux nautelle-card-<shortid>, commits files first, launches argv only, emits ended when tmux exits', async () => {
       const t = await setup();
       const spec = '# C-12 Export as CSV\n\nAcceptance: a CSV.\n';
       const result = await t.executor.run(
@@ -486,7 +486,7 @@ describe.skipIf(!tmuxInstalled)(
       );
       expect(result).toEqual({
         phase: 'running',
-        tmuxSession: 'agentdock-card-ab12cd34',
+        tmuxSession: 'nautelle-card-ab12cd34',
       });
 
       const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
@@ -507,7 +507,7 @@ describe.skipIf(!tmuxInstalled)(
 
       // tmux got an argv (no shell string): `exec-run <roundDir>`.
       const created = t.tmuxCalls.find((c) => c.includes('new-session'));
-      expect(created).toContain('agentdock-card-ab12cd34');
+      expect(created).toContain('nautelle-card-ab12cd34');
       expect(created?.slice(-4)).toEqual([
         process.execPath,
         MAIN,
@@ -517,16 +517,16 @@ describe.skipIf(!tmuxInstalled)(
 
       // The binary received the prompt as one element, metacharacters intact.
       const argv = await t.argvOf('run_1');
-      // #367 D1: the profile has no agentdock plugin — the round's wiring.
+      // #367 D1: the profile has no nautelle plugin — the round's wiring.
       const roundDir = join(t.cardsDir, 'card_1', 'rounds', 'run_1');
       expect(argv).toEqual([
         '--strict-mcp-config',
         '--session-id',
         SESSION_ID,
         '--settings',
-        join(roundDir, 'agentdock-settings.json'),
+        join(roundDir, 'nautelle-settings.json'),
         '--mcp-config',
-        join(roundDir, 'agentdock-mcp.json'),
+        join(roundDir, 'nautelle-mcp.json'),
         '--model',
         'opus',
         '--permission-mode',
@@ -537,9 +537,9 @@ describe.skipIf(!tmuxInstalled)(
       ]);
       expect(existsSync(join(worktree, 'pwned'))).toBe(false);
       const mcp = JSON.parse(
-        readFileSync(join(roundDir, 'agentdock-mcp.json'), 'utf8'),
+        readFileSync(join(roundDir, 'nautelle-mcp.json'), 'utf8'),
       );
-      expect(mcp.mcpServers.agentdock).toEqual({
+      expect(mcp.mcpServers.nautelle).toEqual({
         command: process.execPath,
         args: [MAIN, 'mcp'],
       });
@@ -573,7 +573,7 @@ describe.skipIf(!tmuxInstalled)(
       expect(ended).toMatchObject({
         cardId: 'card_1',
         projectId: t.f.project.id,
-        tmuxSession: 'agentdock-card-ab12cd34',
+        tmuxSession: 'nautelle-card-ab12cd34',
         worktree,
         exitCode: 3,
       });
@@ -584,12 +584,12 @@ describe.skipIf(!tmuxInstalled)(
       );
     });
 
-    it('#367 D2: a profile that reports the agentdock plugin launches without --settings and --mcp-config', async () => {
+    it('#367 D2: a profile that reports the nautelle plugin launches without --settings and --mcp-config', async () => {
       const t = await setup();
       t.f.write(t.f.profileDir, {
         'plugins/installed_plugins.json': JSON.stringify({
           plugins: {
-            'agentdock@agentdock': [
+            'nautelle@nautelle': [
               { version: '0.9.2', installPath: '/x', scope: 'user' },
             ],
           },
@@ -601,7 +601,7 @@ describe.skipIf(!tmuxInstalled)(
       expect(argv).not.toContain('--mcp-config');
       expect(
         existsSync(
-          join(t.cardsDir, 'card_1', 'rounds', 'run_1', 'agentdock-mcp.json'),
+          join(t.cardsDir, 'card_1', 'rounds', 'run_1', 'nautelle-mcp.json'),
         ),
       ).toBe(false);
       expect(
@@ -618,7 +618,7 @@ describe.skipIf(!tmuxInstalled)(
           'card_1',
           'rounds',
           'run_1',
-          'agentdock-settings.json',
+          'nautelle-settings.json',
           'in-the-way',
         ),
         { recursive: true },
@@ -638,7 +638,7 @@ describe.skipIf(!tmuxInstalled)(
     it('feedback resumes in the same worktree, replacing a live session without reporting it ended (D9); stop reports nothing either', async () => {
       const t = await setup();
       await t.executor.run(t.args({ profileKey: 'claude-slow' }));
-      expect(await t.alive('agentdock-card-ab12cd34')).toBe(true);
+      expect(await t.alive('nautelle-card-ab12cd34')).toBe(true);
 
       // Round 2 while round 1 is still open: the old session is killed first.
       await t.executor.run(
@@ -668,7 +668,7 @@ describe.skipIf(!tmuxInstalled)(
           projectId: t.f.project.id,
         }),
       ).toEqual({ stopped: true });
-      expect(await t.alive('agentdock-card-ab12cd34')).toBe(false);
+      expect(await t.alive('nautelle-card-ab12cd34')).toBe(false);
       await t.executor.poll();
       expect(t.phases('run_2').map((d) => d.phase)).toEqual([
         'starting',
@@ -757,9 +757,9 @@ describe.skipIf(!tmuxInstalled)(
       await next.start();
       teardown.push(async () => next.stop());
       expect(next.cardSession(t.f.project.id, t.f.root, 'card_1')).toBe(
-        'agentdock-card-ab12cd34',
+        'nautelle-card-ab12cd34',
       );
-      await t.tmux('kill-session', '-t', '=agentdock-card-ab12cd34');
+      await t.tmux('kill-session', '-t', '=nautelle-card-ab12cd34');
       await t.untilEnded(next, 'run_1');
       // Killed from outside: no exit record, so no exit code.
       expect(t.phases('run_1').at(-1)?.exitCode).toBeUndefined();
@@ -779,7 +779,7 @@ describe.skipIf(!tmuxInstalled)(
         branch: 'card/c12-export-csv',
         number: 12,
         title: 'Export as CSV',
-        body: 'Work.\n\nAgentDock-Card: C-12',
+        body: 'Work.\n\nNautelle-Card: C-12',
       });
       expect(collected).toMatchObject({ ahead: 1, pushed: true, prNumber: 7 });
 
@@ -880,7 +880,7 @@ describe.skipIf(!tmuxInstalled)(
         branch: 'card/c12-export-csv',
         number: 12,
         title: draft.title,
-        body: 'Exported.\n\nAgentDock-Card: C-12',
+        body: 'Exported.\n\nNautelle-Card: C-12',
       });
       expect(collected).toMatchObject({ prNumber: 7, prState: 'open' });
       expect(t.f.readies).toHaveLength(1);
@@ -1062,7 +1062,7 @@ describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
 
     expect(await t.executor.resume(resumeArgs(t))).toEqual({
       outcome: 'resumed',
-      tmuxSession: 'agentdock-card-ab12cd34',
+      tmuxSession: 'nautelle-card-ab12cd34',
     });
     const argv = await t.argvOf('run_1');
     const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
@@ -1086,13 +1086,13 @@ describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
     await t.argvOf('run_1');
     expect(await t.executor.resume(resumeArgs(t))).toEqual({
       outcome: 'alive',
-      tmuxSession: 'agentdock-card-ab12cd34',
+      tmuxSession: 'nautelle-card-ab12cd34',
     });
 
     // A person's stop.
     await t.executor.stopCard({ cardId: 'card_1', projectId: t.f.project.id });
     expect(await failure(t.executor.resume(resumeArgs(t)))).toBe('not_found');
-    expect(await t.alive('agentdock-card-ab12cd34')).toBe(false);
+    expect(await t.alive('nautelle-card-ab12cd34')).toBe(false);
 
     // A crash, then the worktree is gone.
     const u = await setup({ steward: STEWARD });
@@ -1105,7 +1105,7 @@ describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
     expect(await u.executor.resume(resumeArgs(u))).toEqual({
       outcome: 'no_worktree',
     });
-    expect(await u.alive('agentdock-card-ab12cd34')).toBe(false);
+    expect(await u.alive('nautelle-card-ab12cd34')).toBe(false);
   });
 
   it('D11: with Steward on, the poll leaves a known dialog to the API; dismissDialog answers it', async () => {
@@ -1114,7 +1114,7 @@ describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
       t.args({ cardId: 'card_1', runId: 'run_d', profileKey: 'claude-dialog' }),
     );
     const keyFile = join(t.f.ws, 'key-run_d');
-    const session = 'agentdock-card-ab12cd34';
+    const session = 'nautelle-card-ab12cd34';
     await t.paneShows(session, 'Not now');
     for (let i = 0; i < 3; i++) await t.executor.poll();
     expect(t.tmuxCalls.some((c) => c.includes('send-keys'))).toBe(false);
@@ -1148,7 +1148,7 @@ describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
       'feat: export\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>',
     );
     // Wait for the fake prompt box.
-    await t.paneShows('agentdock-card-ab12cd34', '│ >');
+    await t.paneShows('nautelle-card-ab12cd34', '│ >');
 
     await t.executor.poll();
     await t.executor.settled();

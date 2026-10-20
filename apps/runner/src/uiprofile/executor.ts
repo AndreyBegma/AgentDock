@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import type { PlanTurnPhase } from '@agentdock/shared';
-import { planTurnPhaseSchema } from '@agentdock/shared';
+import type { PlanTurnPhase } from '@nautelle/shared';
+import { planTurnPhaseSchema } from '@nautelle/shared';
 import {
   skillRunIdSchema,
   skillRunShortIdSchema,
@@ -13,7 +13,7 @@ import {
   uiProfileBuildArgsSchema,
   uiProfileBuildFinishedDataSchema,
   uiProfileBuildPhaseChangedDataSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
@@ -66,7 +66,7 @@ export const uiProfileWorktreePath = (
 };
 
 export const uiProfileSessionName = (shortId: string): string =>
-  `agentdock-uiprofile-${shortId}`;
+  `nautelle-uiprofile-${shortId}`;
 
 /**
  * What `exec-run` starts for a build: headless, read-only (`plan`), the
@@ -118,7 +118,7 @@ export const uiProfileTokenSaver = (
     runKind: 'ui_profile',
     projectId: build.projectId,
     runId: build.runId,
-    agentdock: false,
+    runnerMcp: false,
     scout: true,
   });
 
@@ -145,7 +145,7 @@ type BuildRecord = z.infer<typeof buildRecordSchema>;
 
 export interface UiProfileExecutorOptions {
   deps: SkillsDeps;
-  /** `$XDG_STATE_HOME/agentdock/uiprofile`, beside the plans. */
+  /** `$XDG_STATE_HOME/nautelle/uiprofile`, beside the plans. */
   buildsDir: string;
   /** The argv that starts this runner: `exec-run <buildDir>` is appended. */
   selfCommand: readonly string[];

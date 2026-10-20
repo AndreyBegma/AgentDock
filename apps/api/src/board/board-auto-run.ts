@@ -1,4 +1,4 @@
-import { cardLabel } from '@agentdock/shared';
+import { cardLabel } from '@nautelle/shared';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { BoardCard } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -10,7 +10,7 @@ import { type BoardActor, BoardWork } from './board-work';
 /**
  * Auto-run when ready (#443): a card reaching Finished (#638) or being
  * accepted starts the Run of every To Do card that waited for it, has the
- * switch on and now has no open dependency — as the person (or AgentDock)
+ * switch on and now has no open dependency — as the person (or Nautelle)
  * that moved it, under the manual Run's rules (slots, budget, profile). A refusal is not queued: it is stored on the card
  * (`autoRunFailure` with `after`) and audited, like a refused design
  * auto-run (#273 D9).

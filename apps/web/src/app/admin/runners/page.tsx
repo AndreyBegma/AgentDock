@@ -1,16 +1,16 @@
 'use client';
 
-import type {
-  AdminRunner,
-  AdminRunnerDetail,
-  PairingCodeResponse,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
+import type {
+  AdminRunner,
+  AdminRunnerDetail,
+  PairingCodeResponse,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
@@ -318,7 +318,7 @@ function RunnersTable() {
     <>
       <PageHeader
         title="Runners"
-        description="The AgentDock daemon on each machine that holds your repositories."
+        description="The Nautelle daemon on each machine that holds your repositories."
         actions={
           <Button variant="solid" onClick={() => setAdding(true)}>
             Add runner
@@ -332,7 +332,7 @@ function RunnersTable() {
         empty={
           <EmptyState
             title="Pair your first runner"
-            description="A runner is the AgentDock daemon on the machine that holds your repositories: it runs the agents and reads the code, and it dials out to AgentDock, so the machine needs no open port. Add one to get a pairing command to run there."
+            description="A runner is the Nautelle daemon on the machine that holds your repositories: it runs the agents and reads the code, and it dials out to Nautelle, so the machine needs no open port. Add one to get a pairing command to run there."
             action={
               <div className="flex flex-wrap justify-center gap-2">
                 <Button

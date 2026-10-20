@@ -3,11 +3,11 @@ import {
   type CommandRunLiveEvent,
   type CommandRunView,
   type ControlErrorCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   OrchestratorMode,
   OrchestratorPermissionMode,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError, type ErrorHint } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';
@@ -93,7 +93,7 @@ export const CONTROL_ERROR_SENTENCE: Record<ControlErrorCode, string> = {
   [CONTROL_ERROR.runnerError]:
     'The runner failed to carry the command out. Check the runner’s log on its machine.',
   [CONTROL_ERROR.policyRefused]:
-    'The runner’s local security policy refused this. Only the person on that machine can change it, with `agentdock-runner policy`.',
+    'The runner’s local security policy refused this. Only the person on that machine can change it, with `nautelle-runner policy`.',
 };
 
 const isControlErrorCode = (
@@ -114,7 +114,7 @@ export function commandRunIdOf(error: unknown): string | undefined {
  * never "not deployed yet".
  */
 export const updateRunnerText = (runnerName?: string | null): string =>
-  `Update the AgentDock runner on ${runnerName || 'the project’s machine'} and try again.`;
+  `Update the Nautelle runner on ${runnerName || 'the project’s machine'} and try again.`;
 
 /** Where a failed control request is fixed, when the viewer can open that page. */
 export interface ControlErrorContext {
@@ -133,7 +133,7 @@ export function describeControlErrorHint(
   const code = error.code as string | undefined;
   if (code === CONTROL_ERROR.runnerOffline) {
     return {
-      text: `${CONTROL_ERROR_SENTENCE.runner_offline} Start it with \`agentdock-runner run\` on that machine.`,
+      text: `${CONTROL_ERROR_SENTENCE.runner_offline} Start it with \`nautelle-runner run\` on that machine.`,
       ...(isAdmin ? { href: RUNNERS_PAGE, cta: 'Open Runners' } : {}),
     };
   }

@@ -1,4 +1,4 @@
-import { RUN_UPDATED_LIVE_EVENT, type RunLiveChange } from '@agentdock/shared';
+import { RUN_UPDATED_LIVE_EVENT, type RunLiveChange } from '@nautelle/shared';
 import {
   Inject,
   Injectable,

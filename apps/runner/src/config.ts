@@ -17,7 +17,7 @@ import {
   runtimeProfileSchema,
   SKILL_RUN_MAX_TIMEOUT_SEC,
   SKILL_RUN_MIN_TIMEOUT_SEC,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { policyConfigSchema } from './policy/schema';
 
@@ -39,7 +39,7 @@ export const configProfileSchema = runtimeProfileSchema
   .extend({ env: profileConfigEnvSchema });
 export type ConfigProfile = z.infer<typeof configProfileSchema>;
 
-/** `~/.config/agentdock/runner.json` (D3). Unpaired until `pair` fills the first three. */
+/** `~/.config/nautelle/runner.json` (D3). Unpaired until `pair` fills the first three. */
 export const runnerConfigSchema = z.object({
   /** API origin, `http(s)://host[:port]`. */
   server: z.url({ protocol: /^https?$/ }).optional(),
@@ -134,7 +134,7 @@ export const runnerConfigSchema = z.object({
     .prefault({}),
   /**
    * The runner-local security policy (ADR-0047). Written only by
-   * `agentdock-runner policy …` and `pair --allow-root`; the daemon reads it
+   * `nautelle-runner policy …` and `pair --allow-root`; the daemon reads it
    * and keeps it as it is when it rewrites the file (`updateConfig`).
    */
   policy: policyConfigSchema,
@@ -174,17 +174,38 @@ export const loadConfig = (path: string): RunnerConfig => {
   return parsed.data;
 };
 
-/** Writes the config atomically with mode 0600: temp file, fsync, rename. */
+/**
+ * Whether the file holds a `policy` block. A runner before 0.13 wrote none
+ * (#691): it parses to the default policy, which allows no project root. A
+ * missing or unreadable file counts as having one — it is no upgrade.
+ */
+export const hasPolicyBlock = (path: string): boolean => {
+  if (!existsSync(path)) return true;
+  try {
+    const raw: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    return typeof raw !== 'object' || raw === null || 'policy' in raw;
+  } catch {
+    return true;
+  }
+};
+
+/**
+ * Writes the config atomically with mode 0600: temp file, fsync, rename.
+ * `withoutPolicy` leaves the `policy` block out of the file.
+ */
 export const saveConfig = (
   path: string,
   config: z.input<typeof runnerConfigSchema>,
+  options: { withoutPolicy?: boolean } = {},
 ): void => {
   const valid = runnerConfigSchema.parse(config);
+  const { policy: _policy, ...unpoliced } = valid;
+  const body = options.withoutPolicy ? unpoliced : valid;
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
   const fd = openSync(tmp, 'w', 0o600);
   try {
-    writeSync(fd, `${JSON.stringify(valid, null, 2)}\n`);
+    writeSync(fd, `${JSON.stringify(body, null, 2)}\n`);
     fsyncSync(fd);
   } catch (error) {
     closeSync(fd);
@@ -210,7 +231,9 @@ export type DaemonConfigPatch = Partial<
 /**
  * The daemon's one way to rewrite `runner.json`: re-reads the file and
  * applies `patch` on top, so the policy on disk — whatever the CLI last
- * wrote — is kept as is.
+ * wrote — is kept as is. A file with no `policy` block keeps none (#691):
+ * the daemon does not write the default policy for the person, so the
+ * upgrade notice shows on every start until they set one.
  */
 export const updateConfig = (path: string, patch: DaemonConfigPatch): void => {
   const {
@@ -223,5 +246,9 @@ export const updateConfig = (path: string, patch: DaemonConfigPatch): void => {
     insecureServer?: unknown;
     skills?: unknown;
   };
-  saveConfig(path, { ...loadConfig(path), ...safe });
+  saveConfig(
+    path,
+    { ...loadConfig(path), ...safe },
+    { withoutPolicy: !hasPolicyBlock(path) },
+  );
 };

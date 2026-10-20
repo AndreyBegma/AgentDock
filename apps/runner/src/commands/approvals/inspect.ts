@@ -1,4 +1,4 @@
-import { type CheckRollupEntry, rollupChecks } from '@agentdock/shared';
+import { type CheckRollupEntry, rollupChecks } from '@nautelle/shared';
 import {
   PR_INSPECT_BODY_MAX_BYTES,
   PR_INSPECT_FILES_MAX,
@@ -8,7 +8,7 @@ import {
   type PrInspection,
   type PrInspectState,
   prInspectionSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { type Clock, isoNow } from '../../clock';
 import { resolveFleetProject } from '../../fleet/project';

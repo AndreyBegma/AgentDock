@@ -67,8 +67,8 @@ describe('terminalSetup', () => {
       expect(plugin?.state).toBe('todo');
       expect(plugin?.optional).toBe(false);
       expect(commands(plugin?.steps ?? [])).toEqual([
-        'agentdock-runner profiles',
-        'agentdock-runner setup claude --profile main',
+        'nautelle-runner profiles',
+        'nautelle-runner setup claude --profile main',
       ]);
       expect(terminalSetup(facts).complete).toBe(false);
       expect(terminalSetup(facts).todo).toBe(1);
@@ -148,7 +148,7 @@ describe('terminalSetup', () => {
       };
       expect(
         commands(item(facts, 'plugin', "it's mine")?.steps ?? []),
-      ).toContain("agentdock-runner setup claude --profile 'it'\\''s mine'");
+      ).toContain("nautelle-runner setup claude --profile 'it'\\''s mine'");
     });
   });
 
@@ -165,9 +165,7 @@ describe('terminalSetup', () => {
       expect(item(facts, 'plugin', 'main')?.state).toBe('done');
       const loaded = item(facts, 'plugin_loaded', 'main');
       expect(loaded?.state).toBe('todo');
-      expect(commands(loaded?.steps ?? [])).toEqual([
-        'agentdock-runner status',
-      ]);
+      expect(commands(loaded?.steps ?? [])).toEqual(['nautelle-runner status']);
     });
 
     it('is not listed unless D1 reports a version', () => {
@@ -285,8 +283,8 @@ describe('terminalSetup', () => {
       });
       expect(plugins[0].profileKey).toBeUndefined();
       expect(commands(plugins[0].steps)).toEqual([
-        'agentdock-runner profiles',
-        'agentdock-runner setup claude --profile <key>',
+        'nautelle-runner profiles',
+        'nautelle-runner setup claude --profile <key>',
       ]);
       expect(terminalSetup(none).complete).toBe(false);
     });
@@ -340,19 +338,32 @@ describe('terminalSetupProfileKeys', () => {
         sessionKeys: ['personal', null, 'main', ''],
         cardRunKeys: ['orch', 'worker'],
       }),
-    ).toEqual(['main', 'orch', 'personal', 'worker']);
+    ).toEqual({ used: ['main', 'orch', 'personal', 'worker'], other: [] });
   });
 
-  it('adds the profiles the runner reports last, deduplicated', () => {
+  it('puts the reported profiles the project does not use in other (#719)', () => {
     expect(
       terminalSetupProfileKeys({
         defaultKey: 'main',
         orchestratorKey: null,
         sessionKeys: [],
         cardRunKeys: [],
-        reportedKeys: ['alt', 'main'],
+        reportedKeys: ['alt', 'main', 'alt'],
       }),
-    ).toEqual(['main', 'alt']);
+    ).toEqual({ used: ['main'], other: ['alt'] });
+  });
+
+  it('leaves the ignored profiles out of both lists (#719)', () => {
+    expect(
+      terminalSetupProfileKeys({
+        defaultKey: 'main',
+        orchestratorKey: null,
+        sessionKeys: ['personal'],
+        cardRunKeys: [],
+        reportedKeys: ['alt', 'hatkom'],
+        ignoredKeys: ['personal', 'hatkom'],
+      }),
+    ).toEqual({ used: ['main'], other: ['alt'] });
   });
 
   it('is empty with nothing set', () => {
@@ -363,6 +374,54 @@ describe('terminalSetupProfileKeys', () => {
         sessionKeys: [],
         cardRunKeys: [],
       }),
-    ).toEqual([]);
+    ).toEqual({ used: [], other: [] });
+  });
+});
+
+describe('terminalSetup other profiles (#719)', () => {
+  const hatkom = claude('hatkom', {
+    agentdock: { plugin: null, telemetry: false },
+    sessions: { hooked: 0, unhooked: 0, unhookedAfterReport: 0 },
+  });
+
+  it('lists another profile without the plugin as optional, never a todo', () => {
+    const view = terminalSetup({ ...ready, otherProfiles: [hatkom] });
+    expect(view.complete).toBe(true);
+    expect(view.todo).toBe(0);
+    expect(view.items.some((entry) => entry.profileKey === 'hatkom')).toBe(
+      false,
+    );
+    expect(view.otherProfiles).toEqual([
+      expect.objectContaining({
+        id: 'plugin',
+        profileKey: 'hatkom',
+        state: 'todo',
+        optional: true,
+      }),
+    ]);
+  });
+
+  it('still counts a used profile without the plugin', () => {
+    const view = terminalSetup({ ...ready, profiles: [hatkom] });
+    expect(view.todo).toBe(1);
+    expect(view.otherProfiles).toEqual([]);
+  });
+
+  it('asks for the profile key when the project uses none, whatever the runner reports', () => {
+    const view = terminalSetup({
+      ...ready,
+      profiles: [],
+      otherProfiles: [hatkom],
+    });
+    const plugin = view.items.find((entry) => entry.id === 'plugin');
+    expect(plugin).toMatchObject({ state: 'unknown', optional: false });
+    expect(plugin?.profileKey).toBeUndefined();
+  });
+
+  it('echoes the ignored profile keys', () => {
+    expect(
+      terminalSetup({ ...ready, ignoredProfileKeys: ['hatkom'] })
+        .ignoredProfileKeys,
+    ).toEqual(['hatkom']);
   });
 });

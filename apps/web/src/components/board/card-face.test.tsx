@@ -3,7 +3,7 @@ import type {
   BoardCardView,
   BoardColumn,
   BoardPlanTaskView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { card as fixtureCard, round } from '../../lib/board/fixtures';
 import { CardFace } from './card-face';

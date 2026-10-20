@@ -2,7 +2,7 @@ import type {
   CardCiRetriggerArgs,
   CardCiRetriggerResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { watchedProject } from '../control/target';
 import type { Exec } from '../detect/exec';
@@ -22,7 +22,7 @@ const prViewSchema = z.looseObject({
 
 /** The comment the reopen leaves, so the closed/reopened pair explains itself. */
 export const ciRetriggerComment = (headSha: string): string =>
-  `AgentDock: no CI check reported on ${headSha.slice(0, 12)}, so the ` +
+  `Nautelle: no CI check reported on ${headSha.slice(0, 12)}, so the ` +
   'pull request was closed and reopened to send its event again (#484).';
 
 /** `gh pr reopen`, once more when the first attempt fails. */

@@ -2,14 +2,14 @@ import {
   injectPinHelper,
   MOCKUP_RESPONSE_HEADERS,
   type UiProfileSnippet,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Response } from 'express';
 
 /**
  * How every mockup document leaves the API (docs/specs/223-design-stage.md
  * "API", D6, D9): `MOCKUP_RESPONSE_HEADERS` over helmet's for this response
  * only — `sandbox allow-scripts` gives the document an opaque origin, so its
- * script reads no cookie, no storage and no API of AgentDock, and
+ * script reads no cookie, no storage and no API of Nautelle, and
  * `connect-src 'none'` stops every network call — with the pin helper
  * injected. The helper is never stored. The revision endpoint and the
  * profile preview both answer through here.

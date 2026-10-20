@@ -4,7 +4,7 @@ import {
   STEWARD_RESUME_MAX_PER_ROUND,
   type StewardActableSubject,
   type StewardAction,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CardResumeArgs,
   CardResumeResult,
@@ -16,7 +16,7 @@ import type {
   SessionNudgeResult,
   StewardCommandName,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CardRecord } from '../cards/record';
 import type { Clock } from '../clock';
 import { CommandFailure } from '../commands/failure';

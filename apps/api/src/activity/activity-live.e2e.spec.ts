@@ -3,7 +3,7 @@ import {
   type ActivityItem,
   RUN_UPDATED_LIVE_EVENT,
   type RunLiveChange,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';

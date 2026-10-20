@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { WebhookDeliveryView, WebhookWithSecret } from '@agentdock/shared';
+import type { WebhookDeliveryView, WebhookWithSecret } from '@nautelle/shared';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';

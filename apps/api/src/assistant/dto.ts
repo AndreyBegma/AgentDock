@@ -7,7 +7,7 @@ import {
   LLM_PROVIDERS,
   type LlmProviderId,
   type UpdateAssistantConversationRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Transform } from 'class-transformer';
 import {
   IsIn,

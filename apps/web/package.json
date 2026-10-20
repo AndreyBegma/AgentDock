@@ -1,5 +1,5 @@
 {
-  "name": "@agentdock/web",
+  "name": "@nautelle/web",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -11,8 +11,8 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@agentdock/shared": "workspace:*",
-    "@andrewbehma/glass-ui": "0.35.0",
+    "@nautelle/shared": "workspace:*",
+    "@andrewbehma/glass-ui": "0.37.0",
     "@dagrejs/dagre": "3.1.1",
     "@radix-ui/react-context-menu": "2.3.8",
     "@radix-ui/react-dialog": "1.2.0",

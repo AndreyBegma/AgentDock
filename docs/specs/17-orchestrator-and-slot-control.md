@@ -1,6 +1,6 @@
 # Orchestrator and slot control from the UI
 
-Issue: [#17](https://github.com/AndreyBegma/AgentDock/issues/17) · Roadmap: M2.2 ·
+Issue: [#17](https://github.com/AndreyBegma/Nautelle/issues/17) · Roadmap: M2.2 ·
 Decisions: [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
 [ADR-0006](../adr/0006-runtime-adapters-and-runtime-profiles.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
@@ -47,7 +47,7 @@ taken, with its source.
 | D4 | **Stop.** `orchestrator.stop` = `tmux kill-session -t <name>`. It never touches worktrees, slots or branches; the workers keep running (the orchestrator skill's own `stop` does not kill them either) | orchestrator SKILL "stop" [Confirmed] |
 | D5 | **Status.** `orchestrator.status` returns tmux presence, the #11 pane classification (`running`/`idle`/`prompt`/`quota`) and the session's start time. It does **not** type `/code-sentinel:orchestrator status` into the session — that would interrupt it | ADR-0005 |
 | D6 | **Slot stop.** `slot.stop` = `tmux kill-session -t cs-<slot>` for a slot of this project (checked against the `.wt-<repo>-<slot>` worktree, #10 D10). Worktree, branch and commits are left alone; the orchestrator resumes or cleans up per its Phase 7c | orchestrator SKILL "stop <slot>", Phase 7c [Confirmed] |
-| D7 | **Slot message.** `slot.message { text }` writes `text` to `<worktree>/.orchestrator-msg.md` (atomic write, max 16 KB, prefixed with `From: <user email> via AgentDock` and a timestamp), then runs `tmux send-keys -t cs-<slot> -l "Read ./.orchestrator-msg.md and reply into ./.orchestrator-reply.md"` and, as a **separate** call, `tmux send-keys -t cs-<slot> Enter` | orchestrator SKILL Phase 6.5 [Confirmed] |
+| D7 | **Slot message.** `slot.message { text }` writes `text` to `<worktree>/.orchestrator-msg.md` (atomic write, max 16 KB, prefixed with `From: <user email> via Nautelle` and a timestamp), then runs `tmux send-keys -t cs-<slot> -l "Read ./.orchestrator-msg.md and reply into ./.orchestrator-reply.md"` and, as a **separate** call, `tmux send-keys -t cs-<slot> Enter` | orchestrator SKILL Phase 6.5 [Confirmed] |
 | D8 | **Message etiquette.** A message to a worker bypasses the orchestrator. The API also writes an `slot.message_sent` event so the orchestrator's next board read (and #16) sees it; the UI warns that the orchestrator normally speaks to workers | ADR-0005 |
 | D9 | **Roles.** `orchestrator.status`: viewer. `orchestrator.start`, `orchestrator.stop`, `slot.stop`, `slot.message`: operator of the project (#10 D11). These minimum roles are written into the protocol allowlist and checked by `RunnerCommandService` (#6 D8) and again by `ProjectAccessGuard` | runner-protocol.md, ADR-0008 |
 | D10 | **Log.** Every command sent by this item gets a `command_runs` row (`requested` → `ok` / `error` / `unknown`), so the UI shows "Stopping…" and the outcome, and history (#21) can list them. Audit (#8) records the same actions with actor and result: `orchestrator.start`, `orchestrator.stop`, `slot.stop`, `slot.message` (message text stored hashed in audit, full text only in `command_runs`) | #8 D5, security.md |

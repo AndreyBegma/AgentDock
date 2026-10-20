@@ -3,7 +3,7 @@ import {
   type BoardColumn,
   type BoardStackView,
   STACK_GATE_REASON,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { boardView, card } from '../../lib/board/fixtures';
 import { boardItems } from '../../lib/board/plan-tasks';

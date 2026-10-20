@@ -1,10 +1,10 @@
-import type { stewardCommands } from '@agentdock/shared/protocol';
+import type { stewardCommands } from '@nautelle/shared/protocol';
 import {
   type CommandResult,
   capabilitiesSchema,
   type StewardCommandName,
   stewardAvailable,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
 import { PrismaService } from '../database/prisma.service';

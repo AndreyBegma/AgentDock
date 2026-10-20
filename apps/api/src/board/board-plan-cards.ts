@@ -1,4 +1,4 @@
-import { type BoardCardKind, captureFingerprint } from '@agentdock/shared';
+import { type BoardCardKind, captureFingerprint } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { BoardCard, Prisma } from '@prisma/client';
 import { CardAssessor } from '../assess/card-assessor';

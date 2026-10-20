@@ -2,7 +2,7 @@ import {
   SESSION_CONTENT_PAGE_LIMIT,
   type SessionContentItem,
   type SessionContentPage,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';

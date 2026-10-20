@@ -1,5 +1,5 @@
 import { appendFileSync } from 'node:fs';
-import type { FilterStatRow, TokenSaverRunKind } from '@agentdock/shared';
+import type { FilterStatRow, TokenSaverRunKind } from '@nautelle/shared';
 import {
   FILTER_PROJECT_ENV,
   FILTER_RUN_ENV,

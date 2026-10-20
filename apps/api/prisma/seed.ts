@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { REGISTRATION_SETTING_KEY } from '@agentdock/shared';
+import { REGISTRATION_SETTING_KEY } from '@nautelle/shared';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { seedPlannerInstructions } from '../src/database/seed-planner-instructions';

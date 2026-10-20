@@ -10,7 +10,7 @@ checkout that runs the suite needs a database of its own (#389).
 |---|---|---|
 | Main checkout | `agentdock_test` | `TEST_DATABASE_URL` in `apps/api/.env` |
 | Orchestrator slot (`.wt-AgentDock-<slot>`) | `agentdock_<slot>_test` | the slot's `apps/api/.env`, written at dispatch |
-| Board card (`.wt-AgentDock-card-<id>`) | `agentdock_card_<id>_test` | `TEST_DATABASE_URL`, renamed after `AGENTDOCK_CARD` |
+| Board card (`.wt-AgentDock-card-<id>`) | `agentdock_card_<id>_test` | `TEST_DATABASE_URL`, renamed after `NAUTELLE_CARD` |
 
 Each of them is the template of one clone per Jest worker:
 `agentdock_test` → `agentdock_1_test`, `agentdock_2_test`, …;
@@ -19,15 +19,19 @@ Each of them is the template of one clone per Jest worker:
 The runner sets two variables in a board card's session (`apps/runner`,
 `cardEnv`), on every round:
 
-- `AGENTDOCK_CARD` — the card's short id (8 characters, `a-z0-9`). With it set,
+- `NAUTELLE_CARD` — the card's short id (8 characters, `a-z0-9`). With it set,
   `testDatabaseUrl()` (`apps/api/src/test/test-database.ts`) keeps the server
   of `TEST_DATABASE_URL` and names the database after the card. A card's
   worktree can copy the main checkout's `apps/api/.env` as it is. It also
   bounds the card's pools (#487): `connection_limit=5` and `pool_timeout=10`,
   unless the URL sets its own.
-- `AGENTDOCK_CARD_PORT` — a port for a server the worker starts, from
+- `NAUTELLE_CARD_PORT` — a port for a server the worker starts, from
   20000–29999, derived from the short id: the same on every round. The e2e
   suite needs none: its apps listen on port 0.
+
+Until runner 0.16.0 the runner sets both under their old names too,
+`AGENTDOCK_CARD` and `AGENTDOCK_CARD_PORT`, and `testDatabaseUrl()` reads
+`AGENTDOCK_CARD` when `NAUTELLE_CARD` is unset (ADR-0073).
 
 The card worker's prompt (`CARD_WORKER_PROMPT_VERSION` 7) names both. Since
 version 13 (#487) it also limits a card to the e2e suites it touched

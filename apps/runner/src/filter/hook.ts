@@ -30,7 +30,7 @@ import { statsTarget, writeStat } from './stats';
 import type { Filter } from './types';
 
 /**
- * `agentdock-runner filter-hook` (#445 D3): Claude Code's PreToolUse hook for
+ * `nautelle-runner filter-hook` (#445 D3): Claude Code's PreToolUse hook for
  * Bash. It turns `bun run test` into `<runner> filter -- bun run test` when —
  * and only when — the session is in `bypassPermissions` (amendment 9),
  * `auto` (amendment 10) or `plan` (amendment 14), the call is a list of pipelines of simple commands
@@ -223,7 +223,7 @@ export const decideHook = (
         hookEventName: 'PreToolUse',
         permissionDecision: 'allow',
         permissionDecisionReason:
-          'AgentDock token saver: the output is filtered; AGENTDOCK_RAW=1 runs it unfiltered',
+          'Nautelle token saver: the output is filtered; NAUTELLE_RAW=1 runs it unfiltered',
         updatedInput,
       },
     },

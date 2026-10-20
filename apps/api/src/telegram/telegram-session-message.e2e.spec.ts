@@ -1,5 +1,5 @@
-import { CARD_WAITING_EVENT, type PendingQuestion } from '@agentdock/shared';
-import type { SessionMessageArgs } from '@agentdock/shared/protocol';
+import { CARD_WAITING_EVENT, type PendingQuestion } from '@nautelle/shared';
+import type { SessionMessageArgs } from '@nautelle/shared/protocol';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BotTokenStore } from '../notifications';
 import {
@@ -169,7 +169,7 @@ describe('Telegram: a waiting card answered from the chat (#489 M2, e2e)', () =>
             cardBody: '',
             cardKind: 'feature',
             phase: 'waiting',
-            tmuxSession: 'agentdock-card-ab12cd34',
+            tmuxSession: 'nautelle-card-ab12cd34',
             ...(question ? { pendingQuestion: question } : {}),
           },
         },
@@ -307,6 +307,6 @@ describe('Telegram: a waiting card answered from the chat (#489 M2, e2e)', () =>
     });
     await poll(callbackPress(nextUpdate++, OPERATOR_CHAT, button));
     expect(messagesSent()).toEqual([]);
-    expect(lastTextTo(OPERATOR_CHAT)).toContain('not one AgentDock can act on');
+    expect(lastTextTo(OPERATOR_CHAT)).toContain('not one Nautelle can act on');
   });
 });

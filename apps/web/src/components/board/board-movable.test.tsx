@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import type { BoardPlanTaskView } from '@agentdock/shared';
 import { Board } from '@andrewbehma/glass-ui/board';
+import type { BoardPlanTaskView } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { boardView, card } from '../../lib/board/fixtures';
 import { columnsOf } from '../../lib/board/format';

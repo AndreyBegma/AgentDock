@@ -31,7 +31,7 @@ setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS);
  * never listed, let alone touched.
  */
 const tmuxInstalled = Bun.which('tmux') !== null;
-const SESSION = 'agentdock-orch-acme-widget';
+const SESSION = 'nautelle-orch-acme-widget';
 
 let ws: ReturnType<typeof workspace> | undefined;
 let killServer: (() => Promise<unknown>) | undefined;
@@ -227,7 +227,7 @@ describe.skipIf(!tmuxInstalled)('control commands on a real tmux', () => {
     ).toEqual({ written: true, delivered: true });
     expect(
       readFileSync(join(f.ws, '.wt-widget-i7', MESSAGE_FILE), 'utf8'),
-    ).toStartWith('From: dev@example.com via AgentDock\n');
+    ).toStartWith('From: dev@example.com via Nautelle\n');
   });
 
   it('messages the orchestrator: file in the git dir, prompt typed, then submitted', async () => {

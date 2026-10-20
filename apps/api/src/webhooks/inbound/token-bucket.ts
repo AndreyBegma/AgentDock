@@ -1,7 +1,7 @@
 import {
   INBOUND_RATE_PER_HOUR,
   INBOUND_REFILL_INTERVAL_MS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** A trigger's D6 bucket, as stored on its row. */
 export interface TokenBucket {

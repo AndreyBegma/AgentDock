@@ -41,7 +41,7 @@ This table is what the plugin writes. What the runner forwards is in
 | `slot.resumed` | `slot, reason` |
 | `slot.redispatched` | `slot, fromModel, toModel, reason` |
 | `slot.checkpoint` | `slot, checkpoint` (`picked_up` · `plan_ready` · `implementation_done` · `pr_open` · `blocked` · `misclassified`), `summary`, `pr?` |
-| `slot.message_sent` | `slot, text`, `by?` — `by: person` when AgentDock appended it for a person's message to the worker (#489, ADR-0045; `source: agentdock`, `eid` `agentdock-<uuid>`) |
+| `slot.message_sent` | `slot, text`, `by?` — `by: person` when Nautelle appended it for a person's message to the worker (#489, ADR-0045; `source: agentdock`, `eid` `agentdock-<uuid>`) |
 | `slot.fence_widened` | `slot, added[]` |
 | `slot.stopped` | `slot, by` |
 | `pr.merged` | `pr, slot, issue, method` |
@@ -153,7 +153,7 @@ envelope `slot`.
 
 A PR event without a `slot` is matched to the latest slot on its `branch`;
 `pr.merged` first to the latest slot with its `number`.
-`rollupChecks` and `checkpointFromHeading` in `@agentdock/shared` are the D3 and
+`rollupChecks` and `checkpointFromHeading` in `@nautelle/shared` are the D3 and
 D5 rules, for the collectors to share.
 
 ### Code Sentinel `events.jsonl` (spec 16)
@@ -169,7 +169,7 @@ normalizeCodeSentinelLine(line: string, project: { repo: string; root: string })
   : { ok: true; event: UnsequencedEvent } | { ok: false; reason: string }
 ```
 
-from `@agentdock/shared`. It then adds `seq` and sends the event. A rejected
+from `@nautelle/shared`. It then adds `seq` and sends the event. A rejected
 line becomes `events.unparsed` (`eventsUnparsedData(file, line, reason,
 offset?)`), and the collector reads on.
 
@@ -245,7 +245,7 @@ with the pull request's number when a merged pull request closed it, else
 `manual`. A dependency whose closure is not reported stays `BLOCKED — work`.
 
 `specGap`, `parseDependsOn`, `parseGate`, `parseClosingRefs` and
-`parseParallelPlan` in `@agentdock/shared` are the D3 body rules; the runner's
+`parseParallelPlan` in `@nautelle/shared` are the D3 body rules; the runner's
 `issue.create` handler uses the same `specGap`.
 
 ### Claude Code hooks (source `hook`, spec 201)
@@ -274,7 +274,7 @@ and transcripts (ADR-0003). The content fields (`content`, `input`, `output`,
 
 The API derives the session's `origin`, `issue`, `ownerId` and `liveState` from
 these events (`sessionOriginOf`, `issueFromBranch`, `liveStateAfter` in
-`@agentdock/shared`).
+`@nautelle/shared`).
 
 ## Correlation
 

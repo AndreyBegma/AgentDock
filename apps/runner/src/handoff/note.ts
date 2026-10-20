@@ -7,7 +7,7 @@ import {
   personLinesKept,
   splitPersonMarks,
   validateHandoffNote,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { StoredNote } from './state';
 
 /**

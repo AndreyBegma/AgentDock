@@ -3,8 +3,8 @@ import {
   ACTION_REQUEST_POLL_MS,
   ACTION_REQUEST_SUMMARY_MAX,
   type ActionRequestSummary,
-} from '@agentdock/shared';
-import type { LocalErrorCode } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { LocalErrorCode } from '@nautelle/shared/protocol';
 import type { LocalClient } from '../local/client';
 
 /**
@@ -24,7 +24,7 @@ export const permissionOutput = (decision: PermissionDecision): string =>
   });
 
 /** The deny message when the approver left no note. */
-export const DEFAULT_DENY_MESSAGE = 'Denied remotely in AgentDock.';
+export const DEFAULT_DENY_MESSAGE = 'Denied remotely in Nautelle.';
 
 /** Polling errors in a row after which the hook gives up and the dialog shows. */
 export const MAX_POLL_FAILURES = 3;

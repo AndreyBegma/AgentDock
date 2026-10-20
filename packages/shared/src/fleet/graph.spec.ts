@@ -118,7 +118,7 @@ const graph = (
     projectId: 'prj_1',
     orchestrator: {
       status: 'running',
-      session: 'agentdock-orch-x',
+      session: 'nautelle-orch-x',
       since: null,
     },
     slots,

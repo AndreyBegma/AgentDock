@@ -6,7 +6,7 @@ import {
   type WebhookEnvelope,
   type WebhookView,
   type WebhookWithSecret,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { REPO, ROOT, seedProject } from '../../fleet/testing/fleet-e2e';
 import type { Session } from '../../test/e2e-app';
 import { verifyOutboundSignature } from '../common';
@@ -49,11 +49,16 @@ describe('outbound webhooks: dispatch and delivery (e2e, spec 26)', () => {
       const first = await sendTest(created.id);
       await ctx.worker.tick(soon());
       const [request] = receiver.requests;
+      expect(request.headers['x-nautelle-event']).toBe('webhook.test');
+      expect(request.headers['x-nautelle-delivery']).toBe(first.id);
+      expect(request.headers['content-type']).toBe('application/json');
+      const signature = request.headers['x-nautelle-signature'] as string;
+      expect(signature).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
+      // ADR-0073: the legacy names carry the same values until runner 0.16.0.
       expect(request.headers['x-agentdock-event']).toBe('webhook.test');
       expect(request.headers['x-agentdock-delivery']).toBe(first.id);
-      expect(request.headers['content-type']).toBe('application/json');
-      const signature = request.headers['x-agentdock-signature'] as string;
-      expect(signature).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
+      expect(request.headers['x-agentdock-signature']).toBe(signature);
+      expect(request.headers['user-agent']).toBe('Nautelle-Webhooks/1');
       expect(
         verifyOutboundSignature(signature, request.body, created.secret),
       ).toBe(true);
@@ -73,7 +78,7 @@ describe('outbound webhooks: dispatch and delivery (e2e, spec 26)', () => {
       await sendTest(created.id);
       await ctx.worker.tick(soon());
       const [after] = receiver.requests;
-      const header = after.headers['x-agentdock-signature'] as string;
+      const header = after.headers['x-nautelle-signature'] as string;
       expect(verifyOutboundSignature(header, after.body, rotated.secret)).toBe(
         true,
       );
@@ -257,7 +262,7 @@ describe('outbound webhooks: dispatch and delivery (e2e, spec 26)', () => {
       expect(JSON.parse(request.body)).toEqual(test.payload);
       expect(
         verifyOutboundSignature(
-          request.headers['x-agentdock-signature'] as string,
+          request.headers['x-nautelle-signature'] as string,
           request.body,
           created.secret,
         ),
@@ -414,10 +419,10 @@ describe('outbound webhooks: dispatch and delivery (e2e, spec 26)', () => {
       await ctx.dispatcher.tick();
       expect(await ctx.worker.tick(soon())).toBe(1);
       const [request] = receiver.requests;
-      expect(request.headers['x-agentdock-event']).toBe('pr.merged');
+      expect(request.headers['x-nautelle-event']).toBe('pr.merged');
       expect(
         verifyOutboundSignature(
-          request.headers['x-agentdock-signature'] as string,
+          request.headers['x-nautelle-signature'] as string,
           request.body,
           hook.secret,
         ),

@@ -1,7 +1,7 @@
 import {
   ACTION_REQUEST_SUMMARY_MAX,
   requestableActionRequestKindSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   LOCAL_CARD_BODY_MAX,
   LOCAL_CARD_KINDS,
@@ -9,12 +9,12 @@ import {
   LOCAL_CARD_TITLE_MAX,
   LOCAL_NOTE_MAX,
   type LocalMethodName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 
 /**
- * One `agentdock` MCP tool (spec 201 D20): a name Claude shows as
- * `mcp__plugin_agentdock_agentdock__<name>`, the local method it calls (D7)
+ * One `nautelle` MCP tool (spec 201 D20): a name Claude shows as
+ * `mcp__plugin_nautelle_nautelle__<name>`, the local method it calls (D7)
  * and the input the model fills in. `method` and `args` are checked by the
  * daemon's and the server's own schemas again; the shape here only gives the
  * model a usable description.
@@ -78,7 +78,7 @@ export const MCP_TOOLS = [
   {
     name: 'create_issue',
     description:
-      'Create a GitHub issue in this project. With queue: true it is not queued yet: AgentDock asks a person to approve queuing it for the orchestrator, and the result carries that request (actionRequestId, poll it with action_status).',
+      'Create a GitHub issue in this project. With queue: true it is not queued yet: Nautelle asks a person to approve queuing it for the orchestrator, and the result carries that request (actionRequestId, poll it with action_status).',
     method: 'issue.create',
     input: {
       title: z.string().min(1).max(256),
@@ -132,7 +132,7 @@ export const MCP_TOOLS = [
   {
     name: 'finish_card',
     description:
-      'Only for the worker of an AgentDock board card: report the card done, with a summary of what changed. AgentDock then opens or updates the pull request. Any other session is refused (not_a_card_session).',
+      'Only for the worker of a Nautelle board card: report the card done, with a summary of what changed. Nautelle then opens or updates the pull request. Any other session is refused (not_a_card_session).',
     method: 'card.finish',
     input: {
       summary: z
@@ -145,7 +145,7 @@ export const MCP_TOOLS = [
   {
     name: 'track_card',
     description:
-      'Track the work the person just asked you to do as a card on the AgentDock Board (In progress, linked to this session). Call it once per piece of work; a second call from the same session updates that card and never creates another. Only for a person’s own terminal session; any other session is refused (not_a_manual_session).',
+      'Track the work the person just asked you to do as a card on the Nautelle Board (In progress, linked to this session). Call it once per piece of work; a second call from the same session updates that card and never creates another. Only for a person’s own terminal session; any other session is refused (not_a_manual_session).',
     method: 'card.track',
     input: {
       title: z

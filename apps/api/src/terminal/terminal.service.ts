@@ -4,12 +4,12 @@ import {
   type TerminalErrorBody,
   type TerminalErrorCode,
   type TerminalTicketResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   capabilitiesSchema,
   type TerminalTarget,
   terminalAvailable,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import type { AuthContext } from '../auth';
 import { PrismaService } from '../database/prisma.service';
@@ -162,7 +162,7 @@ export class TerminalService {
   /**
    * Issue #242: a `card` target names a card of this project; another
    * project's card, or none, is 404 before a ticket exists. The runner checks
-   * again and attaches only that card's `agentdock-card-*` session.
+   * again and attaches only that card's `nautelle-card-*` session.
    */
   private async assertCard(dto: TerminalTicketDto): Promise<void> {
     if (dto.kind !== 'card') return;

@@ -1,9 +1,9 @@
-import type { AdminRunnerDetail } from '@agentdock/shared';
+import type { AdminRunnerDetail } from '@nautelle/shared';
 import {
   RUNNER_CLOSE_CODES,
   type RunnerEvent,
   SPOOL_TRUNCATED_EVENT,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { resetDatabase, type Session } from '../test/e2e-app';
 import { generateRunnerToken } from './credentials';
 import { RunnerConnectHooks } from './runner-connect-hooks';
@@ -34,7 +34,7 @@ const event = (
   ts: '2026-10-07T18:36:02.335Z',
   type: 'slot.checkpoint',
   source: 'code-sentinel',
-  project: { repo: 'AndreyBegma/AgentDock', root: '/home/archi/dev/AgentDock' },
+  project: { repo: 'AndreyBegma/Nautelle', root: '/home/archi/dev/AgentDock' },
   slot: 'i6-api',
   issue: 6,
   session: { runtime: 'claude', id: '8f0c2a', name: 'cs-i6-api' },
@@ -154,7 +154,7 @@ describe('/runner gateway (e2e)', () => {
 
     it('C-108: replacing a live socket is audited with both peers and told to admins', async () => {
       const { runnerId, token } = await pairedRunner(ctx, admin);
-      const first = open(token, { 'User-Agent': 'agentdock-runner/1 (real)' });
+      const first = open(token, { 'User-Agent': 'nautelle-runner/1 (real)' });
       await first.connect();
       const second = open(token, { 'User-Agent': 'impostor/0.1' });
       await second.connect();
@@ -178,7 +178,7 @@ describe('/runner gateway (e2e)', () => {
           ip: '127.0.0.1',
           userAgent: 'impostor/0.1',
           previousIp: '127.0.0.1',
-          previousUserAgent: 'agentdock-runner/1 (real)',
+          previousUserAgent: 'nautelle-runner/1 (real)',
         },
       });
       const notification = await eventually('the admin notification', () =>
@@ -531,7 +531,7 @@ describe('/runner gateway (e2e)', () => {
       expect(stored[0]).toMatchObject({
         type: 'slot.checkpoint',
         source: 'code-sentinel',
-        projectRepo: 'AndreyBegma/AgentDock',
+        projectRepo: 'AndreyBegma/Nautelle',
         projectRoot: '/home/archi/dev/AgentDock',
         slot: 'i6-api',
         issue: 6,

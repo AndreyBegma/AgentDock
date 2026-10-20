@@ -10,7 +10,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { dirname } from 'node:path';
-import { sessionObservedDataSchema } from '@agentdock/shared/protocol';
+import { sessionObservedDataSchema } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { errorMessage, type Logger } from '../log';
 import type { FileState } from './types';
@@ -30,7 +30,7 @@ const offsetsFileSchema = z.object({
 
 /**
  * Where each transcript was read up to (D5), in
- * `$XDG_STATE_HOME/agentdock/offsets.json`, so a restart resumes instead of
+ * `$XDG_STATE_HOME/nautelle/offsets.json`, so a restart resumes instead of
  * re-sending. Written atomically; an unreadable file starts empty, which only
  * re-sends events the API already deduplicates.
  */

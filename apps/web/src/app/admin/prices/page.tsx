@@ -1,11 +1,5 @@
 'use client';
 
-import type {
-  CurrentPricesResponse,
-  ModelPriceInput,
-  PriceVersionListResponse,
-  UsageBreakdownResponse,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -21,6 +15,12 @@ import {
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
+import type {
+  CurrentPricesResponse,
+  ModelPriceInput,
+  PriceVersionListResponse,
+  UsageBreakdownResponse,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -263,7 +263,7 @@ export default function AdminPricesPage() {
       ) : !version ? (
         <EmptyState
           title="No price version yet"
-          description="Without one, every request is unpriced and budgets cannot count it. Seed version 1 from the bundled Langfuse price list: run this in the AgentDock checkout, with the API’s database settings in apps/api/.env."
+          description="Without one, every request is unpriced and budgets cannot count it. Seed version 1 from the bundled Langfuse price list: run this in the Nautelle checkout, with the API’s database settings in apps/api/.env."
           action={<CodeBlock code={PRICES_SEED_COMMAND} />}
         />
       ) : (

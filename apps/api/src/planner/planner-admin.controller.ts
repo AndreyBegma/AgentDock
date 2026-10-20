@@ -1,4 +1,4 @@
-import type { PlannerInstructionsView, TaskPage } from '@agentdock/shared';
+import type { PlannerInstructionsView, TaskPage } from '@nautelle/shared';
 import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';

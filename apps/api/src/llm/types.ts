@@ -1,5 +1,5 @@
-import type { LlmFeature, LlmProviderId } from '@agentdock/shared';
-import type { TokenBuckets } from '@agentdock/shared/protocol';
+import type { LlmFeature, LlmProviderId } from '@nautelle/shared';
+import type { TokenBuckets } from '@nautelle/shared/protocol';
 
 /** Image input: base64 bytes of one of the types every provider accepts. */
 export type LlmImageMediaType =

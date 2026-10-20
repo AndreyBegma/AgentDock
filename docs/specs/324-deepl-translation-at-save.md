@@ -1,11 +1,11 @@
 # Translate saved text to English at save time with DeepL
 
-Issue: [#324](https://github.com/AndreyBegma/AgentDock/issues/324) ·
+Issue: [#324](https://github.com/AndreyBegma/Nautelle/issues/324) ·
 Decision: [ADR-0033](../adr/0033-deepl-translates-stored-text-at-save-time.md) (amends ADR-0027)
 
 ## Summary
 
-ADR-0027 made AgentDock store English. A save returns the text as typed, and a
+ADR-0027 made Nautelle store English. A save returns the text as typed, and a
 `haiku` call on the runner replaces it later, in about 10–60 s. Meanwhile:
 
 - the card shows the original;

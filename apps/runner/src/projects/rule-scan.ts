@@ -3,14 +3,14 @@ import {
   PROJECT_RULE_DESCRIPTION_MAX,
   PROJECT_RULE_TITLE_MAX,
   ruleTitleKey,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type ProjectScanRulesResult,
   RULE_SCAN_CANDIDATES_MAX,
   RULE_SCAN_FILE_MAX_BYTES,
   RULE_SCAN_PER_FILE_MAX,
   type RuleCandidate,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { isDirectory, nodeFs, type ProjectFs } from './fs';
 

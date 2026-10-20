@@ -67,11 +67,11 @@ describe('slotNameSchema', () => {
 
 describe('orchestratorSessionName', () => {
   it('slugs owner/name per D1', () => {
-    expect(orchestratorSessionName('AndreyBegma/AgentDock')).toBe(
-      'agentdock-orch-andreybegma-agentdock',
+    expect(orchestratorSessionName('AndreyBegma/Nautelle')).toBe(
+      'nautelle-orch-andreybegma-nautelle',
     );
     expect(orchestratorSessionName('acme/my.repo_v2')).toBe(
-      'agentdock-orch-acme-my-repo-v2',
+      'nautelle-orch-acme-my-repo-v2',
     );
   });
 
@@ -139,7 +139,7 @@ describe('orchestrator.status result', () => {
       orchestratorStatusResultSchema.safeParse({
         present: true,
         state: 'idle',
-        session: 'agentdock-orch-acme-repo',
+        session: 'nautelle-orch-acme-repo',
         startedAt: '2026-10-08T10:00:00.000Z',
       }).success,
     ).toBe(true);
@@ -228,7 +228,7 @@ describe('orchestrator.message', () => {
 
   it('refuses a session, argv or slot: the runner resolves the session', () => {
     for (const extra of [
-      { session: 'agentdock-orch-acme-widget' },
+      { session: 'nautelle-orch-acme-widget' },
       { argv: ['claude', '--help'] },
       { slot: 'i42' },
       { text: 'the slot field name' },

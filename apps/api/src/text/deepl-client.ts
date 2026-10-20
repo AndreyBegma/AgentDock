@@ -2,7 +2,7 @@ import {
   DEEPL_TARGET_LANG,
   type DeepLAnswer,
   type DeepLError,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 

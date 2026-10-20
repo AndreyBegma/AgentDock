@@ -7,7 +7,7 @@ import {
   type CommandRunStatus,
   type CommandRunView,
   type ControlErrorCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

@@ -34,11 +34,11 @@ import {
   type UpdateBoardCardRequest,
   type UpdateBoardSettingsRequest,
   type UpdateBoardStackRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type OrchestratorPermissionMode,
   orchestratorPermissionModeSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -391,6 +391,10 @@ export class AcceptBoardCardDto implements AcceptBoardCardRequest {
   @ValidateNested()
   @Type(() => AcceptClosePrDto)
   closePr?: AcceptClosePrDto;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmUnlanded?: boolean;
 }
 
 /** `POST /board/cards/:number/accept-suggestion` (#244 D9): Edit & accept. */

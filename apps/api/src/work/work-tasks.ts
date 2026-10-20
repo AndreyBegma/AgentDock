@@ -2,7 +2,7 @@ import type {
   PlanStatus,
   PlanTaskIssueView,
   TaskDesignSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { PlanTask, Prisma } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
 import { readablePlanWhere } from '../planner/plan-access';

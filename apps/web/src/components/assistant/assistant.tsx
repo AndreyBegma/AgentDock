@@ -1,10 +1,10 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { FloatingWindow } from '@andrewbehma/glass-ui/floating-window';
 import { Launcher } from '@andrewbehma/glass-ui/launcher';
+import type { ProjectSummary } from '@nautelle/shared';
 import { MessageSquare, PanelLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useAssistant } from '../../lib/assistant/use-assistant';

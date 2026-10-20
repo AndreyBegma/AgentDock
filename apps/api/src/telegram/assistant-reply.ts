@@ -1,4 +1,4 @@
-import { LLM_PROVIDER_INFO, type LlmProviderId } from '@agentdock/shared';
+import { LLM_PROVIDER_INFO, type LlmProviderId } from '@nautelle/shared';
 import {
   escapeLinkUrl,
   escapeMarkdownV2,
@@ -182,13 +182,13 @@ export const assistantReplyParts = (
 
 export const ASSISTANT_REPLIES = {
   newChat:
-    'Started a new conversation. Your next message begins it; the earlier one stays in AgentDock.',
+    'Started a new conversation. Your next message begins it; the earlier one stays in Nautelle.',
   busy: 'The assistant is still answering your previous message. Send this one again once the reply arrives.',
   tooLong: 'That message is too long for the assistant. Send a shorter one.',
   empty: 'The assistant gave no answer. Try again.',
   failed: 'The assistant could not answer. Try again in a moment.',
   notSetUp:
-    'The assistant is not set up: an admin enables an AI provider in AgentDock → Admin → AI providers.',
+    'The assistant is not set up: an admin enables an AI provider in Nautelle → Admin → AI providers.',
   photoNeedsProject:
     'A photo is stored on a project. Pick this chat’s project with /project, then send the photo again.',
   photoNeedsCaption: 'Add a caption to the photo to send it to the assistant.',

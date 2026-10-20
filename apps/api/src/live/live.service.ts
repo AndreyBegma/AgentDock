@@ -3,7 +3,7 @@ import {
   type LiveTopic,
   liveTopicSchema,
   MAX_LIVE_MESSAGE_BYTES,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { LiveConnections } from './live-connections';
 

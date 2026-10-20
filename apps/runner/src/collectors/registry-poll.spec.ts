@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { GitHubAppHealth } from '@agentdock/shared/protocol';
+import type { GitHubAppHealth } from '@nautelle/shared/protocol';
 import { memoryLogger } from '../testing/fixtures';
 import { type Collector, CollectorRegistry } from './registry';
 

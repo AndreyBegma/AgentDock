@@ -3,7 +3,7 @@ import {
   type BoardErrorCode,
   type CardAutoRunFailure,
   isCardAutoRunCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /**

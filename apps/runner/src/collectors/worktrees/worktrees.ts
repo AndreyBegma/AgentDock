@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import type { WorktreeChangedData } from '@agentdock/shared/protocol';
+import type { WorktreeChangedData } from '@nautelle/shared/protocol';
 import type { Exec } from '../../detect/exec';
 import type { FleetEmitter, FleetProject } from '../../fleet/project';
 import { slotOfWorktree, slotWorktreePath } from '../../fleet/session-name';

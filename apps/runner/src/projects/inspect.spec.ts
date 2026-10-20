@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { join } from 'node:path';
-import { projectInspectionSchema } from '@agentdock/shared/protocol';
+import { projectInspectionSchema } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
 import {

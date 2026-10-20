@@ -1,4 +1,4 @@
-import type { TextSettingsView } from '@agentdock/shared';
+import type { TextSettingsView } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';

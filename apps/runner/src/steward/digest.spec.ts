@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DIGEST_PROSE_MAX, type StewardRunnerConfig } from '@agentdock/shared';
+import { DIGEST_PROSE_MAX, type StewardRunnerConfig } from '@nautelle/shared';
 import {
   type DigestComposeArgs,
   digestComposeResultSchema,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CaptureSpawn } from '../capture/executor';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
@@ -145,6 +145,7 @@ describe('StewardDigestWriter (#491)', () => {
       '--session-id',
       ARGS.sessionId,
     ]);
+    expect(call?.env.NAUTELLE_HOOKS).toBe('off');
     expect(call?.env.AGENTDOCK_HOOKS).toBe('off');
     expect(call?.env.CLAUDE_CONFIG_DIR).toBe('/home/dev/.claude-work');
     // D16: the spend is the API's `steward` run's.

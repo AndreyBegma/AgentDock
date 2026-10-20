@@ -15,7 +15,7 @@ export default function NotFound() {
       id="main-content"
       className="flex min-h-screen w-full flex-col items-center justify-center gap-8 px-4 py-16 text-center"
     >
-      <Link href="/" aria-label="AgentDock, overview">
+      <Link href="/" aria-label="Nautelle, overview">
         <Wordmark size="lg" />
       </Link>
       <div className="flex max-w-md flex-col items-center gap-3">

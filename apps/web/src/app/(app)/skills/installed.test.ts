@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { InstalledSkillView } from '@agentdock/shared';
+import type { InstalledSkillView } from '@nautelle/shared';
 import { installedEntries, whereInstalled } from './installed';
 
 const skill = (patch: Partial<InstalledSkillView>): InstalledSkillView => ({

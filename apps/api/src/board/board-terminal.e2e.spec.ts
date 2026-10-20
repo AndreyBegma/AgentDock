@@ -1,9 +1,5 @@
-import type {
-  BoardCardView,
-  BoardView,
-  FleetCardEdit,
-} from '@agentdock/shared';
-import type { LocalMethodArgs } from '@agentdock/shared/protocol';
+import type { BoardCardView, BoardView, FleetCardEdit } from '@nautelle/shared';
+import type { LocalMethodArgs } from '@nautelle/shared/protocol';
 import type { LocalCall } from '../local/local-call';
 import { LocalError } from '../local/local-error';
 import { LocalHandlers } from '../local/local-handlers';
@@ -67,7 +63,7 @@ describe('terminal cards (e2e)', () => {
     projectId = w.a,
   ) => handlers.table['card.track'](args, call(sessionId, projectId));
 
-  /** The session's hooks reached AgentDock: it is a `manual` session in `root`. */
+  /** The session's hooks reached Nautelle: it is a `manual` session in `root`. */
   const manualSession = async (externalId = MANUAL, root = ROOT_A) => {
     await w.deliver(
       'hook.session_started',

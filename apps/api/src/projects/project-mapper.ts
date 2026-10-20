@@ -6,7 +6,7 @@ import type {
   ProjectSummary,
   Role,
   RunnerStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type DocsSource as DetectedDocsSource,
   type DocsClassified,
@@ -15,7 +15,7 @@ import {
   projectInspectionSchema,
   runnerCommandsOf,
   runtimeProfileSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type {
   DocsSource,
   Prisma,
@@ -102,6 +102,7 @@ export const toProjectSummary = (
   base: project.baseOverride ?? project.baseBranch,
   docsKind: project.docsSource?.kind ?? null,
   role,
+  watchRefusal: project.watchRefusal,
 });
 
 export const toProjectDetail = (

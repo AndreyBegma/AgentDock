@@ -17,11 +17,11 @@ import {
   isCaptureModel,
   parseCaptureOutput,
   selectCaptureInput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CardsExtractArgs,
   CardsExtractFinishedData,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

@@ -2,7 +2,7 @@ import type {
   SkillInspectRequest,
   SkillInstallRequest,
   SkillRunRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type OrchestratorPermissionMode,
   orchestratorPermissionModeSchema,
@@ -14,7 +14,7 @@ import {
   SKILL_SEARCH_QUERY_MAX,
   type SkillRunOutput,
   skillRunOutputSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   IsIn,
   IsInt,

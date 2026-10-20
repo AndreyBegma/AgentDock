@@ -134,7 +134,7 @@ describe('exec-run', () => {
     expect(JSON.parse(readFileSync(join(dir, 'exit.json'), 'utf8')).code).toBe(
       4,
     );
-    expect(out.join('')).toContain('agentdock card');
+    expect(out.join('')).toContain('nautelle card');
   });
 
   it('refuses a relative stdin path', async () => {

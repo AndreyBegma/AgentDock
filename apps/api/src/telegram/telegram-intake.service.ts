@@ -10,7 +10,7 @@ import {
   type PlanTurnInput,
   planTurnInputSchema,
   withRecommendations,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   HttpException,
   Inject,
@@ -96,7 +96,7 @@ export const INTAKE_REPLIES = {
   answered: 'Noted as your answer.',
   emptyAnswer: 'Send your answer as text.',
   busy: 'The planner is still thinking. Wait for its answer.',
-  failed: 'That did not work. Try again in AgentDock.',
+  failed: 'That did not work. Try again in Nautelle.',
 } as const;
 
 /** Why the intake could not start or go on, by the planner's error code. */
@@ -110,9 +110,9 @@ const PLANNER_REFUSALS: Partial<Record<string, string>> = {
     'The proposal changed. Look at the newest one and press again.',
   [PLANNER_ERROR.planClosed]: INTAKE_REPLIES.over,
   [PLANNER_ERROR.noProfile]:
-    'The project has no runtime profile for the planner. Pick one in AgentDock.',
+    'The project has no runtime profile for the planner. Pick one in Nautelle.',
   [PLANNER_ERROR.unsupportedRuntime]:
-    'The project’s planner profile is not a Claude profile. Pick one in AgentDock.',
+    'The project’s planner profile is not a Claude profile. Pick one in Nautelle.',
   budget_exceeded:
     'A budget stops new runs on this project, so nothing was started.',
 };

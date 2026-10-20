@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
-import type { SpecTargetKind } from '@agentdock/shared';
-import { repoRelativeDirSchema } from '@agentdock/shared/protocol';
+import type { SpecTargetKind } from '@nautelle/shared';
+import { repoRelativeDirSchema } from '@nautelle/shared/protocol';
 import type { DocsSourceKind, Prisma } from '@prisma/client';
 import { specDirOf } from './planner-instructions.service';
 

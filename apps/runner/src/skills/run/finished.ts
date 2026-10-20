@@ -9,7 +9,7 @@ import {
   type SkillRunTerminalPhase,
   skillRunChangedFileSchema,
   skillRunFinishedDataSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { redactText } from '../../pane/redact';
 
 const bytes = (text: string): number => Buffer.byteLength(text, 'utf8');

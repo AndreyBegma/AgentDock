@@ -4,7 +4,7 @@ import {
   CODE_ASK_QUESTION_MAX,
   REPO_SEARCH_RESULTS_MAX,
   type RepoCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, type OnModuleInit, Optional } from '@nestjs/common';
 import type { RunStatus } from '@prisma/client';
 import { z } from 'zod';

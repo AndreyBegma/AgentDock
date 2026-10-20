@@ -121,7 +121,7 @@ export const restartChipLabel = (
 // The `resume_context` MCP tool (D6)
 
 /**
- * `resume_context`: the agentdock MCP server's tool for a person's own
+ * `resume_context`: the nautelle MCP server's tool for a person's own
  * terminal session. The runner answers it from the note on the machine (D4)
  * — the API is not asked, so it works with session content off. The card is
  * resolved from the session: its worktree, or a checkout on the card's

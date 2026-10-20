@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { LlmErrorBody, LlmSettingsView } from '@agentdock/shared';
+import type { LlmErrorBody, LlmSettingsView } from '@nautelle/shared';
 import { Logger } from '@nestjs/common';
 import { SecretCipher } from '../common/crypto';
 import {

@@ -3,7 +3,7 @@ import {
   PLANNER_INTAKE_CONTRACT,
   PLANNER_INTAKE_MAX_ROUNDS,
   type PlanDetail,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { block, PlannerHarness, question } from './testing/planner-e2e';
 
 /** #337 D1–D6, D9, D10: New Card is a `card` plan that interviews, then writes one card. */

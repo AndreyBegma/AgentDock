@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { SessionMessageInput } from '@agentdock/shared';
+import type { SessionMessageInput } from '@nautelle/shared';
 import type { CardRecord } from '../cards/record';
 import { createExec } from '../detect/exec';
 import { FakeClock } from '../testing/fake-clock';
@@ -19,7 +19,7 @@ setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS * 2);
  */
 const tmuxInstalled = Bun.which('tmux') !== null;
 const FIXTURES = join(import.meta.dir, '..', 'cards', '__fixtures__');
-const SESSION = 'agentdock-card-ab12cd34';
+const SESSION = 'nautelle-card-ab12cd34';
 
 // Shows the screen, then records raw input until the session is killed.
 const SCREEN = `#!/bin/sh

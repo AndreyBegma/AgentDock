@@ -1,5 +1,5 @@
-import { HANDOFF_PERSON_MARK } from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import { HANDOFF_PERSON_MARK } from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import {
   applyNoteUpdate,
   type StoredNote,

@@ -7,7 +7,7 @@ import {
   type HookCliName,
   parseHookEvent,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { LocalService } from '../local/service';
 import { SessionTokens } from '../local/session-tokens';
 import { HookSessions } from '../local/sessions';
@@ -46,7 +46,7 @@ const spool = async (shipContent: boolean, names = NAMES) => {
   for (const name of names) {
     const event = buildHookEvent(name, fixture(name), {
       gitBranch: 'feat/184-x',
-      tmuxSession: 'agentdock-manual-0a1b2c3d',
+      tmuxSession: 'nautelle-manual-0a1b2c3d',
       ancestors: [{ pid: 10, comm: 'claude' }],
     });
     if (!event) throw new Error(`${name} built nothing`);
@@ -83,7 +83,7 @@ describe('hook payloads → hook.* events (spec 201 D11)', () => {
       gitBranch: 'feat/184-x',
       model: 'claude-opus-5',
       permissionMode: 'default',
-      tmuxSession: 'agentdock-manual-0a1b2c3d',
+      tmuxSession: 'nautelle-manual-0a1b2c3d',
     });
     expect(byType('hook.tool_finished')).toMatchObject({
       toolUseId: 'toolu_01ABC123',

@@ -1,3 +1,5 @@
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
+import type { TraceNode } from '@andrewbehma/glass-ui/trace-tree';
 import {
   SESSION_ERROR,
   type SessionListQuery,
@@ -8,10 +10,8 @@ import {
   type SessionTotals,
   type SessionTreeNode,
   type SessionTurnNode,
-} from '@agentdock/shared';
-import type { QuerySource, Runtime } from '@agentdock/shared/protocol';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
-import type { TraceNode } from '@andrewbehma/glass-ui/trace-tree';
+} from '@nautelle/shared';
+import type { QuerySource, Runtime } from '@nautelle/shared/protocol';
 import { ApiError, describeError, type ErrorHint } from '../api';
 import {
   formatCost as formatCostShared,

@@ -8,7 +8,7 @@ import {
   type StewardActionResult,
   type StewardDialogId,
   stewardActionCount,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardResumeArgs,
   cardResumeArgsSchema,
@@ -17,7 +17,7 @@ import {
   type Role,
   roleAtLeast,
   type StewardCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,
@@ -650,7 +650,7 @@ export class StewardDecider implements OnApplicationBootstrap, OnModuleDestroy {
    * D10, DA-15: the round's own launch facts. The permission mode is the
    * one the round started in (`runs.args.permissionMode`), else the
    * project's; `bypassPermissions` needs the starter to be a project admin
-   * now — as on a Run — except for AgentDock's own `ci_fix` round. `null`:
+   * now — as on a Run — except for Nautelle's own `ci_fix` round. `null`:
    * the round cannot be resumed as it started.
    */
   private async resumeArgs(

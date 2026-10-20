@@ -2,7 +2,7 @@ import {
   AUTH_ERROR,
   type LoginDeniedReason,
   type PublicUser,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { type HttpException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

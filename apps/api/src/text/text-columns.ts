@@ -3,7 +3,7 @@ import {
   TEXT_ANSWER_FIELD_PREFIX,
   type TextOwnerType,
   textAnswerField,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
 

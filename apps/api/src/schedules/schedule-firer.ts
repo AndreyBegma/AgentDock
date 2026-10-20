@@ -8,7 +8,7 @@ import {
   type ScheduleFiringReason,
   type ScheduleTarget,
   SKILLS_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type {
   Prisma,

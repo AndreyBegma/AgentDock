@@ -491,8 +491,8 @@ describe('skill.run', () => {
     ).toBe(true);
   });
 
-  it('names the session agentdock-run-*, never cs-*', () => {
-    expect(skillRunSessionName('a1b2c3')).toBe('agentdock-run-a1b2c3');
+  it('names the session nautelle-run-*, never cs-*', () => {
+    expect(skillRunSessionName('a1b2c3')).toBe('nautelle-run-a1b2c3');
     expect(() => skillRunSessionName('A1;rm')).toThrow();
     expect(
       skillRunResultSchema.safeParse({

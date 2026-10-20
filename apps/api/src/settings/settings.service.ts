@@ -1,4 +1,4 @@
-import { REGISTRATION_SETTING_KEY } from '@agentdock/shared';
+import { REGISTRATION_SETTING_KEY } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

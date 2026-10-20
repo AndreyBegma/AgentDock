@@ -3,8 +3,8 @@ import {
   APPROVALS_LIVE_EVENT,
   type ApprovalDetail,
   type ApprovalsView,
-} from '@agentdock/shared';
-import type { PrInspection, RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { PrInspection, RunnerEvent } from '@nautelle/shared/protocol';
 import { EventStream, ROOT, seedProject } from '../fleet/testing/fleet-e2e';
 import { allowedLiveOrigin } from '../live/live-options';
 import {
@@ -737,7 +737,7 @@ describe('merge approval queue (e2e)', () => {
       });
     });
 
-    it('flags a mismatch between AgentDock’s flag and the config', async () => {
+    it('flags a mismatch between Nautelle’s flag and the config', async () => {
       await ctx.prisma.project.update({
         where: { id: a },
         data: {

@@ -1,4 +1,4 @@
-import { SLOT_WORKTREE_CACHE_MS } from '@agentdock/shared';
+import { SLOT_WORKTREE_CACHE_MS } from '@nautelle/shared';
 
 /** The worktree proxy's timings; e2e tests shorten them. */
 export interface FleetWorkspaceOptions {

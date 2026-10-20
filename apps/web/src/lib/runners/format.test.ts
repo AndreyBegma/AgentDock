@@ -55,13 +55,13 @@ describe('runnerRemedy', () => {
   test('an offline runner is told how to start', () => {
     expect(runnerRemedy({ status: 'offline', pairedAt: paired })).toEqual({
       text: 'Start it on its machine:',
-      command: 'agentdock-runner run',
+      command: 'nautelle-runner run',
     });
   });
 
   test('a stale runner names the command too', () => {
     expect(runnerRemedy({ status: 'stale', pairedAt: paired })?.command).toBe(
-      'agentdock-runner run',
+      'nautelle-runner run',
     );
   });
 

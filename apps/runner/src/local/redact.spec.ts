@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { HOOK_CONTENT_MAX_CHARS } from '@agentdock/shared/protocol';
+import { HOOK_CONTENT_MAX_CHARS } from '@nautelle/shared/protocol';
 import { MASK } from '../pane/redact';
 import { redactText, toHookContent, toToolInputPreview } from './redact';
 

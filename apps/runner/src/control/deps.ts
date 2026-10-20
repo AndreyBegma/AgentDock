@@ -1,4 +1,4 @@
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import type { Clock } from '../clock';
 import type { ConfigProfile } from '../config';
 import type { Exec } from '../detect/exec';
@@ -28,7 +28,7 @@ export interface ControlDeps {
   selfCommand?: readonly string[];
   /**
    * #445: where an orchestrator session's Token saver files go, one
-   * directory per session; `<state>/agentdock/orchestrator` by default.
+   * directory per session; `<state>/nautelle/orchestrator` by default.
    */
   orchestratorDir?: string;
 }

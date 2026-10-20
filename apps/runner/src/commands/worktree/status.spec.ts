@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { join } from 'node:path';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import { REAL_PROCESS_TIMEOUT_MS, workspace } from '../../testing/projects';
 import { CommandFailure } from '../failure';
 import {

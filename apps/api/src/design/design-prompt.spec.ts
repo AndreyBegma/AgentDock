@@ -1,5 +1,5 @@
-import { designBytes } from '@agentdock/shared';
-import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
+import { designBytes } from '@nautelle/shared';
+import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 import { assemblePrompt, type PromptInput } from '../planner/plan-prompt';
 import {
   cardDesignPrompt,

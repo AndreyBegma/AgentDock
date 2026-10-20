@@ -3,7 +3,7 @@ import {
   type FleetEvent,
   parseFleetEvent,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { FakeClock } from '../testing/fake-clock';
 import { type FleetProject, fleetEmitter } from './project';
 import { SlotBook } from './slots';

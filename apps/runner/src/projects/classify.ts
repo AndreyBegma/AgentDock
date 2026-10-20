@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { DocsClassified } from '@agentdock/shared/protocol';
+import type { DocsClassified } from '@nautelle/shared/protocol';
 import type { DirEntry, ProjectFs } from './fs';
 
 type Kind = keyof DocsClassified;

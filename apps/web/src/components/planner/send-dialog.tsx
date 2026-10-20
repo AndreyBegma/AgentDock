@@ -1,10 +1,10 @@
 'use client';
 
-import type { PlanDetail, PlannerSpecOutput } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import type { PlanDetail, PlannerSpecOutput } from '@nautelle/shared';
 import { pluralize } from '../../lib/format';
 import {
   ISSUE_LABEL,

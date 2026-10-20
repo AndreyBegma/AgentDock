@@ -4,7 +4,7 @@ import {
   type RunnerMessage,
   runnerMessageSchema,
   type ServerMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Server, ServerWebSocket } from 'bun';
 
 interface SocketData {
@@ -14,7 +14,7 @@ interface SocketData {
 export type PairingHandler = (body: unknown) => Response;
 
 /**
- * A stand-in for the AgentDock API (#6 is not built yet): the pairing
+ * A stand-in for the Nautelle API (#6 is not built yet): the pairing
  * endpoint and the `/runner` socket. Every message the runner sends is parsed
  * with the protocol schema, so a malformed one fails the test.
  */

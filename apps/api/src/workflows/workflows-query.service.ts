@@ -4,7 +4,7 @@ import {
   type WorkflowsOrchestrationResponse,
   type WorkflowsSummaryResponse,
   type WorkflowsToolsResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthUser } from '../auth';

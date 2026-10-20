@@ -4,7 +4,7 @@ import {
   PLAN_TURN_RESULT_MAX_BYTES,
   type PlanTurnTerminalPhase,
   planSessionIdSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { redact } from '../pane/redact';
 import type { ExitRecord } from '../skills/run/record';
 import { finalResult } from '../skills/run/stream';
@@ -112,11 +112,17 @@ export const turnOutcome = (input: {
   timeoutSec: number;
   /** The session the turn was started in; absent when it never started. */
   fallbackSessionId?: string;
+  /**
+   * Where the result text is cut: one event's `PLAN_TURN_RESULT_MAX_BYTES`
+   * by default; a plan turn, which chunks a larger result (#686), passes
+   * `PLAN_TURN_RESULT_TOTAL_MAX_BYTES`.
+   */
+  maxResultBytes?: number;
 }): TurnOutcome => {
   const { reason, exit } = input;
   const result = finalResult(input.stream);
   const cut = result?.text
-    ? cutBytes(result.text, PLAN_TURN_RESULT_MAX_BYTES)
+    ? cutBytes(result.text, input.maxResultBytes ?? PLAN_TURN_RESULT_MAX_BYTES)
     : null;
   let phase: PlanTurnTerminalPhase = 'failed';
   let error: string | undefined;

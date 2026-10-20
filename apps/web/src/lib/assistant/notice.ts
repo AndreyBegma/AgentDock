@@ -1,5 +1,5 @@
-import type { AssistantStreamEvent } from '@agentdock/shared';
-import { LLM_PROVIDER_INFO } from '@agentdock/shared';
+import type { AssistantStreamEvent } from '@nautelle/shared';
+import { LLM_PROVIDER_INFO } from '@nautelle/shared';
 
 type StreamError = Extract<AssistantStreamEvent, { type: 'error' }>;
 

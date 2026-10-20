@@ -1,12 +1,5 @@
 'use client';
 
-import {
-  DESIGN_COMMENT_MAX,
-  type DesignCommentRequest,
-  type DesignCommentView,
-  type DesignFrameView,
-  type DesignOwnerView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
@@ -17,6 +10,13 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
+import {
+  DESIGN_COMMENT_MAX,
+  type DesignCommentRequest,
+  type DesignCommentView,
+  type DesignFrameView,
+  type DesignOwnerView,
+} from '@nautelle/shared';
 import { PanelTop } from 'lucide-react';
 import { useState } from 'react';
 import {

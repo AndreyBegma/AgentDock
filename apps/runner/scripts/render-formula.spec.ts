@@ -37,7 +37,7 @@ describe('render-formula.sh', () => {
       'linux-arm64': '4'.repeat(64),
     };
     for (const [target, sha] of Object.entries(expected)) {
-      const url = `https://github.com/AndreyBegma/AgentDock/releases/download/runner-v9.8.7/agentdock-runner-9.8.7-${target}.tar.gz`;
+      const url = `https://github.com/AndreyBegma/Nautelle/releases/download/runner-v9.8.7/nautelle-runner-9.8.7-${target}.tar.gz`;
       expect(formula).toContain(`url "${url}"\n      sha256 "${sha}"`);
     }
     expect(formula).toContain('version "9.8.7"');
@@ -46,7 +46,7 @@ describe('render-formula.sh', () => {
 
   it('pins SHA256SUMS and its signature as resources of the release', () => {
     const base =
-      'https://github.com/AndreyBegma/AgentDock/releases/download/runner-v9.8.7';
+      'https://github.com/AndreyBegma/Nautelle/releases/download/runner-v9.8.7';
     expect(formula).toContain(
       `url "${base}/SHA256SUMS"\n    sha256 "${sha256(readFileSync(fixture))}"`,
     );
@@ -70,6 +70,14 @@ describe('render-formula.sh', () => {
     );
   });
 
+  it('installs nautelle-runner and links the old agentdock-runner command to it (ADR-0073)', () => {
+    expect(formula).toContain('class NautelleRunner < Formula');
+    expect(formula).toContain('bin.install "nautelle-runner"');
+    expect(formula).toContain(
+      'bin.install_symlink bin/"nautelle-runner" => "agentdock-runner"',
+    );
+  });
+
   it('runs the service through the same exit-78 wrapper as the launchd agent', () => {
     expect(formula).toContain(`'${TERMINAL_CLOSE_AS_SUCCESS}'`);
     expect(formula).toContain('keep_alive successful_exit: false');
@@ -78,11 +86,11 @@ describe('render-formula.sh', () => {
   // The formula's own check, run by Ruby against a stub of Homebrew's Formula.
   // CI has no Ruby; run it where there is one.
   describe.skipIf(!Bun.which('ruby'))('verify_release! under Ruby', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'agentdock-formula-rb-'));
+    const dir = mkdtempSync(join(tmpdir(), 'nautelle-formula-rb-'));
     afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
     const { privateKey, publicKey } = generateKeyPairSync('ed25519');
-    const name = 'agentdock-runner-9.8.7-linux-x64.tar.gz';
+    const name = 'nautelle-runner-9.8.7-linux-x64.tar.gz';
     const tarball = 'the real tarball';
     const sums = Buffer.from(`${sha256(tarball)}  ${name}\n`);
     writeFileSync(join(dir, 'formula.rb'), formula);
@@ -107,8 +115,8 @@ describe('render-formula.sh', () => {
         'dir = ARGV.shift',
         'load File.join(dir, "formula.rb")',
         'sig, name, digest, key = ARGV',
-        'key = key == "release" ? AgentdockRunner::RELEASE_KEY : File.read(File.join(dir, "key.pem"))',
-        'AgentdockRunner.verify_release!(File.binread(File.join(dir, "SHA256SUMS")), File.binread(File.join(dir, sig)), name, digest, key)',
+        'key = key == "release" ? NautelleRunner::RELEASE_KEY : File.read(File.join(dir, "key.pem"))',
+        'NautelleRunner.verify_release!(File.binread(File.join(dir, "SHA256SUMS")), File.binread(File.join(dir, sig)), name, digest, key)',
         'puts "ok"',
       ].join('\n'),
     );
@@ -139,14 +147,14 @@ describe('render-formula.sh', () => {
       ]) {
         expect(run.exitCode).not.toBe(0);
         expect(run.stderr.toString()).toContain(
-          'SHA256SUMS is not signed by the AgentDock release key',
+          'SHA256SUMS is not signed by the Nautelle release key',
         );
       }
     });
   });
 
   describe('with a target missing from SHA256SUMS', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'agentdock-formula-'));
+    const dir = mkdtempSync(join(tmpdir(), 'nautelle-formula-'));
     afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
     it('fails and names the tarball', () => {
@@ -161,7 +169,7 @@ describe('render-formula.sh', () => {
       const failed = render('9.8.7', partial);
       expect(failed.exitCode).not.toBe(0);
       expect(failed.stderr.toString()).toContain(
-        'agentdock-runner-9.8.7-linux-x64.tar.gz',
+        'nautelle-runner-9.8.7-linux-x64.tar.gz',
       );
     });
   });

@@ -1,7 +1,4 @@
-import {
-  TELEGRAM_RATE_LIMIT,
-  TELEGRAM_RATE_WINDOW_MS,
-} from '@agentdock/shared';
+import { TELEGRAM_RATE_LIMIT, TELEGRAM_RATE_WINDOW_MS } from '@nautelle/shared';
 
 export interface RatePlanInput {
   /** Pending deliveries due now, oldest first. */

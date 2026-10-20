@@ -6,7 +6,7 @@ import {
   cardShortIdSchema,
   cardTmuxSessionSchema,
   skillRunIdSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { removeRawDir } from '../filter/raw-store';
 import {

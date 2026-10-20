@@ -1,0 +1,25 @@
+{
+  "name": "agentdock-runner",
+  "version": "0.0.0-dev",
+  "description": "Deprecated: renamed to nautelle-runner. Installs nautelle-runner and runs it under the old command.",
+  "license": "MIT",
+  "homepage": "https://nautelle.luna-realm.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndreyBegma/Nautelle.git",
+    "directory": "apps/runner"
+  },
+  "bin": {
+    "agentdock-runner": "bin/agentdock-runner.js"
+  },
+  "files": [
+    "bin/agentdock-runner.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "nautelle-runner": "0.0.0-dev"
+  }
+}

@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import type { TerminalSetupItem, TerminalSetupView } from '@agentdock/shared';
+import {
+  type TerminalSetupFacts,
+  type TerminalSetupItem,
+  type TerminalSetupProfileFacts,
+  type TerminalSetupView,
+  terminalSetup,
+} from '@nautelle/shared';
 import {
   setupItemTitle,
   stepNeedsAdmin,
@@ -10,6 +16,8 @@ import {
 
 const view = (todo: number): TerminalSetupView => ({
   items: [],
+  otherProfiles: [],
+  ignoredProfileKeys: [],
   complete: todo === 0,
   todo,
   closing: '',
@@ -53,6 +61,48 @@ describe('terminalSetupNeed', () => {
     );
     expect(needs.map((need) => need.projectId)).toEqual(['a']);
     expect(needs[0]?.reason).toBe('1 step');
+  });
+});
+
+describe('terminalSetupNeed and the profiles a project uses (#719)', () => {
+  const profile = (
+    key: string,
+    plugin: string | null,
+  ): TerminalSetupProfileFacts => ({
+    key,
+    runtime: 'claude',
+    agentdock: { plugin, telemetry: true },
+    sessions: { hooked: 0, unhooked: 0, unhookedAfterReport: 0 },
+  });
+  const facts = (
+    over: Partial<TerminalSetupFacts> = {},
+  ): TerminalSetupFacts => ({
+    projectId: 'p1',
+    runnerConnected: true,
+    profiles: [profile('main', '0.4.0')],
+    shipSessionContent: true,
+    captureEnabled: true,
+    ...over,
+  });
+
+  test('a runner profile without the plugin the project does not use raises nothing', () => {
+    const view = terminalSetup(
+      facts({ otherProfiles: [profile('hatkom', null)] }),
+    );
+    expect(view.otherProfiles).toHaveLength(1);
+    expect(terminalSetupNeed(project('p1', 'operator'), view)).toBeNull();
+  });
+
+  test('the default profile without the plugin still does', () => {
+    const view = terminalSetup(
+      facts({
+        profiles: [profile('main', null)],
+        otherProfiles: [profile('hatkom', null)],
+      }),
+    );
+    expect(terminalSetupNeed(project('p1', 'operator'), view)?.reason).toBe(
+      '1 step',
+    );
   });
 });
 

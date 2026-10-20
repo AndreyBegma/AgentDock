@@ -1,12 +1,13 @@
 'use client';
 
-import type { PlanDetail } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { PlanDetail } from '@nautelle/shared';
 import { Globe, Lock } from 'lucide-react';
-import Link from 'next/link';
+import NextLink from 'next/link';
+import { boardHref } from '../../lib/board/href';
 import { Time } from '../../lib/format/time';
 import {
   canRevise,
@@ -94,22 +95,45 @@ export function PlanHeader({
     plan.status === 'archived' ||
     plan.status === 'done';
   const pill = planPill(plan);
-  const description = briefBeyondTitle(plan);
+  const brief = briefBeyondTitle(plan);
+  // The retired page says why it is read-only where the header can be read.
+  const description = readOnly
+    ? `Read-only: the Planner moved onto the Board.${brief ? ` ${brief}` : ''}`
+    : brief;
   const notes = useTextNotes(projectId, { planId: plan.id }, plan.version);
   const briefNote = notes.view('plan', plan.id, 'brief');
 
   return (
     <PageHeader
       className="mb-0"
+      link={NextLink}
+      primaryAction={
+        readOnly && !closed
+          ? { label: 'Open the Board', href: boardHref(projectId) }
+          : undefined
+      }
+      overflow={
+        readOnly && !closed && onArchive
+          ? [
+              {
+                id: 'archive',
+                label: 'Archive plan',
+                tone: 'danger',
+                disabled: busy,
+                onSelect: onArchive,
+              },
+            ]
+          : undefined
+      }
       eyebrow={
         <span className="flex flex-wrap items-center gap-2">
           {/* The breadcrumbs lead back on a desktop; a phone has none. */}
-          <Link
+          <NextLink
             href={plannerHref(projectId)}
             className="text-accent-ink underline underline-offset-2 lg:hidden"
           >
             Planner
-          </Link>
+          </NextLink>
           <span aria-hidden="true" className="lg:hidden">
             /
           </span>
@@ -157,13 +181,7 @@ export function PlanHeader({
                 : `#${plan.docsPrNumber}`}
             </a>
           ) : undefined
-        ) : readOnly ? (
-          onArchive ? (
-            <Button variant="ghost" disabled={busy} onClick={onArchive}>
-              Archive
-            </Button>
-          ) : undefined
-        ) : (
+        ) : readOnly ? undefined : (
           <>
             {isAuthor && plan.visibility === 'private' ? (
               <Button variant="glass" disabled={busy} onClick={onShare}>

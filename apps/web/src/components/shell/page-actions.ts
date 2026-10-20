@@ -1,4 +1,4 @@
-import { projectRoleAtLeast, type Role } from '@agentdock/shared';
+import { projectRoleAtLeast, type Role } from '@nautelle/shared';
 import type { LucideIcon } from 'lucide-react';
 
 /** A page's create action, which the capsule's `+` offers below `lg` (#521). */

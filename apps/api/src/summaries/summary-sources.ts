@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { cardCiChecksOf } from '@agentdock/shared';
+import { cardCiChecksOf } from '@nautelle/shared';
 import type {
   BoardCardKind,
   BoardColumn,

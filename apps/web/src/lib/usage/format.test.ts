@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ModelPriceInput } from '@agentdock/shared';
+import type { ModelPriceInput } from '@nautelle/shared';
 import {
   compilePattern,
   costChartSeries,
@@ -76,7 +76,7 @@ describe('money', () => {
     expect(groupLabel('project', null, null)).toBe('No project (machine-wide)');
     expect(groupLabel('slot', null, null)).toBe('None');
     expect(groupLabel('issue', null, '13')).toBe('#13');
-    expect(groupLabel('project', 'AgentDock', 'p1')).toBe('AgentDock');
+    expect(groupLabel('project', 'Nautelle', 'p1')).toBe('Nautelle');
   });
 });
 

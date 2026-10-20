@@ -6,11 +6,11 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   type HelloMessage,
   runtimeProfileSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type CliDeps, runCli } from './cli';
 import { type ConfigProfile, saveConfig } from './config';
 import type { RunnerConnection } from './connection';
@@ -25,7 +25,7 @@ import { RUNNER_VERSION } from './version';
 
 const host = { hostname: 'test-host', os: 'linux', arch: 'x64' };
 
-describe('agentdock-runner CLI', () => {
+describe('nautelle-runner CLI', () => {
   let home = '';
   let cleanup = () => {};
   let server: MockServer;
@@ -44,13 +44,13 @@ describe('agentdock-runner CLI', () => {
   });
 
   const deps = (overrides: Partial<CliDeps> = {}): CliDeps => ({
-    env: { HOME: home, PATH: '', AGENTDOCK_LOG: 'debug' },
+    env: { HOME: home, PATH: '', NAUTELLE_LOG: 'debug' },
     host,
     clock: new FakeClock(),
     fetch,
     stdout: (t) => stdout.push(t),
     stderr: (t) => stderr.push(t),
-    execStart: ['/opt/agentdock/agentdock-runner', 'run'],
+    execStart: ['/opt/agentdock/nautelle-runner', 'run'],
     ...overrides,
   });
   const paths = () => resolvePaths({ HOME: home });
@@ -84,7 +84,7 @@ describe('agentdock-runner CLI', () => {
 
     it('prints its usage for an unknown verb', async () => {
       expect(await runCli(['policy', 'grant'], deps())).toBe(EXIT.usage);
-      expect(stderr.join('')).toContain('Usage: agentdock-runner policy');
+      expect(stderr.join('')).toContain('Usage: nautelle-runner policy');
     });
   });
 
@@ -265,7 +265,7 @@ describe('agentdock-runner CLI', () => {
         return runCli(
           ['pair', '--server', server.origin, '--code', 'ABCD-EFGH', ...extra],
           deps({
-            env: { HOME: home, PATH: '', AGENTDOCK_LOG: 'debug', ...env },
+            env: { HOME: home, PATH: '', NAUTELLE_LOG: 'debug', ...env },
           }),
         );
       };
@@ -315,7 +315,7 @@ describe('agentdock-runner CLI', () => {
         expect(server.pairingAccess).toEqual([{ id: ID, secret: SECRET }]);
 
         await pairAccess(['--access-client-id', ID], {
-          AGENTDOCK_ACCESS_CLIENT_SECRET: 'from-env',
+          NAUTELLE_ACCESS_CLIENT_SECRET: 'from-env',
         });
         expect(server.pairingAccess[1]).toEqual({ id: ID, secret: 'from-env' });
       });
@@ -479,12 +479,12 @@ describe('agentdock-runner CLI', () => {
   it('install-service writes a unit that systemd will not restart after a terminal close', async () => {
     expect(await runCli(['install-service'], deps())).toBe(EXIT.ok);
     const unit = readFileSync(paths().serviceFile, 'utf8');
-    expect(unit).toContain('ExecStart=/opt/agentdock/agentdock-runner run\n');
+    expect(unit).toContain('ExecStart=/opt/agentdock/nautelle-runner run\n');
     expect(unit).toContain('Restart=on-failure\n');
     expect(unit).toContain(`RestartPreventExitStatus=${EXIT.terminalClose}\n`);
     expect(unit).toContain('WantedBy=default.target');
     expect(stdout.join('')).toContain(
-      'systemctl --user enable --now agentdock-runner',
+      'systemctl --user enable --now nautelle-runner',
     );
   });
 
@@ -496,16 +496,72 @@ describe('agentdock-runner CLI', () => {
     expect(await runCli(['install-service'], mac)).toBe(EXIT.ok);
     const plist = readFileSync(paths().launchAgentFile, 'utf8');
     expect(paths().launchAgentFile).toBe(
-      join(home, 'Library', 'LaunchAgents', 'com.agentdock.runner.plist'),
+      join(home, 'Library', 'LaunchAgents', 'com.nautelle.runner.plist'),
     );
     expect(plist).toContain(
-      '<string>/opt/agentdock/agentdock-runner</string>\n    <string>run</string>',
+      '<string>/opt/agentdock/nautelle-runner</string>\n    <string>run</string>',
     );
     expect(plist).toContain(`<string>${paths().launchAgentLog}</string>`);
     expect(stdout.join('')).toContain(
       `launchctl bootstrap gui/$UID ${paths().launchAgentFile}`,
     );
     expect(() => statSync(paths().serviceFile)).toThrow();
+  });
+
+  describe('install-service over the unit before the rename (ADR-0073)', () => {
+    const recorder = () => {
+      const calls: string[] = [];
+      const exec: Exec = async (binary, args) => {
+        calls.push([binary, ...args].join(' '));
+        return { code: 0, stdout: '', stderr: '' };
+      };
+      return { calls, exec };
+    };
+
+    it('on Linux stops and removes agentdock-runner and starts nautelle-runner', async () => {
+      const legacy = paths().legacy.serviceFile;
+      mkdirSync(dirname(legacy), { recursive: true });
+      writeFileSync(legacy, '[Unit]\n');
+      const { calls, exec } = recorder();
+      expect(await runCli(['install-service'], deps({ exec }))).toBe(EXIT.ok);
+      expect(calls).toEqual([
+        'systemctl --user disable --now agentdock-runner',
+        'systemctl --user daemon-reload',
+        'systemctl --user enable --now nautelle-runner',
+      ]);
+      expect(() => statSync(legacy)).toThrow();
+      expect(readFileSync(paths().serviceFile, 'utf8')).toContain(
+        'ExecStart=/opt/agentdock/nautelle-runner run\n',
+      );
+      expect(stdout.join('')).toContain(
+        'Enabled and started nautelle-runner in its place',
+      );
+    });
+
+    it('on macOS unloads the old agent and loads the new one', async () => {
+      const mac = { ...host, os: 'darwin', arch: 'arm64' };
+      const legacy = resolvePaths({ HOME: home }).legacy.launchAgentFile;
+      expect(legacy).toBe(
+        join(home, 'Library', 'LaunchAgents', 'com.agentdock.runner.plist'),
+      );
+      mkdirSync(dirname(legacy), { recursive: true });
+      writeFileSync(legacy, '<plist/>');
+      const { calls, exec } = recorder();
+      expect(
+        await runCli(['install-service'], deps({ exec, host: mac, uid: 501 })),
+      ).toBe(EXIT.ok);
+      expect(calls).toEqual([
+        `launchctl bootout gui/501 ${legacy}`,
+        `launchctl bootstrap gui/501 ${paths().launchAgentFile}`,
+      ]);
+      expect(() => statSync(legacy)).toThrow();
+    });
+
+    it('leaves systemd alone when there is no old unit', async () => {
+      const { calls, exec } = recorder();
+      expect(await runCli(['install-service'], deps({ exec }))).toBe(EXIT.ok);
+      expect(calls).toEqual([]);
+    });
   });
 
   it('status reports the config, spool and reachability without the token', async () => {
@@ -567,6 +623,100 @@ describe('agentdock-runner CLI', () => {
         runnerId: 'rn_1',
         config: { projects: [], pollIntervalsMs: {} },
         ackedSeq: 0,
+      });
+    });
+
+    describe('upgrading from before 0.13 (#691)', () => {
+      /** A runner.json as 0.12 wrote it: no `policy` block, a cached list. */
+      const pre013 = (root: string) => {
+        mkdirSync(dirname(paths().configFile), { recursive: true });
+        writeFileSync(
+          paths().configFile,
+          JSON.stringify({
+            server: server.origin,
+            runnerId: 'rn_1',
+            token: TOKEN,
+            profiles: [
+              { id: 'claude-default', runtime: 'claude', env: {}, args: [] },
+            ],
+            projects: [
+              { id: 'prj_a', root },
+              { id: 'prj_b', root: '/srv/dev/with space' },
+            ],
+            otlp: null,
+          }),
+        );
+      };
+
+      it('prints and logs the upgrade notice with the cached roots, allows nothing, and reports every project refused', async () => {
+        const root = join(home, 'dev', 'app');
+        mkdirSync(root, { recursive: true });
+        pre013(root);
+        server.welcome = () => ({
+          type: 'welcome',
+          runnerId: 'rn_1',
+          config: {
+            projects: [
+              { id: 'prj_a', root },
+              { id: 'prj_b', root: '/srv/dev/with space' },
+            ],
+            pollIntervalsMs: {},
+          },
+          ackedSeq: 0,
+        });
+        const { controller, exit, live } = start();
+        await live();
+        const refused = () =>
+          server
+            .of('events')
+            .flatMap((m) => m.events)
+            .find((e) => e.type === 'runner.watch_refused');
+        await until(() => refused() !== undefined);
+        const event = refused();
+        controller.abort();
+        expect(await exit).toBe(EXIT.ok);
+
+        const err = stderr.join('');
+        expect(err).toContain('AgentDock runner 0.13 upgrade');
+        expect(err).toContain(`  ${root} (prj_a)`);
+        expect(err).toContain('nautelle-runner policy allow-root --watched');
+        expect(err).toContain(
+          `nautelle-runner policy allow-root ${root} '/srv/dev/with space'`,
+        );
+        const logged = err
+          .split('\n')
+          .filter((l) => l.startsWith('{'))
+          .map((l) => JSON.parse(l) as { msg: string; roots?: string[] })
+          .find((l) => l.msg.startsWith('runner 0.13 upgrade'));
+        expect(logged?.roots).toEqual([root, '/srv/dev/with space']);
+
+        // Nothing allowed by itself, and still no policy block on disk.
+        const file = JSON.parse(readFileSync(paths().configFile, 'utf8'));
+        expect(file.policy).toBeUndefined();
+        expect(file.projects.map((p: { id: string }) => p.id)).toEqual([
+          'prj_a',
+          'prj_b',
+        ]);
+        const data = event?.data as {
+          projects: { projectId: string; message: string }[];
+        };
+        expect(data.projects.map((p) => p.projectId)).toEqual([
+          'prj_a',
+          'prj_b',
+        ]);
+        expect(data.projects[0].message).toBe(
+          "refused by this runner's policy (allowedRoots): this runner allows no project root yet. On the runner's machine: `nautelle-runner policy allow-root " +
+            `${root}\``,
+        );
+      });
+
+      it('says nothing on a config with a policy block', async () => {
+        paired();
+        const { controller, exit, live } = start();
+        await live();
+        controller.abort();
+        expect(await exit).toBe(EXIT.ok);
+        expect(stderr.join('')).not.toContain('0.13 upgrade');
       });
     });
 
@@ -865,7 +1015,7 @@ describe('agentdock-runner CLI', () => {
         ),
       ).toBe(EXIT.ok);
       expect(stdout.join('')).toContain(
-        'claude plugin install agentdock@agentdock --scope user',
+        'claude plugin install nautelle@nautelle --scope user',
       );
       expect(stdout.join('')).toContain('Dry run');
     });

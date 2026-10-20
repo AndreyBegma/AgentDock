@@ -1,5 +1,13 @@
 'use client';
 
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   type AdminRunner,
   type AdminUser,
@@ -10,15 +18,7 @@ import {
   type ProjectSummary,
   USER_STATUSES,
   type WebhookView,
-} from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
 import { useRouter } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';

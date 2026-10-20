@@ -1,17 +1,25 @@
 'use client';
 
-import type { ProjectDetail } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
-import { useParams } from 'next/navigation';
+import type { ProjectDetail } from '@nautelle/shared';
+import { useParams, useSearchParams } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
+import { WatchRefusalBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import { ApiError, api } from '../../../../../lib/api';
 import { useLive } from '../../../../../lib/live/use-live';
 import { describeProjectError } from '../../../../../lib/projects/format';
+import {
+  SETTINGS_ITEM_SECTION,
+  SETTINGS_SECTION_IDS,
+  SETTINGS_SECTIONS,
+  type SettingsItemId,
+  settingsItemOf,
+} from '../../../../../lib/projects/settings-sections';
 import { useTabParam } from '../../../../../lib/projects/use-tab-param';
 import { STATUS_TONE } from '../../../../../lib/runners/format';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
@@ -27,148 +35,99 @@ import { OrchestratorTab } from './orchestrator-tab';
 import { PlannerTab } from './planner-tab';
 import { RulesTab } from './rules/rules-tab';
 import { SessionsTab } from './sessions-tab';
+import { SettingsIndex } from './settings-index';
 import { StewardTab } from './steward-tab';
 import { TokenSaverTab } from './token-saver-tab';
 
-/** What a tab's panel needs from the page. */
-interface TabContext {
+/** What a block needs from the page. */
+interface BlockContext {
   project: ProjectDetail;
   isAdmin: boolean;
   canOperate: boolean;
   reload: () => void;
 }
 
-/** One entry per tab: a new tab is one line here. */
-const TABS: readonly {
-  id: string;
-  label: string;
-  render: (ctx: TabContext) => ReactNode;
-}[] = [
-  {
-    id: 'general',
-    label: 'General',
-    render: ({ project, isAdmin, reload }) => (
-      <div className="flex flex-col gap-4">
-        <GeneralTab project={project} isAdmin={isAdmin} onChanged={reload} />
-        <GitHubAppRow projectId={project.id} />
-      </div>
-    ),
-  },
-  {
-    id: 'docs',
-    label: 'Docs source',
-    render: ({ project, isAdmin, canOperate, reload }) => (
-      <DocsTab
-        project={project}
-        isAdmin={isAdmin}
-        canRefresh={canOperate}
-        onChanged={reload}
-      />
-    ),
-  },
-  {
-    id: 'rules',
-    label: 'Coding rules',
-    render: ({ project, isAdmin }) => (
-      <RulesTab projectId={project.id} isAdmin={isAdmin} />
-    ),
-  },
-  {
-    id: 'orchestrator',
-    label: 'Orchestrator',
-    render: ({ project, isAdmin, canOperate }) => (
-      <OrchestratorTab
-        project={project}
-        isAdmin={isAdmin}
-        canOperate={canOperate}
-      />
-    ),
-  },
-  {
-    id: 'members',
-    label: 'Members',
-    render: ({ project, isAdmin }) => (
-      <MembersTab projectId={project.id} isAdmin={isAdmin} />
-    ),
-  },
-  {
-    id: 'budget',
-    label: 'Budget',
-    render: ({ project, isAdmin }) => (
-      <BudgetTab projectId={project.id} isAdmin={isAdmin} />
-    ),
-  },
-  {
-    id: 'planner',
-    label: 'Planner',
-    render: ({ project, isAdmin }) => (
-      <PlannerTab projectId={project.id} isAdmin={isAdmin} />
-    ),
-  },
-  {
-    id: 'design',
-    label: 'Design',
-    render: ({ project, isAdmin, canOperate }) => (
-      <DesignTab
-        projectId={project.id}
-        isAdmin={isAdmin}
-        canOperate={canOperate}
-      />
-    ),
-  },
-  {
-    id: 'board',
-    label: 'Board',
-    render: ({ project, isAdmin, canOperate }) => (
-      <BoardTab
-        projectId={project.id}
-        isAdmin={isAdmin}
-        canOperate={canOperate}
-        contentOn={project.shipSessionContent ?? false}
-      />
-    ),
-  },
-  {
-    id: 'token-saver',
-    label: 'Token saver',
-    render: ({ project, isAdmin, canOperate }) => (
-      <TokenSaverTab
-        projectId={project.id}
-        isAdmin={isAdmin}
-        canOperate={canOperate}
-      />
-    ),
-  },
-  {
-    id: 'steward',
-    label: 'Steward',
-    render: ({ project, isAdmin }) => (
-      <StewardTab projectId={project.id} isAdmin={isAdmin} />
-    ),
-  },
-  {
-    id: 'ai-digest',
-    label: 'AI digest',
-    render: ({ project, isAdmin }) => (
-      <AiDigestTab projectId={project.id} isAdmin={isAdmin} />
-    ),
-  },
-  {
-    id: 'sessions',
-    label: 'Sessions',
-    render: ({ project, isAdmin, reload }) => (
-      <SessionsTab project={project} isAdmin={isAdmin} onChanged={reload} />
-    ),
-  },
-];
-const TAB_IDS = TABS.map(({ id }) => id);
+/** One renderer per former tab; the sections are in `SETTINGS_SECTIONS`. */
+const BLOCKS: Readonly<
+  Record<SettingsItemId, (ctx: BlockContext) => ReactNode>
+> = {
+  general: ({ project, isAdmin, reload }) => (
+    <div className="flex flex-col gap-4">
+      <GeneralTab project={project} isAdmin={isAdmin} onChanged={reload} />
+      <GitHubAppRow projectId={project.id} />
+    </div>
+  ),
+  docs: ({ project, isAdmin, canOperate, reload }) => (
+    <DocsTab
+      project={project}
+      isAdmin={isAdmin}
+      canRefresh={canOperate}
+      onChanged={reload}
+    />
+  ),
+  rules: ({ project, isAdmin }) => (
+    <RulesTab projectId={project.id} isAdmin={isAdmin} />
+  ),
+  orchestrator: ({ project, isAdmin, canOperate }) => (
+    <OrchestratorTab
+      project={project}
+      isAdmin={isAdmin}
+      canOperate={canOperate}
+    />
+  ),
+  members: ({ project, isAdmin }) => (
+    <MembersTab projectId={project.id} isAdmin={isAdmin} />
+  ),
+  budget: ({ project, isAdmin }) => (
+    <BudgetTab projectId={project.id} isAdmin={isAdmin} />
+  ),
+  planner: ({ project, isAdmin }) => (
+    <PlannerTab projectId={project.id} isAdmin={isAdmin} />
+  ),
+  design: ({ project, isAdmin, canOperate }) => (
+    <DesignTab
+      projectId={project.id}
+      isAdmin={isAdmin}
+      canOperate={canOperate}
+    />
+  ),
+  board: ({ project, isAdmin, canOperate }) => (
+    <BoardTab
+      projectId={project.id}
+      isAdmin={isAdmin}
+      canOperate={canOperate}
+      contentOn={project.shipSessionContent ?? false}
+    />
+  ),
+  'token-saver': ({ project, isAdmin, canOperate }) => (
+    <TokenSaverTab
+      projectId={project.id}
+      isAdmin={isAdmin}
+      canOperate={canOperate}
+    />
+  ),
+  steward: ({ project, isAdmin }) => (
+    <StewardTab projectId={project.id} isAdmin={isAdmin} />
+  ),
+  'ai-digest': ({ project, isAdmin }) => (
+    <AiDigestTab projectId={project.id} isAdmin={isAdmin} />
+  ),
+  sessions: ({ project, isAdmin, reload }) => (
+    <SessionsTab project={project} isAdmin={isAdmin} onChanged={reload} />
+  ),
+};
 
 export default function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<ProjectDetail>();
   const [missing, setMissing] = useState(false);
-  // `?tab=` carries the tab (links from the usage and fleet pages use it).
-  const [tab, setTab] = useTabParam(TAB_IDS);
+  // `?tab=` carries the section; a former tab's id (`?tab=budget`, still in
+  // links across the app) opens its section and scrolls to its block.
+  const [section, setSection] = useTabParam(
+    SETTINGS_SECTION_IDS,
+    SETTINGS_ITEM_SECTION,
+  );
+  const anchor = settingsItemOf(useSearchParams().get('tab'));
   const showError = useErrorToast();
 
   const load = useCallback(async () => {
@@ -185,6 +144,16 @@ export default function ProjectSettingsPage() {
     setProject(undefined);
     load();
   }, [load]);
+
+  // Scroll to a deep-linked block once the page has drawn it. The first block
+  // of a section is already at the top, under the header.
+  const loaded = project !== undefined;
+  useEffect(() => {
+    if (!loaded || !anchor) return;
+    const first = SETTINGS_SECTIONS.find(({ id }) => id === section)?.items[0];
+    if (first?.id === anchor) return;
+    document.getElementById(anchor)?.scrollIntoView({ block: 'start' });
+  }, [loaded, anchor, section]);
 
   // The API publishes no project events yet; any that arrive reload the page.
   useLive(`project:${projectId}`, () => {
@@ -225,12 +194,19 @@ export default function ProjectSettingsPage() {
           </span>
         }
       />
+      {/* #691: an online runner whose policy refuses the project. */}
+      <WatchRefusalBanner project={project} />
 
-      <TabGroup value={tab} onValueChange={setTab}>
-        {/* Twelve tabs do not fit a phone: the strip scrolls inside its box. */}
+      <TabGroup
+        value={section}
+        onValueChange={(next) => {
+          const id = SETTINGS_SECTION_IDS.find((s) => s === next);
+          if (id) setSection(id);
+        }}
+      >
         <ScrollX>
           <TabList aria-label="Project settings" className="min-w-max">
-            {TABS.map(({ id, label }) => (
+            {SETTINGS_SECTIONS.map(({ id, label }) => (
               <Tab key={id} value={id} className="whitespace-nowrap">
                 {label}
               </Tab>
@@ -238,9 +214,25 @@ export default function ProjectSettingsPage() {
           </TabList>
         </ScrollX>
 
-        {TABS.map(({ id, render }) => (
-          <TabPanel key={id} value={id} className="pt-4">
-            {render({ project, isAdmin, canOperate, reload: load })}
+        {SETTINGS_SECTIONS.map(({ id, items }) => (
+          <TabPanel key={id} value={id} className="pt-6">
+            {/* A section is one page of blocks; from desktop up an index
+                of them sits beside it (the S-7 mockup). */}
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-8 desktop:grid-cols-[168px_minmax(0,1fr)]">
+              <SettingsIndex items={items} />
+              <div className="flex flex-col gap-4">
+                {items.map((item) => (
+                  <div key={item.id} id={item.id} className="scroll-mt-4">
+                    {BLOCKS[item.id]({
+                      project,
+                      isAdmin,
+                      canOperate,
+                      reload: load,
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
           </TabPanel>
         ))}
       </TabGroup>

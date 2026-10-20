@@ -3,7 +3,7 @@ import type {
   WebhookEnvelope,
   WebhookEventType,
   WebhookView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Webhook, WebhookDelivery } from '@prisma/client';
 
 /** The webhook columns a view is built from — never `secret`. */

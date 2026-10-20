@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { CommandName } from '@agentdock/shared/protocol';
+import type { CommandName } from '@nautelle/shared/protocol';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';

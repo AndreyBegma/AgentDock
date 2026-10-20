@@ -3,7 +3,7 @@ import {
   type BoardAskQuery,
   LLM_PROVIDER_INFO,
   type LlmProviderId,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import { resetDate } from '../assistant/notice';
 import { COLUMN_TITLE } from '../board/format';

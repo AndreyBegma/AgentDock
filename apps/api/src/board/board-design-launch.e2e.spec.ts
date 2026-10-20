@@ -1,4 +1,4 @@
-import { DESIGN_ERROR } from '@agentdock/shared';
+import { DESIGN_ERROR } from '@nautelle/shared';
 import { CardDesignHarness } from '../design/testing/card-design-e2e';
 import { designResult } from '../design/testing/design-e2e';
 

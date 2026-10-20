@@ -1,4 +1,4 @@
-import { APPROVAL_STATUSES, type ApprovalStatus } from '@agentdock/shared';
+import { APPROVAL_STATUSES, type ApprovalStatus } from '@nautelle/shared';
 import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
 
 const HEAD_SHA = /^[0-9a-f]{40}$/;

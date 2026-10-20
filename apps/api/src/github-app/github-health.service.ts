@@ -1,7 +1,7 @@
 import type {
   GitHubHealthReason,
   GitHubProjectAppStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Inject,
   Injectable,

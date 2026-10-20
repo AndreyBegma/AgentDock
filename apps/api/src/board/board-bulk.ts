@@ -5,7 +5,7 @@ import {
   type BulkCardAction,
   type BulkCardOutcome,
   bulkCardRule,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { BoardService } from './board.service';
 import { BoardFailure } from './board-error';

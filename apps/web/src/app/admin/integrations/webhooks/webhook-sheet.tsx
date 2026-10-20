@@ -1,14 +1,5 @@
 'use client';
 
-import {
-  WEBHOOK_DELIVERY_STATUSES,
-  WEBHOOK_LIVE_EVENTS,
-  type WebhookDeliveryPage,
-  type WebhookDeliveryStatus,
-  type WebhookDeliveryView,
-  type WebhookView,
-  type WebhookWithSecret,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -25,6 +16,15 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  WEBHOOK_DELIVERY_STATUSES,
+  WEBHOOK_LIVE_EVENTS,
+  type WebhookDeliveryPage,
+  type WebhookDeliveryStatus,
+  type WebhookDeliveryView,
+  type WebhookView,
+  type WebhookWithSecret,
+} from '@nautelle/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
 import { Time } from '../../../../lib/format/time';
@@ -443,7 +443,7 @@ export function WebhookSheet({
                   <p className="text-xs text-ink-3">
                     Each request carries{' '}
                     <code className="font-mono">
-                      X-AgentDock-Signature: t=&lt;unix&gt;,v1=&lt;hex&gt;
+                      X-Nautelle-Signature: t=&lt;unix&gt;,v1=&lt;hex&gt;
                     </code>
                     , where hex is HMAC-SHA256 of{' '}
                     <code className="font-mono">

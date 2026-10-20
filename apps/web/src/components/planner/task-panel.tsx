@@ -1,10 +1,10 @@
 'use client';
 
-import type { PlanTaskView, PlanTurnView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
+import type { PlanTaskView, PlanTurnView } from '@nautelle/shared';
 import { X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';

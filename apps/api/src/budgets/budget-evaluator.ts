@@ -4,7 +4,7 @@ import {
   type BudgetUpdatedEvent,
   budgetState,
   periodAt,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { type Budget, type BudgetPeriodRow, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

@@ -1,4 +1,4 @@
-import type { BoardCardDetail } from '@agentdock/shared';
+import type { BoardCardDetail } from '@nautelle/shared';
 import { BoardService } from './board.service';
 import { BoardShipping } from './board-shipping';
 import {
@@ -117,7 +117,7 @@ describe('a card ships itself (e2e, #359)', () => {
       const [run] = w.sent('card.run');
       expect(run.pullRequest).toEqual({
         title: 'C-1: Add login',
-        body: expect.stringContaining('AgentDock-Card: C-1'),
+        body: expect.stringContaining('Nautelle-Card: C-1'),
       });
       expect(run).not.toHaveProperty('newBranch');
     });

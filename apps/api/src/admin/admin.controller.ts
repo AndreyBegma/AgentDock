@@ -1,4 +1,4 @@
-import type { AdminUser, RegistrationState } from '@agentdock/shared';
+import type { AdminUser, RegistrationState } from '@nautelle/shared';
 import {
   Body,
   Controller,

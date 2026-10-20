@@ -1,7 +1,7 @@
 'use client';
 
-import type { FleetGraph } from '@agentdock/shared';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { FleetGraph } from '@nautelle/shared';
 import {
   NODE_PILL_LABEL,
   NODE_PILL_STATUS,

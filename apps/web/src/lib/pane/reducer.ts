@@ -1,4 +1,4 @@
-import type { PaneFrame } from '@agentdock/shared/protocol';
+import type { PaneFrame } from '@nautelle/shared/protocol';
 
 export interface PaneState {
   lines: string[];

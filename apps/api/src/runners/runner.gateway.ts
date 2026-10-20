@@ -7,7 +7,7 @@ import {
   type RunnerMessage,
   runnerCommandsOf,
   runnerMessageSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Inject, Logger } from '@nestjs/common';
 import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';

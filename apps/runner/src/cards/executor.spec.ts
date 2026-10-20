@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { CardCollectArgs } from '@agentdock/shared/protocol';
+import type { CardCollectArgs } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
@@ -43,7 +43,7 @@ const setup = async () => {
     cwd,
     number: 12,
     title: 'C-12: Fix the pairing flake',
-    body: 'Fixed it.\n\nAgentDock-Card: C-12',
+    body: 'Fixed it.\n\nNautelle-Card: C-12',
   });
   const failure = async (work: Promise<unknown>) => {
     try {

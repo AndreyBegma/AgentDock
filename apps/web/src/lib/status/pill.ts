@@ -1,11 +1,11 @@
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import type {
   OrchestratorStatus,
   QueueState,
   RunStatus,
   SlotStatus,
-} from '@agentdock/shared';
-import type { SkillRunPhase } from '@agentdock/shared/protocol';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
+import type { SkillRunPhase } from '@nautelle/shared/protocol';
 
 /**
  * What a running thing is doing now, on glass-ui's status scale (#163,

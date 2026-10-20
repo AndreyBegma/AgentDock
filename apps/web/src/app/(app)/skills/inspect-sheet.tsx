@@ -1,12 +1,5 @@
 'use client';
 
-import {
-  COMMAND_RUN_LIVE_EVENT,
-  type CommandRunView,
-  type ProjectSummary,
-  type SkillPreviewView,
-  type SkillProfileInstallView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
@@ -20,6 +13,13 @@ import {
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
+import {
+  COMMAND_RUN_LIVE_EVENT,
+  type CommandRunView,
+  type ProjectSummary,
+  type SkillPreviewView,
+  type SkillProfileInstallView,
+} from '@nautelle/shared';
 import { useState } from 'react';
 import { api } from '../../../lib/api';
 import { parseRunEvent } from '../../../lib/control/pending';

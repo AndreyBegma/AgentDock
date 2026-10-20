@@ -1,6 +1,6 @@
 'use client';
 
-import { FLEET_LIVE_EVENT, type FleetView } from '@agentdock/shared';
+import { FLEET_LIVE_EVENT, type FleetView } from '@nautelle/shared';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import { needsAttention } from '../../lib/fleet/format';

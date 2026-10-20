@@ -1,4 +1,4 @@
-import type { BoardAiErrorCode } from '@agentdock/shared';
+import type { BoardAiErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An Ask the Board or triage refusal, shaped like every other API error. */

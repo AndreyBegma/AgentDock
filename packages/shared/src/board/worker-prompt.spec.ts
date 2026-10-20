@@ -210,10 +210,10 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
   it('names the scout and the bypass only when Token saver is on', () => {
     const off = cardWorkerPrompt(plain);
     expect(off).not.toContain('scout');
-    expect(off).not.toContain('AGENTDOCK_RAW=1');
+    expect(off).not.toContain('NAUTELLE_RAW=1');
     const on = cardWorkerPrompt({ ...plain, tokenSaver: true });
     expect(on).toContain('use the `scout` subagent');
-    expect(on).toContain('`AGENTDOCK_RAW=1 <command>`');
+    expect(on).toContain('`NAUTELLE_RAW=1 <command>`');
   });
 
   it('asks for the handoff note only when Token saver is on (#449 D2, D5, D7)', () => {
@@ -373,8 +373,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 19', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(19);
+  it('is version 20', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(21);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

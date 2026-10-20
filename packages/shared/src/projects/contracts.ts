@@ -116,6 +116,12 @@ export interface ProjectSummary {
   docsKind: DocsSourceKind | null;
   /** The caller's effective role on this project (D11). */
   role: Role;
+  /**
+   * #691: why the runner's local policy refuses to watch this project, as the
+   * runner worded it (ADR-0047) — the rule, the reason and the command to run
+   * on its machine. Null while the runner watches it.
+   */
+  watchRefusal: string | null;
 }
 
 /** `GET /projects/:id`, and every route that changes a project. */

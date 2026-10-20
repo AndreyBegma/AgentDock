@@ -2,7 +2,7 @@ import type {
   WorkflowsOrchestrationResponse,
   WorkflowsSummaryResponse,
   WorkflowsToolsResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Controller, Get, Query } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth-request';
 import { CurrentUser } from '../auth/decorators';

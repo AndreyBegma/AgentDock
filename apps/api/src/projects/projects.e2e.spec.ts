@@ -4,7 +4,8 @@ import type {
   ProjectMemberView,
   ProjectSummary,
   Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
+import { WATCH_REFUSED_EVENT } from '@nautelle/shared/protocol';
 import { allowedLiveOrigin } from '../live/live-options';
 import { TestLiveSocket } from '../live/testing/live-e2e';
 import {
@@ -583,6 +584,52 @@ describe('projects (e2e)', () => {
       ]);
     });
 
+    it('keeps the GitHub repository id on the same repo and drops it on another (spec 27 D7)', async () => {
+      const runner = await connectRunner();
+      const project = await connectProject();
+      await ctx.prisma.project.update({
+        where: { id: project.id },
+        data: { githubRepoId: 4_200_000_001n },
+      });
+      const stored = () =>
+        ctx.prisma.project.findUniqueOrThrow({
+          where: { id: project.id },
+          select: { repo: true, githubRepoId: true },
+        });
+
+      runner.answer = () => ({
+        ok: true,
+        output: inspection({
+          remote: {
+            url: 'git@github.com:Acme/Widget.git',
+            forge: 'github',
+            repo: 'Acme/Widget',
+          },
+        }),
+      });
+      await admin.send('post', `/projects/${project.id}/refresh`);
+      expect(await stored()).toEqual({
+        repo: 'Acme/Widget',
+        githubRepoId: 4_200_000_001n,
+      });
+
+      runner.answer = () => ({
+        ok: true,
+        output: inspection({
+          remote: {
+            url: 'git@github.com:acme/gadget.git',
+            forge: 'github',
+            repo: 'acme/gadget',
+          },
+        }),
+      });
+      await admin.send('post', `/projects/${project.id}/refresh`);
+      expect(await stored()).toEqual({
+        repo: 'acme/gadget',
+        githubRepoId: null,
+      });
+    });
+
     it('resends the watch list when the runner does not hold the project', async () => {
       const runner = await connectRunner();
       const project = await connectProject();
@@ -882,6 +929,73 @@ describe('projects (e2e)', () => {
       expect(
         await ctx.prisma.projectMember.findMany({ where: { projectId: a.id } }),
       ).toEqual([expect.objectContaining({ addedById: null })]);
+    });
+  });
+
+  describe('watch refusal (#691)', () => {
+    const refusal = (root: string) =>
+      `refused by this runner's policy (allowedRoots): ${root} is not under an allowed root. On the runner's machine: \`nautelle-runner policy allow-root ${root}\``;
+
+    let seq = 0;
+    const report = async (socket: TestRunnerSocket, data: unknown) => {
+      seq += 1;
+      socket.send({
+        type: 'events',
+        events: [
+          {
+            v: 1,
+            ts: '2026-10-20T10:00:00.000Z',
+            type: WATCH_REFUSED_EVENT,
+            source: 'runner',
+            data,
+            seq,
+          },
+        ],
+      });
+      expect((await socket.next('ack')).seq).toBe(seq);
+    };
+
+    const detail = async (id: string) =>
+      (await admin.get(`/projects/${id}`)).body as ProjectDetail;
+
+    beforeEach(() => {
+      seq = 0;
+    });
+
+    it("shows the runner's refusal with the fix command on the project, and clears it once the runner watches it", async () => {
+      const a = await seedProject('/srv/dev/a');
+      const b = await seedProject('/srv/dev/b', 'acme/b');
+      const socket = new TestRunnerSocket(ctx.origin, token);
+      sockets.push(socket);
+      await socket.connect(hello());
+
+      // The runner allows no root yet: it refuses both.
+      await report(socket, {
+        projects: [
+          { projectId: a.id, message: refusal('/srv/dev/a') },
+          { projectId: b.id, message: refusal('/srv/dev/b') },
+        ],
+      });
+      expect((await detail(a.id)).watchRefusal).toBe(refusal('/srv/dev/a'));
+      expect((await detail(b.id)).watchRefusal).toBe(refusal('/srv/dev/b'));
+      const list = (await admin.get('/projects')).body as ProjectSummary[];
+      expect(list.find((p) => p.id === a.id)?.watchRefusal).toBe(
+        refusal('/srv/dev/a'),
+      );
+
+      // Bad data is skipped and changes nothing.
+      await report(socket, { projects: [{ projectId: a.id }] });
+      expect((await detail(a.id)).watchRefusal).toBe(refusal('/srv/dev/a'));
+
+      // The person allowed /srv/dev/a: the next report names only b.
+      await report(socket, {
+        projects: [{ projectId: b.id, message: refusal('/srv/dev/b') }],
+      });
+      expect((await detail(a.id)).watchRefusal).toBeNull();
+      expect((await detail(b.id)).watchRefusal).toBe(refusal('/srv/dev/b'));
+
+      await report(socket, { projects: [] });
+      expect((await detail(b.id)).watchRefusal).toBeNull();
     });
   });
 });

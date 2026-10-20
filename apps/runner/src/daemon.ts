@@ -3,9 +3,11 @@ import { loadavg } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   type Capabilities,
+  EVENT_SCHEMA_VERSION,
   type Host,
   PROTOCOL_VERSION,
-} from '@agentdock/shared/protocol';
+  WATCH_REFUSED_EVENT,
+} from '@nautelle/shared/protocol';
 import { accessHeaders, accessOf } from './access';
 import { adapters, SessionWatcher } from './adapters';
 import { resolveIngestSince } from './adapters/ingest-since';
@@ -95,8 +97,8 @@ export interface DaemonOptions {
   /** Where `config` was read from; the watch list is cached back into it. */
   configFile: string;
   /**
-   * The local socket for the `agentdock` plugin (spec 201 D5);
-   * `<state>/agentdock/runner.sock` beside the spool by default, null for none.
+   * The local socket for the `nautelle` plugin (spec 201 D5);
+   * `<state>/nautelle/runner.sock` beside the spool by default, null for none.
    */
   localSocket?: string | null;
   home: string;
@@ -113,19 +115,19 @@ export interface DaemonOptions {
   random?: () => number;
   /** Spawns the PTY of a terminal attach (spec 29); Bun's own by default. */
   spawnPty?: SpawnPty;
-  /** Skill runs' directories (spec 24 D7); `<state>/agentdock/runs` beside the spool by default. */
+  /** Skill runs' directories (spec 24 D7); `<state>/nautelle/runs` beside the spool by default. */
   runsDir?: string;
-  /** Plans' worktree records and turns (spec 172); `<state>/agentdock/plans` beside the runs by default. */
+  /** Plans' worktree records and turns (spec 172); `<state>/nautelle/plans` beside the runs by default. */
   plansDir?: string;
-  /** UI profile builds (spec 223); `<state>/agentdock/uiprofile` beside the plans by default. */
+  /** UI profile builds (spec 223); `<state>/nautelle/uiprofile` beside the plans by default. */
   uiprofileDir?: string;
-  /** Board card workers (#242); `<state>/agentdock/cards` beside the runs by default. */
+  /** Board card workers (#242); `<state>/nautelle/cards` beside the runs by default. */
   cardsDir?: string;
-  /** Card capture's per-extraction directories (#244); `<state>/agentdock/capture` beside the runs by default. */
+  /** Card capture's per-extraction directories (#244); `<state>/nautelle/capture` beside the runs by default. */
   captureDir?: string;
-  /** Text normalization's per-run directories (#271); `<state>/agentdock/normalize` beside the runs by default. */
+  /** Text normalization's per-run directories (#271); `<state>/nautelle/normalize` beside the runs by default. */
   normalizeDir?: string;
-  /** Card model assessment's per-run directories (#322); `<state>/agentdock/assess` beside the runs by default. */
+  /** Card model assessment's per-run directories (#322); `<state>/nautelle/assess` beside the runs by default. */
   assessDir?: string;
   /** The argv that starts this runner; a skill run's, plan turn's or card's session appends `exec-run <dir>`. */
   selfCommand?: readonly string[];
@@ -159,7 +161,7 @@ const countTmuxSessions = async (exec: Exec): Promise<number> => {
   return result.stdout.split('\n').filter((l) => l.trim().length > 0).length;
 };
 
-/** `agentdock-runner run`: lock the spool, detect, connect, run until stopped. */
+/** `nautelle-runner run`: lock the spool, detect, connect, run until stopped. */
 export const runDaemon = async (
   options: DaemonOptions,
 ): Promise<StopReason> => {
@@ -187,7 +189,7 @@ export const runDaemon = async (
     const realpath = options.realpath ?? nodeRealpath;
     if (policy.current().allowedRoots.length === 0) {
       log.warn(
-        'the policy allows no project root: no project is watched. Run `agentdock-runner policy allow-root <dir>`',
+        'the policy allows no project root: no project is watched. Run `nautelle-runner policy allow-root <dir>`',
       );
     }
 
@@ -249,6 +251,15 @@ export const runDaemon = async (
       persist: (projects) => updateConfig(options.configFile, { projects }),
       admit: (project) =>
         watchedRootRefusal(project.root, policy.current(), exec, realpath),
+      // #691: the web says why a project is not watched, and what to run.
+      report: (projects) =>
+        connection?.emit({
+          v: EVENT_SCHEMA_VERSION,
+          ts: new Date(clock.now()).toISOString(),
+          type: WATCH_REFUSED_EVENT,
+          source: 'runner',
+          data: { projects },
+        }),
       log,
     });
 

@@ -5,7 +5,7 @@ import type {
   BoardTriageCounts,
   CardTriageView,
   TriageHint,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { api } from '../api';
 
 /** #660: one question, turned into a query and answered. */

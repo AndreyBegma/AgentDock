@@ -1,7 +1,7 @@
 import {
   RUN_LOG_LINE_MAX_CHARS,
   type RunLogLine,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { redactText } from '../../pane/redact';
 
 /** A tool call is summarised in at most this many characters. */

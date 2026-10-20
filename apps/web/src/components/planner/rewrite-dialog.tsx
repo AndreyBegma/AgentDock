@@ -1,9 +1,9 @@
 'use client';
 
-import { PLANNER_SUMMARY_MAX, type PlanTaskView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
+import { PLANNER_SUMMARY_MAX, type PlanTaskView } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 
 /**

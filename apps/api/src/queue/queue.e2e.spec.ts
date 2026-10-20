@@ -2,8 +2,8 @@ import {
   QUEUE_LIVE_EVENT,
   type QueueIssueDetail,
   type QueueView,
-} from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import {
   EventStream,
   REPO,

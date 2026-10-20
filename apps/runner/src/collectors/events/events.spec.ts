@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { UnsequencedEvent } from '@agentdock/shared/protocol';
+import type { UnsequencedEvent } from '@nautelle/shared/protocol';
 import { FakeClock } from '../../testing/fake-clock';
 import { memoryLogger, tempDir } from '../../testing/fixtures';
 import { DEFAULT_FLEET_SETTINGS } from '../registry';

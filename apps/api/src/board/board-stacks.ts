@@ -20,7 +20,7 @@ import {
   stageLinks,
   type TaskDesignSummary,
   type UpdateBoardStackRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { type BoardStack, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -402,7 +402,7 @@ export class BoardStacks {
         include: {
           rounds: { orderBy: { round: 'desc' }, take: 1 },
           design: cardDesignSelect,
-          prBaseCard: { select: { number: true } },
+          prBaseCard: { select: { number: true, mergedAt: true } },
         },
       }),
       this.prisma.boardCardDependency.findMany({
@@ -455,7 +455,7 @@ export class BoardStacks {
             prNumber: card?.prNumber ?? null,
             prUrl: card?.prUrl ?? null,
             prTarget: card
-              ? prTargetOf(card, card.prBaseCard?.number ?? null, base)
+              ? prTargetOf(card, card.prBaseCard ?? null, base)
               : null,
             after: deps
               .filter((d) => d.cardId === c.id)

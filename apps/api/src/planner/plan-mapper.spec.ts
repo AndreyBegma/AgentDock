@@ -1,4 +1,4 @@
-import type { PlannedTask, PlanQuestion } from '@agentdock/shared';
+import type { PlannedTask, PlanQuestion } from '@nautelle/shared';
 import { roundsOf } from './plan-mapper';
 
 const q = (id: string): PlanQuestion => ({

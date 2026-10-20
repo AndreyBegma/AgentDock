@@ -4,7 +4,7 @@ import type {
   LiveErrorCode,
   LiveEventMessage,
   LiveTopic,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { getLiveClient, type LiveSnapshot } from './client';
 

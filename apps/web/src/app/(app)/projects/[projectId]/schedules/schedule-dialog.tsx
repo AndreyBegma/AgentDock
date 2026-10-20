@@ -1,6 +1,5 @@
 'use client';
 
-import type { SchedulePreviewView, ScheduleView } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Combobox } from '@andrewbehma/glass-ui/combobox';
@@ -11,6 +10,7 @@ import {
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import type { SchedulePreviewView, ScheduleView } from '@nautelle/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import { MODE_LABEL } from '../../../../../lib/control/format';

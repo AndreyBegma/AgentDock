@@ -1,11 +1,11 @@
 'use client';
 
+import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   COMMAND_RUN_LIVE_EVENT,
   type CommandRunView,
   type OrchestratorStartRequest,
-} from '@agentdock/shared';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { api, errorText, errorToastOptions } from '../api';

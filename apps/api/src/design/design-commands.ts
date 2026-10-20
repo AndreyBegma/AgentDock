@@ -1,10 +1,10 @@
-import { DESIGN_ERROR } from '@agentdock/shared';
+import { DESIGN_ERROR } from '@nautelle/shared';
 import {
   type CommandName,
   isCommandName,
   type UiProfileCommandName,
   uiprofileCommands,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
 import type { PlannerSendResult } from '../planner/planner-commands';

@@ -10,7 +10,7 @@ import { absolutePathSchema } from './projects';
 
 /**
  * The runner-local security policy (ADR-0047). It lives in the runner's own
- * `runner.json`, written only by `agentdock-runner policy …` on the machine;
+ * `runner.json`, written only by `nautelle-runner policy …` on the machine;
  * no server command or `hello` response changes it. The runner reports it in
  * `hello` so the UI can explain a refusal before the person asks.
  */
@@ -113,16 +113,16 @@ export const policyAllowsCommand = (
 export const policyFixHint = (rule: PolicyRule, detail?: string): string => {
   switch (rule) {
     case 'allowedRoots':
-      return 'agentdock-runner policy allow-root <dir>';
+      return `nautelle-runner policy allow-root ${detail ?? '<dir>'}`;
     case 'maxPermissionMode':
-      return `agentdock-runner policy set maxPermissionMode ${detail ?? '<mode>'}`;
+      return `nautelle-runner policy set maxPermissionMode ${detail ?? '<mode>'}`;
     case 'terminal.write':
-      return 'agentdock-runner policy set terminal.write true';
+      return 'nautelle-runner policy set terminal.write true';
     case 'skills.profileInstall':
-      return 'agentdock-runner policy set skills.profileInstall true';
+      return 'nautelle-runner policy set skills.profileInstall true';
     case 'commands':
-      return `agentdock-runner policy set commands.${detail ?? '<command>'} true`;
+      return `nautelle-runner policy set commands.${detail ?? '<command>'} true`;
     case 'code.deny':
-      return `agentdock-runner policy allow-path ${detail ?? '<pattern>'}`;
+      return `nautelle-runner policy allow-path ${detail ?? '<pattern>'}`;
   }
 };

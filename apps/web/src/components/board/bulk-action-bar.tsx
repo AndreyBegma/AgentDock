@@ -1,11 +1,11 @@
+// glass-ui 0.34.0 exports `SelectionBar` from the barrel only — its package.json
+// has no `./selection-bar` subpath. Move to the subpath once glass-ui adds it.
+import { SelectionBar, type SelectionBarAction } from '@andrewbehma/glass-ui';
 import {
   type BoardCardView,
   BULK_CARD_ACTIONS,
   type BulkCardAction,
-} from '@agentdock/shared';
-// glass-ui 0.34.0 exports `SelectionBar` from the barrel only — its package.json
-// has no `./selection-bar` subpath. Move to the subpath once glass-ui adds it.
-import { SelectionBar, type SelectionBarAction } from '@andrewbehma/glass-ui';
+} from '@nautelle/shared';
 import { BULK_ACTION_LABEL, planBulk } from '../../lib/board/selection';
 import { planGroup } from '../../lib/board/stacks';
 

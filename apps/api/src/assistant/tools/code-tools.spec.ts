@@ -1,4 +1,4 @@
-import type { CommandName } from '@agentdock/shared/protocol';
+import type { CommandName } from '@nautelle/shared/protocol';
 import type { BudgetGate } from '../../budgets/budget-gate';
 import type { PrismaService } from '../../database/prisma.service';
 import type { RuntimeProfileResolver } from '../../readiness';
@@ -14,7 +14,7 @@ import {
 
 const PROJECT = {
   id: 'prj_dock',
-  displayName: 'AgentDock',
+  displayName: 'Nautelle',
   repo: 'acme/agentdock',
   runnerId: 'run_desk',
   role: 'viewer' as const,
@@ -181,7 +181,7 @@ describe('assistant code tools (#622)', () => {
       expect.objectContaining({ role: 'viewer' }),
     );
     expect(result.summary).toBe(
-      'Searched AgentDock for "computeInvoice" — 1 matches in 1 files',
+      'Searched Nautelle for "computeInvoice" — 1 matches in 1 files',
     );
   });
 

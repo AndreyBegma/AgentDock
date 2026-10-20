@@ -1,14 +1,14 @@
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import {
   type CommandRunView,
   type ConversationEntry,
   FLEET_ERROR,
   type FleetNodePill,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CheckpointKind,
   WorktreeFileStatus,
-} from '@agentdock/shared/protocol';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared/protocol';
 import { ApiError, describeError } from '../api';
 import { describeOutcome } from '../control/format';
 import { CHECKPOINT_LABEL } from '../fleet/format';
@@ -136,7 +136,7 @@ export function describeWorktreeError(error: unknown): string {
   return describeError(error);
 }
 
-/** "Orchestrator" unless AgentDock's header names who sent it. */
+/** "Orchestrator" unless Nautelle's header names who sent it. */
 export const ORCHESTRATOR_AUTHOR = 'Orchestrator';
 
 /** What `ChatThread` draws for one conversation entry. */
@@ -185,7 +185,7 @@ export function chatMessageOf(
   };
 }
 
-/** The author of what this tab sent: AgentDock's header names the user. */
+/** The author of what this tab sent: Nautelle's header names the user. */
 export const OUTBOX_AUTHOR = 'You';
 
 export function outboxMessageOf(entry: OutboxEntry): SlotChatMessage {

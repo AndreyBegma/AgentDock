@@ -4,7 +4,7 @@ import type {
   TerminalAttachArgs,
   TerminalAttachResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { AssessHandlers } from '../assess';
 import type { CaptureHandlers } from '../capture';
 import {
@@ -12,6 +12,7 @@ import {
   cardChecks,
   closeCardPr,
   mergeCard,
+  openCardPr,
   retargetCardPr,
   retriggerCardCi,
 } from '../cards';
@@ -303,6 +304,13 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'card.prRetarget': (args) =>
       context.cards
         ? retargetCardPr(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'card.prOpen': (args) =>
+      context.cards
+        ? openCardPr(args, {
             exec: context.exec,
             watchedProjects: context.watchedProjects,
           })

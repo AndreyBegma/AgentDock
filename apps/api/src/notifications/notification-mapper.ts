@@ -1,4 +1,4 @@
-import type { NotificationKind, NotificationView } from '@agentdock/shared';
+import type { NotificationKind, NotificationView } from '@nautelle/shared';
 import type { Notification } from '@prisma/client';
 
 export type NotificationRow = Notification & {
