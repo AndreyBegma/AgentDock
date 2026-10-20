@@ -4,6 +4,7 @@ import {
   collectMessage,
   noPrText,
   prChipText,
+  prTargetNotice,
   prTargetText,
 } from './pull-request';
 
@@ -16,9 +17,35 @@ describe('prTargetText (#636)', () => {
     expect(
       prTargetText({
         branch: 'feat/1-login',
-        stackedOn: { number: 1, label: 'C-1' },
+        stackedOn: { number: 1, label: 'C-1', merged: false },
       }),
     ).toBe('into C-1’s branch');
+  });
+});
+
+describe('prTargetNotice (#709)', () => {
+  const stacked = (merged: boolean) => ({
+    branch: 'feat/1-login',
+    stackedOn: { number: 1, label: 'C-1', merged },
+  });
+
+  test('nothing for a PR into the base', () => {
+    expect(prTargetNotice(null)).toBeNull();
+    expect(prTargetNotice({ branch: 'develop', stackedOn: null })).toBeNull();
+  });
+
+  test('names the dependency branch a stacked PR goes into', () => {
+    expect(prTargetNotice(stacked(false))).toEqual({
+      tone: 'info',
+      text: 'The pull request goes into C-1’s branch (feat/1-login), not the base. Its work reaches the base when C-1’s pull request merges.',
+    });
+  });
+
+  test('warns once the dependency’s own PR has merged', () => {
+    const notice = prTargetNotice(stacked(true));
+    expect(notice?.tone).toBe('warn');
+    expect(notice?.text).toContain('C-1’s own pull request has already merged');
+    expect(notice?.text).toContain('retarget it on GitHub');
   });
 });
 

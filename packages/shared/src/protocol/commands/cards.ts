@@ -50,6 +50,8 @@ export const CARD_TIMEOUTS_MS = {
   ciRetrigger: 45_000,
   /** #636: `gh pr view`, then `gh pr edit --base`. */
   prRetarget: 45_000,
+  /** #709: `gh pr list`, `gh pr create`, then `gh pr view`. */
+  prOpen: 60_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
@@ -610,6 +612,13 @@ export const cardChecksResultSchema = z.object({
   headSha: headShaSchema,
   mergeable: cardPrMergeableSchema,
   checks: z.array(cardCheckSchema).max(CARD_CHECKS_MAX),
+  /**
+   * #709: the branch the PR goes (or went) into — `baseRefName`. Absent from
+   * a runner older than #709.
+   */
+  base: z.string().min(1).max(255).optional(),
+  /** #709: when GitHub merged the PR; `null` while it is not merged. */
+  mergedAt: z.iso.datetime({ offset: true }).nullable().optional(),
 });
 export type CardChecksResult = z.infer<typeof cardChecksResultSchema>;
 
@@ -751,3 +760,71 @@ export const cardPrRetargetCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardPrRetargetCommandName = keyof typeof cardPrRetargetCommands;
+
+// card.prOpen
+
+/**
+ * #709 (ADR-0064, ADR-0010, advertised per ADR-0023): opens a pull request of
+ * a pushed card branch into `base` — the forward PR of a stacked card whose PR
+ * merged into a dependency branch that had already merged. `gh pr list --head
+ * <branch> --base <base> --state open` first, so an open PR is reused; else
+ * `gh pr create`, then `gh pr view --json mergeable`. Argument arrays only,
+ * the body through a private temporary file. The control plane never runs
+ * git itself (ADR-0001).
+ */
+export const cardPrOpenArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  /** The card's branch, the PR's head. */
+  branch: gitRefSchema,
+  /** The branch the PR goes into — the project base. */
+  base: gitRefSchema,
+  title: prTitleSchema,
+  body: prBodySchema,
+});
+export type CardPrOpenArgs = z.infer<typeof cardPrOpenArgsSchema>;
+
+/**
+ * Why no PR was opened: `no_commits` — `branch` has nothing `base` lacks, so
+ * its work has landed; `no_branch` — `branch` is gone from GitHub;
+ * `gh_failed` — `gh` could not list or create it.
+ */
+export const cardPrOpenFailReasonSchema = z.enum([
+  'no_commits',
+  'no_branch',
+  'gh_failed',
+]);
+export type CardPrOpenFailReason = z.infer<typeof cardPrOpenFailReasonSchema>;
+
+/** A refusal is a result, not a command error. */
+export const cardPrOpenResultSchema = z.discriminatedUnion('opened', [
+  z.object({
+    opened: z.literal(true),
+    prNumber: z.number().int().positive(),
+    prUrl: z.url({ protocol: /^https$/ }),
+    /** An open PR of `branch` into `base` existed; nothing was created. */
+    alreadyOpen: z.boolean(),
+    mergeable: cardPrMergeableSchema,
+  }),
+  z.object({
+    opened: z.literal(false),
+    error: cardPrOpenFailReasonSchema,
+    message: stepErrorSchema,
+  }),
+]);
+export type CardPrOpenResult = z.infer<typeof cardPrOpenResultSchema>;
+
+/**
+ * #709: `card.prOpen`, an operator command, in the `commands` allowlist
+ * beside `card.prRetarget`.
+ */
+export const cardPrOpenCommands = {
+  'card.prOpen': {
+    args: cardPrOpenArgsSchema,
+    result: cardPrOpenResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.prOpen,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardPrOpenCommandName = keyof typeof cardPrOpenCommands;

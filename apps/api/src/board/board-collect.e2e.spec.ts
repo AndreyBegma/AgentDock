@@ -173,7 +173,11 @@ describe('board collect (e2e, #329)', () => {
 
   it('never retries a card a person moved out of Finished', async () => {
     await failedCard();
-    expect((await post(1, 'accept')).status).toBe(200);
+    // #709: a failed collect left no PR, so the person confirms.
+    expect((await post(1, 'accept')).status).toBe(409);
+    expect((await post(1, 'accept', { confirmUnlanded: true })).status).toBe(
+      200,
+    );
     await w.work.settled();
     await runRetry(0);
     await hello();

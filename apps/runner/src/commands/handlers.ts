@@ -12,6 +12,7 @@ import {
   cardChecks,
   closeCardPr,
   mergeCard,
+  openCardPr,
   retargetCardPr,
   retriggerCardCi,
 } from '../cards';
@@ -303,6 +304,13 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'card.prRetarget': (args) =>
       context.cards
         ? retargetCardPr(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'card.prOpen': (args) =>
+      context.cards
+        ? openCardPr(args, {
             exec: context.exec,
             watchedProjects: context.watchedProjects,
           })

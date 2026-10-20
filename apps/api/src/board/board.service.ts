@@ -414,7 +414,7 @@ export class BoardService implements OnModuleInit {
     const baseCardIds = branched
       .map((c) => c.prBaseCardId)
       .filter((id): id is string => id !== null);
-    const [bases, numbers] = await Promise.all([
+    const [bases, dependencies] = await Promise.all([
       Promise.all(
         [...new Set(branched.map((c) => c.projectId))].map(
           async (id) => [id, (await this.work.project(id)).base] as const,
@@ -424,11 +424,11 @@ export class BoardService implements OnModuleInit {
         ? Promise.resolve([])
         : this.prisma.boardCard.findMany({
             where: { id: { in: baseCardIds } },
-            select: { id: true, number: true },
+            select: { id: true, number: true, mergedAt: true },
           }),
     ]);
     const baseOf = new Map(bases);
-    const numberOf = new Map(numbers.map((c) => [c.id, c.number]));
+    const dependencyOf = new Map(dependencies.map((c) => [c.id, c]));
     for (const card of branched) {
       const base = baseOf.get(card.projectId);
       const target =
@@ -438,7 +438,7 @@ export class BoardService implements OnModuleInit {
               card,
               card.prBaseCardId === null
                 ? null
-                : (numberOf.get(card.prBaseCardId) ?? null),
+                : (dependencyOf.get(card.prBaseCardId) ?? null),
               base,
             );
       if (target) targets.set(card.id, target);
@@ -978,6 +978,14 @@ export class BoardService implements OnModuleInit {
       (dto.merge?.deleteBranch ?? false) ||
       (dto.closePr?.deleteBranch ?? false);
     if (!fleet && deleteBranch) this.assertMayDeleteBranch(project, card);
+    // #709 (ADR-0064): Completed means landed — a person confirms leaving
+    // the work out of the base. Closing the PR is that decision already.
+    if (!fleet && !dto.merge && !dto.closePr && dto.confirmUnlanded !== true) {
+      const missing = await this.work.missingLanding(project, card.id);
+      if (missing !== null) {
+        throw boardError(409, BOARD_ERROR.notLanded, missing);
+      }
+    }
     const merge =
       dto.merge && !fleet
         ? await this.merge(

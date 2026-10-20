@@ -7,6 +7,7 @@ import {
   type BoardCardDetail,
   type BoardCardKind,
   CARD_FEEDBACK_MAX,
+  type CardPrTarget,
   type CardRoundView,
   isActiveRoundPhase,
 } from '@agentdock/shared';
@@ -74,6 +75,7 @@ import { boardCardPageHref, boardStackPageHref } from '../../lib/board/href';
 import {
   canCreatePr,
   prChipText,
+  prTargetNotice,
   prTargetText,
 } from '../../lib/board/pull-request';
 import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
@@ -368,6 +370,15 @@ const FORM_ID = 'board-card-form';
  */
 export function cardSheetSide(narrow: boolean): 'bottom' | 'right' {
   return narrow ? 'bottom' : 'right';
+}
+
+/**
+ * #709: a stacked PR's target, prominent on the sheet — and a warning once the
+ * dependency's own PR has merged; nothing for a PR into the base.
+ */
+export function PrTargetBanner({ target }: { target: CardPrTarget | null }) {
+  const notice = prTargetNotice(target);
+  return notice ? <Banner tone={notice.tone}>{notice.text}</Banner> : null;
 }
 
 /**
@@ -679,6 +690,7 @@ export function CardDetailBody({
           ) : null}
         </p>
       ) : null}
+      <PrTargetBanner target={card.prTarget} />
       {card.round?.hooksMissing
         ? (() => {
             const notice = hooksNotice(card, card.round);

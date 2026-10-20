@@ -141,6 +141,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
     "Reopened a card's pull request because CI reported no checks",
   'card.pr_retargeted':
     "Moved a stacked card's pull request onto the base after its dependency merged",
+  'card.pr_forwarded':
+    'Opened a forward pull request for a card merged into a dependency branch that had already merged',
   'card.auto_run_toggled': 'Switched Auto-run when ready on a card',
   'card.message': 'Messaged a card session',
   'slot.session_message': 'Messaged a worker session',

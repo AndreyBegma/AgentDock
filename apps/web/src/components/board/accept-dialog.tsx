@@ -49,6 +49,8 @@ export function AcceptDialog({
   version,
   runnerCommands,
   onAccept,
+  unlanded = null,
+  onConfirmUnlanded,
   onClose,
 }: {
   projectId: string;
@@ -60,6 +62,13 @@ export function AcceptDialog({
   runnerCommands?: RunnerCommands | null;
   /** `merge` merges, `closePr` closes the PR, `{}` only moves the card. */
   onAccept: (card: BoardCardView, request: AcceptBoardCardRequest) => void;
+  /**
+   * #709: why the last Accept was refused — the card's work is not in the
+   * base; the dialog then asks the person to confirm instead.
+   */
+  unlanded?: string | null;
+  /** #709: Accept again, confirmed. */
+  onConfirmUnlanded?: (card: BoardCardView) => void;
   onClose: () => void;
 }) {
   const [loaded, setLoaded] = useState<PullRequest>({ state: 'loading' });
@@ -133,49 +142,66 @@ export function AcceptDialog({
         title={`Accept ${card?.label ?? 'the card'}?`}
         description="Accepting moves the card to Completed and closes its worker."
         footer={
-          <>
-            <Button variant="ghost" disabled={busy} onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              variant={choice?.kind === 'merge' ? 'glass' : 'solid'}
-              disabled={busy || choice === null || !card}
-              onClick={() => {
-                if (!card) return;
-                // Already merged: the merge request is what closes the issue (D13).
-                if (choice?.kind === 'already_merged') {
-                  onAccept(card, { merge: { headSha: choice.headSha } });
-                } else {
-                  acceptWithoutMerge(card);
-                }
-              }}
-            >
-              {choice?.kind === 'already_merged'
-                ? 'Accept'
-                : closing
-                  ? busy
-                    ? 'Closing…'
-                    : 'Close pull request and accept'
-                  : 'Accept without merging'}
-            </Button>
-            {choice?.kind === 'merge' && card ? (
+          unlanded !== null && card ? (
+            <>
+              <Button variant="ghost" disabled={busy} onClick={onClose}>
+                Cancel
+              </Button>
               <Button
                 variant="solid"
                 disabled={busy}
-                onClick={() =>
-                  onAccept(
-                    card,
-                    mergeRequest(card, choice.headSha, options, gate),
-                  )
-                }
+                onClick={() => onConfirmUnlanded?.(card)}
               >
-                {busy ? 'Merging…' : 'Merge pull request'}
+                {busy ? 'Accepting…' : 'Accept anyway'}
               </Button>
-            ) : null}
-          </>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" disabled={busy} onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                variant={choice?.kind === 'merge' ? 'glass' : 'solid'}
+                disabled={busy || choice === null || !card}
+                onClick={() => {
+                  if (!card) return;
+                  // Already merged: the merge request is what closes the issue (D13).
+                  if (choice?.kind === 'already_merged') {
+                    onAccept(card, { merge: { headSha: choice.headSha } });
+                  } else {
+                    acceptWithoutMerge(card);
+                  }
+                }}
+              >
+                {choice?.kind === 'already_merged'
+                  ? 'Accept'
+                  : closing
+                    ? busy
+                      ? 'Closing…'
+                      : 'Close pull request and accept'
+                    : 'Accept without merging'}
+              </Button>
+              {choice?.kind === 'merge' && card ? (
+                <Button
+                  variant="solid"
+                  disabled={busy}
+                  onClick={() =>
+                    onAccept(
+                      card,
+                      mergeRequest(card, choice.headSha, options, gate),
+                    )
+                  }
+                >
+                  {busy ? 'Merging…' : 'Merge pull request'}
+                </Button>
+              ) : null}
+            </>
+          )
         }
       >
-        {choice === null || !card ? (
+        {unlanded !== null && card ? (
+          <UnlandedBanner reason={unlanded} />
+        ) : choice === null || !card ? (
           <Skeleton className="h-20 w-full" />
         ) : (
           <div className="flex flex-col gap-3 text-sm">
@@ -223,6 +249,19 @@ export function AcceptDialog({
         )}
       </DialogContent>
     </DialogRoot>
+  );
+}
+
+/**
+ * #709: Completed means landed — Accept named the landing the card's work
+ * still lacks, and the person confirms before it moves.
+ */
+export function UnlandedBanner({ reason }: { reason: string }) {
+  return (
+    <Banner tone="warn" title="Its work is not in the base">
+      {reason}. Accept anyway only if this work is not meant to land; otherwise
+      merge its pull request into the base first.
+    </Banner>
   );
 }
 

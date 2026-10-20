@@ -231,7 +231,8 @@ describe('board accept with merge (e2e, #273)', () => {
 
     it('an empty body is the move only: no card.merge, merge null', async () => {
       await finished();
-      const response = await post(1, 'accept');
+      // #709: the open PR #77 has not landed; the person confirms.
+      const response = await post(1, 'accept', { confirmUnlanded: true });
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({ column: 'completed', merge: null });
       expect(w.sent('card.merge')).toEqual([]);
@@ -443,7 +444,8 @@ describe('board accept with merge (e2e, #273)', () => {
 
     it('leave the PR open: nothing is sent to GitHub', async () => {
       await finished();
-      const response = await post(1, 'accept');
+      // #709: the open PR #77 has not landed; the person confirms.
+      const response = await post(1, 'accept', { confirmUnlanded: true });
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
         column: 'completed',

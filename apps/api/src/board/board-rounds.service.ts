@@ -458,9 +458,17 @@ export class BoardRoundsService {
       (card.prNumber === null ||
         card.mergedAt !== null ||
         card.prState === 'closed');
+    // #709: a kept base whose dependency has merged — on GitHub, unseen —
+    // is moved onto the project base first.
+    const keptBase =
+      !choosesBase &&
+      card.prBaseCardId !== null &&
+      !(await this.work.retargetIfDue(project, card))
+        ? null
+        : card.prBase;
     const base = choosesBase
       ? (stacked?.branch ?? project.base)
-      : (card.prBase ?? project.base);
+      : (keptBase ?? project.base);
     // A session is resumed once Claude has run in it (D5); a round 1 that
     // never started is started again.
     const resume =

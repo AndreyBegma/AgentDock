@@ -34,6 +34,29 @@ export function prTargetText(target: CardPrTarget | null): string | null {
     : `into ${target.branch}`;
 }
 
+/**
+ * #709: the sheet's banner for a PR that goes into a dependency's branch
+ * rather than the project base — a warning once that dependency's own PR has
+ * merged, since a merge into its branch would never reach the base; null for
+ * a PR into the base.
+ */
+export function prTargetNotice(
+  target: CardPrTarget | null,
+): { tone: 'warn' | 'info'; text: string } | null {
+  if (target?.stackedOn == null) return null;
+  const { label, merged } = target.stackedOn;
+  if (merged) {
+    return {
+      tone: 'warn',
+      text: `The pull request goes into ${label}’s branch (${target.branch}), but ${label}’s own pull request has already merged — merging this one there would never reach the base. AgentDock moves it onto the base; if it stays here, retarget it on GitHub.`,
+    };
+  }
+  return {
+    tone: 'info',
+    text: `The pull request goes into ${label}’s branch (${target.branch}), not the base. Its work reaches the base when ${label}’s pull request merges.`,
+  };
+}
+
 /** #329 D5: shared with the bot (#578). */
 export { canCreatePr } from '@agentdock/shared';
 

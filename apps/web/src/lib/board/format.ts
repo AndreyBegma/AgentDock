@@ -339,6 +339,8 @@ export function describeMergeFailure(
       return 'GitHub refuses the merge: checks or branch protection.';
     case 'closed':
       return 'The pull request is closed.';
+    case 'base_merged':
+      return 'The pull request goes into a dependency branch whose own pull request has already merged, and it could not be moved onto the base. Retarget it on GitHub first.';
     default:
       return typeof message === 'string' && message !== ''
         ? `gh failed: ${message}`

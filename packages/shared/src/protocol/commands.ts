@@ -8,6 +8,7 @@ import {
   cardCiRetriggerCommands,
   cardCommands,
   cardPrCloseCommands,
+  cardPrOpenCommands,
   cardPrRetargetCommands,
 } from './commands/cards';
 import { controlCommands } from './commands/control';
@@ -170,6 +171,7 @@ export const commands = {
   ...cardChecksCommands,
   ...cardCiRetriggerCommands,
   ...cardPrRetargetCommands,
+  ...cardPrOpenCommands,
   ...captureCommands,
   ...textCommands,
   ...assessCommands,

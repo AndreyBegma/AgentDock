@@ -391,6 +391,10 @@ export class AcceptBoardCardDto implements AcceptBoardCardRequest {
   @ValidateNested()
   @Type(() => AcceptClosePrDto)
   closePr?: AcceptClosePrDto;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmUnlanded?: boolean;
 }
 
 /** `POST /board/cards/:number/accept-suggestion` (#244 D9): Edit & accept. */

@@ -27,12 +27,21 @@ describe('board bulk actions (e2e, #452)', () => {
   const post = (number: number, action: string) =>
     w.operator.send('post', `${w.path()}/board/cards/${number}/${action}`, {});
 
-  /** A card run and finished by the person: Finished, with PR #77. */
-  const finished = async (): Promise<number> => {
+  /**
+   * A card run and finished by the person: Finished, with PR #77 — merged into
+   * the base unless `open`, since Completed takes only landed work (#709).
+   */
+  const finished = async ({ open = false } = {}): Promise<number> => {
     const { number } = await w.createCard();
     expect((await w.runCard(number)).status).toBe(200);
     expect((await post(number, 'finish')).status).toBe(200);
     await w.work.settled();
+    if (!open) {
+      await w.ctx.prisma.boardCard.updateMany({
+        where: { projectId: w.a, number },
+        data: { prState: 'merged', mergedAt: new Date() },
+      });
+    }
     return number;
   };
 
@@ -91,6 +100,22 @@ describe('board bulk actions (e2e, #452)', () => {
       ]);
       expect(await column(done)).toBe('completed');
       expect(await column(busy)).toBe('in_progress');
+    });
+
+    it('leaves a card whose PR has not landed in Finished, as an error naming the PR (#709)', async () => {
+      const open = await finished({ open: true });
+      const done = await finished();
+      const response = await bulk([open, done], 'complete');
+      expect(response.body.results).toEqual([
+        {
+          number: open,
+          status: 'error',
+          code: 'not_landed',
+          message: expect.stringContaining('#77'),
+        },
+        { number: done, status: 'done' },
+      ]);
+      expect(await column(open)).toBe('finished');
     });
 
     it('completes a fleet card, whose one person move is Accept', async () => {
