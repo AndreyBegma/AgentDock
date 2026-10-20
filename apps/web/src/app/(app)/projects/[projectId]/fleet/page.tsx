@@ -302,7 +302,7 @@ function FleetWorkspace() {
     <div className="flex flex-col gap-4">
       <FleetHeader
         projectId={projectId}
-        title={project?.displayName ?? 'Fleet'}
+        projectName={project?.displayName}
         orchestrator={orchestratorStatus}
         counts={counts}
         view={workspace.view}

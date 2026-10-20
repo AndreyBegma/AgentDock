@@ -81,6 +81,8 @@ export function FilterTable({
   return (
     <ResponsiveRows
       label={label}
+      // Five columns are too wide for a tablet (C-301).
+      stackBelow={passThrough ? 'desktop' : 'tablet'}
       rows={[...filters]}
       getRowId={(f) => f.filter}
       columns={columns}
@@ -130,6 +132,7 @@ export function BeforeAfterTable({
   return (
     <ResponsiveRows
       label="Cost per run, before and after Token saver"
+      stackBelow="desktop"
       rows={shown}
       getRowId={(r) => r.runKind}
       columns={columns}
@@ -191,7 +194,8 @@ export function UnfilteredReasonTable({
       id: 'reason',
       header: 'Reason',
       cell: (r: ReasonRow) => (
-        <span className="flex flex-col">
+        // The cell is `nowrap`; the hint wraps so it is not cut (C-301).
+        <span className="flex flex-col whitespace-normal">
           <span>{filterLabel(r.filter)}</span>
           <span className="text-ink-3 text-xs">
             {UNFILTERED_HINT[r.filter]}
@@ -295,6 +299,7 @@ export function PromptCacheTable({
   return (
     <ResponsiveRows
       label="Prompt cache by run kind"
+      stackBelow="desktop"
       rows={[...rows]}
       getRowId={(r) => r.runKind}
       columns={columns}

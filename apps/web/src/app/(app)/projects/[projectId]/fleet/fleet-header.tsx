@@ -1,6 +1,7 @@
 'use client';
 
 import type { OrchestratorStatus } from '@agentdock/shared';
+import { Badge } from '@andrewbehma/glass-ui/badge';
 import { MetaBar } from '@andrewbehma/glass-ui/meta-bar';
 import type { PageHeaderOverflowItem } from '@andrewbehma/glass-ui/page-header';
 import {
@@ -21,6 +22,7 @@ import {
   fleetCounters,
 } from '../../../../../lib/fleet/graph';
 import type { WorkspaceView } from '../../../../../lib/fleet/workspace-url';
+import { projectHue } from '../../../../../lib/hue';
 import { ORCHESTRATOR_PILL_STATUS } from '../../../../../lib/status/pill';
 
 const VIEW_LABEL: Record<WorkspaceView, string> = {
@@ -29,15 +31,16 @@ const VIEW_LABEL: Record<WorkspaceView, string> = {
 };
 
 /**
- * The Fleet's header (#160, #213, C-283): the shared `PageHeader`, the
- * orchestrator's state beside the title in the one vocabulary the card and
+ * The Fleet's header (#160, #213, C-283): the shared `PageHeader` titled
+ * Fleet with the project in the eyebrow, as the breadcrumb and the rail say
+ * (C-301), the orchestrator's state beside the title in the one vocabulary the card and
  * the canvas use, the fleet's counters in `meta`, New issue as the one solid
  * action and everything else — fit, settings — behind the `…` menu. The view
  * switch is the one quiet control beside it.
  */
 export function FleetHeader({
   projectId,
-  title,
+  projectName,
   orchestrator,
   counts,
   view,
@@ -48,7 +51,8 @@ export function FleetHeader({
   onViewChange,
 }: {
   projectId: string;
-  title: string;
+  /** Absent while the project loads. */
+  projectName: string | undefined;
   orchestrator: OrchestratorStatus | undefined;
   counts: FleetCounts | undefined;
   view: WorkspaceView;
@@ -81,7 +85,20 @@ export function FleetHeader({
   return (
     <PageHeader
       className="mb-0"
-      title={title}
+      eyebrow={
+        projectName ? (
+          <span className="inline-flex items-center gap-2">
+            {/* Identity is square; a round dot means status (#213). */}
+            <Badge
+              shape="square"
+              hue={projectHue(projectId)}
+              aria-hidden="true"
+            />
+            {projectName}
+          </span>
+        ) : undefined
+      }
+      title="Fleet"
       description="The orchestrator and the agents it runs on this project."
       link={NextLink}
       {...(orchestrator
