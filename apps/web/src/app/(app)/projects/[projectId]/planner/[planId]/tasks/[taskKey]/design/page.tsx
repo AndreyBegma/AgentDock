@@ -23,6 +23,7 @@ import {
   applyViewerChange,
   resolveViewerState,
 } from '../../../../../../../../../lib/design/viewer-state';
+import { useStepBack } from '../../../../../../../../../lib/navigation/step-back';
 import { isNotFound } from '../../../../../../../../../lib/planner/format';
 import { planApi, planHref } from '../../../../../../../../../lib/planner/href';
 import { useErrorToast } from '../../../../../../../../../lib/section/use-error-toast';
@@ -54,13 +55,19 @@ export default function DesignViewerPage() {
   const task = plan.data?.tasks.find((t) => t.key === taskKey);
   const section = useDesign(projectId, planId, taskKey);
   const back = planHref(projectId, planId, taskKey);
+  const leave = useStepBack(back);
 
   return (
-    <FullScreenLayer label="Design viewer">
+    <FullScreenLayer
+      label="Design viewer"
+      onBack={leave}
+      bar={{ label: 'Plan', title: 'Design', subtitle: taskKey }}
+    >
       <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
         <Link
           href={back}
-          className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+          // Below `lg` the phone back bar is the way out (#677).
+          className={`${buttonClassName({ variant: 'ghost', size: 'sm' })} max-lg:hidden`}
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           Back to plan
