@@ -364,9 +364,7 @@ describe('stacked card branches (e2e, #636)', () => {
         prBase: null,
         prBaseCardId: null,
       });
-      expect(w.checks()).toContainEqual(
-        expect.objectContaining({ pr: 77 }),
-      );
+      expect(w.checks()).toContainEqual(expect.objectContaining({ pr: 77 }));
       // The merge the poll missed is recorded on C-1.
       expect(await w.card(c1.number)).toMatchObject({
         prState: 'merged',

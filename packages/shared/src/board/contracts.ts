@@ -638,7 +638,8 @@ export const BULK_CARDS_MAX = 100;
 /**
  * `POST /board/cards/bulk` (#452): one action for several cards. `complete`
  * is Accept with neither `merge` nor `closePr` — the PRs are left as they
- * are; `todo` is the person's move; `finished` is Mark finished; `delete`
+ * are, and a card whose work has not landed in the base is that card's
+ * `not_landed` error (#709: it is accepted one at a time, confirmed); `todo` is the person's move; `finished` is Mark finished; `delete`
  * never stops a worker.
  */
 export interface BulkBoardCardsRequest {
