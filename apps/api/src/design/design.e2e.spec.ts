@@ -6,6 +6,7 @@ import {
   type TaskDesignView,
   type UiProfileView,
 } from '@agentdock/shared';
+import { PLAN_TURN_RESULT_MAX_BYTES } from '@agentdock/shared/protocol';
 import { BudgetGate } from '../budgets';
 import { BudgetExceededError } from '../budgets/budget-error';
 import { block, decomposed, task } from '../planner/testing/planner-e2e';
@@ -321,6 +322,57 @@ describe('design stage (e2e)', () => {
     const view = await design(plan.id);
     expect(view.revisions).toHaveLength(0);
     expect(view.status).toBe('idle');
+  });
+
+  it('#686: stores frames over 160 KiB together, each under it, sent in chunk events', async () => {
+    await h.seedProfile();
+    const plan = await uiPlan();
+    await generate(plan.id);
+    const frame = (name: string) => ({
+      name,
+      html: `<!doctype html><html><body><p>${name}${'x'.repeat(100 * 1024)}</p></body></html>`,
+    });
+    const frames = [frame('Board'), frame('Card')];
+    const text = designResult({ taskKey: 't1', variant: 1 }, frames);
+    expect(Buffer.byteLength(text)).toBeGreaterThan(PLAN_TURN_RESULT_MAX_BYTES);
+    await h.finishChunked(plan.id, text);
+    const turn = await h.ctx.prisma.planTurn.findFirstOrThrow({
+      where: { planId: plan.id, action: 'design' },
+    });
+    expect(turn.error).toBeNull();
+    expect(turn.phase).toBe('succeeded');
+    expect(turn.resultText).toBe(text);
+    const view = await design(plan.id);
+    expect(view.revisions).toHaveLength(1);
+    const stored = await h.ctx.prisma.designFrame.findMany({
+      where: { revisionId: view.revisions[0]?.id },
+      orderBy: { position: 'asc' },
+    });
+    expect(stored.map((f) => f.name)).toEqual(['Board', 'Card']);
+    expect(stored.map((f) => Buffer.byteLength(f.html))).toEqual(
+      frames.map((f) => Buffer.byteLength(f.html)),
+    );
+  });
+
+  it('#686: fails a chunked result with a chunk missing as truncated', async () => {
+    await h.seedProfile();
+    const plan = await uiPlan();
+    await generate(plan.id);
+    const html = `<!doctype html><html><body><p>${'x'.repeat(150 * 1024)}</p></body></html>`;
+    await h.finishChunked(
+      plan.id,
+      designResult({ taskKey: 't1', variant: 1 }, [
+        { name: 'A', html },
+        { name: 'B', html },
+      ]),
+      [1],
+    );
+    const turn = await h.ctx.prisma.planTurn.findFirstOrThrow({
+      where: { planId: plan.id, action: 'design' },
+    });
+    expect(turn.phase).toBe('failed');
+    expect(turn.error).toContain('contract_violation: result_truncated');
+    expect((await design(plan.id)).revisions).toHaveLength(0);
   });
 
   it('serves the mockup and the profile preview sandboxed with the pin helper, and hides them from who may not read', async () => {

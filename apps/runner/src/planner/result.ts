@@ -122,10 +122,7 @@ export const turnOutcome = (input: {
   const { reason, exit } = input;
   const result = finalResult(input.stream);
   const cut = result?.text
-    ? cutBytes(
-        result.text,
-        input.maxResultBytes ?? PLAN_TURN_RESULT_MAX_BYTES,
-      )
+    ? cutBytes(result.text, input.maxResultBytes ?? PLAN_TURN_RESULT_MAX_BYTES)
     : null;
   let phase: PlanTurnTerminalPhase = 'failed';
   let error: string | undefined;
