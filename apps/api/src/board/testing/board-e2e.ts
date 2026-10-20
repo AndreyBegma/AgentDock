@@ -401,6 +401,13 @@ export class BoardWorld {
       .mock.calls.map(([, args]) => ({ ...args }));
   }
 
+  /** #709: the `card.checks` commands sent, oldest first. */
+  checks(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.checks)
+      .mock.calls.map(([, args]) => ({ ...args }));
+  }
+
   /** #709: the `card.prOpen` commands sent, oldest first. */
   prOpens(): Record<string, unknown>[] {
     return jest
