@@ -94,7 +94,7 @@ describe('stacked card branches (e2e, #636)', () => {
     });
     expect((response.body as BoardCardDetail).prTarget).toEqual({
       branch: C1_BRANCH,
-      stackedOn: { number: c1.number, label: `C-${c1.number}` },
+      stackedOn: { number: c1.number, label: `C-${c1.number}`, merged: false },
     });
 
     // The round's collect opens the PR into C-1's branch too.
@@ -325,7 +325,7 @@ describe('stacked card branches (e2e, #636)', () => {
     });
     expect(byNumber.get(c2.number)?.prTarget).toEqual({
       branch: C1_BRANCH,
-      stackedOn: { number: c1.number, label: `C-${c1.number}` },
+      stackedOn: { number: c1.number, label: `C-${c1.number}`, merged: false },
     });
   });
   describe('the base read from GitHub (#709)', () => {

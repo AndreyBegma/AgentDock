@@ -10,7 +10,11 @@ import type { RunnerCommands } from '@agentdock/shared/protocol';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { type ReactNode, useCallback, useState } from 'react';
-import { acceptedMessage } from '../../lib/board/accept';
+import {
+  acceptedMessage,
+  confirmUnlanded,
+  notLandedReason,
+} from '../../lib/board/accept';
 import {
   acceptCard,
   acceptSuggestion,
@@ -80,6 +84,12 @@ export function useCardActions({
   const [pending, setPending] = useState<Pending>();
   const [accepting, setAccepting] = useState<BoardCardView>();
   const [acceptVersion, setAcceptVersion] = useState(0);
+  // #709: an Accept refused for work not in the base, waiting for the
+  // person to confirm it.
+  const [unlanded, setUnlanded] = useState<{
+    request: AcceptBoardCardRequest;
+    reason: string;
+  }>();
 
   const perform = useCallback(
     async (job: () => Promise<unknown>, done: string): Promise<boolean> => {
@@ -112,7 +122,13 @@ export function useCardActions({
       if (message.warn) toast.warning(message.text);
       else toast.success(message.text);
       setAccepting(undefined);
+      setUnlanded(undefined);
     } catch (err) {
+      const reason = notLandedReason(err);
+      if (reason) {
+        setUnlanded({ request, reason });
+        return;
+      }
       toast.error(describeBoardError(err, runnerName));
       // A refused merge or close usually means the PR moved: show it again.
       setAcceptVersion((v) => v + 1);
@@ -197,7 +213,10 @@ export function useCardActions({
         () => finishCard(projectId, card.number),
         `${card.label} marked finished.`,
       ),
-    accept: (card) => setAccepting(card),
+    accept: (card) => {
+      setUnlanded(undefined);
+      setAccepting(card);
+    },
     createPullRequest: async (card) => {
       setBusy(true);
       try {
@@ -237,7 +256,14 @@ export function useCardActions({
           version={acceptVersion}
           runnerCommands={runnerCommands}
           onAccept={(card, request) => void accept(card, request)}
-          onClose={() => setAccepting(undefined)}
+          unlanded={unlanded?.reason ?? null}
+          onConfirmUnlanded={(card) => {
+            if (unlanded) void accept(card, confirmUnlanded(unlanded.request));
+          }}
+          onClose={() => {
+            setAccepting(undefined);
+            setUnlanded(undefined);
+          }}
         />
         <ConfirmDialog
           open={pending !== undefined}

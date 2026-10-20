@@ -152,8 +152,12 @@ export interface CardFleetView {
  */
 export interface CardPrTarget {
   branch: string;
-  /** The dependency whose branch it is; `null` for the project base. */
-  stackedOn: { number: number; label: string } | null;
+  /**
+   * The dependency whose branch it is; `null` for the project base. #709:
+   * `merged` — that dependency's own PR has merged, so the branch is dead and
+   * a merge into it would never reach the base.
+   */
+  stackedOn: { number: number; label: string; merged: boolean } | null;
 }
 
 /** One card on the board. */

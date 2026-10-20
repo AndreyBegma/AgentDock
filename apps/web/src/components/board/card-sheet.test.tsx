@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { cardSheetFooter, cardSheetSide, focusSheetTitle } from './card-sheet';
+import {
+  cardSheetFooter,
+  cardSheetSide,
+  focusSheetTitle,
+  PrTargetBanner,
+} from './card-sheet';
 
 interface Fake {
   title: { tabIndex: number; focused: boolean; focusOptions?: unknown };
@@ -105,5 +110,37 @@ describe('Card sheet on a phone (#680)', () => {
     expect(
       cardSheetFooter({ narrow: false, onClose: () => {} }),
     ).toBeUndefined();
+  });
+});
+
+describe('Card sheet PR target (#709)', () => {
+  const banner = (merged: boolean | null) =>
+    renderToStaticMarkup(
+      <PrTargetBanner
+        target={
+          merged === null
+            ? { branch: 'develop', stackedOn: null }
+            : {
+                branch: 'feat/281-the-dependency',
+                stackedOn: { number: 281, label: 'C-281', merged },
+              }
+        }
+      />,
+    );
+
+  test('a PR into the base shows no banner', () => {
+    expect(banner(null)).toBe('');
+  });
+
+  test('a stacked PR names the dependency branch it goes into', () => {
+    const html = banner(false);
+    expect(html).toContain('C-281’s branch (feat/281-the-dependency)');
+    expect(html).not.toContain('already merged');
+  });
+
+  test('warns when the dependency’s own PR has already merged', () => {
+    const html = banner(true);
+    expect(html).toContain('C-281’s own pull request has already merged');
+    expect(html).toContain('retarget it on GitHub');
   });
 });
