@@ -7,6 +7,7 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { Check } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';
 import { api } from '../../../../../lib/api';
@@ -34,28 +35,84 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Detail({
+/**
+ * Approve and Request changes on a waiting pull request, with their dialogs.
+ * Nothing for a viewer or a decided row. In a sheet it is the pinned footer, so
+ * on a phone the decision stays under the thumb however long the detail is.
+ */
+function PrDecision({
   projectId,
   runnerName,
   detail,
   canOperate,
   onChanged,
+  className,
 }: {
   projectId: string;
   runnerName?: string | null;
   detail: ApprovalDetail;
   canOperate: boolean;
   onChanged: () => void;
+  className?: string;
 }) {
-  const [filesOpen, setFilesOpen] = useState(false);
   const [approving, setApproving] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const inspection = detail.inspection;
-  const href = safeHttpsUrl(inspection?.url ?? detail.url);
-
-  const waiting = detail.status === 'waiting';
   const decisionReason = decisionDisabledReason(inspection, runnerName);
-  const decidable = waiting && decisionReason === null;
+  const decidable = decisionReason === null;
+
+  if (!canOperate || detail.status !== 'waiting' || !inspection) return null;
+  return (
+    <div className={`flex flex-col gap-2 ${className ?? ''}`}>
+      <div className="flex gap-2">
+        <Button
+          variant="glass"
+          className="max-tablet:min-h-11 max-tablet:flex-1"
+          disabled={!decidable}
+          onClick={() => setRequesting(true)}
+        >
+          Request changes
+        </Button>
+        <Button
+          variant="glass"
+          className="max-tablet:min-h-11 max-tablet:flex-1"
+          disabled={!decidable}
+          onClick={() => setApproving(true)}
+        >
+          <Check aria-hidden="true" className="size-4" />
+          Approve
+        </Button>
+      </div>
+      {decisionReason ? (
+        <DisabledReason>{decisionReason}</DisabledReason>
+      ) : null}
+      <ApproveDialog
+        projectId={projectId}
+        runnerName={runnerName}
+        pr={detail.pr}
+        headSha={inspection.headSha}
+        open={approving}
+        onOpenChange={setApproving}
+        onChanged={onChanged}
+      />
+      <RequestChangesDialog
+        projectId={projectId}
+        runnerName={runnerName}
+        pr={detail.pr}
+        headSha={inspection.headSha}
+        open={requesting}
+        onOpenChange={setRequesting}
+        onChanged={onChanged}
+      />
+    </div>
+  );
+}
+
+/** What the decision is based on: the PR's status, summary, commits and checks. */
+function Detail({ detail }: { detail: ApprovalDetail }) {
+  const [filesOpen, setFilesOpen] = useState(false);
+  const inspection = detail.inspection;
+  const href = safeHttpsUrl(inspection?.url ?? detail.url);
 
   return (
     <dl className="flex flex-col gap-4">
@@ -72,26 +129,6 @@ function Detail({
           </span>
         </span>
       </Row>
-
-      {canOperate && waiting ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Button disabled={!decidable} onClick={() => setApproving(true)}>
-              Approve
-            </Button>
-            <Button
-              variant="glass"
-              disabled={!decidable}
-              onClick={() => setRequesting(true)}
-            >
-              Request changes
-            </Button>
-          </div>
-          {decisionReason ? (
-            <DisabledReason>{decisionReason}</DisabledReason>
-          ) : null}
-        </div>
-      ) : null}
 
       {detail.inspectionError ? (
         <Banner tone="warn" title="The pull request could not be inspected">
@@ -221,54 +258,17 @@ function Detail({
           </a>
         </Row>
       ) : null}
-
-      {inspection ? (
-        <>
-          <ApproveDialog
-            projectId={projectId}
-            runnerName={runnerName}
-            pr={detail.pr}
-            headSha={inspection.headSha}
-            open={approving}
-            onOpenChange={setApproving}
-            onChanged={onChanged}
-          />
-          <RequestChangesDialog
-            projectId={projectId}
-            runnerName={runnerName}
-            pr={detail.pr}
-            headSha={inspection.headSha}
-            open={requesting}
-            onOpenChange={setRequesting}
-            onChanged={onChanged}
-          />
-        </>
-      ) : null}
     </dl>
   );
 }
 
 /** The latest detail for PR `pr`, refetched when `version` changes (a live push). */
-export function ApprovalSheet({
-  projectId,
-  runnerName,
-  pr,
-  title,
-  canOperate,
-  version,
-  onClose,
-  onChanged,
-}: {
-  projectId: string;
-  /** The project's runner, named when a decision needs it. */
-  runnerName?: string | null;
-  pr: number | undefined;
-  title: string | null | undefined;
-  canOperate: boolean;
-  version: number;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
+function useApprovalDetail(
+  projectId: string,
+  pr: number | undefined,
+  version: number,
+  runnerName: string | null | undefined,
+) {
   const [detail, setDetail] = useState<ApprovalDetail>();
   const [error, setError] = useState<string>();
 
@@ -290,9 +290,101 @@ export function ApprovalSheet({
     };
   }, [projectId, pr, version, runnerName]);
 
-  const close = () => {
+  const reset = () => {
     setDetail(undefined);
     setError(undefined);
+  };
+  // A detail of the previously shown PR is never drawn under this one's title.
+  const current = detail && detail.pr === pr ? detail : undefined;
+  return { detail: current, error, reset };
+}
+
+interface ApprovalViewProps {
+  projectId: string;
+  /** The project's runner, named when a decision needs it. */
+  runnerName?: string | null;
+  pr: number | undefined;
+  title: string | null | undefined;
+  canOperate: boolean;
+  version: number;
+  onChanged: () => void;
+}
+
+function DetailError({ error }: { error: string }) {
+  return (
+    <p role="alert" className="text-sm text-danger">
+      {error}
+    </p>
+  );
+}
+
+/**
+ * A pull request's merge approval in the page, beside the Approvals list from
+ * tablet up (C-284): the decision first, then what it is based on.
+ */
+export function ApprovalPane({
+  projectId,
+  runnerName,
+  pr,
+  title,
+  canOperate,
+  version,
+  onChanged,
+}: ApprovalViewProps) {
+  const { detail, error } = useApprovalDetail(
+    projectId,
+    pr,
+    version,
+    runnerName,
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-medium text-ink-2">Merge approval</p>
+        <h3 className="text-base font-semibold break-words">
+          {`#${pr} ${title ?? ''}`.trim()}
+        </h3>
+      </div>
+      {error ? (
+        <DetailError error={error} />
+      ) : detail ? (
+        <>
+          <PrDecision
+            projectId={projectId}
+            runnerName={runnerName}
+            detail={detail}
+            canOperate={canOperate}
+            onChanged={onChanged}
+          />
+          <Detail detail={detail} />
+        </>
+      ) : (
+        <Skeleton className="h-64 w-full" />
+      )}
+    </div>
+  );
+}
+
+/**
+ * A pull request's merge approval in a sheet: from the right, or from the
+ * bottom on a phone with the decision pinned in its footer.
+ */
+export function ApprovalSheet({
+  side = 'right',
+  onClose,
+  ...props
+}: ApprovalViewProps & { side?: 'right' | 'bottom'; onClose: () => void }) {
+  const { projectId, runnerName, pr, title, canOperate, version, onChanged } =
+    props;
+  const { detail, error, reset } = useApprovalDetail(
+    projectId,
+    pr,
+    version,
+    runnerName,
+  );
+
+  const close = () => {
+    reset();
     onClose();
   };
 
@@ -305,22 +397,25 @@ export function ApprovalSheet({
     >
       {pr !== undefined ? (
         <SheetContent
-          side="right"
+          side={side}
           title={`#${pr} ${title ?? ''}`.trim()}
           description="Merge approval"
+          footer={
+            detail ? (
+              <PrDecision
+                projectId={projectId}
+                runnerName={runnerName}
+                detail={detail}
+                canOperate={canOperate}
+                onChanged={onChanged}
+              />
+            ) : undefined
+          }
         >
           {error ? (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          ) : detail && detail.pr === pr ? (
-            <Detail
-              projectId={projectId}
-              runnerName={runnerName}
-              detail={detail}
-              canOperate={canOperate}
-              onChanged={onChanged}
-            />
+            <DetailError error={error} />
+          ) : detail ? (
+            <Detail detail={detail} />
           ) : (
             <Skeleton className="h-64 w-full" />
           )}
