@@ -110,14 +110,14 @@ describe('the #5 runner daemon against the API (e2e)', () => {
     admin = await adminSession(ctx);
     home = mkdtempSync(join(tmpdir(), 'nautelle-runner-e2e-'));
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
 
   it('pairs, connects, pings, goes stale and offline, and stops for good on revoke', async () => {
     const created = await createRunner(admin, 'e2e-machine');
     const runnerId = created.runner.id;
 
     // A profile in the runner's own config — the server only mirrors it.
-    const configDir = join(home, 'config', 'agentdock');
+    const configDir = join(home, 'config', 'nautelle');
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, 'runner.json'),

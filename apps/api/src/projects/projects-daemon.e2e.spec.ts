@@ -62,9 +62,9 @@ describe('projects against the runner daemon (e2e)', () => {
   beforeEach(async () => {
     await resetDatabase(ctx.prisma);
     admin = await adminSession(ctx);
-    home = mkdtempSync(join(tmpdir(), 'agentdock-projects-e2e-'));
+    home = mkdtempSync(join(tmpdir(), 'nautelle-projects-e2e-'));
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
 
   it('connects a repository, lists it in the watch list, and deletes it without touching the disk', async () => {
     // A GitHub main checkout whose specDir points in-repo, so detection
@@ -84,7 +84,7 @@ describe('projects against the runner daemon (e2e)', () => {
 
     const created = await createRunner(admin, 'e2e-machine');
     const runnerId = created.runner.id;
-    const configFile = join(home, 'config', 'agentdock', 'runner.json');
+    const configFile = join(home, 'config', 'nautelle', 'runner.json');
     const env = {
       PATH: process.env.PATH,
       HOME: home,
