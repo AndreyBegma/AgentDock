@@ -43,6 +43,21 @@ const isUniqueViolation = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError &&
   error.code === 'P2002';
 
+/**
+ * The repo a refresh stores: the origin's, or the stored one when the origin
+ * went away. Another repository drops the GitHub repository id, so App
+ * deliveries match by name again (spec 27 D7).
+ */
+const remoteRepoData = (
+  stored: string,
+  remote: string | null,
+): { repo?: string; githubRepoId?: null } =>
+  !remote
+    ? {}
+    : remote.toLowerCase() === stored.toLowerCase()
+      ? { repo: remote }
+      : { repo: remote, githubRepoId: null };
+
 /** The columns an inspection sets on a project, at connect and on refresh. */
 const inspectionData = (inspection: ProjectInspection) => ({
   baseBranch: inspection.baseBranch,
@@ -330,7 +345,7 @@ export class ProjectsService {
       data: {
         ...inspectionData(inspection),
         // A repository whose origin went away keeps the repo it connected with.
-        ...(inspection.remote.repo ? { repo: inspection.remote.repo } : {}),
+        ...remoteRepoData(project.repo, inspection.remote.repo),
         ...(keepDocs
           ? {}
           : { docsSource: { upsert: { create: docs, update: docs } } }),
@@ -393,7 +408,7 @@ export class ProjectsService {
       where: { id: projectId },
       data: {
         ...inspectionData(inspection),
-        ...(inspection.remote.repo ? { repo: inspection.remote.repo } : {}),
+        ...remoteRepoData(project.repo, inspection.remote.repo),
         docsSource: { upsert: { create: docs, update: docs } },
       },
       include: withRelations,

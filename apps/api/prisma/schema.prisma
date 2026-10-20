@@ -396,6 +396,11 @@ model Project {
   rootPath                    String
   /// `owner/name` on GitHub — the only forge a project connects on (ADR-0004).
   repo                        String
+  /// GitHub's id of `repo` (spec 27 D7): set by the first App delivery matched
+  /// by name, then deliveries route by it and a rename on GitHub updates
+  /// `repo`. BigInt like `github_installation_repos.repoId`. Cleared when a
+  /// refresh finds a different repository.
+  githubRepoId                BigInt?
   displayName                 String
   baseBranch                  String
   baseSource                  BaseSource
@@ -479,6 +484,7 @@ model Project {
   telegramIntakes        TelegramIntake[]
 
   @@unique([runnerId, rootPath])
+  @@index([githubRepoId])
   @@map("projects")
 }
 

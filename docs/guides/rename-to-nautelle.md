@@ -61,7 +61,7 @@ see the new name.
 |---|---|---|---|
 | 2.1 | In the main checkout: `git remote set-url origin git@github.com:AndreyBegma/Nautelle.git` (or the HTTPS form if SSH is refused). | Person | `git remote get-url origin` ends in `Nautelle.git`; `git fetch origin` succeeds |
 | 2.2 | Worktrees share the main checkout's `.git/config`, so 2.1 covers `.claude/worktrees/*`, the orchestrator slots `.wt-AgentDock-<slot>` and the board cards `.wt-AgentDock-card-<id>`. A separate clone (another machine, `/tmp`) needs its own `set-url`. | Person | `git -C <worktree> remote get-url origin` ends in `Nautelle.git` |
-| 2.3 | Refresh the project in Nautelle so the stored `Project.repo` becomes `AndreyBegma/Nautelle`. GitHub App webhooks are routed by `repository.full_name` (`apps/api/src/github-app/github-routing.ts`); until the project is refreshed, events for the renamed repository match no project. Use *Project → Refresh* or `POST /api/projects/<id>/refresh` (`ProjectsService.refresh`). | Person or orchestrator | the project page shows `AndreyBegma/Nautelle`; the next pull request event updates the board |
+| 2.3 | Nothing to do: the project follows the rename by itself. GitHub App deliveries route by the repository id (`Project.githubRepoId`, spec 27 D7, `apps/api/src/github-app/github-hook.service.ts`), so the first delivery after the rename — the `repository` `renamed` event, or any pull request or push — stores `AndreyBegma/Nautelle` in `Project.repo` and audits `project.repo_rename`. The id is backfilled by the migration that added it (from the installation's repository list) or learnt from the first delivery matched by name; before step 1.1, check that `githubRepoId` is set on the project (a push or pull request event sets it). An App registered before the `repository` event was added must have *Repository* ticked under *App settings → Permissions & events → Subscribe to events* for the `renamed` event to arrive; without it the next other event still renames. Fallback, if the project page still shows `AndreyBegma/AgentDock` after the next event: after 2.1, *Project → Refresh* or `POST /api/projects/<id>/refresh` (`ProjectsService.refresh`) — refresh only after 2.1, since it stores whatever the origin remote names. | Person or orchestrator | the project page shows `AndreyBegma/Nautelle`; *Admin → Audit* has `project.repo_rename`; the next pull request event updates the board |
 | 2.4 | The local directory `~/dev/AgentDock` and the `.wt-AgentDock-*` worktree names may stay. Renaming the directory changes every worktree path, the Claude Code project memory path and the runner's `rootPath`; do it only on purpose, as a separate step. | Person | — |
 
 ## 3. Woodpecker (ci.luna-realm.com, repository 9)
@@ -156,7 +156,7 @@ Only after step 1. One pull request into `develop`, and after C-297 has merged
 
 - **Renaming the repository back** (`Nautelle` → `AgentDock`) is the only
   rollback for step 1, and it works while no other repository took either
-  name. Then repeat 3.1 (Repair) and 2.3 (refresh the project). Remotes set to
+  name. Then repeat 3.1 (Repair) and check 2.3 (the project follows the rename back on its own; refresh only as a fallback). Remotes set to
   `Nautelle.git` keep working through the reverse redirect.
 - **Never** create `AndreyBegma/AgentDock` as a new repository — not as a
   mirror, a fork, a placeholder or a test. It ends the redirect for every old

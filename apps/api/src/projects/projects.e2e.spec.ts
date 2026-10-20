@@ -584,6 +584,52 @@ describe('projects (e2e)', () => {
       ]);
     });
 
+    it('keeps the GitHub repository id on the same repo and drops it on another (spec 27 D7)', async () => {
+      const runner = await connectRunner();
+      const project = await connectProject();
+      await ctx.prisma.project.update({
+        where: { id: project.id },
+        data: { githubRepoId: 4_200_000_001n },
+      });
+      const stored = () =>
+        ctx.prisma.project.findUniqueOrThrow({
+          where: { id: project.id },
+          select: { repo: true, githubRepoId: true },
+        });
+
+      runner.answer = () => ({
+        ok: true,
+        output: inspection({
+          remote: {
+            url: 'git@github.com:Acme/Widget.git',
+            forge: 'github',
+            repo: 'Acme/Widget',
+          },
+        }),
+      });
+      await admin.send('post', `/projects/${project.id}/refresh`);
+      expect(await stored()).toEqual({
+        repo: 'Acme/Widget',
+        githubRepoId: 4_200_000_001n,
+      });
+
+      runner.answer = () => ({
+        ok: true,
+        output: inspection({
+          remote: {
+            url: 'git@github.com:acme/gadget.git',
+            forge: 'github',
+            repo: 'acme/gadget',
+          },
+        }),
+      });
+      await admin.send('post', `/projects/${project.id}/refresh`);
+      expect(await stored()).toEqual({
+        repo: 'acme/gadget',
+        githubRepoId: null,
+      });
+    });
+
     it('resends the watch list when the runner does not hold the project', async () => {
       const runner = await connectRunner();
       const project = await connectProject();

@@ -31,6 +31,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'project.member_remove': 'Removed a project member',
   'project.docs_source_override': 'Set a project’s docs source',
   'project.docs_source_reset': 'Reset a project’s docs source',
+  'project.repo_rename': 'Followed a repository rename on GitHub',
   'prices.version_create': 'Created a price version',
   'prices.recompute': 'Re-priced requests',
   'issue.create': 'Created an issue',
