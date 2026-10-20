@@ -16,10 +16,17 @@
 /* #526: where a docked action sits on a phone. `--keyboard-inset` is what the
    soft keyboard covers (the shell sets it); a dock rides on it, and above the
    floating capsule (#521: 6rem and the safe area, as its spacer), which the
-   shell hides while the keyboard is up. */
+   shell hides while the keyboard is up. From `sm` up there is no capsule
+   (C-282: a tablet keeps the rail), so a dock sits on the safe area. */
 :root {
   --keyboard-inset: 0px;
   --dock-bottom: calc(6rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+  :root {
+    --dock-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 :root[data-keyboard="open"] {

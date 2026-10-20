@@ -1,8 +1,9 @@
 import { NARROW_MAX_WIDTH_PX, useNarrow } from '../shell/narrow';
 
 /**
- * The Board's phone breakpoint is the shell's narrow one, 1024 px (`lg`): the
- * floating BottomCapsule shows below it, and so does the phone layout (#497).
+ * The Board's phone breakpoint is the shell's narrow one, 640 px (`sm`, C-282):
+ * the floating BottomCapsule shows below it, and so does the phone layout
+ * (#497). A tablet keeps the desktop columns beside the folded rail.
  */
 export const PHONE_MAX_WIDTH_PX = NARROW_MAX_WIDTH_PX;
 
