@@ -64,7 +64,7 @@
     },
     "apps/runner": {
       "name": "@nautelle/runner",
-      "version": "0.13.0",
+      "version": "0.14.0",
       "bin": {
         "nautelle-runner": "./dist/nautelle-runner",
       },
