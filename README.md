@@ -10,7 +10,6 @@ _Nautelle, formerly AgentDock._
 [![Docs: Wiki](https://img.shields.io/badge/docs-wiki-6d5dfc)](https://github.com/AndreyBegma/Nautelle/wiki)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![nautelle-runner on npm](https://img.shields.io/npm/v/nautelle-runner?label=nautelle-runner)](https://www.npmjs.com/package/nautelle-runner)
-[![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/mkQARkBs4C)
 
 [**Wiki**](https://github.com/AndreyBegma/Nautelle/wiki) ·
 [Getting started](https://github.com/AndreyBegma/Nautelle/wiki/Getting-Started) ·
