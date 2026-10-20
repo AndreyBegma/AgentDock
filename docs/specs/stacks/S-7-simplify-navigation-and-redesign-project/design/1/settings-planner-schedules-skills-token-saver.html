@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S-7 · Settings and project tools</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-canvas:#0a1022;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-ink:#f5c25c;--color-hue-7:#a68bfa;--glass-scrim:rgb(9 9 12/.55);--glass-sheen:rgb(255 255 255/.06);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow:rgb(0 0 0/.35);--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-canvas:#e9eef8;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/.12);--color-hue-3-ink:#2f6617;--color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0/.12);--color-hue-4-ink:#8a5200;--color-hue-7:#7244e0;--glass-scrim:rgb(255 255 255/.52);--glass-sheen:rgb(0 0 0/.06);--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);--glass-shadow:rgb(0 0 0/.12);--glass-shadow-clear:rgb(0 0 0/.08);--canvas-glow:10%}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;font:14px/20px "SF Pro Text",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;color:var(--color-ink);background:var(--color-canvas)}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:12.5px}
+.num{font-variant-numeric:tabular-nums}
+.i2{color:var(--color-ink-2)}.i3{color:var(--color-ink-3)}.sm{font-size:12px;line-height:16px}
+.ic{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.doc{padding:24px 24px 64px}
+.dh{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;max-width:1280px}
+.dh h1{font-size:20px;line-height:28px;font-weight:600}.dh p{max-width:96ch;margin-top:4px}
+.dt{font-size:15px;line-height:22px;font-weight:600;margin:36px 0 12px}
+.boards{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;max-width:1300px}
+.abl{font-size:12px;font-weight:500;color:var(--color-ink-3);margin-bottom:8px}
+.dev{container-type:inline-size;position:relative;overflow:hidden;border-radius:16px;border:1px solid var(--color-line-strong);isolation:isolate;display:flex}
+.cv{position:absolute;inset:0;z-index:-1;background:radial-gradient(60% 50% at 15% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50% 45% at 85% 10%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),var(--color-canvas)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);-webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.surf{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear);border-radius:8px}
+.card{padding:16px 20px 4px}.ct{font-size:15px;line-height:22px;font-weight:600}
+.sp{flex:1}
+.g{display:grid;gap:12px}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;height:28px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:500;line-height:1;cursor:pointer;border:1px solid var(--color-line-strong);color:var(--color-ink);background:var(--color-raised);text-decoration:none}
+.btn.p{background:var(--color-accent);border-color:transparent;color:var(--color-on-accent)}
+.btn.gh{background:transparent;border-color:transparent;color:var(--color-ink-2)}.btn.gh:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn.io{padding:0;width:28px}
+.badge{display:inline-flex;align-items:center;justify-content:center;height:20px;min-width:20px;padding:0 6px;border-radius:999px;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;background:var(--color-hover);color:var(--color-ink-2)}
+.bs{height:18px;min-width:18px;padding:0 5px;font-size:10px}.b-sd{background:var(--color-danger);color:var(--color-ground)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--hue,var(--color-hue-1));flex:none}
+.pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;line-height:1;white-space:nowrap;border:1px solid color-mix(in oklab,var(--s) 45%,transparent);background:var(--s-soft);color:var(--s-ink);flex:none}
+.pill::before{content:"";width:6px;height:6px;border-radius:999px;background:var(--s);flex:none}
+.s-run{--s:var(--color-hue-2);--s-soft:var(--color-hue-2-soft);--s-ink:var(--color-hue-2-ink)}.s-wait{--s:var(--color-hue-1);--s-soft:var(--color-hue-1-soft);--s-ink:var(--color-hue-1-ink)}.s-done{--s:var(--color-hue-3);--s-soft:var(--color-hue-3-soft);--s-ink:var(--color-hue-3-ink)}
+.li{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:12px 16px;border-bottom:1px solid var(--color-line)}.li:last-child{border-bottom:0}
+.mn{flex:1 1 200px;min-width:0}.tt{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tbl{width:100%;border-collapse:collapse}.tbl th{height:32px;padding:0 12px;border-bottom:1px solid var(--color-line);text-align:left;font-size:12px;font-weight:500;color:var(--color-ink-3);white-space:nowrap}
+.tbl td{height:44px;padding:6px 12px;border-bottom:1px solid var(--color-line);white-space:nowrap}.tbl tr:last-child td{border-bottom:0}.tbl tbody tr:hover{background:var(--color-hover)}
+.tbl .num{text-align:right}.tbl td.w{width:100%;max-width:0}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--color-line);overflow-x:auto;scrollbar-width:none}
+.tabs button{all:unset;position:relative;height:36px;padding:0 12px;font-size:14px;font-weight:500;color:var(--color-ink-2);cursor:pointer;white-space:nowrap}
+.tabs [aria-selected=true]{color:var(--color-ink)}.tabs [aria-selected=true]::after{content:"";position:absolute;left:8px;right:8px;bottom:0;height:2px;border-radius:2px;background:var(--color-accent)}
+.tg{all:unset;position:relative;width:32px;height:18px;border-radius:999px;background:var(--color-line-strong);cursor:pointer;flex:none}
+.tg::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/.3);transition:transform .15s}
+.tg[aria-checked=true]{background:var(--color-accent)}.tg[aria-checked=true]::after{transform:translateX(14px)}
+.in,.sel{height:28px;padding:0 10px;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:6px;font:inherit;width:100%}
+.sel{appearance:none;padding-right:26px;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 14px) 50%,calc(100% - 10px) 50%;background-size:4px 4px;background-repeat:no-repeat}
+.kbd{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;border:1px solid var(--color-line-strong);font-size:11px;color:var(--color-ink-3)}
+.stat{padding:14px 16px}.sl{font-size:12px;font-weight:500;color:var(--color-ink-3)}.sv{margin-top:4px;font-size:24px;line-height:28px;font-weight:600;font-variant-numeric:tabular-nums}.sd{margin-top:2px;font-size:12px;color:var(--color-ink-2)}
+.srow{display:flex;align-items:center;gap:16px;padding:14px 0;border-top:1px solid var(--color-line)}.srow>div{flex:1;min-width:0}.srow .sel,.srow .in{width:168px;flex:none}
+.sn{font-weight:500}.sdd{font-size:12px;line-height:16px;color:var(--color-ink-3);margin-top:2px}
+.chd{padding-bottom:12px}.chd p{font-size:12px;color:var(--color-ink-3);margin-top:2px}
+.st{display:grid;grid-template-columns:168px minmax(0,1fr);gap:32px;margin-top:24px}
+.toc{display:flex;flex-direction:column;gap:2px;font-size:13px;position:sticky;top:16px;align-self:start}.toc a{color:var(--color-ink-2);text-decoration:none;padding:5px 10px;border-radius:6px}.toc a[aria-current]{color:var(--color-ink);background:var(--color-hover)}
+.toc .h{font-size:11px;font-weight:500;color:var(--color-ink-3);padding:0 10px 4px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.saved{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ok)}
+.sh{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:32px 0 12px}.sh h2{font-size:16px;line-height:22px;font-weight:600}
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);width:100%}
+.rail{margin:8px 0 8px 8px;border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.brand{display:flex;align-items:center;gap:8px;padding:4px 8px 10px;font-weight:600}.logo{width:18px;height:18px;border-radius:5px;background:var(--color-accent);flex:none}
+.grp{margin:16px 0 4px;padding:0 8px;font-size:11px;font-weight:500;color:var(--color-ink-3)}
+.it{position:relative;display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;color:var(--color-ink-2);font-size:13px;font-weight:500;text-decoration:none;cursor:pointer;list-style:none}
+.it::-webkit-details-marker{display:none}.it:hover{background:var(--color-hover);color:var(--color-ink)}
+.it[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}.it .badge{margin-left:auto}
+.more>.it~.it{padding-left:16px}
+.psw{all:unset;display:flex;align-items:center;gap:8px;height:32px;padding:0 8px;margin-bottom:6px;border-radius:6px;border:1px solid var(--color-line);font-size:13px;font-weight:600;cursor:pointer}.psw .ic{margin-left:auto;color:var(--color-ink-3)}
+.it.bd{height:38px;margin-bottom:6px;color:var(--color-ink);font-weight:600;font-size:14px;background:color-mix(in oklab,var(--color-accent) 8%,transparent);border:1px solid color-mix(in oklab,var(--color-accent) 40%,transparent)}
+.bt{display:grid;place-items:center;width:24px;height:24px;border-radius:6px;background:var(--color-accent);color:var(--color-on-accent);flex:none}.bt .ic{width:14px;height:14px}
+.top{display:flex;align-items:center;gap:8px;height:52px;padding:0 32px}
+.crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--color-ink-3);min-width:0;white-space:nowrap}.crumbs b{color:var(--color-ink);font-weight:500}
+.main{padding:4px 32px 48px;max-width:1040px}
+.ph{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin:12px 0 24px}
+.eb{font-size:12px;font-weight:500;color:var(--color-ink-3);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.ph h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600;display:flex;align-items:center;gap:12px}
+.ph .d{margin-top:6px;color:var(--color-ink-2);max-width:62ch}
+.acts{display:flex;gap:8px;align-items:center}
+.cap{display:none;position:absolute;left:12px;bottom:14px;gap:2px;padding:4px;border-radius:999px;z-index:40}
+.cap a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;border-radius:999px;font-size:11px;font-weight:500;color:var(--color-ink-2);text-decoration:none}
+.cap a[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.fab{position:absolute;right:12px;bottom:16px;width:48px;height:48px;border-radius:999px;display:none;place-items:center;background:var(--color-accent);color:var(--color-on-accent);border:0;box-shadow:0 8px 24px var(--glass-shadow);z-index:40}.fab .ic{width:20px;height:20px}
+@container (max-width:1023px){
+.shell{grid-template-columns:64px minmax(0,1fr)}.rail{align-items:center;padding:12px 6px}
+.lbl,.grp{display:none}.grp+.psw{margin-top:12px}
+.it,.more>.it~.it{width:40px;height:36px;padding:0;justify-content:center}.it.bd{width:44px;height:44px;padding:0}
+.it .badge{position:absolute;top:0;right:-2px;height:14px;min-width:14px;padding:0 3px;font-size:9px}
+.psw{width:36px;height:36px;padding:0;justify-content:center}.psw .ic{display:none}.brand{padding:4px 0 10px}
+.top,.main{padding-left:24px;padding-right:24px}.st{grid-template-columns:minmax(0,1fr)}.toc,.ht{display:none}}
+@container (max-width:639px){
+.shell{display:block}.rail,.hp{display:none}.cap{display:flex}.fab{display:grid}
+.top,.main{padding-left:16px;padding-right:16px}.main{padding-bottom:104px}
+.ph{margin-bottom:20px}.ph h1{font-size:24px;line-height:30px}.ph .acts .p{display:none}
+.crumbs .c0{display:none}.g3{grid-template-columns:minmax(0,1fr)}.srow{flex-wrap:wrap}.srow .sel,.srow .in{width:100%}.card{padding:14px 16px 2px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style></head><body><div class="doc">
+<header class="dh"><div><div class="i3 sm">Stack S-7 · C-286 Settings, C-287 project tools</div><h1>Settings, Planner, Schedules, Skills, Token saver</h1><p class="i2"><b>Settings:</b> 13 tabs become 4 sections — Project (General, Members, Docs source, Coding rules), Automation (Orchestrator, Board, Sessions, Steward), Planning (Planner, Design, AI digest) and Cost (Budget, Token saver). A section is one page of stacked cards, with an on-this-page index on desktop. Changes save on edit. <b>Tools under More:</b> a page header with at most one solid button, then one table or list in a surface card. Token saver leads with three stat tiles.</p></div><button class="btn" type="button" id="tt"><i data-i="moon"></i>Theme</button></header>
+<template data-a="settings" data-c="Projects/AgentDock/Settings" data-t="Settings · Automation">
+<header class="ph"><div><div class="eb"><span class="sw" style="--hue:var(--color-hue-7)"></span>AgentDock</div><h1>Settings</h1><p class="d">How this project is connected, automated, planned and paid for.</p></div><span class="saved"><i data-i="check"></i>Saved</span></header>
+<div class="tabs" role="tablist"><button role="tab" aria-selected="false">Project</button><button role="tab" aria-selected="true">Automation</button><button role="tab" aria-selected="false">Planning</button><button role="tab" aria-selected="false">Cost</button></div>
+<div class="st"><nav class="toc" aria-label="On this page"><div class="h">On this page</div><a href="#" aria-current="true">Orchestrator</a><a href="#">Board</a><a href="#">Sessions</a><a href="#">Steward</a></nav>
+<div class="stack">
+<section class="surf card"><div class="chd"><h2 class="ct">Orchestrator</h2><p>Picks Ready cards and hands them to free slots.</p></div>
+<div class="srow"><div><div class="sn">Dispatch Ready cards automatically</div><div class="sdd">Off means you start every card by hand.</div></div><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Dispatch automatically"></button></div>
+<div class="srow"><div><div class="sn">Parallel slots</div><div class="sdd">Never more than the runner’s concurrency.</div></div><select class="sel" aria-label="Parallel slots"><option>4 slots</option></select></div>
+<div class="srow"><div><div class="sn">Default model</div><div class="sdd">Used when a card does not name one.</div></div><select class="sel" aria-label="Default model"><option>sonnet</option><option>opus</option></select></div>
+<div class="srow"><div><div class="sn">Merge green pull requests</div><div class="sdd">Only when every check passes and no one asked for changes.</div></div><button class="tg" role="switch" aria-checked="false" type="button" aria-label="Merge green pull requests"></button></div></section>
+<section class="surf card"><div class="chd"><h2 class="ct">Board</h2><p>Columns and limits of the project Board.</p></div>
+<div class="srow"><div><div class="sn">Work-in-progress limit</div><div class="sdd">Cards allowed in In progress at once.</div></div><input class="in num" value="4" aria-label="Work-in-progress limit"></div>
+<div class="srow"><div><div class="sn">Archive Done cards after</div></div><select class="sel" aria-label="Archive after"><option>7 days</option></select></div></section>
+<section class="surf card"><div class="chd"><h2 class="ct">Sessions</h2><p>What happens to an agent session that stalls.</p></div>
+<div class="srow"><div><div class="sn">Resume a dead card session</div></div><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Resume a dead card session"></button></div>
+<div class="srow"><div><div class="sn">Nudge after an API or network error</div></div><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Nudge after an error"></button></div>
+<div class="srow"><div><div class="sn">Dismiss known dialogs</div></div><button class="tg" role="switch" aria-checked="false" type="button" aria-label="Dismiss known dialogs"></button></div></section>
+<section class="surf card"><div class="chd"><h2 class="ct">Steward</h2><p>Guards the repository against risky pushes.</p></div>
+<div class="srow"><div><div class="sn">Hold pushes with a Claude trailer</div><div class="sdd">The push waits in the Queue until you approve it.</div></div><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Hold pushes with a Claude trailer"></button></div></section>
+</div></div>
+</template>
+<template data-a="planner" data-c="Projects/AgentDock/Planner" data-f="New plan" data-t="Planner">
+<header class="ph"><div><div class="eb"><span class="sw" style="--hue:var(--color-hue-7)"></span>AgentDock</div><h1>Planner</h1><p class="d">Turn a brief into issues the fleet can run.</p></div><div class="acts"><button class="btn p" type="button"><i data-i="plus"></i>New plan</button></div></header>
+<div class="surf"><table class="tbl"><thead><tr><th>Plan</th><th class="hp num">Tasks</th><th>Status</th><th class="ht">Updated</th></tr></thead><tbody>
+<tr><td class="w"><div class="tt">Simplify navigation and redesign project pages</div><div class="i3 sm">Stack S-7</div></td><td class="hp num">8</td><td><span class="pill s-done">Sent</span></td><td class="ht i3">2 h ago</td></tr>
+<tr><td class="w"><div class="tt">Make exiting full-screen modes easy on phones</div><div class="i3 sm">Stack S-6</div></td><td class="hp num">4</td><td><span class="pill s-done">Sent</span></td><td class="ht i3">Yesterday</td></tr>
+<tr><td class="w"><div class="tt">Admin pages in the calm layout</div><div class="i3 sm">Draft</div></td><td class="hp num">—</td><td><span class="pill s-wait">Drafting</span></td><td class="ht i3">3 days ago</td></tr>
+</tbody></table></div>
+</template>
+<template data-a="schedules" data-c="Projects/AgentDock/Schedules" data-f="New schedule" data-t="Schedules">
+<header class="ph"><div><div class="eb"><span class="sw" style="--hue:var(--color-hue-7)"></span>AgentDock</div><h1>Schedules</h1><p class="d">Prompts the fleet runs on a timer.</p></div><div class="acts"><button class="btn p" type="button"><i data-i="plus"></i>New schedule</button></div></header>
+<div class="surf"><table class="tbl"><thead><tr><th>Schedule</th><th class="hp">When</th><th class="ht">Next run</th><th>On</th></tr></thead><tbody>
+<tr><td class="w"><div class="tt">Nightly dependency audit</div><div class="i3 sm mono">0 3 * * *</div></td><td class="hp i2">Every day 03:00</td><td class="ht num i2">in 9 h</td><td><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Enabled"></button></td></tr>
+<tr><td class="w"><div class="tt">Weekly dead-code sweep</div><div class="i3 sm mono">0 9 * * 1</div></td><td class="hp i2">Mondays 09:00</td><td class="ht num i2">in 6 d</td><td><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Enabled"></button></td></tr>
+<tr><td class="w"><div class="tt">Clean merged branches</div><div class="i3 sm mono">30 18 * * 5</div></td><td class="hp i2">Fridays 18:30</td><td class="ht i3">Paused</td><td><button class="tg" role="switch" aria-checked="false" type="button" aria-label="Enabled"></button></td></tr>
+</tbody></table></div>
+</template>
+<template data-a="skills" data-c="Projects/AgentDock/Skills" data-t="Skills">
+<header class="ph"><div><div class="eb"><span class="sw" style="--hue:var(--color-hue-7)"></span>AgentDock</div><h1>Skills</h1><p class="d">Skills this project’s agents can load.</p></div><div class="acts"><button class="btn" type="button"><i data-i="refresh"></i>Sync from repo</button></div></header>
+<div class="surf">
+<div class="li"><span class="mono">cs-feature</span><div class="mn i2 tt">Take a feature from request to pull request</div><span class="badge hp">plugin</span><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Enabled"></button></div>
+<div class="li"><span class="mono">cs-review</span><div class="mn i2 tt">Quick review for style and correctness</div><span class="badge hp">plugin</span><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Enabled"></button></div>
+<div class="li"><span class="mono">glass-ui</span><div class="mn i2 tt">Build UI only from glass-ui components</div><span class="badge hp">repo</span><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Enabled"></button></div>
+<div class="li"><span class="mono">cs-seo</span><div class="mn i2 tt">SEO analysis from GSC exports</div><span class="badge hp">plugin</span><button class="tg" role="switch" aria-checked="false" type="button" aria-label="Enabled"></button></div>
+</div>
+</template>
+<template data-a="tokens" data-c="Projects/AgentDock/Token saver" data-t="Token saver">
+<header class="ph"><div><div class="eb"><span class="sw" style="--hue:var(--color-hue-7)"></span>AgentDock</div><h1>Token saver <span class="pill s-run">On</span></h1><p class="d">Filters noisy command output before it reaches the agents.</p></div></header>
+<div class="g g3"><div class="stat surf"><div class="sl">Saved this week</div><div class="sv">1.24M</div><div class="sd">tokens</div></div><div class="stat surf"><div class="sl">Commands filtered</div><div class="sv">842</div><div class="sd">across 4 slots</div></div><div class="stat surf"><div class="sl">Estimated saving</div><div class="sv">$9.80</div><div class="sd">this week</div></div></div>
+<div class="sh"><h2>Behaviour</h2></div>
+<div class="surf card">
+<div class="srow" style="border-top:0"><div><div class="sn">Filter command output</div><div class="sdd">Keeps failures, drops progress noise.</div></div><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Filter command output"></button></div>
+<div class="srow"><div><div class="sn">Guard whole reads of big files</div><div class="sdd">Over 400 lines asks for a range first.</div></div><button class="tg" role="switch" aria-checked="true" type="button" aria-label="Guard big reads"></button></div>
+<div class="srow"><div><div class="sn">Cut large tool results</div><div class="sdd">Keeps head and tail; saves the rest to a file.</div></div><button class="tg" role="switch" aria-checked="false" type="button" aria-label="Cut large results"></button></div>
+</div>
+</template>
+</div>
+<script>
+(()=>{'use strict';
+const I={grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',board:'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>',home:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',bot:'<path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',list:'<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>',activity:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',sparkles:'<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/>',clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',book:'<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',gauge:'<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',sliders:'<path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/>',more:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',chev:'<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',check:'<path d="M20 6 9 17l-5-5"/>',shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',refresh:'<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M8 16H3v5"/>'};
+const S=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${I[n]||''}</svg>`;
+const WS=[['overview','grid','Overview'],['projects','folder','Projects'],['work','layers','Work']];
+const PR=[['home','home','Overview'],['fleet','bot','Fleet',1],['queue','list','Queue',2],['activity','activity','Activity']];
+const MO=[['planner','sparkles','Planner'],['schedules','clock','Schedules'],['skills','book','Skills'],['tokens','gauge','Token saver'],['settings','sliders','Settings']];
+const cur=(k,a)=>k==a?' aria-current="page"':'';
+const it=a=>([k,i,l,b])=>`<a class="it" href="#" title="${l}"${cur(k,a)}>${S(i)}<span class="lbl">${l}</span>${b?`<span class="badge bs${k=='queue'?' b-sd':''}">${b}</span>`:''}</a>`;
+const rail=a=>`<nav class="rail glass" aria-label="Main"><div class="brand"><span class="logo"></span><span class="lbl">AgentDock</span></div>${WS.map(it(a)).join('')}<div class="grp">Project</div><button class="psw" type="button" title="Switch project"><span class="sw" style="--hue:var(--color-hue-7)"></span><span class="lbl">AgentDock</span>${S('chev')}</button><a class="it bd" href="#" title="Board"${cur('board',a)}><span class="bt">${S('board')}</span><span class="lbl">Board</span><span class="badge bs">12</span></a>${PR.map(it(a)).join('')}<details class="more"${MO.some(m=>m[0]==a)?' open':''}><summary class="it" title="More">${S('more')}<span class="lbl">More</span></summary>${MO.map(it(a)).join('')}</details><div class="sp"></div>${it(a)(['admin','shield','Admin'])}</nav>`;
+const CP=[['board','board','Board'],['queue','list','Queue'],['activity','activity','Activity']];
+const cap=(a,f)=>`<nav class="cap glass" aria-label="Main">${CP.map(([k,i,l])=>`<a href="#"${cur(k,a)}>${S(i)}${l}</a>`).join('')}<a href="#"${CP.some(c=>c[0]==a)?'':' aria-current="page"'}>${S('more')}More</a></nav>${f?`<button class="fab" type="button" aria-label="${f}">${S('plus')}</button>`:''}`;
+const topBar=c=>`<div class="top"><nav class="crumbs" aria-label="Breadcrumb">${c.split('/').map((x,i,r)=>i==r.length-1?`<b aria-current="page">${x}</b>`:`<span class="c${i}">${x}</span><span class="c${i}">/</span>`).join('')}</nav><span class="sp"></span><button class="btn gh io" type="button" aria-label="Search">${S('search')}</button><span class="kbd hp">⌘K</span></div>`;
+const W=[[1280,'Desktop','≥1024px',640],[820,'Tablet','640–1023px',680],[390,'Phone','<640px',760]];
+document.querySelectorAll('template').forEach(t=>{const d=t.dataset,b=document.createElement('section');b.innerHTML=`<h2 class="dt">${d.t}</h2><div class="boards">${W.map(([w,n,r,h])=>`<div><div class="abl">${n} · ${r}</div><div class="dev" style="width:${w}px;min-height:${h}px"><div class="cv"></div><div class="shell">${rail(d.a)}<div>${topBar(d.c)}<main class="main">${t.innerHTML}</main></div></div>${cap(d.a,d.f)}</div></div>`).join('')}</div>`;t.replaceWith(b)});
+document.querySelectorAll('i[data-i]').forEach(e=>e.outerHTML=S(e.dataset.i));
+document.getElementById('tt').addEventListener('click',()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme=='dark'?'light':'dark'});
+})();
+</script></body></html>

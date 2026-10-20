@@ -1,7 +1,7 @@
 # glass-ui in AgentDock
 
 [glass-ui](https://github.com/AndreyBegma/glass-ui) is the only component
-library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109), `0.28.1` the flat navy glass button (glass-ui#127), `0.29.0` the style-system components (glass-ui#130–#135), `0.30.0` `ResizableFrame` (glass-ui#139–#141). `0.34.0` the floating `BottomCapsule` the shell uses below `lg` (#521), `0.35.0` `FloatingWindow` and `Launcher` (glass-ui#161, for the assistant, #600). AgentDock is on **0.35.0**.
+library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109), `0.28.1` the flat navy glass button (glass-ui#127), `0.29.0` the style-system components (glass-ui#130–#135), `0.30.0` `ResizableFrame` (glass-ui#139–#141). `0.34.0` the floating `BottomCapsule` the shell uses below `lg` (#521), `0.35.0` `FloatingWindow` and `Launcher` (glass-ui#161, for the assistant, #600), `0.37.0` the calm page primitives for stack S-7 (glass-ui#172, C-281 / #694). AgentDock is on **0.37.0**.
 
 ## Consumption
 
@@ -105,6 +105,21 @@ markup.
 | `Toolbar` | `activeFilters` + `onClearAll` draw removable chips; `collapseBelow` folds `filters` into "Filters (n)" and a Sheet |
 | `EmptyState` `action` | data form `{ label, onClick }` or `{ label, href }` renders a Button |
 | `TabBar` `badge` | a count or dot on a tab-bar item, like the rail's (the shell moved to `BottomCapsule` in #521) |
+
+## Added in 0.37.0 (stack S-7)
+
+The calm layout of stack S-7 (approved mockup: `docs/specs/stacks/S-7-simplify-navigation-and-redesign-project/design/1/`). Pages adopt it card by card (C-282 to C-288).
+
+| Component | What it is |
+|---|---|
+| breakpoints | three bands: phone below 640 px (the base), tablet 640–1023 px (`tablet:`, `max-tablet:`), desktop from 1024 px (`desktop:`, `max-desktop:`); the edges equal `sm` and `lg`. `@andrewbehma/glass-ui/breakpoints` exports `BREAKPOINTS`, the media queries and `breakpointFor(width)`. Prefer the CSS variants. |
+| `useBreakpoint(serverFallback = 'desktop')` | `@andrewbehma/glass-ui/use-breakpoint`: the current band, for a difference in *what* renders. The server and the first client render answer the fallback. |
+| `NavRail` `collapsed="tablet"` | folds to the 64 px icon strip only in the tablet band, by CSS, so the server HTML is right at every width; `data-collapsed="tablet"`. `collapsed={true \| false}` is unchanged. |
+| `NavRailItem.primary` | the one emphasised entry (the Board): accent frame, the glyph on a solid accent tile, 38 px open / 44 px folded. One per rail. |
+| `PageHeader` `primaryAction`, `overflow` | the screen's one `solid` action (data `{ label, onClick \| href, icon? }` or a node; `primaryActionOnPhone="hidden"` when the capsule's `+` carries it) and a `…` menu of everything else (`{ id, label, onSelect, icon?, tone?, disabled? }[]`). `actions` still renders before them. |
+| `Section` | `@andrewbehma/glass-ui/section`: a titled block, the `SectionHeader` on the page and the body on `surface-content` (`surface="none"` for a body that is already a surface, `pad="none"` for edge-to-edge rows). |
+| `ListDetail` | `@andrewbehma/glass-ui/list-detail`: list and detail stacked on a phone (or one of them, `phoneView`), side by side from tablet up at `listWidth` (default 280 px). CSS only. |
+| quieter glass | under `data-palette="navy"` the glass keeps scrim, sheen, highlight, blur and shadow and drops the rim, meniscus and refraction layers. Palette colours are unchanged. |
 
 ## The style system (canonical choice per pattern)
 
