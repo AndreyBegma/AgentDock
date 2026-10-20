@@ -9,7 +9,6 @@ import {
   SCHEDULE_FIRING_UPDATED_LIVE_EVENT,
   SCHEDULE_UPDATED_LIVE_EVENT,
 } from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { toast } from '@andrewbehma/glass-ui/toast';
@@ -223,11 +222,8 @@ export default function ProjectSchedulesPage() {
       <EmptyState
         title="Project not found"
         description="It was removed, or you are not a member of it."
-        action={
-          <Link href="/projects" className="text-sm text-accent-ink underline">
-            Open Projects
-          </Link>
-        }
+        link={Link}
+        action={{ label: 'Open Projects', href: '/projects' }}
       />
     );
   }
@@ -239,13 +235,16 @@ export default function ProjectSchedulesPage() {
           className="mb-0"
           title="Schedules"
           description="Skills and orchestrator commands that run on this project at fixed times, with their creator’s authority."
-          actions={
-            canOperate ? (
-              <Button variant="solid" onClick={() => setCreating(true)}>
-                New schedule
-              </Button>
-            ) : undefined
+          primaryAction={
+            canOperate
+              ? {
+                  label: 'New schedule',
+                  icon: CalendarPlus,
+                  onClick: () => setCreating(true),
+                }
+              : undefined
           }
+          primaryActionOnPhone="hidden"
         />
         {project ? <RunnerOfflineBanner project={project} /> : null}
       </div>
@@ -264,13 +263,6 @@ export default function ProjectSchedulesPage() {
               canOperate
                 ? 'A schedule runs a skill, or starts the orchestrator, at fixed times, for example a skill every night or a new round every morning.'
                 : 'An operator of this project can create one.'
-            }
-            action={
-              canOperate ? (
-                <Button variant="glass" onClick={() => setCreating(true)}>
-                  New schedule
-                </Button>
-              ) : undefined
             }
           />
         }

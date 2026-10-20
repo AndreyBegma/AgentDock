@@ -7,7 +7,7 @@ import type {
   PlanTaskView,
 } from '@agentdock/shared';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
-import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import { Section } from '@andrewbehma/glass-ui/section';
 import { useEffect, useRef, useState } from 'react';
 import {
   activeTurn,
@@ -231,20 +231,18 @@ export function PlanWorkspace({
       />
 
       {planLevel ? (
-        <section
-          aria-labelledby="plan-questions"
-          className="flex max-w-3xl flex-col gap-3"
+        <Section
+          surface="none"
+          pad="none"
+          className="max-w-3xl"
+          title={
+            plan.mode === 'dialogue'
+              ? 'Questions about the brief'
+              : 'Splitting the brief'
+          }
         >
-          <SectionHeader
-            headingId="plan-questions"
-            title={
-              plan.mode === 'dialogue'
-                ? 'Questions about the brief'
-                : 'Splitting the brief'
-            }
-          />
           {conversationFor(null)}
-        </section>
+        </Section>
       ) : (
         <>
           {planActive || planFailed ? (
@@ -260,21 +258,13 @@ export function PlanWorkspace({
            * — and in the Board's panel — everything stacks, graph first.
            */}
           <div className={grid}>
-            <section
-              aria-labelledby="plan-tasks"
-              className={`flex min-w-0 flex-col gap-3 ${tasksOrder}`}
+            <Section
+              surface="none"
+              pad="none"
+              title="Tasks"
+              className={`min-w-0 ${tasksOrder}`}
+              bodyClassName="flex flex-col gap-3"
             >
-              <SectionHeader
-                headingId="plan-tasks"
-                title={
-                  <>
-                    Tasks{' '}
-                    <span className="font-normal text-ink-3">
-                      ({plan.tasks.length})
-                    </span>
-                  </>
-                }
-              />
               {plan.tasks.map((task) => (
                 <TaskCard
                   key={task.key}
@@ -293,18 +283,19 @@ export function PlanWorkspace({
                   onDesignChanged={onRefresh}
                 />
               ))}
-            </section>
-            <section
-              aria-labelledby="plan-graph"
-              className={`flex min-w-0 flex-col gap-3 ${graphOrder}`}
+            </Section>
+            <Section
+              surface="none"
+              pad="none"
+              title="Dependencies"
+              className={`min-w-0 ${graphOrder}`}
             >
-              <SectionHeader headingId="plan-graph" title="Dependencies" />
               <PlanGraph
                 plan={plan}
                 selectedKey={selectedKey}
                 onSelect={onSelect}
               />
-            </section>
+            </Section>
             {selected ? (
               <div
                 ref={panelRef}
