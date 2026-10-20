@@ -1,7 +1,7 @@
 'use client';
 
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import { Section } from '@andrewbehma/glass-ui/section';
 import Link from 'next/link';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import {
@@ -42,23 +42,22 @@ export function TokenSaverSection({
     />
   );
   return (
-    <section className="mt-6" aria-labelledby="usage-token-saver">
-      <SectionHeader
-        className="mb-2"
-        headingId="usage-token-saver"
-        title="Token saver"
-        description="What the runner's filter kept out of what agents read. Figures marked ≈ are estimates (bytes ÷ 4, priced at the model's input price)."
-        actions={
-          dashboard ? (
-            <Link
-              href={dashboard}
-              className="text-accent-ink text-sm underline underline-offset-2"
-            >
-              Open the dashboard
-            </Link>
-          ) : undefined
-        }
-      />
+    <Section
+      className="mt-6"
+      title="Token saver"
+      surface="none"
+      description="What the runner's filter kept out of what agents read. Figures marked ≈ are estimates (bytes ÷ 4, priced at the model's input price)."
+      actions={
+        dashboard ? (
+          <Link
+            href={dashboard}
+            className="text-accent-ink text-sm underline underline-offset-2"
+          >
+            Open the dashboard
+          </Link>
+        ) : undefined
+      }
+    >
       <AsyncSection
         section={section}
         isEmpty={(data) => data === null}
@@ -102,6 +101,6 @@ export function TokenSaverSection({
           ) : null
         }
       </AsyncSection>
-    </section>
+    </Section>
   );
 }

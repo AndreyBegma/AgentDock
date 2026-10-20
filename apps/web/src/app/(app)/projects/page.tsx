@@ -1,39 +1,32 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
+import type { FleetView, ProjectSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
+import { Card } from '@andrewbehma/glass-ui/card';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Sparkline } from '@andrewbehma/glass-ui/sparkline';
-import { StatusDot } from '@andrewbehma/glass-ui/status-pill';
+import { SearchField } from '@andrewbehma/glass-ui/field';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
-import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { useCurrentUser } from '../../../components/shell/user-context';
 import { api } from '../../../lib/api';
 import { ORCHESTRATOR_STATUS_LABEL } from '../../../lib/fleet/format';
-import { formatCost, formatNumber } from '../../../lib/format';
-import { Time } from '../../../lib/format/time';
+import { pluralize } from '../../../lib/format';
 import { projectHue } from '../../../lib/hue';
 import { RUNNERS_PAGE } from '../../../lib/prerequisites/copy';
 import { usePrerequisites } from '../../../lib/prerequisites/use-prerequisites';
-import {
-  COST_DAYS,
-  costTrend,
-  hasTrend,
-  lastActivity,
-  lastDays,
-} from '../../../lib/projects/overview';
 import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../../lib/runners/format';
 import { useSection } from '../../../lib/section/use-section';
 import { ORCHESTRATOR_PILL_STATUS } from '../../../lib/status/pill';
 import { ConnectDialog } from './connect-dialog';
-import { useProjectFacts } from './use-project-facts';
+import { type Fact, useProjectFacts } from './use-project-facts';
 
 /** Like /admin/runners: the page polls; project events are not published yet. */
 const POLL_MS = 15_000;
@@ -41,130 +34,114 @@ const POLL_MS = 15_000;
 /** `/projects?connect=1` opens the Connect dialog (the pairing dialog links here). */
 const CONNECT_PARAM = 'connect';
 
-const DASH = <span className="text-ink-3">—</span>;
+/** Fleet figures that have not loaded or did not answer. */
+const factText = (fleet: Fact<FleetView>, text: (f: FleetView) => string) =>
+  fleet ? text(fleet) : fleet === undefined ? '…' : '—';
 
-function ProjectsTable({ projects }: { projects: ProjectSummary[] }) {
-  const router = useRouter();
-  const { fleets, cost } = useProjectFacts(projects.map((p) => p.id));
-  const days = useMemo(() => lastDays(Date.now()), []);
-
-  const columns = useMemo<Column<ProjectSummary>[]>(
-    () => [
-      {
-        id: 'name',
-        header: 'Project',
-        cell: (project) => (
-          <span className="flex items-start gap-2">
-            {/* The project's identity hue, as on its Overview card (#163):
-                a square swatch, since a round dot means status (#213). */}
-            <Badge
-              shape="square"
-              hue={projectHue(project.id)}
-              aria-hidden="true"
-              className="mt-1.5"
-            />
-            <span className="min-w-0">
-              <Link
-                href={`/projects/${project.id}`}
-                className="font-medium underline-offset-4 hover:underline"
-              >
-                {project.displayName}
-              </Link>
-              <span className="block text-xs text-ink-3">{project.repo}</span>
-            </span>
+function ProjectCard({
+  project,
+  fleet,
+}: {
+  project: ProjectSummary;
+  fleet: Fact<FleetView>;
+}) {
+  return (
+    <Link
+      href={`/projects/${project.id}/board`}
+      aria-label={`Open the Board of ${project.displayName}`}
+      className="group block min-w-0 rounded-surface"
+    >
+      <Card
+        pad="md"
+        hue={projectHue(project.id)}
+        className="flex h-full flex-col gap-3 transition-colors group-hover:bg-hover"
+      >
+        <div className="flex items-center gap-2">
+          {/* Identity is square; a round dot means status (#213). */}
+          <Badge
+            shape="square"
+            hue={projectHue(project.id)}
+            aria-hidden="true"
+          />
+          <span className="min-w-0 flex-1 truncate font-semibold tracking-tight">
+            {project.displayName}
           </span>
-        ),
-      },
-      {
-        id: 'runner',
-        header: 'Runner',
-        cell: (project) => (
-          <span className="inline-flex items-center gap-2">
-            <Badge
-              dot
-              tone={STATUS_TONE[project.runnerStatus]}
-              aria-hidden="true"
+          {fleet ? (
+            <StatusPill
+              status={ORCHESTRATOR_PILL_STATUS[fleet.orchestrator.status]}
+              label={ORCHESTRATOR_STATUS_LABEL[fleet.orchestrator.status]}
             />
-            {project.runnerName}
-            <span className="sr-only">
-              ({RUNNER_STATUS_LABEL[project.runnerStatus]})
-            </span>
+          ) : null}
+        </div>
+        <p className="truncate font-mono text-sm text-ink-2">{project.repo}</p>
+        <p className="inline-flex items-center gap-1.5 text-xs text-ink-3">
+          <Badge
+            dot
+            tone={STATUS_TONE[project.runnerStatus]}
+            aria-hidden="true"
+          />
+          {project.runnerName} · {RUNNER_STATUS_LABEL[project.runnerStatus]}
+        </p>
+        <div className="mt-auto flex items-center gap-2 border-t border-line pt-3 text-sm">
+          <span className="num text-ink-2">
+            {factText(fleet, (f) => pluralize(f.slots.length, 'slot'))}
           </span>
-        ),
-      },
-      {
-        id: 'orchestrator',
-        header: 'Orchestrator',
-        cell: (project) => {
-          const fleet = fleets[project.id];
-          if (!fleet) return fleet === undefined ? '…' : DASH;
-          const status = fleet.orchestrator.status;
-          return (
-            <span className="inline-flex items-center gap-2">
-              <StatusDot status={ORCHESTRATOR_PILL_STATUS[status]} />
-              {ORCHESTRATOR_STATUS_LABEL[status]}
-            </span>
-          );
-        },
-      },
-      {
-        id: 'slots',
-        header: 'Slots',
-        align: 'end',
-        cell: (project) => {
-          const fleet = fleets[project.id];
-          if (!fleet) return fleet === undefined ? '…' : DASH;
-          return (
-            <span className="num">{formatNumber(fleet.slots.length)}</span>
-          );
-        },
-      },
-      {
-        id: 'activity',
-        header: 'Last activity',
-        cell: (project) => {
-          const fleet = fleets[project.id];
-          if (!fleet) return fleet === undefined ? '…' : DASH;
-          const at = lastActivity(fleet);
-          return at ? <Time value={at} /> : DASH;
-        },
-      },
-      {
-        id: 'cost',
-        header: '7-day cost',
-        align: 'end',
-        cell: (project) => {
-          if (!cost) return cost === undefined ? '…' : DASH;
-          const trend = costTrend(cost, project.id, days);
-          return (
-            <span className="inline-flex items-center justify-end gap-2">
-              {hasTrend(trend) ? (
-                <Sparkline
-                  values={trend.values}
-                  width={64}
-                  height={20}
-                  label={`Daily cost over the last ${COST_DAYS} days`}
-                />
-              ) : null}
-              <span className="num">{formatCost(trend.total)}</span>
-            </span>
-          );
-        },
-      },
-      { id: 'role', header: 'Your role', cell: (project) => project.role },
-    ],
-    [fleets, cost, days],
+          <span className="flex-1" />
+          <span className="inline-flex items-center gap-1 font-medium text-accent-ink">
+            Board
+            <ArrowRight
+              aria-hidden="true"
+              className="size-4 transition-transform group-hover:translate-x-0.5"
+            />
+          </span>
+        </div>
+      </Card>
+    </Link>
   );
+}
+
+function ProjectsGrid({ projects }: { projects: ProjectSummary[] }) {
+  const { fleets } = useProjectFacts(projects.map((p) => p.id));
+  const [query, setQuery] = useState('');
+  const needle = query.trim().toLowerCase();
+  const shown = needle
+    ? projects.filter((p) =>
+        `${p.displayName} ${p.repo}`.toLowerCase().includes(needle),
+      )
+    : projects;
 
   return (
-    <ScrollX label="Projects">
-      <DataTable
-        rows={projects}
-        getRowId={(project) => project.id}
-        columns={columns}
-        onRowActivate={(project) => router.push(`/projects/${project.id}`)}
+    <div className="flex flex-col gap-4">
+      <Toolbar
+        aria-label="Filter projects"
+        filters={
+          <SearchField
+            aria-label="Search projects"
+            placeholder="Search projects"
+            value={query}
+            className="w-full tablet:w-64"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        }
       />
-    </ScrollX>
+      {shown.length === 0 ? (
+        <EmptyState
+          title="No project matches"
+          description="Try the repository name, or clear the search."
+          action={{ label: 'Clear search', onClick: () => setQuery('') }}
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-3">
+          {shown.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              fleet={fleets[project.id]}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -232,24 +209,27 @@ export default function ProjectsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Workspace"
         title="Projects"
-        description="Repositories on your runners that AgentDock can drive agents on."
-        actions={
-          isAdmin ? (
-            // With no project and no runner, "Pair a runner" below is the
-            // next step and the one solid; Connect would only say so (#213).
-            <Button
-              variant={
-                noOnlineRunner && projects.data?.length === 0
-                  ? 'glass'
-                  : 'solid'
+        description="Repositories this control plane runs agents for."
+        // With no project and no runner, "Pair a runner" below is the next
+        // step and the one solid; Connect would only say so (#213).
+        {...(isAdmin
+          ? noOnlineRunner && projects.data?.length === 0
+            ? {
+                actions: (
+                  <Button variant="glass" onClick={() => setConnecting(true)}>
+                    Connect project
+                  </Button>
+                ),
               }
-              onClick={() => setConnecting(true)}
-            >
-              Connect project
-            </Button>
-          ) : undefined
-        }
+            : {
+                primaryAction: {
+                  label: 'Connect project',
+                  onClick: () => setConnecting(true),
+                },
+              }
+          : {})}
       />
 
       <AsyncSection
@@ -257,7 +237,7 @@ export default function ProjectsPage() {
         unavailable={{ title: 'Projects are not answering' }}
         empty={empty}
       >
-        {(list) => <ProjectsTable projects={list} />}
+        {(list) => <ProjectsGrid projects={list} />}
       </AsyncSection>
 
       {isAdmin ? (
@@ -267,7 +247,7 @@ export default function ProjectsPage() {
           onConnected={(project) => {
             setConnecting(false);
             toast.success(`${project.displayName} connected.`);
-            router.push(`/projects/${project.id}`);
+            router.push(`/projects/${project.id}/board`);
           }}
         />
       ) : null}
