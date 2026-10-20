@@ -30,7 +30,7 @@ import { TelegramPoller } from './telegram-poller';
 export const TELEGRAM_LINKS_BOT_SETTING_KEY = 'telegram.linksBot';
 
 const TEST_MESSAGE =
-  'AgentDock test message: Telegram notifications reach this chat.';
+  'Nautelle test message: Telegram notifications reach this chat.';
 
 const isLinksBot = (value: unknown): value is { botUsername: string } =>
   typeof value === 'object' &&

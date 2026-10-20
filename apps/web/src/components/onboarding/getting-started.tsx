@@ -21,7 +21,7 @@ function StepBody({ step, runners }: { step: Step; runners: RunnersFact }) {
       return (
         <>
           <p>
-            The runner is the AgentDock daemon. It runs agents and reads the
+            The runner is the Nautelle daemon. It runs agents and reads the
             repositories on its machine. Install it with one of:
           </p>
           <InstallCommands />
@@ -53,7 +53,7 @@ function StepBody({ step, runners }: { step: Step; runners: RunnersFact }) {
       return (
         <p>
           Pick the runner and the absolute path of a GitHub repository&apos;s
-          clone on its machine. AgentDock inspects it before anything is stored.
+          clone on its machine. Nautelle inspects it before anything is stored.
         </p>
       );
     default:
@@ -140,8 +140,8 @@ export function GettingStarted({
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-bold">Getting started</h2>
         <p className="text-sm text-ink-2">
-          AgentDock drives agents on your own machines. These steps get the
-          first project running.
+          Nautelle drives agents on your own machines. These steps get the first
+          project running.
         </p>
       </div>
       <Progress

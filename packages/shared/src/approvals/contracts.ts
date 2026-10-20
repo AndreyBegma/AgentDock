@@ -65,7 +65,7 @@ export interface ApprovalItemView {
   updatedAt: string;
 }
 
-/** D1: what AgentDock intends, and what the project's config asks of the orchestrator. */
+/** D1: what Nautelle intends, and what the project's config asks of the orchestrator. */
 export interface MergeApprovalFlags {
   /** `projects.mergeApproval`. */
   agentdock: boolean;
@@ -189,8 +189,8 @@ export const configMergeApproval = (
 };
 
 /**
- * D1: whether AgentDock's flag and the project's config disagree. An unread
- * config is a mismatch only when AgentDock expects approval — nothing then
+ * D1: whether Nautelle's flag and the project's config disagree. An unread
+ * config is a mismatch only when Nautelle expects approval — nothing then
  * says the orchestrator will wait.
  */
 export const mergeApprovalMismatch = (project: {

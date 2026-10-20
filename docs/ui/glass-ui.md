@@ -1,7 +1,7 @@
-# glass-ui in AgentDock
+# glass-ui in Nautelle
 
 [glass-ui](https://github.com/AndreyBegma/glass-ui) is the only component
-library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109), `0.28.1` the flat navy glass button (glass-ui#127), `0.29.0` the style-system components (glass-ui#130–#135), `0.30.0` `ResizableFrame` (glass-ui#139–#141). `0.34.0` the floating `BottomCapsule` the shell uses below `lg` (#521), `0.35.0` `FloatingWindow` and `Launcher` (glass-ui#161, for the assistant, #600), `0.37.0` the calm page primitives for stack S-7 (glass-ui#172, C-281 / #694). AgentDock is on **0.37.0**.
+library (ADR-0011), consumed from npm as `@andrewbehma/glass-ui`. Releases are tags on `main`, cut from `develop` through a release PR and published to npm; `v0.21.0` ships the M1 desk primitives (glass-ui#67), `v0.22.0` the M2 activity primitives (#70), `0.23.0` the npm package with compiled `dist/` (#89), `0.24.0` the look from the UI audit (canvas, accent, two surface levels, `Select`/`DateInput`, `TabBar` — #93), `0.27.0` the workspace patterns and NavRail groups (#94), `0.28.0` the navy palette, identity hues and status tokens (#109), `0.28.1` the flat navy glass button (glass-ui#127), `0.29.0` the style-system components (glass-ui#130–#135), `0.30.0` `ResizableFrame` (glass-ui#139–#141). `0.34.0` the floating `BottomCapsule` the shell uses below `lg` (#521), `0.35.0` `FloatingWindow` and `Launcher` (glass-ui#161, for the assistant, #600), `0.37.0` the calm page primitives for stack S-7 (glass-ui#172, C-281 / #694). Nautelle is on **0.37.0**.
 
 ## Consumption
 
@@ -143,9 +143,9 @@ The calm layout of stack S-7 (approved mockup: `docs/specs/stacks/S-7-simplify-n
 ## Missing in glass-ui
 
 Each is its own spec in glass-ui's queue, its own PR there, and a new release.
-Until then AgentDock does without it rather than drawing it here (ADR-0011).
+Until then Nautelle does without it rather than drawing it here (ADR-0011).
 
-| Gap | Effect in AgentDock |
+| Gap | Effect in Nautelle |
 |---|---|
 | `NavRailGroup` has no `badge` | A folded group cannot carry a count on its heading; the shell appends Fleet's count to More's title ("More · 2") until glass-ui adds a group badge (C-247). |
 | `Board` has no `canDrop(card, column)` | The Board page checks `boardMoveRule` in `onMove` and declines there; a refused card snaps back, and the menu's "Move to" items still list every column. |

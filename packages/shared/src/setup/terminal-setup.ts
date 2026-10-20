@@ -61,7 +61,7 @@ export interface TerminalSetupView {
    * `complete` or `todo`.
    */
   otherProfiles: TerminalSetupItem[];
-  /** #719: the profiles hidden from AgentDock on the project's runner. */
+  /** #719: the profiles hidden from Nautelle on the project's runner. */
   ignoredProfileKeys: string[];
   /** Every required item is done. */
   complete: boolean;
@@ -76,7 +76,7 @@ export const TERMINAL_SETUP_PROFILE_KEY_MAX_LENGTH = 128;
 
 /**
  * `PUT /projects/:projectId/terminal-setup/ignored-profiles` (#719): hide a
- * profile from AgentDock on the project's runner, or show it again. Answers
+ * profile from Nautelle on the project's runner, or show it again. Answers
  * the project's new `TerminalSetupView`.
  */
 export interface IgnoreTerminalSetupProfileRequest {

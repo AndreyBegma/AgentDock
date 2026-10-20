@@ -31,7 +31,7 @@ export const GITHUB_APP_EVENTS = [
 
 /** D5: the public route GitHub delivers to. */
 export const GITHUB_HOOK_PATH = '/hooks/github';
-/** D6: largest delivery AgentDock accepts (GitHub's own cap is 25 MB). */
+/** D6: largest delivery Nautelle accepts (GitHub's own cap is 25 MB). */
 export const GITHUB_HOOK_BODY_MAX_BYTES = 5 * 1024 * 1024;
 /** D1: the web page GitHub sends the browser back to after the manifest flow. */
 export const GITHUB_APP_CALLBACK_PAGE = '/admin/integrations/github/callback';
@@ -97,7 +97,7 @@ export const buildGitHubAppManifest = (
 ): GitHubAppManifest => {
   const appUrl = trimSlash(input.appUrl);
   const publicUrl = input.publicUrl ? trimSlash(input.publicUrl) : null;
-  const name = `AgentDock ${hostOf(publicUrl ?? appUrl)}`.slice(
+  const name = `Nautelle ${hostOf(publicUrl ?? appUrl)}`.slice(
     0,
     GITHUB_APP_NAME_MAX,
   );
@@ -105,7 +105,7 @@ export const buildGitHubAppManifest = (
     name,
     url: appUrl,
     description:
-      'Read-only events for AgentDock: issues, pull requests, checks.',
+      'Read-only events for Nautelle: issues, pull requests, checks.',
     hook_attributes: {
       // GitHub requires a URL even for an inactive hook.
       url: `${publicUrl ?? appUrl}${GITHUB_HOOK_PATH}`,

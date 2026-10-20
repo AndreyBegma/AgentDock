@@ -737,7 +737,7 @@ describe('merge approval queue (e2e)', () => {
       });
     });
 
-    it('flags a mismatch between AgentDock’s flag and the config', async () => {
+    it('flags a mismatch between Nautelle’s flag and the config', async () => {
       await ctx.prisma.project.update({
         where: { id: a },
         data: {

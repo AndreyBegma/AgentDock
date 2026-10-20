@@ -342,7 +342,7 @@ function RecentMerges({
  * requests before the orchestrator merges them, and what Claude Code sessions
  * ask to do — in one list. From tablet up the list sits beside the picked
  * row's detail; on a phone a pull request opens in a bottom sheet with its
- * decision pinned to the bottom edge. AgentDock never merges itself.
+ * decision pinned to the bottom edge. Nautelle never merges itself.
  */
 export function ApprovalsTab({
   projectId,

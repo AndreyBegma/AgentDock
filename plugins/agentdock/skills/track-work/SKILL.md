@@ -1,14 +1,14 @@
 ---
 name: track-work
-description: Track the work a person asks for as a card on the AgentDock Board. Use when the person asks you to implement, fix, change or build something in this repository; not for questions, explanations or reading code.
+description: Track the work a person asks for as a card on the Nautelle Board. Use when the person asks you to implement, fix, change or build something in this repository; not for questions, explanations or reading code.
 ---
 
-# Track work on the AgentDock Board
+# Track work on the Nautelle Board
 
 When the person asks you to **do work** — implement a feature, fix a bug,
 change or refactor code — call the `track_card` tool of the `agentdock` MCP server
 (`mcp__plugin_agentdock_agentdock__track_card`) **once**, before you start. It
-puts the work on the AgentDock Board as a card In progress, linked to this
+puts the work on the Nautelle Board as a card In progress, linked to this
 session.
 
 ## What counts as work

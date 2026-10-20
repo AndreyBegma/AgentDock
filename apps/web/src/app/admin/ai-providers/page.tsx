@@ -76,7 +76,7 @@ export default function AiProvidersPage() {
       <PageHeader
         className="mb-0"
         title="AI providers"
-        description="Keys and monthly caps for the models AgentDock calls directly: the assistant, the digest, summaries, Board search and triage hints. Spend resets on the 1st at 00:00 UTC."
+        description="Keys and monthly caps for the models Nautelle calls directly: the assistant, the digest, summaries, Board search and triage hints. Spend resets on the 1st at 00:00 UTC."
       />
 
       <AsyncSection

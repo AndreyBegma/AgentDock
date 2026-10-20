@@ -126,7 +126,7 @@ export const cardDraftPullRequest = (
   const title =
     full.length > PR_TITLE_MAX ? `${full.slice(0, PR_TITLE_MAX - 1)}…` : full;
   const parts = [
-    `Work in progress on AgentDock board card ${label}. The description is written when the worker finishes.`,
+    `Work in progress on Nautelle board card ${label}. The description is written when the worker finishes.`,
   ];
   if (card.issueNumber !== null) parts.push(`Closes #${card.issueNumber}`);
   parts.push(`${CARD_PR_MARKER}: ${label}`);

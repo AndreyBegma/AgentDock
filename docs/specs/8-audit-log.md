@@ -7,7 +7,7 @@ Decisions: [ADR-0008](../adr/0008-local-accounts-with-admin-approved-registratio
 
 ## Summary
 
-Every privileged action in AgentDock — who logged in, who approved whom, who
+Every privileged action in Nautelle — who logged in, who approved whom, who
 revoked a runner, who sent a command to a machine — must leave a record that
 cannot be quietly rewritten. This adds an append-only audit log whose rows form
 a hash chain, a service every module calls to write it, a verification job that

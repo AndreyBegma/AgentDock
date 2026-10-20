@@ -199,7 +199,7 @@ export function FirstProjectChecklist({
     <Card pad="md" className="flex flex-col gap-4">
       <SectionHeader
         title="Get this project running"
-        description="AgentDock does not create agents itself: the orchestrator reads the queue and dispatches a slot per issue."
+        description="Nautelle does not create agents itself: the orchestrator reads the queue and dispatches a slot per issue."
       />
       <ol className="flex flex-col gap-4">
         <Step n={1} title="Set a default runtime profile" done={profileSet}>

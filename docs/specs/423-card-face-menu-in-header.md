@@ -22,7 +22,7 @@ Per ADR-0011 the menu placement belongs in glass-ui. Add a way for `Board` to ha
 - [x] A design-stage mockup of the new card exists and was approved before implementation (`docs/specs/423-card-face-menu-in-header/design/approved.html`).
 - [ ] The "…" trigger sits in the card's header row; the card has no separate menu column, and the content uses the card's full width.
 - [ ] The C-29 card from the screenshot is no taller with the trigger than without it, and its cost stays visible next to the trigger.
-- [ ] The card menu still opens from the keyboard (Tab to the trigger, Enter), and still offers the move items and the AgentDock items (Open, Accept, Feedback…, etc.).
+- [ ] The card menu still opens from the keyboard (Tab to the trigger, Enter), and still offers the move items and the Nautelle items (Open, Accept, Feedback…, etc.).
 - [ ] On a coarse pointer the trigger stays visible; on a fine pointer it follows glass-ui's existing `RowActions` reveal rule.
 - [ ] Drag and drop of cards between columns still works.
 - [ ] The card shows every existing variant (bug, attachments, dependency, design state, round pill, hooks chip, auto-run failure, approve offer, terminal, fleet, suggestion, PR/Issue) in the new layout, in both normal and compact density.
@@ -37,9 +37,9 @@ Per ADR-0011 the menu placement belongs in glass-ui. Add a way for `Board` to ha
 - Adding or removing items in the card menu.
 
 ## Open questions
-- The glass-ui change lives in a separate repository. Default: land it as a glass-ui PR and release first, then bump AgentDock. If one agent cannot work across both repositories, the glass-ui slot becomes its own card and this one depends on it.
+- The glass-ui change lives in a separate repository. Default: land it as a glass-ui PR and release first, then bump Nautelle. If one agent cannot work across both repositories, the glass-ui slot becomes its own card and this one depends on it.
 
 ## Sequencing
 
 1. glass-ui: the `Board` hands the card-menu trigger to the consumer (filed in AndreyBegma/glass-ui), released as 0.33.0.
-2. AgentDock: bump to 0.33.0 and implement the approved card face. This issue is the AgentDock part; it depends on that glass-ui release.
+2. Nautelle: bump to 0.33.0 and implement the approved card face. This issue is the Nautelle part; it depends on that glass-ui release.

@@ -130,7 +130,7 @@ describe('Ask the Board and triage hints (e2e)', () => {
     alice = await login(ctx, 'alice@example.com');
     viewer = await login(ctx, 'vera@example.com');
     runnerId = (await ctx.prisma.runner.create({ data: { name: 'desk' } })).id;
-    dock = await project('AgentDock', 'acme/agentdock');
+    dock = await project('Nautelle', 'acme/agentdock');
     secret = await project('Secret Garden', 'acme/secret-garden');
     for (const userId of [aliceId, viewerId]) {
       await ctx.prisma.projectMember.create({
@@ -243,7 +243,7 @@ describe('Ask the Board and triage hints (e2e)', () => {
       ]);
       // The query model is shown only the person's projects; the answer
       // model only what was found.
-      expect(calls[0].system).toContain('AgentDock (acme/agentdock)');
+      expect(calls[0].system).toContain('Nautelle (acme/agentdock)');
       expect(calls[0].system).not.toContain('Secret Garden');
       expect(calls[1].system).toContain('[C-12] Digest arrives twice');
       expect(calls[1].system).not.toContain('secret roadmap');

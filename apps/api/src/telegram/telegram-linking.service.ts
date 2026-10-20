@@ -24,16 +24,16 @@ export const hashLinkCode = (code: string): string =>
 /** What the bot answers. Fixed text: nothing from the chat is echoed back. */
 export const LINK_REPLIES = {
   linked:
-    'Linked to AgentDock. Notifications you turn on for Telegram arrive here. Send /stop to unlink.',
+    'Linked to Nautelle. Notifications you turn on for Telegram arrive here. Send /stop to unlink.',
   invalidCode:
-    'This link has expired or was already used. Create a new one in AgentDock → Account → Notifications.',
+    'This link has expired or was already used. Create a new one in Nautelle → Account → Notifications.',
   noCode:
-    'Open the link from AgentDock → Account → Notifications to connect this chat.',
-  notPrivate: 'AgentDock links only in a private chat with the bot.',
+    'Open the link from Nautelle → Account → Notifications to connect this chat.',
+  notPrivate: 'Nautelle links only in a private chat with the bot.',
   chatTaken:
-    'This chat is already linked to another AgentDock account. Send /stop there first.',
-  unlinked: 'Unlinked. AgentDock will send nothing more to this chat.',
-  notLinked: 'This chat is not linked to AgentDock.',
+    'This chat is already linked to another Nautelle account. Send /stop there first.',
+  unlinked: 'Unlinked. Nautelle will send nothing more to this chat.',
+  notLinked: 'This chat is not linked to Nautelle.',
 } as const;
 
 export type LinkReply = keyof typeof LINK_REPLIES;

@@ -191,6 +191,6 @@ export type BackfillResponse = SessionBackfillResult;
 /** Live event on `project:<id>` when that project's sessions changed. */
 export const SESSIONS_CHANGED_LIVE_EVENT = 'sessions.changed';
 export interface SessionsChangedLiveData {
-  /** AgentDock ids of the sessions touched by one runner batch. */
+  /** Nautelle ids of the sessions touched by one runner batch. */
   sessionIds: string[];
 }

@@ -5,7 +5,7 @@ Decision: [ADR-0033](../adr/0033-deepl-translates-stored-text-at-save-time.md) (
 
 ## Summary
 
-ADR-0027 made AgentDock store English. A save returns the text as typed, and a
+ADR-0027 made Nautelle store English. A save returns the text as typed, and a
 `haiku` call on the runner replaces it later, in about 10–60 s. Meanwhile:
 
 - the card shows the original;

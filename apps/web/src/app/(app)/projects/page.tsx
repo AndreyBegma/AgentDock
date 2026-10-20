@@ -183,7 +183,7 @@ export default function ProjectsPage() {
   ) : noOnlineRunner ? (
     <EmptyState
       title="No projects yet"
-      description="Projects live on a runner, the AgentDock daemon on the machine that holds your repositories. Pair one first."
+      description="Projects live on a runner, the Nautelle daemon on the machine that holds your repositories. Pair one first."
       action={
         <Link
           href={RUNNERS_PAGE}

@@ -187,7 +187,7 @@ model Runner {
   localUserId        String?
   /// Away mode: permission prompts go to the web app and Telegram (spec 201 D17).
   awayMode           Boolean   @default(false)
-  /// #719: profile keys a person hid from AgentDock on this runner — left out
+  /// #719: profile keys a person hid from Nautelle on this runner — left out
   /// of every project's terminal-setup checklist. The runner's local policy
   /// does not read it.
   ignoredProfileKeys String[]  @default([])
@@ -1239,7 +1239,7 @@ model IssueCache {
 }
 
 /// The queue state of each open ready issue, recomputed on every change of its inputs.
-/// `state`/`why`/`clears` are AgentDock's own (D3); `source` says whether the
+/// `state`/`why`/`clears` are Nautelle's own (D3); `source` says whether the
 /// orchestrator's fresher verdict (D4) is the one shown.
 model QueueStateRow {
   id                 String           @id @default(cuid())
@@ -2251,7 +2251,7 @@ model GitHubApp {
   ownerLogin             String
   privateKey             String
   webhookSecret          String
-  /// Stored, unused: AgentDock does no OAuth (D3).
+  /// Stored, unused: Nautelle does no OAuth (D3).
   clientSecret           String?
   /// False when the manifest had no `PUBLIC_URL` (D14).
   hookActive             Boolean
@@ -2894,7 +2894,7 @@ enum BoardCardSource {
 enum CardRoundTrigger {
   run
   feedback
-  /// #359 D6: started by AgentDock for a red check or a merge conflict.
+  /// #359 D6: started by Nautelle for a red check or a merge conflict.
   ci_fix
 }
 
@@ -2958,7 +2958,7 @@ enum CardEffort {
   high
 }
 
-/// A work item AgentDock owns (ADR-0024), not a GitHub issue. Each Run or
+/// A work item Nautelle owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
   id                      String           @id @default(cuid())
@@ -3376,7 +3376,7 @@ model BoardCardRound {
   runId               String           @unique
   trigger             CardRoundTrigger
   /// #443: started by Auto-run when ready, after this dependency (`C-<n>`)
-  /// was accepted; `null` for a round a person or AgentDock started.
+  /// was accepted; `null` for a round a person or Nautelle started.
   autoRunAfter        Int?
   /// The person's feedback (D9), at most 8 000 characters.
   feedback            String?

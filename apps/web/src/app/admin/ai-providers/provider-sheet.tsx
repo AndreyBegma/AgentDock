@@ -204,7 +204,7 @@ export function ProviderSheet({
               <Field
                 label={provider.key.configured ? 'Replace the key' : 'Key'}
                 htmlFor="llm-key"
-                hint="Stored encrypted. AgentDock never shows or returns the full key; replacing it overwrites the old one."
+                hint="Stored encrypted. Nautelle never shows or returns the full key; replacing it overwrites the old one."
                 error={keyError}
               >
                 <Input

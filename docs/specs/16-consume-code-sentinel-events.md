@@ -23,7 +23,7 @@ markdown collectors.
 
 - Runner collector `events` (tail `events.jsonl`, persisted offset, rotation-safe).
 - `state.json` snapshot on connect and on change, sent as one `orchestrator.snapshot` event.
-- Mapping plugin event types to AgentDock's envelope (they share the schema; the runner assigns `seq`).
+- Mapping plugin event types to Nautelle's envelope (they share the schema; the runner assigns `seq`).
 - Source precedence in the #11 projector: `code-sentinel` over `scraped` for the same fact.
 - Per-project indicator of which channel is active (`events` / `scraped` / `both`).
 
@@ -43,7 +43,7 @@ taken, with its source.
 | D1 | **Location.** The collector reads `<git-common-dir>/cs-orchestrator/events.jsonl` and `<git-common-dir>/cs-orchestrator/state.json` for each watched project (`git-common-dir` from #10's inspection). It does not read dated board folders — #11's `board` collector keeps doing that | plugin P1/P2 [Confirmed in docs/plugin]; exact path [Unknown until plugin#5 merges] |
 | D2 | **Tailing.** `fs.watch` plus a 5 s poll fallback. The byte offset and the file's inode are persisted in `$XDG_STATE_HOME/agentdock/events-offsets.json` under key `events:<projectId>` (same `OffsetStore` class as #12's `offsets.json`, written atomically — but a file of its own, see Notes 11). If the inode changes or the file is shorter than the offset, the collector restarts from 0 and relies on dedupe (D5) | #12 D5 |
 | D3 | **Parsing.** Each line is parsed as the envelope from event-schema.md with schema version `v`. Lines with `v` greater than the runner understands, malformed JSON, or a missing `type` emit `events.unparsed { line, reason }` and are skipped; the collector never stops | ADR-0002 |
-| D4 | **Mapping.** Plugin events already use AgentDock's type names (`orchestrator.*`, `round.*`, `slot.*`, `pr.merged`, `issue.blocked`, `person.needed`). The runner only adds `seq`, sets `source: "code-sentinel"`, and fills `project` from the watch list. Unknown types are forwarded unchanged and stored raw (event-schema.md) | event-schema.md |
+| D4 | **Mapping.** Plugin events already use Nautelle's type names (`orchestrator.*`, `round.*`, `slot.*`, `pr.merged`, `issue.blocked`, `person.needed`). The runner only adds `seq`, sets `source: "code-sentinel"`, and fills `project` from the watch list. Unknown types are forwarded unchanged and stored raw (event-schema.md) | event-schema.md |
 | D5 | **Dedupe.** The plugin writes an `id` (ULID) on every event (plugin#5 requirement, stated in its spec). The API dedupes plugin events on `(projectId, data.pluginEventId)` in addition to `(runnerId, seq)`, so a re-read from offset 0 does not double-apply | new |
 | D6 | **Snapshot.** On runner connect and whenever `state.json` changes, the collector sends `orchestrator.snapshot { state }`. The projector reconciles: slots in the snapshot are upserted, open slots missing from it are left to the scraped/tmux collectors to end (the snapshot is not authority on ending) | new |
 | D7 | **Precedence.** The projector stores `source` per field group on `slots` and `rounds` (`model/modelWhy/owns/never/lead`, `checkpoint`, `pr`). An update from `scraped` never overwrites a field group last written by `code-sentinel`; `code-sentinel` always overwrites `scraped`. Live state the plugin does not report (pane flags, ahead/behind) stays with the #11 collectors | ADR-0002 |
@@ -140,7 +140,7 @@ Depends on #11
 i16-api, decided with the orchestrator on 2026-10-08. Checked against plugin#5
 as merged: `skills/orchestrator/EVENTS.md` at claude-code-plugin@`bdce2e0`.
 
-1. **D4 was wrong about shapes.** The plugin uses AgentDock's type names but
+1. **D4 was wrong about shapes.** The plugin uses Nautelle's type names but
    not every `data` shape. Its envelope `session` has no `id`, and
    `project.repo` can be null. `slot.dispatched` names the brief's worktree
    copy (no date or round). `round.started` has `board` and no date or base.

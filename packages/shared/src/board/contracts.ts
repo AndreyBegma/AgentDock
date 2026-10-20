@@ -96,7 +96,7 @@ export interface CardRoundBrief {
   wiringReason?: CardRunWiringReason | null;
   /**
    * #443: Auto-run when ready started the round, after this dependency's
-   * number reached Finished (#638) or was accepted; `null` for a round a person or AgentDock started.
+   * number reached Finished (#638) or was accepted; `null` for a round a person or Nautelle started.
    * Optional so older fixtures stay valid.
    */
   autoRunAfter?: number | null;

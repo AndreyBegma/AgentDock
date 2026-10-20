@@ -263,7 +263,7 @@ export default function AdminPricesPage() {
       ) : !version ? (
         <EmptyState
           title="No price version yet"
-          description="Without one, every request is unpriced and budgets cannot count it. Seed version 1 from the bundled Langfuse price list: run this in the AgentDock checkout, with the API’s database settings in apps/api/.env."
+          description="Without one, every request is unpriced and budgets cannot count it. Seed version 1 from the bundled Langfuse price list: run this in the Nautelle checkout, with the API’s database settings in apps/api/.env."
           action={<CodeBlock code={PRICES_SEED_COMMAND} />}
         />
       ) : (

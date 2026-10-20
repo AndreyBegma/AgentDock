@@ -1,9 +1,9 @@
-# C-220: Stop Woodpecker asking approval for card PRs from AgentDock
+# C-220: Stop Woodpecker asking approval for card PRs from Nautelle
 
 Issue: #504
 
 ## What to do
-Pipelines for pull requests that AgentDock opens for board cards (for example PR #501, pipeline #982) stop at "This pipeline is awaiting approval from a maintainer" in Woodpecker 3.18, so a person has to click Approve on every card. `deploy/README.md` (CI setup, step 2) and the header of `.woodpecker/pipeline.yml` both say *Require approval* must be `forks` only, so same-repository PRs should run at once.
+Pipelines for pull requests that Nautelle opens for board cards (for example PR #501, pipeline #982) stop at "This pipeline is awaiting approval from a maintainer" in Woodpecker 3.18, so a person has to click Approve on every card. `deploy/README.md` (CI setup, step 2) and the header of `.woodpecker/pipeline.yml` both say *Require approval* must be `forks` only, so same-repository PRs should run at once.
 
 Find out why the approval is requested and remove the cause:
 - Check the repository's Woodpecker settings (via the Woodpecker API or UI): the *Require approval* value. It is most likely `pull_requests` or `all_events` instead of `forks`.
@@ -16,7 +16,7 @@ The repository is public and the pipeline mounts the host Docker socket, so unap
 
 ## Acceptance criteria
 - [ ] The cause of the approval request on PR #501 / pipeline #982 is identified and written down in the PR description.
-- [ ] A new card PR opened from an AgentDock branch in the same repository starts its pipeline without a manual Approve.
+- [ ] A new card PR opened from a Nautelle branch in the same repository starts its pipeline without a manual Approve.
 - [ ] A pull request from a fork still waits for approval (*Require approval: forks* stays in force).
 - [ ] `deploy/README.md` and the header of `.woodpecker/pipeline.yml` match the real configuration, and a troubleshooting entry for this symptom is added.
 - [ ] If the cause was in the push/PR code, a test next to it (`*.spec.ts`) covers the head and base repository.

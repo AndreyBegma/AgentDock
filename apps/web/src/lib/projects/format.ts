@@ -60,7 +60,7 @@ export const docsKindLabel = (kind: DocsSourceKind | null): string =>
  */
 function pathNotAllowedText(message: string): string {
   if (/is not a registered root of project/.test(message)) {
-    return "The runner has not registered this path as the project's root yet. AgentDock has sent it again; try again in a moment.";
+    return "The runner has not registered this path as the project's root yet. Nautelle has sent it again; try again in a moment.";
   }
   return message
     ? `The runner does not allow that path: ${message}`
@@ -132,7 +132,7 @@ export function noOnlineRunnerCopy(
       return {
         tone: 'warn',
         title: 'No runner is paired.',
-        body: 'Projects live on a runner, the AgentDock daemon on the machine that holds your repositories. Pair one first.',
+        body: 'Projects live on a runner, the Nautelle daemon on the machine that holds your repositories. Pair one first.',
         href: RUNNERS_PAGE,
         cta: 'Pair a runner',
       };

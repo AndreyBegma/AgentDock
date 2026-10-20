@@ -1,4 +1,4 @@
-# Every card session carries AgentDock hooks and finish_card
+# Every card session carries Nautelle hooks and finish_card
 
 Issue: [#367](https://github.com/AndreyBegma/AgentDock/issues/367)
 
@@ -76,7 +76,7 @@ say plainly when something it needs is missing.
 
 - **Medium — `--settings` merges with the profile's own hooks.** Claude Code
   adds hooks from `--settings` to the user's own. A person's own hooks still
-  run; only the AgentDock ones are added. Covered by D2 for the double case.
+  run; only the Nautelle ones are added. Covered by D2 for the double case.
 - **Low — a stale runner path in an old round directory after an upgrade.**
   The file is written per round, so a new round uses the new path.
 

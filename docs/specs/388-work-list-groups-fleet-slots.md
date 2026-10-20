@@ -13,7 +13,7 @@ Change the Work list as follows:
 
 ## Acceptance criteria
 
-- [ ] With issue #359 dispatched as several slots, the Work list (filter Project: AgentDock) shows one row for #359, not one row per slot with the same title.
+- [ ] With issue #359 dispatched as several slots, the Work list (filter Project: Nautelle) shows one row for #359, not one row per slot with the same title.
 - [ ] Expanding the #359 row lists each slot (contract, api, runner, web) with its slot name, stage, status and PR. Collapsing it hides them again.
 - [ ] The group row's status is the least advanced status among its visible slots (e.g. In progress while any slot is In progress). Its Updated time is the latest of its slots.
 - [ ] With a status filter on, the group shows only the slots that match the filter. A group with no matching slot is hidden.

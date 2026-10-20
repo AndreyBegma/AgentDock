@@ -264,7 +264,7 @@ export default function SessionPage() {
 
   const name = detail ? sessionName(detail.session) : null;
   useEffect(() => {
-    if (name) document.title = `${name} · Sessions · AgentDock`;
+    if (name) document.title = `${name} · Sessions · Nautelle`;
   }, [name]);
 
   if (missing) {

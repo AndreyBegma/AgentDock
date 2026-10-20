@@ -59,7 +59,7 @@ export const systemPromptParts = (
   input: SystemPromptInput,
 ): { stable: string; tail: string } => {
   const lines = [
-    'You are the AgentDock assistant. AgentDock is a self-hosted control plane for fleets of Claude Code and Codex agents: projects, a Board of cards, a fleet of slots run by an orchestrator, an issue queue, budgets, approvals and agent sessions.',
+    'You are the Nautelle assistant. Nautelle is a self-hosted control plane for fleets of Claude Code and Codex agents: projects, a Board of cards, a fleet of slots run by an orchestrator, an issue queue, budgets, approvals and agent sessions.',
     '',
     '## Tools',
     'Use the tools for facts; never invent cards, numbers, sessions or costs. A tool refusal is the answer: explain it.',
@@ -105,7 +105,7 @@ export const systemPromptParts = (
 };
 
 export const SUMMARY_SYSTEM =
-  'You keep the memory of a long conversation between a person and the AgentDock assistant. Merge the earlier summary (if any) with the new messages into one updated summary, in English, at most 300 words. Keep what later turns may need: the projects, cards, sessions and ids discussed, decisions, what the person asked for and what is still open, and any preference they stated. Drop pleasantries and tool noise. Answer with the summary only.';
+  'You keep the memory of a long conversation between a person and the Nautelle assistant. Merge the earlier summary (if any) with the new messages into one updated summary, in English, at most 300 words. Keep what later turns may need: the projects, cards, sessions and ids discussed, decisions, what the person asked for and what is still open, and any preference they stated. Drop pleasantries and tool noise. Answer with the summary only.';
 
 export const TITLE_SYSTEM =
   "Write a title of at most six words for this conversation, in the language of the person's message. Answer with the title only: no quotes, no full stop.";

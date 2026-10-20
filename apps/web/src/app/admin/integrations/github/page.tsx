@@ -47,7 +47,7 @@ function NoKeyBanner({ registered }: { registered: boolean }) {
       title="No APP_ENCRYPTION_KEY on the server"
       body={
         registered
-          ? `The App’s stored secrets cannot be opened, so deliveries fail their signature check and AgentDock cannot call GitHub. ${ENCRYPTION_KEY_REMEDY} Use the key the App was registered with.`
+          ? `The App’s stored secrets cannot be opened, so deliveries fail their signature check and Nautelle cannot call GitHub. ${ENCRYPTION_KEY_REMEDY} Use the key the App was registered with.`
           : `Both ways to register below stay off: the App’s secrets are stored encrypted. ${ENCRYPTION_KEY_REMEDY}`
       }
     />
@@ -110,7 +110,7 @@ export default function GitHubAppPage() {
       <PageHeader
         className="mb-0"
         title="GitHub App"
-        description="A read-only App that tells AgentDock the moment an issue, pull request or check changes. Without it everything still works — runners poll GitHub every 60 s."
+        description="A read-only App that tells Nautelle the moment an issue, pull request or check changes. Without it everything still works — runners poll GitHub every 60 s."
       />
 
       {callbackError ? (
@@ -154,7 +154,7 @@ export default function GitHubAppPage() {
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title="Remove the GitHub App?"
-        consequence="AgentDock forgets the App and its stored secrets, and runners go back to polling every 60 s. The App itself stays on GitHub — delete it there too."
+        consequence="Nautelle forgets the App and its stored secrets, and runners go back to polling every 60 s. The App itself stays on GitHub — delete it there too."
         verb="Remove"
         busy={busy}
         onConfirm={() => void remove()}

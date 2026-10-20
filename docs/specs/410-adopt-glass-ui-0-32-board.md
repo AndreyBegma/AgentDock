@@ -1,13 +1,13 @@
 # Adopt glass-ui 0.32.0 on the Board: collapsible columns per the C-29 mockup, plan tasks not movable
 
-Issue: #410 · Board cards: C-43 (AgentDock half) and C-44 (AgentDock half)
+Issue: #410 · Board cards: C-43 (Nautelle half) and C-44 (Nautelle half)
 
 ## What to do
 
 glass-ui 0.32.0 is published (`@andrewbehma/glass-ui`, release PR AndreyBegma/glass-ui#153). It adds:
 - a per-item `movable` flag on the kanban `Board` (glass-ui #146);
 - collapsible columns, a fixed column header with a scroll shadow, a fixed column footer slot, a scroll region per column and a count slot that can show `1/3` (glass-ui #149);
-- `ResizableFrame` keeping the dragged edge under the pointer when a drag crosses the centred/left-aligned boundary (glass-ui #151; AgentDock #394 left this as a known limit).
+- `ResizableFrame` keeping the dragged edge under the pointer when a drag crosses the centred/left-aligned boundary (glass-ui #151; Nautelle #394 left this as a known limit).
 
 Bump the exact pinned version in `apps/web/package.json` (and `bun.lock`) from 0.31.0 to 0.32.0 and use the new parts:
 

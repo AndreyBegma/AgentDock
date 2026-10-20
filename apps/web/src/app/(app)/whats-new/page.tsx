@@ -16,7 +16,7 @@ export default function WhatsNewPage() {
     <>
       <PageHeader
         title="What’s new"
-        description={`AgentDock ${versionLabel(APP_VERSION)} — what each release brought.`}
+        description={`Nautelle ${versionLabel(APP_VERSION)} — what each release brought.`}
       />
       <ChangelogList entries={CHANGELOG} />
     </>

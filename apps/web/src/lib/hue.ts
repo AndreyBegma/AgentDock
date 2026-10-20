@@ -1,7 +1,7 @@
 import { type Hue, hueFor } from '@andrewbehma/glass-ui/hue';
 
 /**
- * Identity colours (#163, glass-ui#109): the one place a thing in AgentDock
+ * Identity colours (#163, glass-ui#109): the one place a thing in Nautelle
  * gets its hue, so a project or a slot wears the same one on every screen.
  * A hue tells things apart; it never says how they are doing — that is the
  * status colours' job (`lib/status/pill.ts`).

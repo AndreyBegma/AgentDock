@@ -119,10 +119,10 @@ export function roundPill(round: CardRoundBrief | null): RoundPill | null {
 
 const FINISH_REFUSED_REASON: Partial<Record<LocalErrorCode, string>> = {
   not_a_card_session:
-    'AgentDock did not recognise the worker’s session as this card’s — the runner may have restarted.',
-  runner_offline: 'the runner could not reach AgentDock.',
+    'Nautelle did not recognise the worker’s session as this card’s — the runner may have restarted.',
+  runner_offline: 'the runner could not reach Nautelle.',
   daemon_unavailable: 'the runner was not running.',
-  timeout: 'AgentDock did not answer in time.',
+  timeout: 'Nautelle did not answer in time.',
   forbidden: 'the runner’s user may not finish cards in this project.',
   no_project: 'the worker’s folder is in no watched project.',
 };
@@ -475,7 +475,7 @@ export function describeBoardError(
       return describePrCloseFailure(body?.reason, body?.message);
     }
     case BOARD_ERROR.branchDeleteRefused:
-      return 'A terminal card’s branch is your session branch, so AgentDock does not delete it.';
+      return 'A terminal card’s branch is your session branch, so Nautelle does not delete it.';
     case BOARD_ERROR.noBranch:
       return 'This card never ran, so there is no branch to open a pull request from.';
     case BOARD_ERROR.noPullRequest:
@@ -520,9 +520,9 @@ const HOOKS_CONSEQUENCE =
 
 /** #367 D3: why a round launched by the runner reports no hooks. */
 const WIRING_REASON_TEXT: Record<CardRunWiringReason, string> = {
-  runner_outdated: `The runner that started this round is older than 0.10.0, so it did not add AgentDock hooks to the session; ${HOOKS_CONSEQUENCE} Update the runner, then run the card again.`,
-  settings_write_failed: `The runner could not write this round's hook settings, so the session started without AgentDock hooks; ${HOOKS_CONSEQUENCE} Check the runner's log and the disk it writes to, then run the card again.`,
-  claude_too_old: `The Claude Code on this runner does not accept --settings, so the session started without AgentDock hooks; ${HOOKS_CONSEQUENCE} Update Claude Code, then run the card again.`,
+  runner_outdated: `The runner that started this round is older than 0.10.0, so it did not add Nautelle hooks to the session; ${HOOKS_CONSEQUENCE} Update the runner, then run the card again.`,
+  settings_write_failed: `The runner could not write this round's hook settings, so the session started without Nautelle hooks; ${HOOKS_CONSEQUENCE} Check the runner's log and the disk it writes to, then run the card again.`,
+  claude_too_old: `The Claude Code on this runner does not accept --settings, so the session started without Nautelle hooks; ${HOOKS_CONSEQUENCE} Update Claude Code, then run the card again.`,
 };
 
 /** The profile placeholder of `SETUP_CLAUDE_COMMAND`. */
@@ -610,7 +610,7 @@ export const hooksNotice = (
     return {
       text: wiringReason
         ? WIRING_REASON_TEXT[wiringReason]
-        : `The runner started this round without AgentDock hooks; ${HOOKS_CONSEQUENCE}`,
+        : `The runner started this round without Nautelle hooks; ${HOOKS_CONSEQUENCE}`,
       chip: 'no hooks',
       commands: [],
       guide: false,
@@ -621,9 +621,9 @@ export const hooksNotice = (
       ? "the profile's agentdock plugin"
       : wiring === 'injected'
         ? "the runner's own hook settings"
-        : 'AgentDock hooks';
+        : 'Nautelle hooks';
   return {
-    text: `The session started with ${via}, but no hook event reached AgentDock within 2 minutes; ${HOOKS_CONSEQUENCE} Check that the runner is online and can reach the API.`,
+    text: `The session started with ${via}, but no hook event reached Nautelle within 2 minutes; ${HOOKS_CONSEQUENCE} Check that the runner is online and can reach the API.`,
     chip: 'no hook events',
     commands: [{ label: 'Check the runner', code: RUNNER_STATUS_COMMAND }],
     guide: false,

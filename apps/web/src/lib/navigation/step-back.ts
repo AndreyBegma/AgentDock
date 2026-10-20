@@ -11,7 +11,7 @@ export type StepBackWindow = {
 };
 
 /**
- * Whether one step back in the history stays in AgentDock. The Navigation API
+ * Whether one step back in the history stays in Nautelle. The Navigation API
  * counts same-origin entries only, so a page opened from another site or in a
  * fresh tab is at index 0; without it, any earlier entry counts.
  */

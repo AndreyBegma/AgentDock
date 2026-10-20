@@ -31,7 +31,7 @@ Below `lg` (1024 px, `NARROW_QUERY` in `apps/web/src/components/shell/narrow.ts`
 - [ ] The PR includes screenshots at 375 px and 768 px, inside and outside a project, plus one with the `+` sheet open.
 
 ## Out of scope
-- Any change to glass-ui itself (filing the badge gap is enough), or a hand-written bar or FAB in AgentDock.
+- Any change to glass-ui itself (filing the badge gap is enough), or a hand-written bar or FAB in Nautelle.
 - The desktop `NavRail`, the top header and the command palette.
 - New create actions that pages do not have today.
 - A second breakpoint for tablets.

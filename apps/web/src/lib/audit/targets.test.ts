@@ -4,7 +4,7 @@ import { buildNameIndex, runnerActorName, targetDisplay } from './targets';
 const index = buildNameIndex({
   user: [{ id: 'u1', email: 'a@x.dev', name: null }],
   runner: [{ id: 'r1', name: 'build-box' }],
-  project: [{ id: 'p1', displayName: 'AgentDock' }],
+  project: [{ id: 'p1', displayName: 'Nautelle' }],
 });
 
 describe('targetDisplay', () => {

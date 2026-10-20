@@ -22,10 +22,10 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: 'AgentDock', template: '%s · AgentDock' },
+  title: { default: 'Nautelle', template: '%s · Nautelle' },
   description:
     'Self-hosted control plane for Claude Code and Codex agent fleets.',
-  applicationName: 'AgentDock',
+  applicationName: 'Nautelle',
 };
 
 // The browser chrome takes the navy palette's ground (glass-ui#109): a meta

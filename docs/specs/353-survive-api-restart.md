@@ -44,7 +44,7 @@ say so, retry what is safe to retry, and never hang.
   Each of these marks the app **unreachable**. The first successful response
   or live reconnect clears it.
 - **D2 — The banner.** While unreachable, a slim app-shell banner (glass-ui)
-  says "Reconnecting to AgentDock… (the server may be restarting)". It reuses
+  says "Reconnecting to Nautelle… (the server may be restarting)". It reuses
   `components/shell/live-status.ts`'s state, so there is one source. It
   appears after 1.5 s, so a blip does not flash it.
 - **D3 — Reads retry; writes do not.**
@@ -52,7 +52,7 @@ say so, retry what is safe to retry, and never hang.
     backoff (0.5, 1, 2, 4, 8 s, capped at 30 s in all). When the app becomes
     reachable again, the current page's queries refetch.
   - `POST/PUT/PATCH/DELETE` are **not** retried automatically. They fail with
-    one message, "AgentDock was restarting — nothing was changed. Try again",
+    one message, "Nautelle was restarting — nothing was changed. Try again",
     and keep the form's input. A 404 from a known route family is not
     reinterpreted. Only D1 conditions get this text.
 - **D4 — Terminal attach.** The terminal view (`terminal-view.tsx`) times out
@@ -78,7 +78,7 @@ say so, retry what is safe to retry, and never hang.
 - [ ] With the API stopped (a test double returns 502, then a network error),
   a `GET` used by the board is retried and succeeds once the double answers
   200. The page shows fresh data without a reload.
-- [ ] A `DELETE` card during the outage is not retried. It shows "AgentDock was
+- [ ] A `DELETE` card during the outage is not retried. It shows "Nautelle was
   restarting — nothing was changed. Try again", and the card is still there.
 - [ ] The banner appears after 1.5 s of unreachability and disappears on the
   first success. A 300 ms blip does not show it.

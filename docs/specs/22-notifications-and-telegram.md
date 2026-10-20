@@ -26,7 +26,7 @@ digested so a bad hour does not become two hundred messages.
   - admin configures the bot (token encrypted at rest);
   - users link and unlink via a one-time deep link;
   - delivery with retries, rate limit and digest.
-- `APP_ENCRYPTION_KEY` helper (AES-256-GCM), the first secret stored by AgentDock.
+- `APP_ENCRYPTION_KEY` helper (AES-256-GCM), the first secret stored by Nautelle.
 - Web: bell + panel in the shell top bar, `/account/notifications`, admin `/admin/integrations/telegram`.
 
 ### Out of scope
@@ -51,7 +51,7 @@ The person delegated all decisions on 2026-10-07. Each row is the default taken,
 | D7 | **Long polling, not a webhook.** The first deployment is a home server that may sit behind NAT without a public HTTPS endpoint, and the API is a single instance (ADR-0007). Long polling (`getUpdates`, 30 s timeout) needs only outbound HTTPS. A webhook mode can be added later behind config. Exactly one poller runs, guarded by a Postgres advisory lock. | overview.md deployment; ADR-0007 |
 | D8 | **Bot configuration.**<br>• An admin sets the bot token at `/admin/integrations/telegram`. The API verifies it with `getMe` and stores it in `settings` (#3) under `telegram.botToken` as AES-256-GCM ciphertext (`v1:<iv>:<tag>:<ct>`, base64) with `APP_ENCRYPTION_KEY` (32 bytes, base64).<br>• The token is never returned and never logged; the UI shows only the bot username.<br>• A missing key disables the integration with a clear error. | security.md "Secrets at rest" |
 | D9 | **Linking.**<br>• A user clicks "Link Telegram" and the API creates a one-time code (10 minutes, single use, stored hashed) and returns `https://t.me/<bot>?start=<code>`.<br>• The bot receives `/start <code>` and binds `chatId` to the user. Only private chats are accepted.<br>• `/stop` in the chat or "Unlink" in the UI removes the binding.<br>• One chat per user. A chat already linked to another user is refused. | new |
-| D10 | **Message content** is plain text with an AgentDock link (`APP_URL`). It names the project and slot / issue and gives a one-line reason. It never includes pane text, prompts, code or secrets. It uses Telegram `MarkdownV2` with strict escaping. | security.md |
+| D10 | **Message content** is plain text with a Nautelle link (`APP_URL`). It names the project and slot / issue and gives a one-line reason. It never includes pane text, prompts, code or secrets. It uses Telegram `MarkdownV2` with strict escaping. | security.md |
 | D11 | **In-app** notifications are stored rows. `GET` returns the newest first with unread counts. New rows publish `notification.new` on `user:<id>` (#9's own-id authorizer). Read state is per row, with mark-all. | #9 D11 |
 | D12 | **Optional inline actions.** Only if #20 has merged when `i22-telegram` is cut, `pr.awaiting_approval` messages carry Approve / Request changes buttons. A callback re-checks that the linked user is an active operator+ member of the project, calls #20's approval service and writes an audit record (`telegram.approval`, actor the user, `meta.via = "telegram"`). Request changes asks for the note as a reply. Otherwise this is filed as a follow-up issue and the message links to the approvals page. | #20; #8 D5; ADR-0010 spirit (typed actions only) |
 | D13 | **Audit.** The following are recorded through #8's `AuditService`, with new actions added to its closed union:<br>• bot configured / cleared;<br>• Telegram linked / unlinked;<br>• rules changed. | #8 D5 |

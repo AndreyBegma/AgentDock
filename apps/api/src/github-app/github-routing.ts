@@ -1,7 +1,7 @@
 import type { PollableCollector } from '@agentdock/shared/protocol';
 
 /**
- * D8: what a verified GitHub delivery asks AgentDock to do. Pure — the hook
+ * D8: what a verified GitHub delivery asks Nautelle to do. Pure — the hook
  * service maps it to projects (D7) and sends the polls after the response.
  */
 export type GitHubRouting =

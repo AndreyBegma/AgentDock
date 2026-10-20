@@ -44,10 +44,10 @@ interface RequestOptions {
 
 /** What a write says when the API was unreachable: the request never landed. */
 export const RESTARTING_WRITE_MESSAGE =
-  'AgentDock was restarting — nothing was changed. Try again';
+  'Nautelle was restarting — nothing was changed. Try again';
 /** What a read says once its retries ran out. */
 export const RESTARTING_READ_MESSAGE =
-  'AgentDock is restarting and could not be reached. Try again in a moment.';
+  'Nautelle is restarting and could not be reached. Try again in a moment.';
 
 /** The API could not be reached, or answered 502/503/504 (spec 353 D1). */
 export class ApiUnreachableError extends ApiError {

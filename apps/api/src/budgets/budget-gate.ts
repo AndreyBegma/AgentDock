@@ -8,7 +8,7 @@ export interface BudgetGateInput {
   projectId: string;
   /**
    * The person starting it — for a schedule firing, its principal (D-10);
-   * null for a webhook or AgentDock's own work (D3).
+   * null for a webhook or Nautelle's own work (D3).
    */
   userId: string | null;
 }

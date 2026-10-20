@@ -354,7 +354,7 @@ describe('errors', () => {
       new ApiError(503, SKILLS_ERROR.commandUnavailable as never, 'x'),
       'laptop',
     );
-    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).toContain('Update the Nautelle runner on laptop');
     expect(text).not.toContain('yet');
   });
 });

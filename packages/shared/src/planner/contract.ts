@@ -793,7 +793,7 @@ Frames:
 
 - Draw one frame unless the task touches several pages or several standalone components. Then draw one frame per page, plus one per component that matters on its own (its states side by side).
 - \`"frames"\` lists a short name per frame (at most ${DESIGN_FRAME_NAME_MAX} characters, distinct), in the order of the design blocks: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out; the frame is then named "${DESIGN_LEGACY_FRAME_NAME}".
-- On a revision, \`"kept"\` names the frames of \`"frames"\` you leave exactly as the previous revision drew them, by their previous names. A kept frame has no design block — AgentDock copies it; every other frame of \`"frames"\` has one, in order.
+- On a revision, \`"kept"\` names the frames of \`"frames"\` you leave exactly as the previous revision drew them, by their previous names. A kept frame has no design block — Nautelle copies it; every other frame of \`"frames"\` has one, in order.
 
 The mockup's rules — a frame that breaks one fails the turn:
 

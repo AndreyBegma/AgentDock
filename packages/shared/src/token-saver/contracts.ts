@@ -308,7 +308,7 @@ export interface TokenSaverPromptCache {
  * #663 D5: the session kinds cost per round is measured for. A round is one
  * run, except for the assistant chat, where it is one reply.
  * - `card`: a board card round started by a person (run or feedback);
- * - `ci_fix`: a card round AgentDock started for a red check or a conflict;
+ * - `ci_fix`: a card round Nautelle started for a red check or a conflict;
  * - `design`: a card's or a stack's design turn;
  * - `plan`: a Planner turn;
  * - `worker`: a cs-orchestrator worker slot;

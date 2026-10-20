@@ -42,7 +42,7 @@ describe('buildGitHubAppManifest (spec 27 D1, D2, D14)', () => {
     expect(manifest.redirect_url).toBe(
       'https://web.example/admin/integrations/github/callback',
     );
-    expect(manifest.name).toBe('AgentDock dock.example');
+    expect(manifest.name).toBe('Nautelle dock.example');
   });
 
   it('sets the hook inactive without PUBLIC_URL', () => {

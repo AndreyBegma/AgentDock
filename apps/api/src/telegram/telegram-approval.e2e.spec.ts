@@ -330,7 +330,7 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
 
       expect(commands.approve).not.toHaveBeenCalled();
       expect(lastTextTo(OPERATOR_CHAT)).toBe(
-        'PR #51 has new commits since this message. Review the new head in AgentDock.',
+        'PR #51 has new commits since this message. Review the new head in Nautelle.',
       );
       expect(await telegramAudits(operatorId)).toEqual([
         expect.objectContaining({
@@ -389,7 +389,7 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
         }),
       );
       expect(lastTextTo(OPERATOR_CHAT)).toBe(
-        'This message is not one AgentDock can act on any more. Decide in AgentDock.',
+        'This message is not one Nautelle can act on any more. Decide in Nautelle.',
       );
       expect(commands.approve).not.toHaveBeenCalled();
     });
@@ -400,7 +400,7 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
         `a:9999999999999999999:${PR}:${'A'.repeat(27)}`,
       );
       expect(lastTextTo(OPERATOR_CHAT)).toBe(
-        'This button is no longer valid. Decide in AgentDock.',
+        'This button is no longer valid. Decide in Nautelle.',
       );
     });
 
@@ -408,13 +408,13 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
       // The operator's button, replayed from the viewer's chat.
       await press(VIEWER_CHAT, approveButton);
       expect(lastTextTo(VIEWER_CHAT)).toBe(
-        'This message is not one AgentDock can act on any more. Decide in AgentDock.',
+        'This message is not one Nautelle can act on any more. Decide in Nautelle.',
       );
       await press(9999, approveButton);
-      expect(lastTextTo(9999)).toBe('This chat is not linked to AgentDock.');
+      expect(lastTextTo(9999)).toBe('This chat is not linked to Nautelle.');
       await press(OPERATOR_CHAT, 'a:1:2:not-ours');
       expect(lastTextTo(OPERATOR_CHAT)).toBe(
-        'This button is no longer valid. Decide in AgentDock.',
+        'This button is no longer valid. Decide in Nautelle.',
       );
 
       expect(commands.approve).not.toHaveBeenCalled();
@@ -523,7 +523,7 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
       expect(commands.requestChanges).not.toHaveBeenCalled();
       expect(await telegramAudits(operatorId)).toEqual([]);
       expect(lastTextTo(OPERATOR_CHAT)).toBe(
-        'Open the link from AgentDock → Account → Notifications to connect this chat.',
+        'Open the link from Nautelle → Account → Notifications to connect this chat.',
       );
     });
   });

@@ -16,7 +16,7 @@ import { describeBoardError } from '../../lib/board/format';
 import { noteModel } from '../../lib/text/note';
 
 /**
- * The small line under a text that people typed in any language and AgentDock
+ * The small line under a text that people typed in any language and Nautelle
  * stores in English (#271): translating, "Show original", or "Not normalized".
  * Renders nothing for text that was English or never requested.
  */

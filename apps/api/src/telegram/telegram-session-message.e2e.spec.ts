@@ -307,6 +307,6 @@ describe('Telegram: a waiting card answered from the chat (#489 M2, e2e)', () =>
     });
     await poll(callbackPress(nextUpdate++, OPERATOR_CHAT, button));
     expect(messagesSent()).toEqual([]);
-    expect(lastTextTo(OPERATOR_CHAT)).toContain('not one AgentDock can act on');
+    expect(lastTextTo(OPERATOR_CHAT)).toContain('not one Nautelle can act on');
   });
 });

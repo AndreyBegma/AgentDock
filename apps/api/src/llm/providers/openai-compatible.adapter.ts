@@ -45,7 +45,7 @@ export const OPENROUTER_PROFILE: OpenAiCompatibleProfile = {
   provider: 'openrouter',
   baseUrl: 'https://openrouter.ai/api/v1',
   maxTokensField: 'max_tokens',
-  headers: { 'X-Title': 'AgentDock' },
+  headers: { 'X-Title': 'Nautelle' },
   testPath: '/key',
 };
 

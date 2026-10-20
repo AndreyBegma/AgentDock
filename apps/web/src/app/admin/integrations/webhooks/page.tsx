@@ -79,7 +79,7 @@ export default function AdminWebhooksPage() {
       <PageHeader
         className="mb-0"
         title="Webhooks"
-        description="Outbound. AgentDock’s events are pushed to a URL you choose — signed, retried with backoff, and paused for a while when the receiver keeps failing."
+        description="Outbound. Nautelle’s events are pushed to a URL you choose — signed, retried with backoff, and paused for a while when the receiver keeps failing."
         actions={<Button onClick={() => setEditing('new')}>New webhook</Button>}
       />
 
@@ -93,7 +93,7 @@ export default function AdminWebhooksPage() {
         skeleton={<Skeleton className="h-48 w-full" />}
         empty={
           <EmptyState
-            title="Where AgentDock sends its events"
+            title="Where Nautelle sends its events"
             description="Create a webhook to send events — pull requests, blocked issues, agents waiting for a person — to n8n, Slack or your own bot. New webhook is at the top of the page."
           />
         }

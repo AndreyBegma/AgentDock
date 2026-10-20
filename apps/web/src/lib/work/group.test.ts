@@ -13,7 +13,7 @@ const slot = (
 ): WorkCardItem => ({
   source: 'fleet',
   projectId,
-  projectName: 'AgentDock',
+  projectName: 'Nautelle',
   cardId: `card${number}`,
   number,
   label: `C-${number}`,

@@ -8,7 +8,7 @@ Decisions: [ADR-0006](../adr/0006-runtime-adapters-and-runtime-profiles.md),
 ## Summary
 
 Skills are run by hand today, project by project, with no record (PRD,
-*Problem*). This item lets operators do three things from AgentDock:
+*Problem*). This item lets operators do three things from Nautelle:
 - search the public [skills.sh](https://skills.sh) catalog;
 - install a skill into a project or into a runtime profile;
 - run any installed skill on a project, choosing the runtime profile and the model.

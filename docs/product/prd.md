@@ -1,4 +1,4 @@
-# Product requirements — AgentDock
+# Product requirements — Nautelle
 
 Status: draft · Owner: Andrey Begma · Last reviewed: 2026-10-07
 
@@ -43,7 +43,7 @@ It works, but:
 
 ## Non-goals
 
-- Reimplementing the orchestrator's scheduling logic. AgentDock drives the
+- Reimplementing the orchestrator's scheduling logic. Nautelle drives the
   `cs-orchestrator` skill and observes it (ADR-0005).
 - A task tracker of its own. GitHub issues are the queue (ADR-0004).
 - Prompt management, evals, LLM-as-judge, datasets.

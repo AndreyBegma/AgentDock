@@ -344,7 +344,7 @@ export function RunnerSheet({
                     <p className="mb-2 text-sm text-ink-3">
                       Set on the machine with{' '}
                       <span className="font-mono">agentdock-runner policy</span>
-                      ; AgentDock cannot change it.
+                      ; Nautelle cannot change it.
                     </p>
                     <KeyValueList
                       dense

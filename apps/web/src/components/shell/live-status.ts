@@ -26,7 +26,7 @@ export function liveDotLabel(status: LiveStatus, paused: boolean): string {
 
 /** The words of the restart banner (spec 353 D2). */
 export const RESTARTING_BANNER_TEXT =
-  'Reconnecting to AgentDock… (the server may be restarting)';
+  'Reconnecting to Nautelle… (the server may be restarting)';
 
 /** True once the API has been unreachable for 1.5 s; false on the first success. */
 export function useServerRestarting(): boolean {

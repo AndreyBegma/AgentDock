@@ -184,7 +184,7 @@ describe('prompt budgets — design turns (C-254)', () => {
 describe('prompt budgets — the assistant (C-254)', () => {
   const project = {
     id: 'p1',
-    displayName: 'AgentDock',
+    displayName: 'Nautelle',
     repo: 'a/b',
     role: 'owner',
   };
@@ -208,7 +208,7 @@ describe('prompt budgets — the assistant (C-254)', () => {
     const shared = a.slice(0, commonPrefix(a, b));
     expect(shared).toContain('## Language');
     expect(shared).not.toContain('@x.io');
-    expect(shared).not.toContain('AgentDock (a/b)');
+    expect(shared).not.toContain('Nautelle (a/b)');
   });
 });
 

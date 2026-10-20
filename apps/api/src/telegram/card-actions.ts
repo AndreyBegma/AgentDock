@@ -253,10 +253,10 @@ export type CardRefusal =
 
 const REFUSALS: Record<CardRefusal, string> = {
   invalid_button:
-    'This button is no longer valid. Act on the card in AgentDock.',
-  not_linked: 'This chat is not linked to AgentDock.',
+    'This button is no longer valid. Act on the card in Nautelle.',
+  not_linked: 'This chat is not linked to Nautelle.',
   unknown_card: 'That card does not exist any more.',
-  inactive_user: 'Your AgentDock account is not active.',
+  inactive_user: 'Your Nautelle account is not active.',
   not_member: 'You are not a member of this project any more.',
   role: 'Your role on this project does not allow that, so nothing changed.',
   not_allowed:
@@ -282,7 +282,7 @@ const ERRORS: Partial<Record<string, string>> = {
   [BOARD_ERROR.budgetExceeded]:
     'A budget stops new rounds, so nothing changed.',
   [BOARD_ERROR.noProfile]:
-    'No runtime profile can run this card. Fix it in AgentDock.',
+    'No runtime profile can run this card. Fix it in Nautelle.',
 };
 
 const MERGE_REFUSED: Record<string, string> = {
@@ -299,12 +299,12 @@ export const boardErrorText = (
 ): string => {
   if (code === BOARD_ERROR.mergeFailed) {
     return `The merge was refused, so the card stays in Finished. ${
-      (reason && MERGE_REFUSED[reason]) ?? 'Merge it in AgentDock.'
+      (reason && MERGE_REFUSED[reason]) ?? 'Merge it in Nautelle.'
     }`;
   }
   return (
     (code && ERRORS[code]) ??
-    'That did not work, and nothing changed. Try again, or act in AgentDock.'
+    'That did not work, and nothing changed. Try again, or act in Nautelle.'
   );
 };
 
@@ -338,7 +338,7 @@ export const resultLine = (
       if (outcome?.state === 'no_changes') {
         return `${label} has nothing to push, so no pull request was opened.`;
       }
-      return `No pull request for ${label}: collecting the work failed. See the card in AgentDock.`;
+      return `No pull request for ${label}: collecting the work failed. See the card in Nautelle.`;
     }
     case 'message':
       return `Message sent to ${label}.`;

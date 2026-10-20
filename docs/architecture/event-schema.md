@@ -41,7 +41,7 @@ This table is what the plugin writes. What the runner forwards is in
 | `slot.resumed` | `slot, reason` |
 | `slot.redispatched` | `slot, fromModel, toModel, reason` |
 | `slot.checkpoint` | `slot, checkpoint` (`picked_up` · `plan_ready` · `implementation_done` · `pr_open` · `blocked` · `misclassified`), `summary`, `pr?` |
-| `slot.message_sent` | `slot, text`, `by?` — `by: person` when AgentDock appended it for a person's message to the worker (#489, ADR-0045; `source: agentdock`, `eid` `agentdock-<uuid>`) |
+| `slot.message_sent` | `slot, text`, `by?` — `by: person` when Nautelle appended it for a person's message to the worker (#489, ADR-0045; `source: agentdock`, `eid` `agentdock-<uuid>`) |
 | `slot.fence_widened` | `slot, added[]` |
 | `slot.stopped` | `slot, by` |
 | `pr.merged` | `pr, slot, issue, method` |

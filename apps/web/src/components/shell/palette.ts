@@ -90,7 +90,7 @@ function group(id: string, title: string, items: Item[]) {
   return items.length > 0 ? [{ id, title, items }] : [];
 }
 
-/** The project's own pages, labelled "AgentDock › Fleet". */
+/** The project's own pages, labelled "Nautelle › Fleet". */
 function projectPages(project: ProjectSummary, role: Role): Item[] {
   const section = visibleNav(role, `/projects/${project.id}`).find(
     (candidate) => candidate.id === 'project',

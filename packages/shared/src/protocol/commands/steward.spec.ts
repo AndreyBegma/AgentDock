@@ -117,7 +117,7 @@ describe('digest.compose (#491)', () => {
     profileKey: 'default',
     model: 'haiku',
     trigger: 'daily',
-    projectName: 'AgentDock',
+    projectName: 'Nautelle',
     done: section(2),
     stuck: {
       total: 1,

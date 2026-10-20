@@ -14,7 +14,7 @@ export interface ConversationMessageEntry {
   id: string;
   /** When the runner saw it. */
   at: string;
-  /** `From:` of its header (a user's email for AgentDock's own messages), else null. */
+  /** `From:` of its header (a user's email for Nautelle's own messages), else null. */
   sender: string | null;
   /** `Date:` of its header, else null. */
   sentAt: string | null;

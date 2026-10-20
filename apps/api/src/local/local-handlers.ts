@@ -223,7 +223,7 @@ export class LocalHandlers {
         }),
       ]);
     const lines = [
-      `AgentDock project ${project.displayName} (${project.repo}), base branch ${baseOf(project)}.`,
+      `Nautelle project ${project.displayName} (${project.repo}), base branch ${baseOf(project)}.`,
       ...(issueNumber
         ? [
             issue
@@ -234,7 +234,7 @@ export class LocalHandlers {
       budgetLine(budgets),
       `Fleet: ${liveSlots} live slot${liveSlots === 1 ? '' : 's'}, ${ready} ready issue${ready === 1 ? '' : 's'}, ${prs + requests} pending approval${prs + requests === 1 ? '' : 's'}.`,
       runner?.awayMode
-        ? 'Away mode is on: permission prompts go to AgentDock for a person to approve.'
+        ? 'Away mode is on: permission prompts go to Nautelle for a person to approve.'
         : 'Away mode is off.',
       TOOLS_LINE,
     ];
@@ -477,7 +477,7 @@ export class LocalHandlers {
       ...result,
       queued: false,
       actionRequestId: request.id,
-      waiting: `Issue #${created.number} is not queued yet: it waits for a person to approve it in AgentDock (Approvals) or Telegram. Do not queue it another way.`,
+      waiting: `Issue #${created.number} is not queued yet: it waits for a person to approve it in Nautelle (Approvals) or Telegram. Do not queue it another way.`,
     };
   }
 

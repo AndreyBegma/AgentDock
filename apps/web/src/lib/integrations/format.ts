@@ -103,7 +103,7 @@ export function webhooksStatus(
     return {
       tone: 'neutral',
       label: 'None',
-      detail: 'Send AgentDock’s events to n8n, Slack or your own bot.',
+      detail: 'Send Nautelle’s events to n8n, Slack or your own bot.',
     };
   }
   const paused = list.filter((w) => w.enabled && w.circuitState !== 'closed');
@@ -133,7 +133,7 @@ export function triggersStatus(
         'Let CI or a deploy hook start a skill run or an orchestrator round.',
     };
   }
-  // Turned off by AgentDock itself, not by a person: something to look at.
+  // Turned off by Nautelle itself, not by a person: something to look at.
   const stopped = list.filter(
     (t) => !t.enabled && t.disabledReason && t.disabledReason !== 'manual',
   );
@@ -141,7 +141,7 @@ export function triggersStatus(
     return {
       tone: 'warn',
       label: `${plural(stopped.length, 'trigger')} turned off`,
-      detail: 'AgentDock disabled it. Open it to see why.',
+      detail: 'Nautelle disabled it. Open it to see why.',
     };
   }
   const enabled = list.filter((t) => t.enabled).length;

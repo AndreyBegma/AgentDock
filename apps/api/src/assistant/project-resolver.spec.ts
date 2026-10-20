@@ -1,7 +1,7 @@
 import { projectsNamedIn } from './project-resolver';
 
 const projects = [
-  { id: 'a', displayName: 'AgentDock', repo: 'acme/agentdock' },
+  { id: 'a', displayName: 'Nautelle', repo: 'acme/agentdock' },
   { id: 'b', displayName: 'Billing API', repo: 'acme/billing-api' },
   { id: 'c', displayName: 'billing-web', repo: 'acme/billing-web' },
 ];
@@ -11,7 +11,7 @@ const ids = (message: string) =>
 
 describe('projectsNamedIn', () => {
   it('matches a display name or a repository name as a whole word', () => {
-    expect(ids('What is holding up the AgentDock queue?')).toEqual(['a']);
+    expect(ids('What is holding up the Nautelle queue?')).toEqual(['a']);
     expect(ids('Что с очередью в billing-api?')).toEqual(['b']);
     expect(ids('look at acme/billing-web')).toEqual(['c']);
   });

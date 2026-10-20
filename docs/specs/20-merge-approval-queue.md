@@ -13,7 +13,7 @@ want a person to look first. With merge approval on, the orchestrator stops at
 "green and mergeable" and waits (plugin change P8). This item gives that person a
 queue: every waiting PR with the worker's merge summary, checks and diff size, and
 two buttons. **Approve** lets the orchestrator merge it. **Request changes** sends
-a note back to the worker through the orchestrator. AgentDock never merges itself
+a note back to the worker through the orchestrator. Nautelle never merges itself
 (ADR-0005), and every decision is audited.
 
 ## Scope
@@ -23,13 +23,13 @@ a note back to the worker through the orchestrator. AgentDock never merges itsel
 - Detecting "awaiting approval" from #11's PR projection and from the plugin's `pr.awaiting_approval` event (#16).
 - API: approval records, queue endpoint, approve and request-changes endpoints.
 - Runner commands `pr.approve`, `pr.requestChanges` and `pr.inspect`, with the approval-signal writer isolated in one module.
-- Mismatch warning between AgentDock's `mergeApproval` flag and the project's `orchestrator.mergeApproval` config.
+- Mismatch warning between Nautelle's `mergeApproval` flag and the project's `orchestrator.mergeApproval` config.
 - Web `/projects/[projectId]/approvals`.
 
 ### Out of scope
 
 - The orchestrator side: waiting, reading the signal, merging or forwarding the note. That is plugin P8, [AndreyBegma/claude-code-plugin#8](https://github.com/AndreyBegma/claude-code-plugin/issues/8).
-- Editing `.code-analyzer-config.json` in the project. AgentDock never writes a project's committed files.
+- Editing `.code-analyzer-config.json` in the project. Nautelle never writes a project's committed files.
 - GitHub PR reviews / approvals via the GitHub API (branch protection). The signal goes to the orchestrator, not to GitHub.
 - Notifications that a PR is waiting. M2.7 (#22) consumes this item's events.
 
@@ -40,7 +40,7 @@ taken, with its source.
 
 | # | Decision | Source |
 |---|---|---|
-| D1 | **Two flags, one truth.** The orchestrator obeys `orchestrator.mergeApproval: true` in the project's `.code-analyzer-config.json` (P8). AgentDock's `projects.mergeApproval` (from #10) is the person's intent. When they differ (from #10's config snapshot), the project settings and the approvals page show a warning telling the person to set the config key. AgentDock never writes that file. | #10 D13; ADR-0010; delegated rule "never edit committed config" |
+| D1 | **Two flags, one truth.** The orchestrator obeys `orchestrator.mergeApproval: true` in the project's `.code-analyzer-config.json` (P8). Nautelle's `projects.mergeApproval` (from #10) is the person's intent. When they differ (from #10's config snapshot), the project settings and the approvals page show a warning telling the person to set the config key. Nautelle never writes that file. | #10 D13; ADR-0010; delegated rule "never edit committed config" |
 | D2 | **Awaiting approval.** A PR is listed when **either** the plugin emitted `pr.awaiting_approval { pr, slot, issue }` (#16, source `code-sentinel`) **or**, with no events source, the project's config has `mergeApproval: true` and #11's slot projection shows the slot's PR `green` + mergeable + `pr_open` checkpoint and no merge. An event-sourced row is `source: orchestrator`; a derived one is `source: derived` and labelled as such. | ADR-0002 (events first, scraped fallback) |
 | D3 | **Merge summary** is the body of the slot's latest `pull request open — <url>` checkpoint from #11's `slot_checkpoints` (the worker's reply file). Missing → "no summary written". | worker SKILL.md; #11 D5 |
 | D4 | **Diff and checks.** On opening a PR row the API calls runner command `pr.inspect { projectId, root, pr }` (viewer) → `gh pr view <n> --json additions,deletions,changedFiles,files,statusCheckRollup,mergeable,mergeStateStatus,url,title,body,state,headRefOid` (`state` and `headRefOid` added for D6 — notes, 3). Result cached 60 s. File list capped at 300 entries. | ADR-0010; `gh` [Confirmed] |
@@ -75,7 +75,7 @@ Migration directory: `apps/api/prisma/migrations/20261022000000_approvals/`. New
 `/projects/[projectId]/approvals` (nav entry "Approvals", flipped to `enabled: true`
 in `apps/web/src/components/shell/nav.ts`; the nav badge shows the waiting count):
 
-- **Banner** when `configMismatch` (glass-ui `Banner` from AndreyBegma/glass-ui#70 when released, else `SectionUnavailable`-style notice): "AgentDock expects approval but the project config does not ask for it", or the reverse.
+- **Banner** when `configMismatch` (glass-ui `Banner` from AndreyBegma/glass-ui#70 when released, else `SectionUnavailable`-style notice): "Nautelle expects approval but the project config does not ask for it", or the reverse.
 - **Waiting list**: PR, title, slot, issue, checks dot, `+adds / −dels`, waiting for, source badge (derived rows marked).
 - **Detail sheet**: merge summary (markdown), changed files (`Disclosure`), checks list, buttons **Approve** and **Request changes** (dialog with required note). Buttons hidden for viewers.
 - **Recent decisions**: who, when, decision, note.
@@ -169,7 +169,7 @@ i20-api, decided with the orchestrator on 2026-10-08:
    `approvalCommands` into `commands` and replaces each body with
    `commandOutput(name, await send(...))`. Both files are outside i20-runner's
    listed fence.
-3. **Where the head comes from (D6).** Nothing in AgentDock knew a PR's head
+3. **Where the head comes from (D6).** Nothing in Nautelle knew a PR's head
    SHA: not the slot projection, not the runner's `gh pr list` fields, not
    `pr.awaiting_approval`. `pr.inspect` therefore adds `headRefOid` and `state`
    to D4's field list. The API reads the head (a) when a detail opens (cached
@@ -234,7 +234,7 @@ i20-api, decided with the orchestrator on 2026-10-08:
 11. **D1 helper.** `mergeApprovalMismatch(project)` and
     `configMergeApproval(config)` in `@agentdock/shared` are what the web
     settings page calls with the project detail it already has; an unread
-    config is a mismatch only when AgentDock expects approval.
+    config is a mismatch only when Nautelle expects approval.
 
 i20-runner, 2026-10-09:
 

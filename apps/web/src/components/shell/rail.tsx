@@ -182,7 +182,7 @@ export function Rail({
             >
               <Link
                 href="/"
-                aria-label="AgentDock, overview"
+                aria-label="Nautelle, overview"
                 className={`flex min-w-0 items-center rounded-control text-ink h-10 ${iconOnly ? 'justify-center' : 'flex-1 px-3'}`}
               >
                 {iconOnly ? (

@@ -8,7 +8,7 @@ Decisions: [ADR-0001](../adr/0001-control-plane-and-per-machine-runner.md),
 
 ## Summary
 
-The runner is the only part of AgentDock that touches a machine: it will
+The runner is the only part of Nautelle that touches a machine: it will
 observe fleets and execute commands. This item builds its skeleton and the
 contract it speaks — the protocol schemas shared with the API, a Bun daemon that
 pairs, connects out over WebSocket, announces its capabilities and runtime

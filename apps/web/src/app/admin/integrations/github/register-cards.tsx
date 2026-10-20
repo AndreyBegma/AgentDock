@@ -78,7 +78,7 @@ export function RegisterCard({ view }: { view: Unregistered }) {
       <SectionHeader className="mb-2" title="Register the App" />
       <p className="mb-4 max-w-prose text-sm text-ink-2">
         One read-only GitHub App for this instance. GitHub shows the permissions
-        before you confirm; AgentDock never writes to GitHub through it.
+        before you confirm; Nautelle never writes to GitHub through it.
       </p>
       {view.publicUrl ? null : (
         <div className="mb-4 max-w-prose">

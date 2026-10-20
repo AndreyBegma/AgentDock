@@ -1,4 +1,4 @@
-# AgentDock API image (ADR-0016). Built from the repository root:
+# Nautelle API image (ADR-0016). Built from the repository root:
 #
 #   docker build -t agentdock-api:staging -f apps/api/Dockerfile .
 #

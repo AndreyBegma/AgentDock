@@ -63,7 +63,7 @@ function Step({ step, isAdmin }: { step: SetupStep; isAdmin: boolean }) {
   }
 }
 
-/** #719: hide a profile from AgentDock on the runner, or show it again. */
+/** #719: hide a profile from Nautelle on the runner, or show it again. */
 type SetIgnored = (profileKey: string, ignored: boolean) => void;
 
 function Item({
@@ -120,7 +120,7 @@ function Item({
 
 /**
  * The checklist itself, for a view already loaded. `onIgnore`, given to a
- * project admin, offers to hide a profile from AgentDock on the runner (#719).
+ * project admin, offers to hide a profile from Nautelle on the runner (#719).
  */
 export function TerminalSetupList({
   view,

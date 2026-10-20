@@ -24,10 +24,15 @@ const PUBLIC_PATHS = [
 
 /**
  * The app icons (`app/icon.svg`, and `app/apple-icon.tsx`, served at
- * `/apple-icon`) are fetched by the browser on the sign-in page too;
- * redirected, the tab shows no icon there.
+ * `/apple-icon`) and the manifest (`app/manifest.ts`) are fetched by the
+ * browser on the sign-in page too; redirected, the tab shows no icon there.
  */
-export const PUBLIC_FILES = ['/favicon.ico', '/icon.svg', '/apple-icon'];
+export const PUBLIC_FILES = [
+  '/favicon.ico',
+  '/icon.svg',
+  '/apple-icon',
+  '/manifest.webmanifest',
+];
 
 /**
  * Route protection (spec D13). Next 16 renamed `middleware` to `proxy`; this is
@@ -78,6 +83,8 @@ function route(request: NextRequest, nonce: string, csp: string) {
 
 export const config = {
   // Everything except the API rewrite, Next internals and the app icons
-  // (`PUBLIC_FILES`, kept in step with this list).
-  matcher: ['/((?!api/|_next/|favicon\\.ico$|icon\\.svg$|apple-icon$).*)'],
+  // and the manifest (`PUBLIC_FILES`, kept in step with this list).
+  matcher: [
+    '/((?!api/|_next/|favicon\\.ico$|icon\\.svg$|apple-icon$|manifest\\.webmanifest$).*)',
+  ],
 };
