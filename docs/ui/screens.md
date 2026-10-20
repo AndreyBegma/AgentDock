@@ -4,20 +4,27 @@ Information architecture for `apps/web`. Layout: `NavRail` on the left, project
 switcher at its top, `CommandPalette` on ⌘K, live updates everywhere over the
 UI WebSocket.
 
-**The shell** (`components/shell/`). A skip link comes first. The rail has three
-sections: Workspace (Overview, Projects, Activity, Work, Sessions, Usage,
-Workflows, Skills), then the open project's pages under its name (its
-Board entry is labelled Work, #270; the Planner left it with #337 — New work
-is on the Board, #409),
-then Admin (its "Planner instructions" entry opens the instructions editor). Inside a
-project the project's section keeps only Project, Work and Activity; Fleet,
-Queue, Approvals, History, Token saver, Skills, Schedules and Settings sit in a
-**More** group under it, and Workspace folds into one group too (outside a
-project it is a plain section). More, Workspace-in-a-project and Admin start
-folded, unfold by themselves on one of their pages (History, Sessions, an
-admin page) and each remembers its state per browser under its own key; with
-storage blocked they stay folded. The icon-only rail shows every entry. Exactly one item is active: the longest matching href wins, and
-`/` and `/projects` match only exactly. Integrations goes to the hub,
+**The shell** (`components/shell/`). A skip link comes first. It has three
+layouts on glass-ui's breakpoints (C-282): a phone (below 640 px) gets the
+floating capsule, a tablet (640–1023 px) the rail folded to its icon strip, and
+a desktop (1024 px and up) the full rail. The rail has two sections: Workspace,
+which keeps Overview, Projects and Work in view (Activity, Sessions, Usage,
+Workflows and Skills sit in a **More** group under it), then the open project's
+pages under its name. Inside a project five entries stay in view — **Board**
+first, in glass-ui's primary-entry frame (the entry was labelled Work, #270),
+then Fleet, Queue, Activity and Settings — and Project home, Approvals,
+History, Planner, Schedules, Skills and Token saver sit in the project's More
+group. Each More starts folded, unfolds by itself on one of its pages and
+remembers its state per browser under its own key; with storage blocked it
+stays folded. While the project's More is folded its title carries the waiting
+approvals. The Admin pages are not in the rail: an admin finds them through
+**Admin** in the account menu, which opens `/admin` (it lands on Runners), and
+the admin area has its own row of link tabs (`AdminNav`; its "Planner
+instructions" entry opens the instructions editor). The icon rail — a tablet's,
+always, and a desktop's once collapsed with the toggle or ⌘\ — shows the same
+primary entries and one **More** item that opens a side sheet with the rest.
+Exactly one item is active: the longest matching href wins, and `/` and
+`/projects` match only exactly. Integrations goes to the hub,
 `/admin/integrations`. The active item is scrolled into view, and the rail
 fades at whichever edge has more. The project switcher is a button with the
 project's name, its runner's status and a chevron. Breadcrumbs come from data
@@ -25,19 +32,21 @@ project's name, its runner's status and a chevron. Breadcrumbs come from data
 the session's title. An unknown id is never title-cased; it reads as its kind
 ("Run", "Plan"). Tab titles are `"<Page> · AgentDock"`, and inside a project
 `"<Page> · <Project>"` (`pageTitleOf`); client pages take the page from the
-last crumb. Below 1024 px the rail gives way to glass-ui's floating
-`BottomCapsule` (#521) — outside a project Overview · Projects · Activity ·
-More; inside one Work · Fleet · Approvals · More, the active tab carrying the
-travelling pill and `aria-current="page"`. More's bottom sheet holds the
-project switcher, a "Needs you" group with the waiting approvals and the slots
-that need a person (the capsule's tabs have no badge), and every other page.
+last crumb. Below 640 px the rail gives way to glass-ui's floating
+`BottomCapsule` (#521) — outside a project Overview · Projects · Work · More;
+inside one Board · Queue · Activity · More, the active tab carrying the
+travelling pill and `aria-current="page"`. More's bottom sheet (and the icon
+rail's side sheet) holds the project switcher (the capsule's only), a "Needs
+you" group with the waiting approvals and the slots that need a person (the
+capsule's tabs have no badge), and every other page.
 The round `+` beside the capsule is the page's create action: New work on the
 Board, New issue on Fleet and Queue, New schedule on Schedules; a page that
 registers several lists them in a bottom sheet; inside a project a page with
 none gets New work on the Board, outside one there is no `+`, and a viewer
-never sees an operator-only action (so no `+` when none remain). The top bar
-shows the page title with a back link, and the page sits on a 16 px gutter
-and ends clear of the capsule.
+never sees an operator-only action (so no `+` when none remain). On a phone the
+top bar shows the page title with a back link, and the page sits on a 16 px
+gutter and ends clear of the capsule; a tablet keeps the breadcrumbs and the
+page header's actions, as a desktop does.
 The main column is `max-w-5xl`, and `max-w-7xl` on the data pages the nav
 registry marks `wide` (and every page below them). A route that is loading
 shows a page-shaped skeleton (`app/(app)/loading.tsx`); one that throws shows
