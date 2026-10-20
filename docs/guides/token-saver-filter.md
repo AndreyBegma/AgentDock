@@ -10,7 +10,7 @@ the bypass, the raw files and the MCP allowlist.
 
 ## How a Bash call reaches the filter
 
-1. A launch with Token saver on registers `agentdock-runner filter-hook` as a
+1. A launch with Token saver on registers `nautelle-runner filter-hook` as a
    Claude Code `PreToolUse` hook for `Bash`. It also adds `filterEnv(…)` to the
    session's environment (`filter/env.ts`).
 2. The hook reads Claude Code's PreToolUse JSON. It rewrites `tool_input.command`
@@ -76,13 +76,13 @@ the bypass, the raw files and the MCP allowlist.
 
 The hook **fails open**: on any error it prints nothing and exits 0. Claude Code
 reads that as "no decision", so the command runs as written. Without the launch's
-`AGENTDOCK_FILTER_*` env, the hook does nothing. That is the case when Token
+`NAUTELLE_FILTER_*` env, the hook does nothing. That is the case when Token
 saver is off.
 
 ## Permissions: the rewrite never changes what is allowed
 
 Claude Code matches its permission rules against the command a hook *returns*.
-A rewritten `agentdock-runner filter -- git push` would therefore slip past
+A rewritten `nautelle-runner filter -- git push` would therefore slip past
 `Bash(git push:*)`. The hook (`permissionFor` in `filter/permissions.ts`)
 applies these rules in order (spec #445 amendments 9, 10, 11 and 14):
 
@@ -95,7 +95,7 @@ applies these rules in order (spec #445 amendments 9, 10, 11 and 14):
 | Anything else, in `auto` or `plan` | rewrite, with **no** `permissionDecision`: only `updatedInput` |
 
 In auto mode the hook returns no decision, so Claude Code's own permission rules
-and auto-mode classifier judge the wrapped `agentdock-runner filter -- <argv>`,
+and auto-mode classifier judge the wrapped `nautelle-runner filter -- <argv>`,
 just as they would judge any other command. Nothing is approved by the hook. An
 `allow` rule written for the original command does not match the wrapped form,
 so for that call the classifier decides. This was verified on Claude Code
@@ -129,7 +129,7 @@ The rules come from the files Claude Code loads:
 - `$CLAUDE_CONFIG_DIR/settings.json` (default `~/.claude/settings.json`);
 - `<project>/.claude/settings.json` and `<project>/.claude/settings.local.json`,
   where `<project>` is `$CLAUDE_PROJECT_DIR`, or the hook's `cwd` when it is unset;
-- the launch's own `--settings` file, named by `$AGENTDOCK_LAUNCH_SETTINGS`.
+- the launch's own `--settings` file, named by `$NAUTELLE_LAUNCH_SETTINGS`.
 
 ## What the engine guarantees (D4)
 
@@ -155,7 +155,7 @@ The rules come from the files Claude Code loads:
   ends with:
 
   ```
-  [agentdock filter: N lines hidden · full output: <path> · AGENTDOCK_RAW=1 to bypass]
+  [agentdock filter: N lines hidden · full output: <path> · NAUTELLE_RAW=1 to bypass]
   ```
 
   When the raw file was cut, the footer says `full output (first 10 MB, truncated)`.
@@ -169,18 +169,18 @@ The rules come from the files Claude Code loads:
   and private-key blocks. The raw file keeps every byte. The fuller hook-content
   redactor (`local/redact.ts`) is not used here, because it loads the protocol
   schemas, which costs about 140 ms per command.
-- **Bypass.** With `AGENTDOCK_RAW=1 <cmd>`, the output streams through unchanged
+- **Bypass.** With `NAUTELLE_RAW=1 <cmd>`, the output streams through unchanged
   and the command is counted `bypassed`.
 - **Big outputs.** Output over 10 MB is not filtered. Whatever arrived so far is
   printed and the rest streams through.
-- **Without the launch env** (no `AGENTDOCK_FILTER_STATS`), the filter runs the
+- **Without the launch env** (no `NAUTELLE_FILTER_STATS`), the filter runs the
   command and prints its output. It writes no raw file and no stats.
 
 ## The read guard (`read-hook`, #616)
 
 The filter sees only Bash, while an agent's largest inputs are whole reads of
 big files and the same file read again. A launch with Token saver on also
-registers `agentdock-runner read-hook` (`filter/read-guard.ts`) as a
+registers `nautelle-runner read-hook` (`filter/read-guard.ts`) as a
 `PreToolUse` and a `PostToolUse` hook for `Read`, and as a `PreCompact` hook.
 
 - **Whole reads.** A `Read` with no `offset`, `limit` or `pages` of a text file
@@ -222,11 +222,11 @@ stats reader.
 
 | Variable | Value |
 |---|---|
-| `AGENTDOCK_FILTER_STATS` | `<run dir>/filter-stats.jsonl`. Its directory is also where `raw/` goes |
-| `AGENTDOCK_FILTER_PROJECT` | the project id |
-| `AGENTDOCK_FILTER_RUN` | the run id; unset for the orchestrator session |
-| `AGENTDOCK_FILTER_RUN_KIND` | a `TokenSaverRunKind` |
-| `AGENTDOCK_LAUNCH_SETTINGS` | the `--settings` file the launch passed |
+| `NAUTELLE_FILTER_STATS` | `<run dir>/filter-stats.jsonl`. Its directory is also where `raw/` goes |
+| `NAUTELLE_FILTER_PROJECT` | the project id |
+| `NAUTELLE_FILTER_RUN` | the run id; unset for the orchestrator session |
+| `NAUTELLE_FILTER_RUN_KIND` | a `TokenSaverRunKind` |
+| `NAUTELLE_LAUNCH_SETTINGS` | the `--settings` file the launch passed |
 | `CS_ECO` | `off`: the code-sentinel plugin's eco hooks stand down (#616) |
 
 The orchestrator session has no run dir. It uses a directory of its own,
@@ -235,7 +235,7 @@ The orchestrator session has no run dir. It uses a directory of its own,
 ## Stats
 
 Each command appends one JSONL line, `{ "projectId", "row" }`, to
-`$AGENTDOCK_FILTER_STATS`. `row` is a `FilterStatRow`. The daemon
+`$NAUTELLE_FILTER_STATS`. `row` is a `FilterStatRow`. The daemon
 (`FilterStatsReader`) scans the executors' base dirs and the orchestrator dir
 every 5 s, at most three levels deep (a card's round is
 `<cards>/<card>/rounds/<run>`). It reads complete lines from the offset kept
@@ -251,7 +251,7 @@ after a crash is harmless, because the API skips row ids it already has.
 
 ### Manual sessions (`/cs-eco`, #475)
 
-The code-sentinel plugin's `/cs-eco` runs `agentdock-runner filter-hook` in
+The code-sentinel plugin's `/cs-eco` runs `nautelle-runner filter-hook` in
 sessions the runner did not launch: manual terminals, the orchestrator's own
 session and fleet workers. It keeps one directory per Claude session,
 `${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions/<session id>/`, and appends
@@ -351,9 +351,9 @@ Measured on a developer machine (Linux x64), median / p95 of 30 runs:
 
 | Command | Before | After |
 |---|---|---|
-| `agentdock-runner version` (whole CLI) | 213 / 245 ms | 228 / 248 ms |
-| `agentdock-runner filter -- true` | — | 21.9 / 25.9 ms |
-| `agentdock-runner filter-hook` | — | 14.4 / 15.8 ms |
+| `nautelle-runner version` (whole CLI) | 213 / 245 ms | 228 / 248 ms |
+| `nautelle-runner filter -- true` | — | 21.9 / 25.9 ms |
+| `nautelle-runner filter-hook` | — | 14.4 / 15.8 ms |
 
 `filter/bench.spec.ts` is a local benchmark: it is skipped unless `RUN_BENCH=1`
 is set (`RUN_BENCH=1 bun test src/filter/bench.spec.ts` in `apps/runner`), because

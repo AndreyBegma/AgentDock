@@ -30,17 +30,17 @@ describe('the /install guide', () => {
   test('/install#claude-code has the profiles and setup commands', () => {
     expect(CLAUDE_CODE_PATH).toBe('/install#claude-code');
     expect(guide.claudeCode).toEqual({
-      listProfiles: 'agentdock-runner profiles',
-      setup: 'agentdock-runner setup claude --profile <key>',
-      dryRun: 'agentdock-runner setup claude --profile <key> --dry-run',
-      uninstall: 'agentdock-runner setup claude --profile <key> --uninstall',
-      status: 'agentdock-runner status',
+      listProfiles: 'nautelle-runner profiles',
+      setup: 'nautelle-runner setup claude --profile <key>',
+      dryRun: 'nautelle-runner setup claude --profile <key> --dry-run',
+      uninstall: 'nautelle-runner setup claude --profile <key> --uninstall',
+      status: 'nautelle-runner status',
     });
   });
 
   test("pairs with the page's origin plus /api", () => {
     expect(guide.pair).toBe(
-      'agentdock-runner pair --server https://dock.example.com/api --code XXXX-XXXX',
+      'nautelle-runner pair --server https://dock.example.com/api --code XXXX-XXXX',
     );
     expect(guide.health).toBe('https://dock.example.com/api/health');
     expect(guide.healthCheck).toBe('curl https://dock.example.com/api/health');
@@ -64,21 +64,21 @@ describe('install and keep-online commands', () => {
       'npm',
     ]);
     expect(KEEP_ONLINE_COMMANDS.map((item) => item.command)).toEqual([
-      'brew services start agentdock-runner',
-      'agentdock-runner install-service',
+      'brew services start nautelle-runner',
+      'nautelle-runner install-service',
     ]);
   });
 });
 
 describe('pairing servers', () => {
   const command = (server: string) =>
-    `agentdock-runner pair --server ${server} --code ABCD-EFGH`;
+    `nautelle-runner pair --server ${server} --code ABCD-EFGH`;
 
   test('reads the --server value', () => {
     expect(serverOfCommand(command('https://api.x.dev'))).toBe(
       'https://api.x.dev',
     );
-    expect(serverOfCommand('agentdock-runner pair')).toBeNull();
+    expect(serverOfCommand('nautelle-runner pair')).toBeNull();
   });
 
   test('local hosts', () => {

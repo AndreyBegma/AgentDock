@@ -40,7 +40,7 @@ interface Call {
   token?: string;
 }
 
-describe('agentdock-runner hook (spec 201 D11–D17)', () => {
+describe('nautelle-runner hook (spec 201 D11–D17)', () => {
   let dir = '';
   let cleanup = () => {};
   let server: LocalSocketServer | null = null;
@@ -87,7 +87,7 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
     stdin: string,
     overrides: Partial<HookDeps> = {},
   ): HookDeps => ({
-    env: { AGENTDOCK_TMUX_SESSION: 'agentdock-manual-0a1b2c3d' },
+    env: { NAUTELLE_TMUX_SESSION: 'nautelle-manual-0a1b2c3d' },
     os: 'linux',
     socketPath: socketPath(),
     cwd: '/home/person/dev/app',
@@ -149,7 +149,7 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
       sessionId: '0c9e2f4a-5b1d-4e8a-9c3f-2a7b6d1e8f90',
       data: {
         gitBranch: 'feat/184-x',
-        tmuxSession: 'agentdock-manual-0a1b2c3d',
+        tmuxSession: 'nautelle-manual-0a1b2c3d',
       },
       ancestors: [
         { pid: 300, comm: 'claude' },
@@ -186,7 +186,7 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
         worktree,
         branch: 'card/c12-add-login',
         base: 'main',
-        tmuxSession: 'agentdock-card-ab12cd34',
+        tmuxSession: 'nautelle-card-ab12cd34',
         runId: 'run_1',
         phase: 'ended',
         startedAt: '2026-10-16T10:00:00.000Z',
@@ -225,7 +225,7 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
         deps(c.input('startup'), { cwd: c.worktree, cardsDir: c.cardsDir }),
       );
       expect(context()).toStartWith('Project app, base develop.\n\n');
-      expect(context()).toContain('AgentDock card C-12');
+      expect(context()).toContain('Nautelle card C-12');
       expect(context()).toContain('Ship the login page.');
     });
 
@@ -240,7 +240,7 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
 
     it('gives the card’s own worker the note only after a compaction', async () => {
       const c = cardSetup();
-      const env = { AGENTDOCK_CARD: 'ab12cd34' };
+      const env = { NAUTELLE_CARD: 'ab12cd34' };
       await runHook(
         ['session-start'],
         deps(c.input('startup'), {
@@ -264,7 +264,7 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
 
     it('#494: the worker’s start after a compaction carries the request owed before it', async () => {
       const c = cardSetup();
-      const env = { AGENTDOCK_CARD: 'ab12cd34' };
+      const env = { NAUTELLE_CARD: 'ab12cd34' };
       const state = new HandoffStateStore((id) =>
         new CardStore(c.cardsDir).dir(id),
       );
@@ -347,8 +347,8 @@ describe('agentdock-runner hook (spec 201 D11–D17)', () => {
           : { ok: true, data: { queued: true, token: 'tok-env' } },
       );
       const env = {
-        AGENTDOCK_SESSION_TOKEN: 'tok-env',
-        AGENTDOCK_TMUX_SESSION: 'agentdock-manual-0a1b2c3d',
+        NAUTELLE_SESSION_TOKEN: 'tok-env',
+        NAUTELLE_TMUX_SESSION: 'nautelle-manual-0a1b2c3d',
       };
       await runHook(['session-start'], deps(fixture('session-start'), { env }));
       await runHook(['stop'], deps(fixture('stop'), { env }));

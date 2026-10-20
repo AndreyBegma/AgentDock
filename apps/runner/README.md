@@ -1,4 +1,4 @@
-# agentdock-runner
+# nautelle-runner
 
 The per-machine daemon of AgentDock ([ADR-0001](../../docs/adr/0001-control-plane-and-per-machine-runner.md)).
 It pairs with the API, connects out over WebSocket, reports the machine's
@@ -14,17 +14,17 @@ Prebuilt binaries exist for `darwin-arm64`, `darwin-x64`, `linux-x64` and
 **Homebrew** (macOS and Linux):
 
 ```sh
-brew install andreybegma/tap/agentdock-runner
-agentdock-runner pair --server https://<agentdock-host>/api --code XXXX-XXXX
-brew services start agentdock-runner
+brew install andreybegma/tap/nautelle-runner
+nautelle-runner pair --server https://<agentdock-host>/api --code XXXX-XXXX
+brew services start nautelle-runner
 ```
 
-**npm** (or `bun add -g agentdock-runner`):
+**npm** (or `bun add -g nautelle-runner`):
 
 ```sh
-npm i -g agentdock-runner
-agentdock-runner pair --server https://<agentdock-host>/api --code XXXX-XXXX
-agentdock-runner install-service
+npm i -g nautelle-runner
+nautelle-runner pair --server https://<agentdock-host>/api --code XXXX-XXXX
+nautelle-runner install-service
 ```
 
 `install-service` writes a systemd user unit on Linux and a launchd agent on
@@ -35,7 +35,7 @@ macOS, then prints the command that starts it.
 ```sh
 git clone https://github.com/AndreyBegma/AgentDock && cd AgentDock
 bun install && bun run build
-apps/runner/dist/agentdock-runner version
+apps/runner/dist/nautelle-runner version
 ```
 
 `sh apps/runner/scripts/build-release.sh` builds all four targets, the
@@ -54,8 +54,8 @@ Its `allowedRoots` is empty by default, so a runner upgraded from 0.12 or
 earlier watches **no** project until you allow their folders, on its machine:
 
 ```sh
-agentdock-runner policy allow-root --watched   # the roots it watched before; asks first, --yes skips it
-agentdock-runner policy allow-root ~/dev       # or name the folders yourself
+nautelle-runner policy allow-root --watched   # the roots it watched before; asks first, --yes skips it
+nautelle-runner policy allow-root ~/dev       # or name the folders yourself
 ```
 
 A runner started on a `runner.json` with no `policy` block logs and prints a
@@ -80,7 +80,7 @@ The web app shows the same refusal, with the command, on each project. See
 ### `mcp`
 
 Twelve tools, each one local method of the daemon's socket (spec 201 D7). Claude
-shows them as `mcp__plugin_agentdock_agentdock__<tool>`:
+shows them as `mcp__plugin_nautelle_nautelle__<tool>`:
 
 | Tool | Local method | Role |
 |---|---|---|
@@ -122,19 +122,19 @@ unsuccessful exit.
 
 | What | Where |
 |---|---|
-| Config (mode 0600) | `$XDG_CONFIG_HOME/agentdock/runner.json`, default `~/.config/agentdock/runner.json` |
-| Event spool | `$XDG_STATE_HOME/agentdock/spool/`, default `~/.local/state/agentdock/spool/` |
+| Config (mode 0600) | `$XDG_CONFIG_HOME/agentdock/runner.json`, default `~/.config/nautelle/runner.json` |
+| Event spool | `$XDG_STATE_HOME/agentdock/spool/`, default `~/.local/state/nautelle/spool/` |
 | Transcript offsets | `$XDG_STATE_HOME/agentdock/offsets.json`: how far each agent transcript was read |
 | `events.jsonl` offsets | `$XDG_STATE_HOME/agentdock/events-offsets.json`: byte offset and inode per project ([spec 16](../../docs/specs/16-consume-code-sentinel-events.md)); `fleet.eventsPollSeconds` (default 5) in `runner.json` sets the poll fallback |
 | Queue poll | `queue.pollSeconds` in `runner.json` (default 60, minimum 15): how often the `issues` collector polls GitHub for a project's open issues ([spec 19](../../docs/specs/19-task-queue.md)) |
 | Skill runs | `$XDG_STATE_HOME/agentdock/runs/<runId>/`: `state.json`, `run.json`, `stream.jsonl`, `stderr.log`, `exit.json`, `patch.diff` ([spec 24](../../docs/specs/24-skills.md)) |
-| systemd unit (Linux) | `$XDG_CONFIG_HOME/systemd/user/agentdock-runner.service` |
-| launchd agent (macOS) | `~/Library/LaunchAgents/com.agentdock.runner.plist`, logging to `~/Library/Logs/agentdock-runner.log`; it keeps the `PATH` `install-service` ran with |
-| Homebrew service logs | `$(brew --prefix)/var/log/agentdock-runner.log` |
+| systemd unit (Linux) | `$XDG_CONFIG_HOME/systemd/user/nautelle-runner.service` |
+| launchd agent (macOS) | `~/Library/LaunchAgents/com.nautelle.runner.plist`, logging to `~/Library/Logs/nautelle-runner.log`; it keeps the `PATH` `install-service` ran with |
+| Homebrew service logs | `$(brew --prefix)/var/log/nautelle-runner.log` |
 
 | Variable | Effect |
 |---|---|
-| `AGENTDOCK_LOG` | `debug` \| `info` (default) \| `warn` \| `error`; logs are JSON lines on stderr, the token redacted |
+| `NAUTELLE_LOG` | `debug` \| `info` (default) \| `warn` \| `error`; logs are JSON lines on stderr, the token redacted |
 | `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` | where the files above live |
 | `CODEX_HOME` | the codex profile `profiles --detect` proposes |
 
@@ -198,8 +198,8 @@ copying (never `npx`, never a symlink), and run them headless.
   temporary worktree. A profile install writes
   `<CLAUDE_CONFIG_DIR>/skills/<name>/` directly.
 - A run gets its own worktree `.wt-<repo>-run-<shortid>` and its own tmux
-  session `agentdock-run-<shortid>`. The session executes
-  `agentdock-runner exec-run <runDir>`, an internal subcommand that spawns the
+  session `nautelle-run-<shortid>`. The session executes
+  `nautelle-runner exec-run <runDir>`, an internal subcommand that spawns the
   profile binary from `run.json` as an argv. The run survives a runner
   restart.
 - The runner's own commits skip the project's hooks and carry no trailer.
@@ -223,5 +223,5 @@ members and URL userinfo. It is pattern-based and best-effort.
 ```sh
 bun run src/main.ts version        # run from source
 bun run test                       # typecheck + bun test (mock server, fake clock)
-bun run build                      # dist/agentdock-runner, a single binary
+bun run build                      # dist/nautelle-runner, a single binary
 ```

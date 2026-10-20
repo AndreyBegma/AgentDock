@@ -151,7 +151,7 @@ describe('card.run args', () => {
     expect(
       cardRunResultSchema.safeParse({
         phase: 'starting',
-        tmuxSession: 'agentdock-card-ab12cd34',
+        tmuxSession: 'nautelle-card-ab12cd34',
       }).success,
     ).toBe(true);
     expect(
@@ -555,7 +555,7 @@ describe('cardCommands', () => {
   });
 
   it('names the session from the short id', () => {
-    expect(cardSessionName('ab12cd34')).toBe('agentdock-card-ab12cd34');
+    expect(cardSessionName('ab12cd34')).toBe('nautelle-card-ab12cd34');
     expect(() => cardSessionName('nope')).toThrow();
     expect(cardShortIdSchema.safeParse('0a1b2c3d').success).toBe(true);
   });
@@ -574,7 +574,7 @@ describe('terminal target card', () => {
     expect(
       terminalTargetSchema.safeParse({
         ...target,
-        session: 'agentdock-card-ab12cd34',
+        session: 'nautelle-card-ab12cd34',
       }).success,
     ).toBe(false);
     expect(

@@ -57,7 +57,7 @@ export const filterFooter = (
   rawPath: string,
   truncated: boolean,
 ): string =>
-  `[agentdock filter: ${hidden} lines hidden · full output${truncated ? ' (first 10 MB, truncated)' : ''}: ${rawPath} · ${RAW_ENV}=1 to bypass]\n`;
+  `[nautelle filter: ${hidden} lines hidden · full output${truncated ? ' (first 10 MB, truncated)' : ''}: ${rawPath} · ${RAW_ENV}=1 to bypass]\n`;
 
 /** The program a filter matches on: the bare name, without its directory. */
 export const commandArgv = (argv: readonly string[]): string[] =>
@@ -156,7 +156,7 @@ const processSignals = (
 };
 
 /**
- * `agentdock-runner filter -- <argv…>` (#445 D3, D4): runs the command, keeps
+ * `nautelle-runner filter -- <argv…>` (#445 D3, D4): runs the command, keeps
  * its raw output in the run dir, and prints a compressed version when a
  * filter covers the command and passes the checks. The exit code is the
  * command's own. Returns it.
@@ -166,7 +166,7 @@ export const runFilter = async (
   deps: FilterDeps,
 ): Promise<number> => {
   if (argv.length === 0) {
-    deps.stderr('agentdock filter: no command given\n');
+    deps.stderr('nautelle filter: no command given\n');
     return 2;
   }
   const target = safe(() => statsTarget(deps.env));

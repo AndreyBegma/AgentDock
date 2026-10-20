@@ -15,7 +15,7 @@ describe('localSocketPath (spec 201 D5)', () => {
   it('uses $XDG_RUNTIME_DIR on Linux, the state dir otherwise', () => {
     expect(
       localSocketPath({ XDG_RUNTIME_DIR: '/run/user/1000' }, 'linux', '/s'),
-    ).toBe('/run/user/1000/agentdock/runner.sock');
+    ).toBe('/run/user/1000/nautelle/runner.sock');
     expect(localSocketPath({}, 'linux', '/s')).toBe('/s/runner.sock');
     expect(localSocketPath({ XDG_RUNTIME_DIR: 'rel' }, 'linux', '/s')).toBe(
       '/s/runner.sock',

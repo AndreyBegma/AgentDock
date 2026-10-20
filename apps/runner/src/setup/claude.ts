@@ -9,14 +9,19 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ConfigProfile } from '../config';
+import { legacyPluginInstalled } from '../detect/capabilities';
 import type { Exec } from '../detect/exec';
 import { type Env, expandHome } from '../env';
 import { OTLP_HOST } from '../otlp/receiver';
 
 /** The repository marketplace and the plugin in it (spec 201 D21). */
 export const MARKETPLACE_SOURCE = 'AndreyBegma/AgentDock';
-export const MARKETPLACE_NAME = 'agentdock';
-export const PLUGIN_REF = `agentdock@${MARKETPLACE_NAME}`;
+export const MARKETPLACE_NAME = 'nautelle';
+export const PLUGIN_REF = `nautelle@${MARKETPLACE_NAME}`;
+
+/** ADR-0073: the marketplace and plugin names before the rename. */
+export const LEGACY_MARKETPLACE_NAME = 'agentdock';
+export const LEGACY_PLUGIN_REF = `agentdock@${LEGACY_MARKETPLACE_NAME}`;
 
 /** Plugin commands reach the network; they get longer than a probe. */
 export const PLUGIN_COMMAND_TIMEOUT_MS = 120_000;
@@ -146,6 +151,15 @@ export const uninstalledSettings = (
   return settings;
 };
 
+/**
+ * ADR-0073: removes the plugin installed under its old name, so its hooks do
+ * not fire beside the new one's. Run before install and uninstall alike.
+ */
+const LEGACY_PLUGIN_COMMANDS: readonly string[][] = [
+  ['plugin', 'uninstall', LEGACY_PLUGIN_REF, '--scope', 'user'],
+  ['plugin', 'marketplace', 'remove', LEGACY_MARKETPLACE_NAME],
+];
+
 const pluginCommands = (uninstall: boolean): string[][] =>
   uninstall
     ? [
@@ -171,8 +185,8 @@ const configDirOf = (profile: ConfigProfile, home: string): string => {
 };
 
 /**
- * `agentdock-runner setup claude` (spec 201 D21): per Claude profile, with
- * `CLAUDE_CONFIG_DIR` set, installs the `agentdock` plugin from the
+ * `nautelle-runner setup claude` (spec 201 D21): per Claude profile, with
+ * `CLAUDE_CONFIG_DIR` set, installs the `nautelle` plugin from the
  * repository marketplace (argv, never a shell) and merges the exporter keys
  * into the user `settings.json` → `env`. Writes `<settings>.bak` once, before
  * its first change, prints the diff, and changes nothing on a rerun.
@@ -189,8 +203,8 @@ export const setupClaude = async (
   if (selected.length === 0) {
     options.stderr(
       options.profile
-        ? `No Claude profile ${options.profile}. See \`agentdock-runner profiles\`.\n`
-        : 'No Claude profiles configured. Run `agentdock-runner profiles --detect --write` first.\n',
+        ? `No Claude profile ${options.profile}. See \`nautelle-runner profiles\`.\n`
+        : 'No Claude profiles configured. Run `nautelle-runner profiles --detect --write` first.\n',
     );
     return 1;
   }
@@ -224,7 +238,11 @@ export const setupClaude = async (
     }
 
     const exec = options.exec(env);
-    for (const args of pluginCommands(options.uninstall)) {
+    const commands = [
+      ...(legacyPluginInstalled(configDir) ? LEGACY_PLUGIN_COMMANDS : []),
+      ...pluginCommands(options.uninstall),
+    ];
+    for (const args of commands) {
       const shown = `  $ ${binary} ${args.join(' ')}`;
       out(shown);
       if (options.dryRun) continue;
@@ -252,7 +270,7 @@ export const setupClaude = async (
   else if (!failed && !options.uninstall) {
     // #348 D7: setup does not talk to the daemon; its next heartbeat sees it.
     out(
-      'A running agentdock-runner reports this within 15 seconds. Sessions started before now need a restart to load the plugin.',
+      'A running nautelle-runner reports this within 15 seconds. Sessions started before now need a restart to load the plugin.',
     );
   }
   return failed ? 1 : 0;

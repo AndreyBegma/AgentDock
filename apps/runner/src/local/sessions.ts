@@ -11,7 +11,7 @@ interface HookSession {
   cwd: string;
   claudePid: number | null;
   ended: boolean;
-  /** The `agentdock-manual-*` tmux session `SessionStart` reported (D23). */
+  /** The `nautelle-manual-*` tmux session `SessionStart` reported (D23). */
   tmuxSession: string | null;
 }
 

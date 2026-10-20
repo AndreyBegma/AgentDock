@@ -57,7 +57,7 @@
 |---|---|
 | `apps/api` | NestJS; REST for the UI, `/runner` WebSocket gateway, `/live` WebSocket for live updates (session cookie + origin check, authorized topics — [spec 9](../specs/9-application-shell-and-live-updates.md)), webhook endpoints, schedulers |
 | `apps/web` | Next.js App Router; talks only to `apps/api` |
-| `apps/runner` | Bun daemon; compiled with `bun build --compile`; config in `~/.config/agentdock/runner.json` |
+| `apps/runner` | Bun daemon; compiled with `bun build --compile`; config in `~/.config/nautelle/runner.json` |
 | `packages/shared` | protocol types: runner messages, event schema, command schema (zod), shared enums |
 
 ## Live data path

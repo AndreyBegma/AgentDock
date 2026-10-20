@@ -29,7 +29,7 @@ const args: CardPrCloseArgs = {
   pr: 41,
   deleteBranch: true,
   issue: null,
-  comment: 'Closed from the AgentDock Board (C-12)',
+  comment: 'Closed from the Nautelle Board (C-12)',
 };
 
 interface Fake {
@@ -120,7 +120,7 @@ describe('card.prClose (#329 D8)', () => {
         '--repo',
         'acme/widget',
         '--comment',
-        'Closed from the AgentDock Board (C-12)',
+        'Closed from the Nautelle Board (C-12)',
       ],
     ]);
     const closed = gh.findIndex((c) => c[0] === 'pr' && c[1] === 'close');
@@ -200,7 +200,7 @@ describe('card.prClose (#329 D8)', () => {
         '--reason',
         'not planned',
         '--comment',
-        'Closed from the AgentDock Board (C-12)',
+        'Closed from the Nautelle Board (C-12)',
       ],
     ]);
 

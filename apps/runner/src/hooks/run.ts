@@ -189,7 +189,7 @@ const sessionToken = (
 };
 
 /**
- * `agentdock-runner hook <name>` (spec 201 D11–D13, D16, D17): reads the hook
+ * `nautelle-runner hook <name>` (spec 201 D11–D13, D16, D17): reads the hook
  * JSON from stdin and reports it to the daemon. Always exits 0 — a broken
  * runner must never break a Claude Code session — and prints nothing unless
  * it has a `SessionStart` context or a permission decision to give.
@@ -202,7 +202,7 @@ export const runHook = async (
   if (hooksDisabled(deps.env)) return 0;
   const name = hookCliNameSchema.safeParse(args[0]);
   if (!name.success || args.length !== 1) {
-    deps.stderr(`agentdock-runner hook: unknown hook ${args.join(' ')}\n`);
+    deps.stderr(`nautelle-runner hook: unknown hook ${args.join(' ')}\n`);
     return 0;
   }
   let input: unknown;
@@ -255,7 +255,7 @@ const handle = async (
     ]);
     if (branch) extras.gitBranch = branch;
     extras.ancestors = ancestors;
-    const tmux = deps.env.AGENTDOCK_TMUX_SESSION;
+    const tmux = deps.env.NAUTELLE_TMUX_SESSION;
     if (tmux) extras.tmuxSession = tmux;
   }
   if (name === 'stop') {

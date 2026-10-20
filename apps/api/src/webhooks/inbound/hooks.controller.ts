@@ -1,4 +1,8 @@
-import { type InboundHookAccepted, WEBHOOK_HEADERS } from '@nautelle/shared';
+import {
+  type InboundHookAccepted,
+  LEGACY_WEBHOOK_HEADERS,
+  WEBHOOK_HEADERS,
+} from '@nautelle/shared';
 import {
   Controller,
   HttpCode,
@@ -13,6 +17,16 @@ import { Public } from '../../auth';
 import { HookFailureThrottleGuard, type RawBodyRequest } from '../common';
 import { InboundHookService } from './inbound-hook.service';
 import { TriggerFirer } from './trigger-firer';
+
+/**
+ * An inbound signing header: its `X-Nautelle-*` name first, its legacy name
+ * during the rename window (ADR-0073).
+ */
+const header = (
+  req: Request,
+  name: 'timestamp' | 'delivery' | 'signature',
+): string | undefined =>
+  req.get(WEBHOOK_HEADERS[name]) ?? req.get(LEGACY_WEBHOOK_HEADERS[name]);
 
 /**
  * `POST /hooks/:publicId` (spec 26 D1–D7): the one public webhooks route.
@@ -37,9 +51,9 @@ export class HooksController {
     const received = await this.hooks.receive({
       publicId,
       rawBody: req.rawBody,
-      timestamp: req.get(WEBHOOK_HEADERS.timestamp),
-      deliveryId: req.get(WEBHOOK_HEADERS.delivery),
-      signature: req.get(WEBHOOK_HEADERS.signature),
+      timestamp: header(req, 'timestamp'),
+      deliveryId: header(req, 'delivery'),
+      signature: header(req, 'signature'),
       sourceIp: req.ip ?? null,
     });
     if (!received) {

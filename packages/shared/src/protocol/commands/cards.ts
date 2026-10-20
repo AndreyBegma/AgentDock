@@ -82,11 +82,15 @@ export const cardShortIdSchema = z
   .regex(/^[a-z0-9]{8}$/, 'must match ^[a-z0-9]{8}$');
 
 /** D5: the card's tmux session. Never `cs-` — `watch.sh` treats those as slots. */
-export const CARD_SESSION_PREFIX = 'agentdock-card-';
+export const CARD_SESSION_PREFIX = 'nautelle-card-';
 
+/** A session started before the rename keeps its `agentdock-` name (ADR-0073). */
 export const cardTmuxSessionSchema = z
   .string()
-  .regex(/^agentdock-card-[a-z0-9]{8}$/, 'must be agentdock-card-<shortid>');
+  .regex(
+    /^(?:nautelle|agentdock)-card-[a-z0-9]{8}$/,
+    'must be nautelle-card-<shortid>',
+  );
 
 export const cardSessionName = (shortId: string): string =>
   CARD_SESSION_PREFIX + cardShortIdSchema.parse(shortId);
@@ -158,7 +162,7 @@ export type CardDraftPullRequest = z.infer<typeof cardDraftPullRequestSchema>;
  * D5. Round 1 (`session.resume: false`) creates the worktree
  * `<parent>/.wt-<repo>-card-<shortId>` from `origin/<base>` on `branch` — or
  * checks out `origin/<branch>` when it exists — commits `files`, then starts
- * tmux `agentdock-card-<shortId>` running `exec-run` with `interactive: true`.
+ * tmux `nautelle-card-<shortId>` running `exec-run` with `interactive: true`.
  * A later round reuses the worktree and resumes the session. The round
  * outlives this command: progress arrives as `card_run.*` events.
  *

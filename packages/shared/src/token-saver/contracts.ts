@@ -7,8 +7,8 @@ import { z } from 'zod';
  * event, and the views the API serves to the card, Usage and the dashboard.
  */
 
-/** The bypass (D4c): `AGENTDOCK_RAW=1 <cmd>` runs the command unfiltered. */
-export const TOKEN_SAVER_RAW_ENV = 'AGENTDOCK_RAW';
+/** The bypass (D4c): `NAUTELLE_RAW=1 <cmd>` runs the command unfiltered. */
+export const TOKEN_SAVER_RAW_ENV = 'NAUTELLE_RAW';
 
 /**
  * Mirrors the Prisma enum `TokenSaverRunKind`: the launch a filtered command
@@ -54,7 +54,7 @@ export const mcpServerNameSchema = z
 /**
  * The setting as the API stores it and sends it on every launch command
  * (D11, `tokenSaver` on the eight launch args). `mcpAllow` lists the servers
- * a launch loads besides `agentdock`; empty means `agentdock` only. With
+ * a launch loads besides `nautelle`; empty means `nautelle` only. With
  * `enabled: false` the runner launches exactly as before #445.
  */
 export const tokenSaverConfigSchema = z.strictObject({
@@ -112,7 +112,7 @@ export const FILTER_ID_NONE_UNCOVERED = 'none:uncovered';
 export const FILTER_ID_NONE_MODE = 'none:mode';
 /**
  * #663 D9: a filter family covers the command, but the launch switched that
- * family off (`AGENTDOCK_FILTER_OFF`), so it passed through.
+ * family off (`NAUTELLE_FILTER_OFF`), so it passed through.
  */
 export const FILTER_ID_NONE_OFF = 'none:off';
 
@@ -215,7 +215,7 @@ export const filterStatRowSchema = z
     program: filterProgramSchema.optional(),
     rawBytes: byteCount,
     keptBytes: byteCount,
-    /** Ran with `AGENTDOCK_RAW=1` (D4c). */
+    /** Ran with `NAUTELLE_RAW=1` (D4c). */
     bypassed: z.boolean(),
     /** The filter returned the original output (D4b). */
     passedThrough: z.boolean(),

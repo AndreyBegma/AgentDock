@@ -93,7 +93,7 @@ export const CONTROL_ERROR_SENTENCE: Record<ControlErrorCode, string> = {
   [CONTROL_ERROR.runnerError]:
     'The runner failed to carry the command out. Check the runner’s log on its machine.',
   [CONTROL_ERROR.policyRefused]:
-    'The runner’s local security policy refused this. Only the person on that machine can change it, with `agentdock-runner policy`.',
+    'The runner’s local security policy refused this. Only the person on that machine can change it, with `nautelle-runner policy`.',
 };
 
 const isControlErrorCode = (
@@ -133,7 +133,7 @@ export function describeControlErrorHint(
   const code = error.code as string | undefined;
   if (code === CONTROL_ERROR.runnerOffline) {
     return {
-      text: `${CONTROL_ERROR_SENTENCE.runner_offline} Start it with \`agentdock-runner run\` on that machine.`,
+      text: `${CONTROL_ERROR_SENTENCE.runner_offline} Start it with \`nautelle-runner run\` on that machine.`,
       ...(isAdmin ? { href: RUNNERS_PAGE, cta: 'Open Runners' } : {}),
     };
   }

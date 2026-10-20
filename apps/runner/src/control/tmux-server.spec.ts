@@ -11,7 +11,7 @@ const noServer: ExecResult = {
   stderr: 'no server running on /tmp/tmux-1000/default',
 };
 const SYSTEMD: Env = { INVOCATION_ID: '61ff12a3d98e4bf4bdf736ea178c90e7' };
-const NEW_SESSION = ['new-session', '-d', '-s', 'agentdock-card-1', 'claude'];
+const NEW_SESSION = ['new-session', '-d', '-s', 'nautelle-card-1', 'claude'];
 
 /**
  * An exec stub recording every call. `server` says whether `list-sessions`
@@ -61,12 +61,12 @@ describe('TmuxServerGuard (#327)', () => {
         '--collect',
         '--quiet',
         '--unit',
-        'agentdock-tmux-1000-beef',
+        'nautelle-tmux-1000-beef',
         'tmux',
         ...NEW_SESSION,
       ],
     ]);
-    expect(lines.join('')).toContain('agentdock-tmux-1000-beef.scope');
+    expect(lines.join('')).toContain('nautelle-tmux-1000-beef.scope');
   });
 
   it('keeps the server selection inside the scope and in the probe', async () => {

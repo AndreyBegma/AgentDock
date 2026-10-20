@@ -108,7 +108,7 @@ const REFUSAL_LABEL: Record<TerminalRefusalCode, string> = {
   disabled: 'Terminal attach is disabled on this runner.',
   runner_unavailable: 'The runner is offline or did not answer.',
   policy_refused:
-    'The runner’s local security policy does not allow typing into a terminal. Open it read-only, or run `agentdock-runner policy set terminal.write true` on that machine.',
+    'The runner’s local security policy does not allow typing into a terminal. Open it read-only, or run `nautelle-runner policy set terminal.write true` on that machine.',
 };
 
 export function describeRefusal(

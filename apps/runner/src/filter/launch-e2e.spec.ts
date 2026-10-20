@@ -33,11 +33,11 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
       profile: { id: 'p', runtime: 'claude', env: {}, args: [] },
       home,
       dir: runDir,
-      selfCommand: ['/opt/agentdock-runner'],
+      selfCommand: ['/opt/nautelle-runner'],
       runKind: 'card',
       projectId: 'prj_a',
       runId: 'run_1',
-      agentdock: false,
+      runnerMcp: false,
       scout: false,
     });
     if (!launch) throw new Error('expected a launch');
@@ -54,7 +54,7 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
       {
         env,
         filters: [demoFilter],
-        selfCommand: ['/opt/agentdock-runner'],
+        selfCommand: ['/opt/nautelle-runner'],
         home,
         os: 'linux',
         now: Date.now,
@@ -63,7 +63,7 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
     );
     expect(
       (JSON.parse(out) as HookOutput).hookSpecificOutput.updatedInput.command,
-    ).toBe('/opt/agentdock-runner filter -- demo-test --all');
+    ).toBe('/opt/nautelle-runner filter -- demo-test --all');
 
     // The filter, as the rewritten command runs it.
     const fixture = join(home, 'demo.sh');
@@ -82,7 +82,7 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
       onSignal: () => () => {},
     });
     expect(code).toBe(0);
-    expect(printed.join('')).toContain('[agentdock filter:');
+    expect(printed.join('')).toContain('[nautelle filter:');
 
     // The daemon's reader, over the card root.
     const events: UnsequencedEvent[] = [];
@@ -123,11 +123,11 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
       profile: { id: 'p', runtime: 'claude', env: {}, args: [] },
       home,
       dir: runDir,
-      selfCommand: ['/opt/agentdock-runner'],
+      selfCommand: ['/opt/nautelle-runner'],
       runKind,
       projectId: 'prj_a',
       runId: 'run_1',
-      agentdock: false,
+      runnerMcp: false,
       scout: false,
     });
     if (!launch) throw new Error('expected a launch');
@@ -143,7 +143,7 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
       {
         env,
         filters: [demoFilter],
-        selfCommand: ['/opt/agentdock-runner'],
+        selfCommand: ['/opt/nautelle-runner'],
         home,
         os: 'linux',
         now: Date.now,
@@ -153,7 +153,7 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
     const output = (JSON.parse(out) as HookOutput).hookSpecificOutput;
     expect(output.permissionDecision).toBeUndefined();
     expect(output.updatedInput.command).toBe(
-      '/opt/agentdock-runner filter -- demo-test --all',
+      '/opt/nautelle-runner filter -- demo-test --all',
     );
 
     const fixture = join(home, 'demo.sh');

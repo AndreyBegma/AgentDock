@@ -20,7 +20,7 @@ import {
   type RunnerE2eContext,
 } from './testing/runner-e2e';
 
-/** The #5 daemon, run from source exactly as `agentdock-runner` would. */
+/** The #5 daemon, run from source exactly as `nautelle-runner` would. */
 const RUNNER_MAIN = resolve(API_ROOT, '../runner/src/main.ts');
 const BUN = process.env.BUN_BIN ?? 'bun';
 const STALE_AFTER_MS = 3_000;
@@ -108,16 +108,18 @@ describe('the #5 runner daemon against the API (e2e)', () => {
   beforeEach(async () => {
     await resetDatabase(ctx.prisma);
     admin = await adminSession(ctx);
-    home = mkdtempSync(join(tmpdir(), 'agentdock-runner-e2e-'));
+    home = mkdtempSync(join(tmpdir(), 'nautelle-runner-e2e-'));
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true }));
+  afterEach(() =>
+    rmSync(home, { recursive: true, force: true, maxRetries: 5 }),
+  );
 
   it('pairs, connects, pings, goes stale and offline, and stops for good on revoke', async () => {
     const created = await createRunner(admin, 'e2e-machine');
     const runnerId = created.runner.id;
 
     // A profile in the runner's own config — the server only mirrors it.
-    const configDir = join(home, 'config', 'agentdock');
+    const configDir = join(home, 'config', 'nautelle');
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, 'runner.json'),

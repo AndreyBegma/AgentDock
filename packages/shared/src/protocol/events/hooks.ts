@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { RunnerEvent } from '../envelope';
 
 /**
- * Events of the `agentdock` Claude Code plugin's hooks
+ * Events of the `nautelle` Claude Code plugin's hooks
  * (docs/specs/201-claude-code-integration.md D11, ADR-0020), source `hook`.
  * The envelope's `session: { runtime: 'claude', id }` carries Claude Code's
  * `session_id`.
@@ -39,7 +39,7 @@ export const HOOK_EVENT_TYPES = [
 export type HookEventType = (typeof HOOK_EVENT_TYPES)[number];
 
 /**
- * The `agentdock-runner hook <name>` arguments the plugin's `hooks.json`
+ * The `nautelle-runner hook <name>` arguments the plugin's `hooks.json`
  * passes, and the Claude Code hook each one is declared on (D12). The CLI
  * name is kebab-case.
  */
@@ -112,11 +112,17 @@ export const hookStartSourceSchema = z.enum([
   'fork',
 ]);
 
-/** A tmux session `agentdock-runner claude` created (D23). */
-export const MANUAL_TMUX_SESSION_PREFIX = 'agentdock-manual-';
+/**
+ * A tmux session `nautelle-runner claude` created (D23); one started before
+ * the rename keeps its `agentdock-` name (ADR-0073).
+ */
+export const MANUAL_TMUX_SESSION_PREFIX = 'nautelle-manual-';
 export const manualTmuxSessionSchema = z
   .string()
-  .regex(/^agentdock-manual-[0-9a-f]{8}$/, 'must be agentdock-manual-<8 hex>');
+  .regex(
+    /^(?:nautelle|agentdock)-manual-[0-9a-f]{8}$/,
+    'must be nautelle-manual-<8 hex>',
+  );
 
 export const hookSessionStartedDataSchema = z.strictObject({
   source: hookStartSourceSchema,

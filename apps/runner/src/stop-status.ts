@@ -4,7 +4,7 @@ import { RUNNER_CLOSE_CODES } from '@nautelle/shared/protocol';
 
 /**
  * Why the daemon last stopped for good — a terminal close — so
- * `agentdock-runner status` can say it after the process is gone. A replaced
+ * `nautelle-runner status` can say it after the process is gone. A replaced
  * connection may be another process holding this runner's token (C-108).
  */
 export interface StopStatus {

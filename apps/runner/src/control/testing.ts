@@ -31,12 +31,12 @@ export interface FakeTmuxOptions {
 
 /**
  * C-123: where a fake orchestrator start writes its launch file — never the
- * real `<state>/agentdock/orchestrator`. One per test process.
+ * real `<state>/nautelle/orchestrator`. One per test process.
  */
 let orchestratorDir: string | undefined;
 const fakeOrchestratorDir = (): string => {
   if (!orchestratorDir) {
-    const dir = mkdtempSync(join(tmpdir(), 'agentdock-orch-'));
+    const dir = mkdtempSync(join(tmpdir(), 'nautelle-orch-'));
     process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
     orchestratorDir = dir;
   }
@@ -44,7 +44,7 @@ const fakeOrchestratorDir = (): string => {
 };
 
 /** The runner's argv in a fake start: `exec-run <dir>` is appended. */
-export const FAKE_SELF_COMMAND = ['/opt/agentdock-runner'] as const;
+export const FAKE_SELF_COMMAND = ['/opt/nautelle-runner'] as const;
 
 const ok = (stdout = ''): ExecResult => ({ code: 0, stdout, stderr: '' });
 const fail = (stderr: string): ExecResult => ({ code: 1, stdout: '', stderr });

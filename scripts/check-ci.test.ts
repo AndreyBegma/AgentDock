@@ -83,6 +83,21 @@ describe('checkWorkflow', () => {
     ]);
   });
 
+  test('fails on a command that YAML parsed as a map', () => {
+    expect(
+      checkWorkflow('w.yml', {
+        steps: [
+          {
+            name: 'npm',
+            commands: [{ "npm deprecate x 'Renamed to y": "npm i -g y'" }],
+          },
+        ],
+      }),
+    ).toEqual([
+      "w.yml: step `npm` has a command that is not a string (quote an item holding ': ')",
+    ]);
+  });
+
   test('a socket step limited to push and manual passes', () => {
     expect(
       checkWorkflow('w.yml', {

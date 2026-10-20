@@ -66,7 +66,7 @@
       "name": "@nautelle/runner",
       "version": "0.13.0",
       "bin": {
-        "agentdock-runner": "./dist/agentdock-runner",
+        "nautelle-runner": "./dist/nautelle-runner",
       },
       "dependencies": {
         "@nautelle/shared": "workspace:*",

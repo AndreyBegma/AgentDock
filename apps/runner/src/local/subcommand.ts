@@ -28,6 +28,6 @@ export class NotImplementedError extends Error {
   readonly code = 'not_implemented';
 
   constructor(command: string) {
-    super(`agentdock-runner ${command} is not implemented yet`);
+    super(`nautelle-runner ${command} is not implemented yet`);
   }
 }

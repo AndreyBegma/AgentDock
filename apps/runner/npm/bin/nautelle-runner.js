@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// The npm entry point of agentdock-runner (ADR-0017). The runner is a Bun
+// The npm entry point of nautelle-runner (ADR-0017). The runner is a Bun
 // binary, so this shim only finds the platform package npm installed from
 // optionalDependencies and runs its binary with the same arguments and stdio.
 // It runs a binary only when its checksum is in the SHA256SUMS this package
-// ships and that file is signed by the AgentDock release key (ADR-0049).
+// ships and that file is signed by the Nautelle release key (ADR-0049).
 
 const { execFileSync } = require('node:child_process');
 const { createHash, verify } = require('node:crypto');
@@ -11,7 +11,7 @@ const fs = require('node:fs');
 const { constants } = require('node:os');
 const path = require('node:path');
 
-/** apps/runner/release-key.pub of AgentDock. */
+/** apps/runner/release-key.pub of Nautelle. */
 const RELEASE_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAUZTyf8lH2FdBavFF1oadsbBAOQD9kXfGp4YHCNFB3r8=
 -----END PUBLIC KEY-----
@@ -22,7 +22,7 @@ const TARGETS = ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64'];
 /** The platform package for `platform`/`arch`, or null when none is built. */
 const platformPackage = (platform, arch) => {
   const target = `${platform}-${arch}`;
-  return TARGETS.includes(target) ? `agentdock-runner-${target}` : null;
+  return TARGETS.includes(target) ? `nautelle-runner-${target}` : null;
 };
 
 /** What to print when no binary can be run here. */
@@ -32,11 +32,11 @@ const noMatchMessage = (platform, arch) => {
     ? `the package ${pkg} is not installed (were optional dependencies skipped, e.g. --no-optional or --omit=optional?)`
     : `there is no prebuilt binary for ${platform}-${arch}`;
   return [
-    `agentdock-runner: ${why}.`,
+    `nautelle-runner: ${why}.`,
     '',
     `Supported targets: ${TARGETS.join(', ')}.`,
     'Other ways to install it:',
-    '  brew install andreybegma/tap/agentdock-runner',
+    '  brew install andreybegma/tap/nautelle-runner',
     '  build from source: https://github.com/AndreyBegma/AgentDock/tree/main/apps/runner',
     '',
   ].join('\n');
@@ -47,7 +47,7 @@ const resolveBinary = (platform, arch, resolve) => {
   const pkg = platformPackage(platform, arch);
   if (!pkg) return null;
   try {
-    return resolve(`${pkg}/bin/agentdock-runner`);
+    return resolve(`${pkg}/bin/nautelle-runner`);
   } catch {
     return null;
   }
@@ -76,7 +76,7 @@ const verifyChecksum = ({
     signed = verify(null, sums, publicKey, signature);
   } catch {}
   if (!signed) {
-    throw new Error('SHA256SUMS is not signed by the AgentDock release key');
+    throw new Error('SHA256SUMS is not signed by the Nautelle release key');
   }
   const listed = checksumsOf(sums.toString('utf8'), name);
   if (listed.length === 0) {
@@ -134,7 +134,7 @@ const verifyBinary = (binary, target, dir, publicKey = RELEASE_KEY) => {
   verifyChecksum({
     sums,
     signature,
-    name: `bin/${target}/agentdock-runner`,
+    name: `bin/${target}/nautelle-runner`,
     digest,
     publicKey,
   });
@@ -166,7 +166,7 @@ const main = () => {
     );
   } catch (error) {
     process.stderr.write(
-      `agentdock-runner: refusing to run ${binary}: ${error.message}. Reinstall agentdock-runner; if it happens again, do not run the binary and report it at https://github.com/AndreyBegma/AgentDock/security.\n`,
+      `nautelle-runner: refusing to run ${binary}: ${error.message}. Reinstall nautelle-runner; if it happens again, do not run the binary and report it at https://github.com/AndreyBegma/AgentDock/security.\n`,
     );
     process.exit(1);
   }
@@ -175,7 +175,7 @@ const main = () => {
   } catch (error) {
     if (error.status == null && !error.signal) {
       process.stderr.write(
-        `agentdock-runner: could not run ${binary}: ${error.message}\n`,
+        `nautelle-runner: could not run ${binary}: ${error.message}\n`,
       );
     }
     process.exit(exitCodeOf(error));
@@ -192,6 +192,7 @@ module.exports = {
   noMatchMessage,
   resolveBinary,
   exitCodeOf,
+  main,
 };
 
 if (require.main === module) main();

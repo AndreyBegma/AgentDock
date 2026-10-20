@@ -224,7 +224,7 @@ describe('runner-local policy (ADR-0047)', () => {
     expect(message).toContain('(maxPermissionMode)');
     expect(message).toContain('bypassPermissions');
     expect(message).toContain(
-      'agentdock-runner policy set maxPermissionMode bypassPermissions',
+      'nautelle-runner policy set maxPermissionMode bypassPermissions',
     );
   });
 
@@ -413,7 +413,7 @@ describe('runner-local policy (ADR-0047)', () => {
     expect(store.current()).toEqual(defaultPolicy());
   });
 
-  describe('agentdock-runner policy', () => {
+  describe('nautelle-runner policy', () => {
     it('show prints the effective policy', () => {
       const { code, out } = cli('show');
       expect(code).toBe(0);

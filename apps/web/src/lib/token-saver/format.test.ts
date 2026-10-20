@@ -84,10 +84,10 @@ describe('labels', () => {
 });
 
 describe('mcpChoices (D6)', () => {
-  test('unions the profiles’ servers, sorted, without agentdock', () => {
+  test('unions the profiles’ servers, sorted, without the runner’s own', () => {
     const choices = mcpChoices(
       [
-        { mcpServers: ['playwright', 'agentdock'] },
+        { mcpServers: ['playwright', 'nautelle', 'agentdock'] },
         { mcpServers: ['glitchtip', 'playwright'] },
         {},
       ],

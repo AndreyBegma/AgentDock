@@ -14,7 +14,7 @@ const SAME = (a: PolicyConfig, b: PolicyConfig) =>
 
 /**
  * The daemon's view of the runner-local policy (ADR-0047). It re-reads
- * `runner.json` when the file changed, so `agentdock-runner policy …` takes
+ * `runner.json` when the file changed, so `nautelle-runner policy …` takes
  * effect without a restart. It never writes: the policy has one writer, the
  * CLI. A file that cannot be read gives the safe defaults, never the last
  * policy — a refusal is the failure mode, not an allow.

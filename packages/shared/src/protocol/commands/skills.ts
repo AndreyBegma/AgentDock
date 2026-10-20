@@ -143,7 +143,7 @@ export const profileKeySchema = z
   );
 
 /**
- * A `runs` id (#21). It names `$XDG_STATE_HOME/agentdock/runs/<runId>/` and
+ * A `runs` id (#21). It names `$XDG_STATE_HOME/nautelle/runs/<runId>/` and
  * the `run:<projectId>:<runId>` live topic.
  */
 export const skillRunIdSchema = z
@@ -229,16 +229,20 @@ export const skillPhaseToRunStatus = (
 };
 
 /** D7: the run's tmux session. Never `cs-` — `watch.sh` treats those as slots. */
-export const SKILL_RUN_SESSION_PREFIX = 'agentdock-run-';
+export const SKILL_RUN_SESSION_PREFIX = 'nautelle-run-';
 
 /** The short id a run's session, worktree and branch share. */
 export const skillRunShortIdSchema = z
   .string()
   .regex(/^[a-z0-9]{6,16}$/, 'must match ^[a-z0-9]{6,16}$');
 
+/** A session started before the rename keeps its `agentdock-` name (ADR-0073). */
 export const skillRunSessionSchema = z
   .string()
-  .regex(/^agentdock-run-[a-z0-9]{6,16}$/, 'must be agentdock-run-<shortid>');
+  .regex(
+    /^(?:nautelle|agentdock)-run-[a-z0-9]{6,16}$/,
+    'must be nautelle-run-<shortid>',
+  );
 
 export const skillRunSessionName = (shortId: string): string =>
   SKILL_RUN_SESSION_PREFIX + skillRunShortIdSchema.parse(shortId);

@@ -9,20 +9,20 @@
  *                                      what reaches a browser — the client
  *                                      chunks and the prerendered pages.
  *
- * Names the later rename cards own stay allowed: the `X-AgentDock-*` webhook
- * headers, the `AgentDock-Card` pull request marker, the webhook User-Agent,
- * repository URLs and file paths. Exits 1 and lists the hits when there are
- * any.
+ * Allowed: the legacy `X-AgentDock-*` webhook headers and `AgentDock-Card`
+ * pull request marker, still accepted until runner 0.16.0 (ADR-0073), and the
+ * repository URLs and file paths the infrastructure card renames. Exits 1 and
+ * lists the hits when there are any.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const root = resolve(import.meta.dir, '..');
 
-/** An occurrence that is a name, not the brand: a later card renames it. */
+/** An occurrence that is a name, not the brand: legacy, or a later card's. */
 const ALLOWED = [
   /X-AgentDock-[A-Za-z]+/g,
-  /AgentDock-(?:Card|Webhooks)/g,
+  /AgentDock-Card/g,
   /[\w.-]*\/AgentDock\b/g,
   /\.wt-AgentDock\b/g,
 ];

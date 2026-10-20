@@ -10,7 +10,7 @@ import type { ProfileAgentdock, Runtime } from '../protocol';
 
 /**
  * - `runner_online` — the project's runner is connected;
- * - `plugin` — the agentdock plugin is installed in a profile (one per profile);
+ * - `plugin` — the nautelle plugin is installed in a profile (one per profile);
  * - `plugin_loaded` — sessions of a profile with the plugin do report hooks;
  * - `content` — the project ships session content (ADR-0021);
  * - `capture` — card capture is on (ADR-0026);
@@ -184,7 +184,7 @@ const shellWord = (value: string): string =>
   SAFE_SHELL_WORD.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 
 const setupCommand = (key: string): string =>
-  `agentdock-runner setup claude --profile ${shellWord(key)}`;
+  `nautelle-runner setup claude --profile ${shellWord(key)}`;
 
 const RESTART_NOTE: SetupStep = {
   kind: 'note',
@@ -194,13 +194,13 @@ const RESTART_NOTE: SetupStep = {
 const pluginSteps = (key: string): SetupStep[] => [
   {
     kind: 'command',
-    code: 'agentdock-runner profiles',
+    code: 'nautelle-runner profiles',
     label: 'Find the key: the first column',
   },
   {
     kind: 'command',
     code: setupCommand(key),
-    label: 'Install the agentdock plugin into this profile',
+    label: 'Install the nautelle plugin into this profile',
   },
   RESTART_NOTE,
   { kind: 'note', text: 'A new session then shows as Manual in Sessions.' },
@@ -218,13 +218,13 @@ const unknownProfilePlugin = (): TerminalSetupItem => ({
   steps: [
     {
       kind: 'command',
-      code: 'agentdock-runner profiles',
+      code: 'nautelle-runner profiles',
       label: 'List the profile keys: the first column',
     },
     {
       kind: 'command',
-      code: 'agentdock-runner setup claude --profile <key>',
-      label: 'Install the agentdock plugin into the profile you work in',
+      code: 'nautelle-runner setup claude --profile <key>',
+      label: 'Install the nautelle plugin into the profile you work in',
     },
     RESTART_NOTE,
     { kind: 'note', text: 'A new session then shows as Manual in Sessions.' },
@@ -281,7 +281,7 @@ const profileItems = (profile: TerminalSetupProfileFacts): ProfileItems => {
         RESTART_NOTE,
         {
           kind: 'command',
-          code: 'agentdock-runner status',
+          code: 'nautelle-runner status',
           label: 'Check that the runner is connected',
         },
       ],
@@ -350,7 +350,7 @@ export const terminalSetup = (facts: TerminalSetupFacts): TerminalSetupView => {
         },
         {
           kind: 'command',
-          code: 'agentdock-runner status',
+          code: 'nautelle-runner status',
           label: 'Check that the runner is connected',
         },
       ],

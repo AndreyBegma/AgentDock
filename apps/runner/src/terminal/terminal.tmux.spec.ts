@@ -234,7 +234,7 @@ describe.skipIf(!tmuxInstalled)(
 
     it('attaches to a skill run of the project: read drops input, write types, the session survives; another project is refused', async () => {
       const f = await fixture();
-      const session = 'agentdock-run-abc123';
+      const session = 'nautelle-run-abc123';
       const created = await f.tmux(
         'new-session',
         '-d',

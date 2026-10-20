@@ -4,6 +4,7 @@ import {
   CARD_DIALOG_WAIT_MS,
   CARD_PUSH_MIN_INTERVAL_MS,
   CARD_SESSION_POLL_MS,
+  legacySessionName,
   STEWARD_RESUME_TEXT,
 } from '@nautelle/shared';
 import {
@@ -74,7 +75,7 @@ import { type CardWiring, wireCardRound } from './wiring';
 
 export interface CardExecutorOptions {
   deps: SkillsDeps;
-  /** `$XDG_STATE_HOME/agentdock/cards`, beside the runs. */
+  /** `$XDG_STATE_HOME/nautelle/cards`, beside the runs. */
   cardsDir: string;
   /** The argv that starts this runner: `exec-run <roundDir>` is appended. */
   selfCommand: readonly string[];
@@ -165,7 +166,7 @@ const eventError = (error: unknown): string =>
 
 /**
  * Board card workers (issue #242 D5–D10, ADR-0024). Each card has its own
- * worktree and tmux session `agentdock-card-<shortId>`, where `exec-run`
+ * worktree and tmux session `nautelle-card-<shortId>`, where `exec-run`
  * starts an interactive Claude Code session — a person can attach and type.
  * Outside the orchestrator and outside the skill-run cap: the API limits
  * running cards per project (D13). A round outlives `card.run`; the session
@@ -254,6 +255,9 @@ export class CardExecutor {
         this.setPhase(previous, 'stopped');
       }
       await this.kill(tmuxSession);
+      // ADR-0073: the card's session as an older runner named it.
+      const legacy = legacySessionName(tmuxSession);
+      if (legacy) await this.kill(legacy);
       const record: CardRecord = {
         cardId: args.cardId,
         projectId: args.projectId,

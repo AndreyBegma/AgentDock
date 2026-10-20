@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "nautelle": {
+      "command": "nautelle-runner",
+      "args": ["mcp"]
+    }
+  }
+}

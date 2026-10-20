@@ -10,16 +10,14 @@ describe('WatchRefusalBanner (#691)', () => {
           runnerName: 'laptop',
           runnerStatus: 'online',
           watchRefusal:
-            "refused by this runner's policy (allowedRoots): this runner allows no project root yet. On the runner's machine: `agentdock-runner policy allow-root /srv/dev/widget`",
+            "refused by this runner's policy (allowedRoots): this runner allows no project root yet. On the runner's machine: `nautelle-runner policy allow-root /srv/dev/widget`",
         }}
       />,
     );
     expect(html).toContain('Runner laptop refuses to watch this project.');
     expect(html).toContain('This runner allows no project root yet.');
-    expect(html).toContain(
-      'agentdock-runner policy allow-root /srv/dev/widget',
-    );
-    expect(html).toContain('agentdock-runner policy allow-root --watched');
+    expect(html).toContain('nautelle-runner policy allow-root /srv/dev/widget');
+    expect(html).toContain('nautelle-runner policy allow-root --watched');
   });
 
   test('renders nothing while the runner watches the project', () => {

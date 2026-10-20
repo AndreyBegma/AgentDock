@@ -367,7 +367,7 @@ describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
       expect(notice.text).toContain('no hook event reached Nautelle');
       expect(notice.text).not.toContain('not set up');
       expect(notice.commands.map((c) => c.code)).toEqual([
-        'agentdock-runner status',
+        'nautelle-runner status',
       ]);
       expect(notice.guide).toBe(false);
     }
@@ -378,8 +378,8 @@ describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
       const notice = hooksNotice({ source }, { wiring: null });
       expect(notice.text).toContain('plugin is not set up');
       expect(notice.commands.map((c) => c.code)).toEqual([
-        'agentdock-runner profiles',
-        'agentdock-runner setup claude --profile <key>',
+        'nautelle-runner profiles',
+        'nautelle-runner setup claude --profile <key>',
       ]);
       expect(notice.guide).toBe(true);
     }
@@ -391,7 +391,7 @@ describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
       { wiring: null },
     );
     expect(notice.commands.map((c) => c.code)).toEqual([
-      'agentdock-runner setup claude --profile claude-work',
+      'nautelle-runner setup claude --profile claude-work',
     ]);
     expect(notice.commands[0]?.label).toContain('claude-work');
   });
@@ -404,7 +404,7 @@ describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
       );
       expect(notice.text).toContain('not set up for the profile claude-work');
       expect(notice.commands.map((c) => c.code)).toEqual([
-        'agentdock-runner setup claude --profile claude-work',
+        'nautelle-runner setup claude --profile claude-work',
       ]);
       expect(notice.commands[0]?.label).toContain('restart its sessions');
       expect(JSON.stringify(notice)).not.toContain('<key>');

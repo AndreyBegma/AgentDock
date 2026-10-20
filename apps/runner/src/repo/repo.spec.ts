@@ -255,7 +255,7 @@ describe('repo.read (#622)', () => {
       "refused by this runner's policy (code.deny)",
     );
     expect((error as CommandFailure).message).toContain(
-      'agentdock-runner policy allow-path internal',
+      'nautelle-runner policy allow-path internal',
     );
   });
 
@@ -419,6 +419,7 @@ describe('code.ask (#622)', () => {
     expect(call.prompt).toContain(
       '<question>\nWhere is the invoice total computed?\n</question>',
     );
+    expect(call.env.NAUTELLE_HOOKS).toBe('off');
     expect(call.env.AGENTDOCK_HOOKS).toBe('off');
     expect(call.env.OTEL_RESOURCE_ATTRIBUTES).toContain('agentdock.run=run_1');
   });

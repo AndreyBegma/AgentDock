@@ -161,7 +161,7 @@ enum Runtime {
   codex
 }
 
-/// A machine running the agentdock-runner daemon (docs/specs/6). Status is
+/// A machine running the nautelle-runner daemon (docs/specs/6). Status is
 /// derived from the live socket, never stored. Only hashes of the token live
 /// here; `tokenPrefix` is its first 8 characters, used to find the row.
 model Runner {
@@ -758,7 +758,7 @@ model AgentSession {
   ownerId         String?
   /// Live state from hooks; null for sessions no hook has reported.
   liveState       SessionLiveState?
-  /// `agentdock-manual-*` tmux session from `agentdock-runner claude` (D23).
+  /// `nautelle-manual-*` tmux session from `nautelle-runner claude` (D23).
   tmuxSession     String?
 
   runner               Runner                @relation(fields: [runnerId], references: [id], onDelete: Cascade)
@@ -3396,7 +3396,7 @@ model BoardCardRound {
   /// Nullable so deleting the author keeps the round.
   authorId            String?
   phase               CardRoundPhase   @default(queued)
-  /// `agentdock-card-<shortId>`.
+  /// `nautelle-card-<shortId>`.
   tmuxSession         String?
   /// #367 D3: how the round's session reports (`plugin` | `injected` | `none`),
   /// from `card_run.started`; `null` until that event arrives.
@@ -3784,7 +3784,7 @@ model TokenSaverStat {
   program       String?
   rawBytes      Int
   keptBytes     Int
-  /// `AGENTDOCK_RAW=1`: the command ran unfiltered.
+  /// `NAUTELLE_RAW=1`: the command ran unfiltered.
   bypassed      Boolean
   /// The filter returned the original output.
   passedThrough Boolean

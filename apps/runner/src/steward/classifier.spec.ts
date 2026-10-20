@@ -83,6 +83,7 @@ describe('StewardClassifier (#447 D3)', () => {
       '--session-id',
       result?.sessionId ?? '',
     ]);
+    expect(call?.env.NAUTELLE_HOOKS).toBe('off');
     expect(call?.env.AGENTDOCK_HOOKS).toBe('off');
     expect(call?.env.CLAUDE_CONFIG_DIR).toBe('/home/dev/.claude-work');
     expect(call?.env.OTEL_RESOURCE_ATTRIBUTES).toBe(

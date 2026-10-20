@@ -20,7 +20,9 @@ export const cardBackgroundStalledTitle = (
   }`;
 
 /** D8: the line every card PR body carries, so a PR is traced back to its card. */
-export const CARD_PR_MARKER = 'AgentDock-Card';
+export const CARD_PR_MARKER = 'Nautelle-Card';
+/** The marker of PRs opened before the rename, still recognised (ADR-0073). */
+export const LEGACY_CARD_PR_MARKER = 'AgentDock-Card';
 
 const SLUG_MAX = 40;
 

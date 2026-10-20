@@ -33,7 +33,7 @@ const RECORD: CardRecord = {
   worktree: '/home/dev/.wt-widget-card-ab12cd34',
   branch: 'card/c12-export-csv',
   base: 'main',
-  tmuxSession: 'agentdock-card-ab12cd34',
+  tmuxSession: 'nautelle-card-ab12cd34',
   runId: 'run_1',
   phase: 'running',
   startedAt: '2026-10-16T12:00:00.000Z',
@@ -82,7 +82,7 @@ const setup = (
     cards: {
       record: (cardId) => (cardId === 'card_1' ? RECORD : null),
       liveSession: () =>
-        options.live === false ? null : 'agentdock-card-ab12cd34',
+        options.live === false ? null : 'nautelle-card-ab12cd34',
       typeAtPrompt: async (session, text) => {
         if (options.idle === false) return false;
         typed.push({ session, text });
@@ -103,7 +103,7 @@ const setup = (
         const outcome = options.resume ?? 'resumed';
         return outcome === 'no_worktree'
           ? { outcome }
-          : { outcome, tmuxSession: `agentdock-card-${args.shortId}` };
+          : { outcome, tmuxSession: `nautelle-card-${args.shortId}` };
       },
     },
     watchedProjects: () => [project],
@@ -136,7 +136,7 @@ describe('session.nudge (#447 D9)', () => {
       }),
     ).toEqual({ sent: true });
     expect(t.typed).toEqual([
-      { session: 'agentdock-card-ab12cd34', text: STEWARD_NUDGE_TEXT },
+      { session: 'nautelle-card-ab12cd34', text: STEWARD_NUDGE_TEXT },
     ]);
     expect(t.acted()).toEqual([
       expect.objectContaining({ action: 'nudge', result: 'ok', subject }),
@@ -236,7 +236,7 @@ describe('session.dismiss (#447 D11)', () => {
         dialogId: 'teach-auto-mode',
       }),
     ).toEqual({ dismissed: true });
-    expect(t.keys).toEqual(['agentdock-card-ab12cd34:teach-auto-mode']);
+    expect(t.keys).toEqual(['nautelle-card-ab12cd34:teach-auto-mode']);
     expect(t.acted()).toEqual([
       expect.objectContaining({ action: 'dismiss', result: 'ok' }),
     ]);
@@ -272,7 +272,7 @@ describe('card.resume (#447 D10)', () => {
     const t = setup();
     expect(await t.actions.resume(RESUME)).toEqual({
       outcome: 'resumed',
-      tmuxSession: 'agentdock-card-ab12cd34',
+      tmuxSession: 'nautelle-card-ab12cd34',
     });
     await t.actions.resume(RESUME);
     expect(await t.failure(t.actions.resume(RESUME))).toBe('busy');

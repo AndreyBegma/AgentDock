@@ -83,8 +83,14 @@ export const readCodeSentinel = (
   return null;
 };
 
-/** The installed version of `agentdock@*` — user scope first — or null. */
-const readAgentdockPlugin = (configDir: string): string | null => {
+/**
+ * The installed version of the first plugin whose key starts with one of
+ * `prefixes`, in that order — user scope first — or null.
+ */
+const readPluginVersion = (
+  configDir: string,
+  prefixes: readonly string[],
+): string | null => {
   let raw: unknown;
   try {
     raw = JSON.parse(
@@ -98,14 +104,27 @@ const readAgentdockPlugin = (configDir: string): string | null => {
   }
   const parsed = installedPluginsSchema.safeParse(raw);
   if (!parsed.success) return null;
-  for (const [key, installs] of Object.entries(parsed.data.plugins)) {
-    if (!key.startsWith('agentdock@')) continue;
-    const install =
-      installs.find((i) => i.scope === 'user') ?? installs[0] ?? null;
-    if (install) return install.version;
+  for (const prefix of prefixes) {
+    for (const [key, installs] of Object.entries(parsed.data.plugins)) {
+      if (!key.startsWith(prefix)) continue;
+      const install =
+        installs.find((i) => i.scope === 'user') ?? installs[0] ?? null;
+      if (install) return install.version;
+    }
   }
   return null;
 };
+
+/**
+ * The installed version of the `nautelle` plugin, or null. ADR-0073: one
+ * installed as `agentdock@*` before the rename counts until it is replaced.
+ */
+const readNautellePlugin = (configDir: string): string | null =>
+  readPluginVersion(configDir, ['nautelle@', 'agentdock@']);
+
+/** ADR-0073: whether the plugin is still installed under its old name. */
+export const legacyPluginInstalled = (configDir: string): boolean =>
+  readPluginVersion(configDir, ['agentdock@']) !== null;
 
 const settingsEnvSchema = z.object({
   env: z.record(z.string(), z.unknown()).optional(),
@@ -142,19 +161,19 @@ const readTelemetry = (configDir: string, port: number | null): boolean => {
 };
 
 /**
- * The agentdock plugin and telemetry state of one Claude profile (#281 D1),
+ * The nautelle plugin and telemetry state of one Claude profile (#281 D1),
  * read from its config directory — never a guess.
  */
 export const readProfileAgentdock = (
   configDir: string,
   otlpPort: number | null,
 ): ProfileAgentdock => ({
-  plugin: readAgentdockPlugin(configDir),
+  plugin: readNautellePlugin(configDir),
   telemetry: readTelemetry(configDir, otlpPort),
 });
 
 /**
- * Every Claude profile's agentdock state, by profile id (#348 D4) — the
+ * Every Claude profile's plugin and exporter state, by profile id (#348 D4) — the
  * heartbeat's `profiles`. Reads two JSON files per profile and runs nothing;
  * a Codex profile is never in it.
  */

@@ -46,10 +46,10 @@ const defaultIo = (deps: LocalCommandDeps): ClaudeIo => ({
 });
 
 /**
- * `agentdock-runner claude [-- <args>]` (spec 201 D23): `claude` in an
- * `agentdock-manual-<hex>` tmux session the browser can attach to. Without a
+ * `nautelle-runner claude [-- <args>]` (spec 201 D23): `claude` in an
+ * `nautelle-manual-<hex>` tmux session the browser can attach to. Without a
  * terminal or without tmux it is plain `claude <args>`. Every command is an
- * argv, never a shell string; `AGENTDOCK_TMUX_SESSION` tells the
+ * argv, never a shell string; `NAUTELLE_TMUX_SESSION` tells the
  * `SessionStart` hook which session to report.
  */
 export const runClaude = async (
@@ -71,13 +71,13 @@ export const runClaude = async (
     '-c',
     deps.cwd,
     '-e',
-    `AGENTDOCK_TMUX_SESSION=${name}`,
+    `NAUTELLE_TMUX_SESSION=${name}`,
     'claude',
     ...claudeArgs,
   ]);
   if (!created || created.code !== 0) {
     deps.stderr(
-      `agentdock-runner: cannot start tmux session ${name}: ${created?.stderr.trim() || 'tmux failed'}\n`,
+      `nautelle-runner: cannot start tmux session ${name}: ${created?.stderr.trim() || 'tmux failed'}\n`,
     );
     return 1;
   }

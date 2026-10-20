@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "bin": {
-    "agentdock-runner": "./dist/agentdock-runner"
+    "nautelle-runner": "./dist/nautelle-runner"
   },
   "scripts": {
-    "build": "tsc --noEmit && bun build --compile --splitting --format=esm src/main.ts --outfile dist/agentdock-runner",
+    "build": "tsc --noEmit && bun build --compile --splitting --format=esm src/main.ts --outfile dist/nautelle-runner",
     "lint": "biome lint src",
     "test": "tsc --noEmit && bun test"
   },

@@ -40,7 +40,7 @@ describe('Steward (e2e)', () => {
           'session.dismiss': { dismissed: true },
           'card.resume': {
             outcome: 'resumed',
-            tmuxSession: 'agentdock-card-abcd1234',
+            tmuxSession: 'nautelle-card-abcd1234',
           },
           'digest.compose': { prose: 'Nothing happened.' },
         };
@@ -503,7 +503,7 @@ describe('Steward (e2e)', () => {
         projectId: w.a,
         at: new Date().toISOString(),
         phase: 'running',
-        tmuxSession: 'agentdock-card-abcd1234',
+        tmuxSession: 'nautelle-card-abcd1234',
       });
       expect(
         (

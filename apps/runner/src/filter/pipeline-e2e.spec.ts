@@ -115,7 +115,7 @@ describe('Token saver on pipelines and lists (#610)', () => {
     // tail reads what the filter printed: the passing lines are gone.
     expect(filtered.out).not.toContain('ok 50 - passes');
     expect(filtered.out).toContain('not ok 51 - fails');
-    expect(filtered.out).toContain('[agentdock filter:');
+    expect(filtered.out).toContain('[nautelle filter:');
     // A failing first stage: `$?` is tail's, PIPESTATUS keeps the 1.
     expect(original.status).toBe('status 0 1 0');
     expect(filtered.status).toBe(original.status);
@@ -137,7 +137,7 @@ describe('Token saver on pipelines and lists (#610)', () => {
   });
 
   it('stays quiet when `| head` closes the pipe, as the command does', () => {
-    const command = 'AGENTDOCK_RAW=1 ./demo.sh big | head -2';
+    const command = 'NAUTELLE_RAW=1 ./demo.sh big | head -2';
     const original = run(command);
     const filtered = run(rewrite(command));
     expect(original).toEqual({

@@ -7,7 +7,7 @@ import { createLogger, type Logger } from '../log';
 
 /** A fresh directory, removed by the returned cleanup. */
 export const tempDir = (): { dir: string; cleanup: () => void } => {
-  const dir = mkdtempSync(join(tmpdir(), 'agentdock-runner-'));
+  const dir = mkdtempSync(join(tmpdir(), 'nautelle-runner-'));
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 };
 

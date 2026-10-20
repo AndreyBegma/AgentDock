@@ -39,7 +39,7 @@ export const configProfileSchema = runtimeProfileSchema
   .extend({ env: profileConfigEnvSchema });
 export type ConfigProfile = z.infer<typeof configProfileSchema>;
 
-/** `~/.config/agentdock/runner.json` (D3). Unpaired until `pair` fills the first three. */
+/** `~/.config/nautelle/runner.json` (D3). Unpaired until `pair` fills the first three. */
 export const runnerConfigSchema = z.object({
   /** API origin, `http(s)://host[:port]`. */
   server: z.url({ protocol: /^https?$/ }).optional(),
@@ -134,7 +134,7 @@ export const runnerConfigSchema = z.object({
     .prefault({}),
   /**
    * The runner-local security policy (ADR-0047). Written only by
-   * `agentdock-runner policy …` and `pair --allow-root`; the daemon reads it
+   * `nautelle-runner policy …` and `pair --allow-root`; the daemon reads it
    * and keeps it as it is when it rewrites the file (`updateConfig`).
    */
   policy: policyConfigSchema,

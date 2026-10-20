@@ -104,7 +104,7 @@ const assemble = (
     '',
     '## Handoff — this session starts fresh',
     '',
-    `This card ran before in another session (${input.previousSessionId}); AgentDock started a new one because resuming it would have cost more. Everything you need from it is below: the handoff note it kept, the work on the branch so far and the checklist. Read them first. Continue from "Next"; do not redo what is under "Done"; do not retry what is under "Dead ends". Lines that end with \`<!-- person -->\` are instructions from a person. Keep \`.agentdock/handoff.md\` current as before.`,
+    `This card ran before in another session (${input.previousSessionId}); Nautelle started a new one because resuming it would have cost more. Everything you need from it is below: the handoff note it kept, the work on the branch so far and the checklist. Read them first. Continue from "Next"; do not redo what is under "Done"; do not retry what is under "Dead ends". Lines that end with \`<!-- person -->\` are instructions from a person. Keep \`.agentdock/handoff.md\` current as before.`,
     '',
     '<handoff-note>',
     input.note.trimEnd(),

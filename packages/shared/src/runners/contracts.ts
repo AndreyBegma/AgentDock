@@ -158,4 +158,4 @@ export type PingResult =
 
 /** The install / pair command shown with a pairing code. */
 export const pairCommand = (server: string, code: string): string =>
-  `agentdock-runner pair --server ${server} --code ${code}`;
+  `nautelle-runner pair --server ${server} --code ${code}`;

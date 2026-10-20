@@ -145,6 +145,7 @@ describe('StewardDigestWriter (#491)', () => {
       '--session-id',
       ARGS.sessionId,
     ]);
+    expect(call?.env.NAUTELLE_HOOKS).toBe('off');
     expect(call?.env.AGENTDOCK_HOOKS).toBe('off');
     expect(call?.env.CLAUDE_CONFIG_DIR).toBe('/home/dev/.claude-work');
     // D16: the spend is the API's `steward` run's.

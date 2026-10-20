@@ -5,10 +5,7 @@ import {
   HANDOFF_NOTE_MAX_TOKENS,
   HANDOFF_NOTE_TEMPLATE,
 } from '@nautelle/shared';
-import {
-  AGENTDOCK_HOOKS_ENV,
-  AGENTDOCK_HOOKS_OFF,
-} from '@nautelle/shared/protocol';
+import { HOOKS_OFF_ENV } from '@nautelle/shared/protocol';
 import {
   bunSpawn,
   CAPTURE_CLAUDE_FLAGS,
@@ -59,7 +56,7 @@ export const unwrapNote = (text: string): string => {
 };
 
 export interface HandoffWriterOptions {
-  /** `$XDG_STATE_HOME/agentdock/handoff`: one directory per call, deleted at its end. */
+  /** `$XDG_STATE_HOME/nautelle/handoff`: one directory per call, deleted at its end. */
   dir: string;
   env: Env;
   clock: Clock;
@@ -73,7 +70,7 @@ export interface HandoffWriterOptions {
  * D2: a dead session's note, written by haiku from its transcript, locally on
  * the round's own profile — the `StewardClassifier` precedent: one headless
  * `claude -p --tools ""` with the prompt on stdin, in a directory of its own,
- * with `AGENTDOCK_HOOKS=off`. The prompt carries session content, so its file
+ * with `NAUTELLE_HOOKS=off`. The prompt carries session content, so its file
  * is deleted when the call ends and neither is logged. Resolves `null` on any
  * failure; the caller validates what it gets like any other note.
  */
@@ -112,7 +109,7 @@ export class HandoffWriter {
         /[^A-Za-z0-9_.-]/g,
         (c) => encodeURIComponent(c),
       )}`;
-      env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
+      Object.assign(env, HOOKS_OFF_ENV);
       const proc = (this.options.spawn ?? bunSpawn)({
         command: [
           profile.binary ?? profile.runtime,

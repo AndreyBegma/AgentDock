@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import shim from './agentdock-runner.js';
+import shim from './nautelle-runner.js';
 
 const sha256 = (data: string | Buffer) =>
   createHash('sha256').update(data).digest('hex');
@@ -33,16 +33,16 @@ const missing = (path: string): string => {
 describe('the npm shim', () => {
   it('maps each supported platform to its package', () => {
     expect(shim.platformPackage('darwin', 'arm64')).toBe(
-      'agentdock-runner-darwin-arm64',
+      'nautelle-runner-darwin-arm64',
     );
     expect(shim.platformPackage('darwin', 'x64')).toBe(
-      'agentdock-runner-darwin-x64',
+      'nautelle-runner-darwin-x64',
     );
     expect(shim.platformPackage('linux', 'x64')).toBe(
-      'agentdock-runner-linux-x64',
+      'nautelle-runner-linux-x64',
     );
     expect(shim.platformPackage('linux', 'arm64')).toBe(
-      'agentdock-runner-linux-arm64',
+      'nautelle-runner-linux-arm64',
     );
   });
 
@@ -54,7 +54,7 @@ describe('the npm shim', () => {
 
   it('resolves the binary inside the platform package', () => {
     expect(shim.resolveBinary('linux', 'x64', found)).toBe(
-      '/node_modules/agentdock-runner-linux-x64/bin/agentdock-runner',
+      '/node_modules/nautelle-runner-linux-x64/bin/nautelle-runner',
     );
   });
 
@@ -66,13 +66,13 @@ describe('the npm shim', () => {
     const message = shim.noMatchMessage('win32', 'x64');
     expect(message).toContain('no prebuilt binary for win32-x64');
     for (const target of shim.TARGETS) expect(message).toContain(target);
-    expect(message).toContain('brew install andreybegma/tap/agentdock-runner');
+    expect(message).toContain('brew install andreybegma/tap/nautelle-runner');
     expect(message).toContain('build from source');
   });
 
   it('on a supported platform without its package, says optional dependencies were skipped', () => {
     expect(shim.noMatchMessage('linux', 'arm64')).toContain(
-      'agentdock-runner-linux-arm64 is not installed',
+      'nautelle-runner-linux-arm64 is not installed',
     );
   });
 
@@ -93,10 +93,10 @@ describe('the npm shim', () => {
 
   describe('verifying a checksum', () => {
     const key = testKey();
-    const name = 'bin/linux-x64/agentdock-runner';
+    const name = 'bin/linux-x64/nautelle-runner';
     const digest = 'a'.repeat(64);
     const sums = Buffer.from(
-      `${'b'.repeat(64)}  agentdock-runner-1.0.0-linux-x64.tar.gz\n${digest} *${name}\n`,
+      `${'b'.repeat(64)}  nautelle-runner-1.0.0-linux-x64.tar.gz\n${digest} *${name}\n`,
     );
     const check =
       (overrides: Record<string, unknown> = {}) =>
@@ -118,8 +118,8 @@ describe('the npm shim', () => {
       expect(check({ digest: 'c'.repeat(64) })).toThrow(
         `${name} does not match its checksum in SHA256SUMS`,
       );
-      expect(check({ name: 'bin/darwin-x64/agentdock-runner' })).toThrow(
-        'SHA256SUMS lists no checksum for bin/darwin-x64/agentdock-runner',
+      expect(check({ name: 'bin/darwin-x64/nautelle-runner' })).toThrow(
+        'SHA256SUMS lists no checksum for bin/darwin-x64/nautelle-runner',
       );
     });
 
@@ -133,36 +133,36 @@ describe('the npm shim', () => {
           signature: key.sign(sums),
           digest: 'c'.repeat(64),
         }),
-      ).toThrow('SHA256SUMS is not signed by the AgentDock release key');
+      ).toThrow('SHA256SUMS is not signed by the Nautelle release key');
     });
 
     it('refuses a SHA256SUMS signed by another key', () => {
       const other = testKey();
       expect(check({ signature: other.sign(sums) })).toThrow(
-        'not signed by the AgentDock release key',
+        'not signed by the Nautelle release key',
       );
       expect(check({ signature: Buffer.alloc(0) })).toThrow(
-        'not signed by the AgentDock release key',
+        'not signed by the Nautelle release key',
       );
     });
 
     it('trusts only the release key by default', () => {
       expect(check({ publicKey: undefined })).toThrow(
-        'not signed by the AgentDock release key',
+        'not signed by the Nautelle release key',
       );
     });
   });
 
   describe('verifying a binary', () => {
     const key = testKey();
-    const root = mkdtempSync(join(tmpdir(), 'agentdock-verify-'));
+    const root = mkdtempSync(join(tmpdir(), 'nautelle-verify-'));
     afterAll(() => rmSync(root, { recursive: true, force: true }));
-    const binary = join(root, 'agentdock-runner');
+    const binary = join(root, 'nautelle-runner');
     const release = (content: string) => {
       writeFileSync(binary, content);
       rmSync(`${binary}.verified`, { force: true });
       const sums = Buffer.from(
-        `${sha256(content)}  bin/linux-x64/agentdock-runner\n`,
+        `${sha256(content)}  bin/linux-x64/nautelle-runner\n`,
       );
       writeFileSync(join(root, 'SHA256SUMS'), sums);
       writeFileSync(join(root, 'SHA256SUMS.sig'), key.sign(sums));
@@ -185,7 +185,7 @@ describe('the npm shim', () => {
       writeFileSync(binary, 'a malicious binary');
       utimesSync(binary, new Date(), new Date(Date.now() + 5_000));
       expect(verifyIt).toThrow(
-        'bin/linux-x64/agentdock-runner does not match its checksum',
+        'bin/linux-x64/nautelle-runner does not match its checksum',
       );
     });
 
@@ -197,40 +197,40 @@ describe('the npm shim', () => {
   });
 
   describe('installed, under node', () => {
-    const root = mkdtempSync(join(tmpdir(), 'agentdock-shim-'));
+    const root = mkdtempSync(join(tmpdir(), 'nautelle-shim-'));
     afterAll(() => rmSync(root, { recursive: true, force: true }));
 
     const modules = join(root, 'node_modules');
     const shimPath = join(
       modules,
-      'agentdock-runner',
+      'nautelle-runner',
       'bin',
-      'agentdock-runner.js',
+      'nautelle-runner.js',
     );
     mkdirSync(dirname(shimPath), { recursive: true });
     // The installed shim trusts a test key in place of the release key.
     const key = testKey();
     writeFileSync(
       shimPath,
-      readFileSync(
-        join(import.meta.dir, 'agentdock-runner.js'),
-        'utf8',
-      ).replace(shim.RELEASE_KEY, key.publicKey),
+      readFileSync(join(import.meta.dir, 'nautelle-runner.js'), 'utf8').replace(
+        shim.RELEASE_KEY,
+        key.publicKey,
+      ),
     );
     const target = `${process.platform}-${process.arch}`;
     const binary = join(
       modules,
-      `agentdock-runner-${target}`,
+      `nautelle-runner-${target}`,
       'bin',
-      'agentdock-runner',
+      'nautelle-runner',
     );
 
     const script = '#!/bin/sh\nprintf "%s|" "$@"\nexit 78\n';
     const writeRelease = (listed: string) => {
       const sums = Buffer.from(
-        `${sha256(listed)}  bin/${target}/agentdock-runner\n`,
+        `${sha256(listed)}  bin/${target}/nautelle-runner\n`,
       );
-      const wrapper = join(modules, 'agentdock-runner');
+      const wrapper = join(modules, 'nautelle-runner');
       writeFileSync(join(wrapper, 'SHA256SUMS'), sums);
       writeFileSync(join(wrapper, 'SHA256SUMS.sig'), key.sign(sums));
     };
@@ -264,7 +264,7 @@ describe('the npm shim', () => {
       expect(run.exitCode).toBe(1);
       expect(run.stdout.toString()).toBe('');
       expect(run.stderr.toString()).toContain(
-        `refusing to run ${binary}: bin/${target}/agentdock-runner does not match its checksum in SHA256SUMS`,
+        `refusing to run ${binary}: bin/${target}/nautelle-runner does not match its checksum in SHA256SUMS`,
       );
       expect(existsSync(`${binary}.verified`)).toBe(false);
     });

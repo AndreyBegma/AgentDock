@@ -87,7 +87,7 @@ const createDraftPullRequest = async (
   deps: GitDeps,
   pr: { github: string; base: string; branch: string } & CardDraftPullRequest,
 ): Promise<{ number: number; url: string }> => {
-  const dir = mkdtempSync(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
+  const dir = mkdtempSync(join(deps.tempRoot ?? tmpdir(), 'nautelle-pr-'));
   try {
     const bodyFile = join(dir, 'body.md');
     writeFileSync(bodyFile, pr.body, { mode: 0o600 });

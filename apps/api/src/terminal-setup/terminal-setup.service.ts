@@ -45,7 +45,7 @@ export class TerminalSetupService {
   /**
    * #719: hide a profile from Nautelle on the project's runner, or show it
    * again — every project on that runner. Kept by the server only: the
-   * runner's local policy and `agentdock-runner profiles` are unchanged.
+   * runner's local policy and `nautelle-runner profiles` are unchanged.
    */
   async setIgnored(
     projectId: string,

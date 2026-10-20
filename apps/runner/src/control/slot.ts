@@ -42,7 +42,7 @@ export const messageFileContent = (
   args: Pick<SlotMessageArgs, 'from' | 'text'>,
   at: string,
 ): string =>
-  `From: ${args.from} via AgentDock\nDate: ${at}\n\n${args.text.replace(/\n*$/, '\n')}`;
+  `From: ${args.from} via Nautelle\nDate: ${at}\n\n${args.text.replace(/\n*$/, '\n')}`;
 
 /**
  * Replaces `path` atomically: a new file beside it (`wx`, so nothing existing

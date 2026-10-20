@@ -169,7 +169,7 @@ describe('Telegram: a waiting card answered from the chat (#489 M2, e2e)', () =>
             cardBody: '',
             cardKind: 'feature',
             phase: 'waiting',
-            tmuxSession: 'agentdock-card-ab12cd34',
+            tmuxSession: 'nautelle-card-ab12cd34',
             ...(question ? { pendingQuestion: question } : {}),
           },
         },

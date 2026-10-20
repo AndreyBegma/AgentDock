@@ -105,7 +105,7 @@ describe('steward.observed (#447 D6, D12)', () => {
     expect(
       stewardObservedDataSchema.safeParse({
         ...observed,
-        subject: { ...card, tmuxSession: 'agentdock-card-abcd1234' },
+        subject: { ...card, tmuxSession: 'nautelle-card-abcd1234' },
       }).success,
     ).toBe(false);
   });

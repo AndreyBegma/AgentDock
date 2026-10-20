@@ -21,7 +21,7 @@ export const REDACTED = '[redacted]';
 const SECRET_KEYS = new Set(['token', 'authorization']);
 
 export const parseLogLevel = (env: Env): LogLevel => {
-  const value = env.AGENTDOCK_LOG?.toLowerCase();
+  const value = env.NAUTELLE_LOG?.toLowerCase();
   return LOG_LEVELS.find((l) => l === value) ?? 'info';
 };
 

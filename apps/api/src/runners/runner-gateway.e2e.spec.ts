@@ -154,7 +154,7 @@ describe('/runner gateway (e2e)', () => {
 
     it('C-108: replacing a live socket is audited with both peers and told to admins', async () => {
       const { runnerId, token } = await pairedRunner(ctx, admin);
-      const first = open(token, { 'User-Agent': 'agentdock-runner/1 (real)' });
+      const first = open(token, { 'User-Agent': 'nautelle-runner/1 (real)' });
       await first.connect();
       const second = open(token, { 'User-Agent': 'impostor/0.1' });
       await second.connect();
@@ -178,7 +178,7 @@ describe('/runner gateway (e2e)', () => {
           ip: '127.0.0.1',
           userAgent: 'impostor/0.1',
           previousIp: '127.0.0.1',
-          previousUserAgent: 'agentdock-runner/1 (real)',
+          previousUserAgent: 'nautelle-runner/1 (real)',
         },
       });
       const notification = await eventually('the admin notification', () =>

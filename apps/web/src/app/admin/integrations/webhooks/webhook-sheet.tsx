@@ -443,7 +443,7 @@ export function WebhookSheet({
                   <p className="text-xs text-ink-3">
                     Each request carries{' '}
                     <code className="font-mono">
-                      X-AgentDock-Signature: t=&lt;unix&gt;,v1=&lt;hex&gt;
+                      X-Nautelle-Signature: t=&lt;unix&gt;,v1=&lt;hex&gt;
                     </code>
                     , where hex is HMAC-SHA256 of{' '}
                     <code className="font-mono">

@@ -27,7 +27,7 @@ export const acquireLock = (path: string, pid = process.pid): (() => void) => {
     }
     const owner = Number.parseInt(readFileSync(path, 'utf8'), 10);
     if (Number.isInteger(owner) && owner !== pid && isAlive(owner)) {
-      throw new LockError(`another agentdock-runner is running (pid ${owner})`);
+      throw new LockError(`another nautelle-runner is running (pid ${owner})`);
     }
     rmSync(path, { force: true });
   }

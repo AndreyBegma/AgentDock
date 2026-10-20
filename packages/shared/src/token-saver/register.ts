@@ -1,6 +1,6 @@
 /**
  * #663 D2, D3 (ADR-0068, amends ADR-0039 §4): the one terse register. It is
- * printed by `agentdock-runner register`, embedded in the card worker prompt,
+ * printed by `nautelle-runner register`, embedded in the card worker prompt,
  * and used by the plugin whenever the runner is installed. Change the text
  * here and nowhere else; a test pins the card worker prompt to it.
  */
@@ -28,5 +28,5 @@ export const TERSE_REGISTER_LINES: readonly string[] = [
   `- Full sentences, every required section: ${REGISTER_FULL_PROSE_EXEMPTIONS.join(', ')}.`,
 ];
 
-/** The register as printed by `agentdock-runner register`. */
+/** The register as printed by `nautelle-runner register`. */
 export const TERSE_REGISTER = TERSE_REGISTER_LINES.join('\n');

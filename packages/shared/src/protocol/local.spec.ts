@@ -217,7 +217,7 @@ describe('hook events (spec 201 D11)', () => {
         cwd: '/home/u/dev/app',
         gitBranch: 'feat/184-grill-rounds',
         permissionMode: 'default',
-        tmuxSession: 'agentdock-manual-0a1b2c3d',
+        tmuxSession: 'nautelle-manual-0a1b2c3d',
       }),
     );
     expect(parsed?.ok).toBe(true);

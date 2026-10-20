@@ -60,7 +60,7 @@ export class TerminalTicketDto implements TerminalTicketRequest {
   })
   runId?: string;
 
-  /** Required for `manual`: the Claude session of `agentdock-runner claude` (spec 201 D23). Another kind with it is 400. */
+  /** Required for `manual`: the Claude session of `nautelle-runner claude` (spec 201 D23). Another kind with it is 400. */
   @ValidateIf(
     (dto: TerminalTicketDto) =>
       dto.kind === 'manual' || dto.sessionId !== undefined,

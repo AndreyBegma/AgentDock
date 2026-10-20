@@ -7,7 +7,7 @@ import { useTerminalAvailable } from '../../lib/terminal/use-terminal-available'
 import { TerminalSheet } from '../terminal/terminal-sheet';
 
 /**
- * Attach to a manual session started by `agentdock-runner claude` (spec 201
+ * Attach to a manual session started by `nautelle-runner claude` (spec 201
  * D23, spec 29). Offered to an admin when the session reported a tmux session
  * and its runner can attach; it opens read-only, like every attach.
  */

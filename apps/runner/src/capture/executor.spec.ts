@@ -101,7 +101,7 @@ const setup = (script: Script = { stdout: resultLine('ok') }) => {
     log: memoryLogger().log,
     spawn,
     home: dir,
-    selfCommand: ['/opt/agentdock-runner'],
+    selfCommand: ['/opt/nautelle-runner'],
   });
   const args = (over: Partial<CardsExtractArgs> = {}): CardsExtractArgs => ({
     runId: 'run_1',
@@ -192,6 +192,7 @@ describe('CaptureExecutor (#244 D4)', () => {
     expect(call.cwd).toBe(join(t.capturesDir, 'run_1'));
     expect(call.cwd.startsWith(`${t.root}/`)).toBe(false);
     // The profile's own AGENTDOCK_HOOKS=on cannot win.
+    expect(call.env.NAUTELLE_HOOKS).toBe('off');
     expect(call.env.AGENTDOCK_HOOKS).toBe('off');
     expect(call.env.CLAUDE_CONFIG_DIR).toBe('/profile');
     expect(call.env.PATH).toBe('/bin');

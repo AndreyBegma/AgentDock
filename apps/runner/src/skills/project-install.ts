@@ -145,7 +145,7 @@ export const installProjectSkill = async (
     base,
   ]);
   const bodyDir = await mkdtemp(
-    join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'),
+    join(deps.tempRoot ?? tmpdir(), 'nautelle-pr-'),
   );
   try {
     writeSkillDir(

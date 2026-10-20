@@ -51,10 +51,10 @@ describe('manifests', () => {
       owner: { name: string };
       plugins: { name: string; source: string }[];
     };
-    expect(m.name).toBe('agentdock');
+    expect(m.name).toBe('nautelle');
     expect(m.owner.name).toBeTruthy();
     expect(m.plugins).toHaveLength(1);
-    expect(m.plugins[0]?.name).toBe('agentdock');
+    expect(m.plugins[0]?.name).toBe('nautelle');
     const source = m.plugins[0]?.source ?? '';
     expect(source.startsWith('./')).toBe(true);
     expect(
@@ -62,18 +62,18 @@ describe('manifests', () => {
     ).toBe(true);
   });
 
-  test('plugin.json is named agentdock', () => {
+  test('plugin.json is named nautelle', () => {
     const p = readJson(join(pluginDir, '.claude-plugin/plugin.json'));
-    expect(p.name).toBe('agentdock');
+    expect(p.name).toBe('nautelle');
     expect(typeof p.version).toBe('string');
   });
 
-  test('.mcp.json runs agentdock-runner mcp as server "agentdock"', () => {
+  test('.mcp.json runs nautelle-runner mcp as server "nautelle"', () => {
     const m = readJson(join(pluginDir, '.mcp.json')) as {
       mcpServers: Record<string, { command: string; args: string[] }>;
     };
-    expect(m.mcpServers.agentdock).toEqual({
-      command: 'agentdock-runner',
+    expect(m.mcpServers.nautelle).toEqual({
+      command: 'nautelle-runner',
       args: ['mcp'],
     });
   });
@@ -83,7 +83,7 @@ describe('manifests', () => {
       const text = readFileSync(join(pluginDir, `commands/${name}.md`), 'utf8');
       expect(text.startsWith('---\n')).toBe(true);
       expect(text).toContain('description:');
-      expect(text).toContain(`mcp__plugin_agentdock_agentdock__${name}`);
+      expect(text).toContain(`mcp__plugin_nautelle_nautelle__${name}`);
     }
   });
 });
@@ -102,7 +102,7 @@ describe('track-work skill (#282)', () => {
   });
 
   test('tells the model to call track_card once and what is not work', () => {
-    expect(skill).toContain('mcp__plugin_agentdock_agentdock__track_card');
+    expect(skill).toContain('mcp__plugin_nautelle_nautelle__track_card');
     expect(skill).toContain('once');
     expect(skill).toContain('Questions');
     expect(skill).toContain('not_a_manual_session');
@@ -110,7 +110,7 @@ describe('track-work skill (#282)', () => {
 
   test('plugin version is bumped for the PreCompact hook (#494)', () => {
     const p = readJson(join(pluginDir, '.claude-plugin/plugin.json'));
-    expect(p.version).toBe('0.3.0');
+    expect(p.version).toBe('0.4.0');
   });
 });
 
@@ -130,7 +130,7 @@ describe('hooks.json shape', () => {
       const h = entries[0] as HookEntry;
       expect(h.type).toBe('command');
       expect(h.command).toBe(
-        `command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook ${arg} || true`,
+        `command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook ${arg} || true`,
       );
       if (sync) {
         expect(h.async).toBeUndefined();
@@ -142,9 +142,9 @@ describe('hooks.json shape', () => {
   }
 });
 
-describe('hooks are silent without agentdock-runner on PATH', () => {
-  // A PATH with only the basics the shell needs, and no agentdock-runner.
-  const emptyBin = mkdtempSync(join(tmpdir(), 'agentdock-nobin-'));
+describe('hooks are silent without nautelle-runner on PATH', () => {
+  // A PATH with only the basics the shell needs, and no nautelle-runner.
+  const emptyBin = mkdtempSync(join(tmpdir(), 'nautelle-nobin-'));
 
   for (const [event, groups] of Object.entries(hooksFile.hooks)) {
     test(event, () => {
@@ -160,9 +160,9 @@ describe('hooks are silent without agentdock-runner on PATH', () => {
   }
 
   test('with the binary present, the hook is invoked with the event argument', () => {
-    const bin = mkdtempSync(join(tmpdir(), 'agentdock-stub-'));
+    const bin = mkdtempSync(join(tmpdir(), 'nautelle-stub-'));
     const log = join(bin, 'argv.log');
-    const stub = join(bin, 'agentdock-runner');
+    const stub = join(bin, 'nautelle-runner');
     writeFileSync(stub, `#!/bin/sh\necho "$@" > "${log}"\n`);
     chmodSync(stub, 0o755);
     const command = hooksFile.hooks.SessionStart?.[0]?.hooks[0]

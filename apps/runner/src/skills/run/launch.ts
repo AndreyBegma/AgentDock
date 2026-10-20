@@ -107,6 +107,6 @@ export const skillTokenSaver = (
     runKind: 'skill',
     projectId: args.projectId,
     runId: args.runId,
-    agentdock: [],
+    runnerMcp: [],
     scout: true,
   });

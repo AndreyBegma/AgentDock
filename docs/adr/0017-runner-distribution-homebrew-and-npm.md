@@ -1,6 +1,6 @@
 # ADR-0017: The runner ships as prebuilt binaries through Homebrew and npm
 
-Status: accepted · Date: 2026-10-13
+Status: accepted · Date: 2026-10-13 · Amended by [ADR-0073](0073-the-runner-and-its-protocol-are-renamed-nautelle-with-a-compatibility-window.md) (the package, binary and formula are renamed `nautelle-runner`)
 
 ## Context
 

@@ -3,7 +3,7 @@ import type { TerminalTarget } from '@nautelle/shared/protocol';
 import type { Exec } from '../detect/exec';
 import { type ResolveDeps, resolveTerminalTarget } from './resolve';
 
-const SESSION = 'agentdock-card-ab12cd34';
+const SESSION = 'nautelle-card-ab12cd34';
 const project = { id: 'prj_1', root: '/home/u/dev/app' };
 const other = { id: 'prj_2', root: '/home/u/dev/other' };
 
@@ -32,13 +32,13 @@ const cards: Record<string, { projectId: string; root: string }> = {
 };
 
 const deps = (over: Partial<ResolveDeps> = {}): ResolveDeps => ({
-  exec: tmuxWith(SESSION, 'agentdock-card-zz99yy88'),
+  exec: tmuxWith(SESSION, 'nautelle-card-zz99yy88'),
   watchedProjects: () => [project, other],
   cardSession: (projectId, root, cardId) => {
     const card = cards[cardId];
     if (!card || card.projectId !== projectId || card.root !== root)
       return null;
-    return cardId === 'card_1' ? SESSION : 'agentdock-card-zz99yy88';
+    return cardId === 'card_1' ? SESSION : 'nautelle-card-zz99yy88';
   },
   ...over,
 });
@@ -50,7 +50,7 @@ const code = async (promise: Promise<unknown>) =>
   );
 
 describe('resolving a card terminal target (#242)', () => {
-  it("resolves the card's agentdock-card-* session", async () => {
+  it("resolves the card's nautelle-card-* session", async () => {
     expect(await resolveTerminalTarget(target, deps())).toBe(SESSION);
   });
 
@@ -72,7 +72,7 @@ describe('resolving a card terminal target (#242)', () => {
     ).toBe('not_found');
   });
 
-  it('refuses a looked-up name that is not agentdock-card-<shortid>', async () => {
+  it('refuses a looked-up name that is not nautelle-card-<shortid>', async () => {
     const bad = deps({
       cardSession: () => 'cs-main',
       exec: tmuxWith('cs-main'),

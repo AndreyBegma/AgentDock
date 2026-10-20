@@ -92,7 +92,7 @@ describe('card.resume (D10)', () => {
     expect(
       cardResumeResultSchema.safeParse({
         outcome: 'resumed',
-        tmuxSession: 'agentdock-card-abcd1234',
+        tmuxSession: 'nautelle-card-abcd1234',
       }).success,
     ).toBe(true);
     expect(

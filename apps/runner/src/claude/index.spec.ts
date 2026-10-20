@@ -29,7 +29,7 @@ const setup = (opts: { isTTY: boolean; tmux: boolean; attach?: number }) => {
   return { deps, io, execCalls, inherited };
 };
 
-describe('agentdock-runner claude (spec 201 D23)', () => {
+describe('nautelle-runner claude (spec 201 D23)', () => {
   it('starts claude in a manual tmux session and attaches to it', async () => {
     const t = setup({ isTTY: true, tmux: true, attach: 3 });
     const code = await runClaude(['--', '--resume', 'x'], t.deps, t.io);
@@ -40,18 +40,18 @@ describe('agentdock-runner claude (spec 201 D23)', () => {
         'new-session',
         '-d',
         '-s',
-        'agentdock-manual-0a1b2c3d',
+        'nautelle-manual-0a1b2c3d',
         '-c',
         '/home/u/dev/app',
         '-e',
-        'AGENTDOCK_TMUX_SESSION=agentdock-manual-0a1b2c3d',
+        'NAUTELLE_TMUX_SESSION=nautelle-manual-0a1b2c3d',
         'claude',
         '--resume',
         'x',
       ],
     ]);
     expect(t.inherited).toEqual([
-      ['tmux', ['attach-session', '-t', 'agentdock-manual-0a1b2c3d']],
+      ['tmux', ['attach-session', '-t', 'nautelle-manual-0a1b2c3d']],
     ]);
   });
 

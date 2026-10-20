@@ -377,7 +377,7 @@ describe('LocalService — card rounds after a restart (#482)', () => {
     worktree: WORKTREE,
     branch: 'fix/1-x',
     base: 'develop',
-    tmuxSession: 'agentdock-card-abc12345',
+    tmuxSession: 'nautelle-card-abc12345',
     runId: 'run_1',
     phase: 'running',
     sessionId: SESSION,
@@ -606,7 +606,7 @@ describe('LocalService — authenticated callers (#113)', () => {
     const tree: Record<number, { pid: number; comm: string }[]> = {
       // A hook under the session's claude (300).
       500: [
-        { pid: 500, comm: 'agentdock-runner' },
+        { pid: 500, comm: 'nautelle-runner' },
         { pid: 400, comm: 'sh' },
         { pid: 300, comm: 'claude' },
       ],
@@ -632,7 +632,7 @@ describe('LocalService — authenticated callers (#113)', () => {
   it('records the claude pid the daemon read, not the one the hook claimed', async () => {
     const { service, sessions } = setup(false, true, {
       ancestorsOf: async () => [
-        { pid: 610, comm: 'agentdock-runner' },
+        { pid: 610, comm: 'nautelle-runner' },
         { pid: 600, comm: 'claude' },
       ],
     });

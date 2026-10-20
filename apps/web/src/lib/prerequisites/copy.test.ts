@@ -75,7 +75,7 @@ describe('runnerOfflineCopy', () => {
 
 describe('watchRefusalCopy (#691)', () => {
   const REFUSED =
-    "refused by this runner's policy (allowedRoots): this runner allows no project root yet. On the runner's machine: `agentdock-runner policy allow-root /srv/dev/widget`";
+    "refused by this runner's policy (allowedRoots): this runner allows no project root yet. On the runner's machine: `nautelle-runner policy allow-root /srv/dev/widget`";
 
   test('no banner while the runner watches the project', () => {
     expect(
@@ -112,8 +112,8 @@ describe('watchRefusalCopy (#691)', () => {
       title: 'Runner laptop refuses to watch this project.',
       body: "This runner allows no project root yet. The Board, card collect and the Planner stop for this project until its folder is allowed. Only the person on the runner's machine can allow it: run this there.",
       commands: [
-        'agentdock-runner policy allow-root /srv/dev/widget',
-        'agentdock-runner policy allow-root --watched',
+        'nautelle-runner policy allow-root /srv/dev/widget',
+        'nautelle-runner policy allow-root --watched',
       ],
     });
   });
@@ -123,11 +123,9 @@ describe('watchRefusalCopy (#691)', () => {
       runnerName: 'laptop',
       runnerStatus: 'online',
       watchRefusal:
-        "refused by this runner's policy (allowedRoots): /srv/dev/widget is not a git main checkout. On the runner's machine: `agentdock-runner policy allow-root <dir>`",
+        "refused by this runner's policy (allowedRoots): /srv/dev/widget is not a git main checkout. On the runner's machine: `nautelle-runner policy allow-root <dir>`",
     });
-    expect(copy?.commands).toEqual([
-      'agentdock-runner policy allow-root <dir>',
-    ]);
+    expect(copy?.commands).toEqual(['nautelle-runner policy allow-root <dir>']);
   });
 
   test('text the runner did not word as a refusal is shown as it is', () => {

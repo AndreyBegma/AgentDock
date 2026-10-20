@@ -11,7 +11,7 @@ const data = {
   projectId: 'p1',
   phase: 'running',
   at: '2026-10-14T10:00:00.000Z',
-  tmuxSession: 'agentdock-card-ab12cd34',
+  tmuxSession: 'nautelle-card-ab12cd34',
   worktree: '/home/me/.wt-app-card-ab12cd34',
 };
 

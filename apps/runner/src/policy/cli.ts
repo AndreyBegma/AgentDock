@@ -25,7 +25,7 @@ export interface PolicyCliDeps {
   confirm?: (question: string) => boolean;
 }
 
-export const POLICY_USAGE = `Usage: agentdock-runner policy <command>
+export const POLICY_USAGE = `Usage: nautelle-runner policy <command>
 
   show                         print the effective policy
   allow-root <dir>…            let projects under <dir> be watched
@@ -113,7 +113,7 @@ const showPolicy = (deps: PolicyCliDeps): void => {
   deps.stdout(`${JSON.stringify(policy, null, 2)}\n`);
   if (policy.allowedRoots.length === 0) {
     deps.stderr(
-      'No root is allowed: no project is watched. Add one with `agentdock-runner policy allow-root <dir>`.\n',
+      'No root is allowed: no project is watched. Add one with `nautelle-runner policy allow-root <dir>`.\n',
     );
   }
   const outside = config.projects.filter((p) =>
@@ -162,7 +162,7 @@ const allowWatched = (
   if (roots.length === 0) {
     deps.stderr(
       config.projects.length === 0
-        ? 'The cached watch list is empty: name the directories with `agentdock-runner policy allow-root <dir>`.\n'
+        ? 'The cached watch list is empty: name the directories with `nautelle-runner policy allow-root <dir>`.\n'
         : 'Every root of the cached watch list is allowed already.\n',
     );
     return 'nothing';
@@ -192,7 +192,7 @@ const allowWatched = (
 };
 
 /**
- * `agentdock-runner policy …` (ADR-0047): the one writer of the policy. It
+ * `nautelle-runner policy …` (ADR-0047): the one writer of the policy. It
  * rewrites `runner.json` with only the policy changed.
  */
 export const runPolicy = (

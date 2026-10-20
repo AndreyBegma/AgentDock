@@ -33,15 +33,15 @@ import type { BoardCardKind } from './types';
  * stable text trimmed, no rule dropped. Version 18 (#630): never rewrite a
  * commit Nautelle pushed. Version 19 (#663 D2, D3): the working register is
  * the shared terse register. Version 20 (C-295): the product is named
- * Nautelle.
+ * Nautelle. Version 21 (C-297, ADR-0073): the `NAUTELLE_*` variables.
  */
-export const CARD_WORKER_PROMPT_VERSION = 20;
+export const CARD_WORKER_PROMPT_VERSION = 21;
 
 /** #389: the env the runner sets in the card's session — its short id. */
-export const CARD_ENV_ID = 'AGENTDOCK_CARD';
+export const CARD_ENV_ID = 'NAUTELLE_CARD';
 
 /** #389: the env the runner sets in the card's session — a port of its own. */
-export const CARD_ENV_PORT = 'AGENTDOCK_CARD_PORT';
+export const CARD_ENV_PORT = 'NAUTELLE_CARD_PORT';
 
 /**
  * #389: two cards' e2e runs wiped one shared test database, and a worker
@@ -158,7 +158,7 @@ export interface CardWorkerPromptInput {
   /**
    * #445: the round is launched with Token saver on (`card.run` carries
    * `tokenSaver.enabled`). The prompt then names the scout and the
-   * `AGENTDOCK_RAW=1` bypass, which exist only then. Absent is off.
+   * `NAUTELLE_RAW=1` bypass, which exist only then. Absent is off.
    */
   tokenSaver?: boolean;
   /**
@@ -450,7 +450,7 @@ const READING_LINES = [
 /** #445 D4c, D9: what exists only when the runner launched the card with Token saver on. */
 const TOKEN_SAVER_LINES = [
   '- For a broad search or reading many files for one question, use the `scout` subagent (fast, cheap; reports paths and lines). Decide and write code yourself, never through the scout.',
-  '- Long command output is compressed: every error, failure and warning line is kept, and a last line names the file with the full output. Read it when you need more, or run `AGENTDOCK_RAW=1 <command>` for unfiltered output.',
+  '- Long command output is compressed: every error, failure and warning line is kept, and a last line names the file with the full output. Read it when you need more, or run `NAUTELLE_RAW=1 <command>` for unfiltered output.',
 ];
 
 /**
