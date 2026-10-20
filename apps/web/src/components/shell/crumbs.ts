@@ -11,6 +11,7 @@ export type CrumbNames = ReadonlyMap<string, string>;
 /** Pages with a label of their own that the nav registry does not hold. */
 const STATIC: Record<string, string> = {
   '/account': 'Account',
+  '/account/about': 'About',
   '/account/notifications': 'Notifications',
   '/admin': 'Admin',
   '/admin/integrations/github': 'GitHub App',

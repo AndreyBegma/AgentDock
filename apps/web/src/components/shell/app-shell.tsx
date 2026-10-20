@@ -1,6 +1,10 @@
 'use client';
 
-import { LIVE_CLOSE_CODES, type PublicUser } from '@agentdock/shared';
+import {
+  LIVE_CLOSE_CODES,
+  type PublicUser,
+  presentContacts,
+} from '@agentdock/shared';
 import { Avatar } from '@andrewbehma/glass-ui/avatar';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
@@ -23,7 +27,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
 import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
-import { ArrowLeft, LogOut, Search, Shield, User } from 'lucide-react';
+import { ArrowLeft, Info, LogOut, Search, Shield, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -35,6 +39,11 @@ import {
 } from 'react';
 import { api, describeError } from '../../lib/api';
 import { useLiveStatus } from '../../lib/live/use-live';
+import {
+  CONTACT_ICON,
+  contactName,
+  EXTERNAL_LINK,
+} from '../about/contact-links';
 import { Assistant } from '../assistant/assistant';
 import { AskBoardDialog } from '../board-ai/ask-board-dialog';
 import { Capsule } from './capsule';
@@ -352,6 +361,27 @@ export function AppShell({
                         </MenuRadioItem>
                       ))}
                     </MenuRadioGroup>
+                    <MenuSeparator />
+                    <MenuItem onSelect={() => router.push('/account/about')}>
+                      <Info size={16} aria-hidden="true" />
+                      About
+                    </MenuItem>
+                    {presentContacts().map((contact) => {
+                      // C-293: the author's links, each a real anchor.
+                      const Icon = CONTACT_ICON[contact.kind];
+                      return (
+                        <MenuItem key={contact.kind} asChild>
+                          <a
+                            href={contact.href}
+                            {...EXTERNAL_LINK}
+                            aria-label={contactName(contact)}
+                          >
+                            <Icon size={16} aria-hidden="true" />
+                            {contact.label}
+                          </a>
+                        </MenuItem>
+                      );
+                    })}
                     <MenuSeparator />
                     <MenuItem tone="danger" onSelect={() => void logout()}>
                       <LogOut size={16} aria-hidden="true" />
