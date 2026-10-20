@@ -56,8 +56,8 @@ export const CARD_TIMEOUTS_MS = {
 export const CARD_RUN_PROMPT_MAX_BYTES = 64 * 1024;
 /**
  * Files `card.run` commits as the branch's first commit: the D2 spec and
- * every frame of the approved design (#441). A design's frames share one
- * `DESIGN_HTML_MAX_BYTES`, so this bounds the command, not the frames.
+ * every frame of the approved design (#441). A frame is at most
+ * `DESIGN_HTML_MAX_BYTES` (#686), so this bounds the command, not the frames.
  */
 export const CARD_RUN_FILES_MAX = 256;
 export const CARD_RUN_FILE_MAX_BYTES = 192 * 1024;

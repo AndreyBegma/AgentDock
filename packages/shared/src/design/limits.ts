@@ -3,11 +3,14 @@
  * "Configuration", D4, D7, D12, D13, "Open questions").
  */
 
-/**
- * D7: HTML per variant. A turn's whole result travels in one event of at
- * most 192 KiB (`PLAN_TURN_RESULT_MAX_BYTES`), with the plan block beside it.
- */
+/** D7, #686: HTML of one frame (one mockup page). */
 export const DESIGN_HTML_MAX_BYTES = 160 * 1024;
+/**
+ * D7, #686: HTML of every frame of a revision together. A result over one
+ * event's 192 KiB travels in chunk events (ADR-0070), up to
+ * `PLAN_TURN_RESULT_TOTAL_MAX_BYTES`, which leaves room for the plan block.
+ */
+export const DESIGN_TOTAL_MAX_BYTES = 1024 * 1024;
 
 /** D4: variants per task. */
 export const DESIGN_VARIANTS_MIN = 1;
