@@ -28,6 +28,7 @@ import {
   isNotFound,
   ORCHESTRATOR_STATUS_LABEL,
 } from '../../../../lib/fleet/format';
+import { runsHref } from '../../../../lib/history/format';
 import { projectHue } from '../../../../lib/hue';
 import { useLive } from '../../../../lib/live/use-live';
 import {
@@ -57,7 +58,7 @@ const NEXT_WAVE_BRIEF = 'Plan the next wave of work for this project.';
  * A project's home (C-283): a short summary — what is running, what waits for
  * the person, the latest result — and one primary action, Open Board. The
  * figures the Board, Queue and Activity already show are not repeated here;
- * Usage keeps the cost and History the runs.
+ * Usage keeps the cost and Activity › Runs the runs.
  */
 export default function ProjectHomePage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -148,7 +149,7 @@ export default function ProjectHomePage() {
     {
       id: 'history',
       label: 'Run history',
-      onSelect: () => router.push(`${base}/history`),
+      onSelect: () => router.push(runsHref(projectId)),
     },
   ];
 

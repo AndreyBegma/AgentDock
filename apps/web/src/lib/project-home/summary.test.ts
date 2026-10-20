@@ -99,7 +99,7 @@ describe('needsYou', () => {
     });
     expect(items[1]?.href).toBe('/projects/p1/fleet?open=i2&focus=i2');
     expect(items[2]?.title).toBe('Checks failed on #690');
-    expect(items[3]?.href).toBe('/projects/p1/history/w');
+    expect(items[3]?.href).toBe('/projects/p1/activity?tab=runs&run=w');
   });
 
   test('nothing loaded, nothing waits', () => {

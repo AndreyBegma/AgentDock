@@ -5,6 +5,7 @@ import type {
   RunSummary,
 } from '@agentdock/shared';
 import { slotHref } from '../fleet/workspace-url';
+import { runHref } from '../history/format';
 
 /**
  * What the calm project home (C-283) says: pure, so the rules are tested
@@ -95,7 +96,7 @@ export function needsYou(
       detail: [run.slot, run.issue === null ? null : `#${run.issue}`]
         .filter(Boolean)
         .join(' · '),
-      href: `/projects/${projectId}/history/${run.id}`,
+      href: runHref(projectId, run.id),
       since: run.updatedAt,
     });
   }

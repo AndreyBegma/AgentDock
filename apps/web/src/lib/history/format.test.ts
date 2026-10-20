@@ -4,6 +4,7 @@ import {
   abandonedHiddenLabel,
   costLabel,
   hasRunFilters,
+  historyRedirectTarget,
   latestSession,
   NO_RUN_FILTERS,
   parseRunUpdate,
@@ -13,10 +14,13 @@ import {
   RUN_STATUS_CHIPS,
   RUN_STATUS_LABEL,
   retryHref,
+  runFacts,
   runFailure,
   runFiltersFromSearch,
   runFiltersSearch,
+  runHref,
   runLabel,
+  runsHref,
   runTitle,
   runtimeLabel,
   splitAbandoned,
@@ -132,6 +136,74 @@ describe('run kinds and filters', () => {
         abandoned: 5,
       }),
     ).toBe(15);
+  });
+});
+
+describe('the Runs tab of Activity (C-285)', () => {
+  test('the tab carries the filters it is given, in a stable order', () => {
+    expect(runsHref('p1')).toBe('/projects/p1/activity?tab=runs');
+    expect(runsHref('p1', { status: 'failed', kind: 'skill' })).toBe(
+      '/projects/p1/activity?tab=runs&kind=skill&status=failed',
+    );
+  });
+
+  test("a row carries History's columns and leaves the empty ones out", () => {
+    const usage: RunUsage = {
+      requests: 0,
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite5m: 0,
+      cacheWrite1h: 0,
+      reasoning: 0,
+      costUsd: null,
+      unpricedRequests: 0,
+    };
+    expect(
+      runFacts({
+        kind: 'skill',
+        runtime: null,
+        model: null,
+        prNumber: null,
+        prChecks: null,
+        durationMs: null,
+        usage,
+      }),
+    ).toBe(RUN_KIND_LABEL.skill);
+    const facts = runFacts({
+      kind: 'orchestrator_slot',
+      runtime: 'claude',
+      model: 'opus',
+      prNumber: 9,
+      prChecks: null,
+      durationMs: 65_000,
+      usage: { ...usage, requests: 2, input: 1200, costUsd: '0.5' },
+    });
+    expect(facts).toContain('claude / opus');
+    expect(facts).toContain('PR #9');
+    expect(facts).toContain('tokens');
+    expect(facts.split(' · ')).toHaveLength(6);
+  });
+
+  test('a run opens beside the tab', () => {
+    expect(runHref('p1', 'r1')).toBe('/projects/p1/activity?tab=runs&run=r1');
+  });
+
+  test('an old /history link keeps its filters and drops the unknown ones', () => {
+    expect(
+      historyRedirectTarget('p1', {
+        kind: 'skill',
+        from: ['2026-10-01', '2026-10-02'],
+        status: 'nonsense',
+        other: 'x',
+      }),
+    ).toBe('/projects/p1/activity?tab=runs&kind=skill&from=2026-10-01');
+  });
+
+  test('an old /history/:runId link opens that run', () => {
+    expect(historyRedirectTarget('p1', {}, 'r1')).toBe(
+      '/projects/p1/activity?tab=runs&run=r1',
+    );
   });
 });
 

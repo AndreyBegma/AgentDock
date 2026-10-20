@@ -26,6 +26,8 @@ import {
   costLabel,
   prLabel,
   RUN_STATUS_LABEL,
+  runHref,
+  runsHref,
   runTitle,
 } from '../../../../../lib/history/format';
 import { slotHue } from '../../../../../lib/hue';
@@ -152,15 +154,14 @@ export function RecentResultSection({
   projectId: string;
   runs: SectionState<RunPage>;
 }) {
-  const history = `/projects/${projectId}/history`;
   return (
     <Section
       title="Recent result"
       description="The last task that finished."
       pad="none"
       actions={
-        <NextLink href={history} className={quietLink}>
-          Open History
+        <NextLink href={runsHref(projectId)} className={quietLink}>
+          Open Runs
         </NextLink>
       }
     >
@@ -168,7 +169,7 @@ export function RecentResultSection({
         section={runs}
         unavailable={{
           title: 'The latest result could not be loaded',
-          stillWorks: 'History still lists every run.',
+          stillWorks: 'Activity › Runs still lists every run.',
         }}
         isEmpty={(page) => recentResult(page.items) === undefined}
         empty={<Quiet>No task has finished yet.</Quiet>}
@@ -177,7 +178,7 @@ export function RecentResultSection({
         {(page) => {
           const run = recentResult(page.items);
           return run ? (
-            <ResultRow run={run} href={`${history}/${run.id}`} />
+            <ResultRow run={run} href={runHref(projectId, run.id)} />
           ) : null;
         }}
       </AsyncSection>
