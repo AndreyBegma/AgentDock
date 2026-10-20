@@ -2,7 +2,8 @@
 
 Status: accepted · Date: 2026-10-16 ·
 Issue: [#441](https://github.com/AndreyBegma/AgentDock/issues/441) ·
-Amends [ADR-0022](0022-design-stage-html-mockups-from-a-ui-profile.md) §1
+Amends [ADR-0022](0022-design-stage-html-mockups-from-a-ui-profile.md) §1 ·
+Amended by [ADR-0070](0070-a-large-plan-turn-result-travels-in-chunk-events.md) (160 KiB per frame, 1 MiB together; large results travel in chunk events)
 
 ## Context
 

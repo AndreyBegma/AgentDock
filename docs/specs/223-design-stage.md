@@ -92,7 +92,7 @@ existing record or a protocol limit and were read back and confirmed.
 | D4 | **Variants follow the task.** The planner picks 1–3 variants and says why in one line (an unambiguous change is 1; a new screen with real layout choices is 2–3). The person can change the count before generating. **Each variant is its own turn** (D7). On approve the person picks one variant; the others are archived — readable, never published. | Q7, Q18 |
 | D5 | **A mockup is one self-contained HTML document.** No dev server, no project build. It is styled from the profile's style kit, so mockups of one project look alike. The viewer marks it as a mockup, not the implementation. | Q3, Q12; ADR-0022 |
 | D6 | **What a mockup may contain.**<br>• Inline CSS and JS. JS runs in an iframe sandboxed with `allow-scripts` only — no `allow-same-origin`, so it gets an opaque origin, no cookies, no storage of AgentDock.<br>• External scripts, styles, fonts and images only from a **fixed allowlist in code**: `cdnjs.cloudflare.com`, `cdn.jsdelivr.net/npm/`, `unpkg.com`, `cdn.tailwindcss.com`, `fonts.googleapis.com`, `fonts.gstatic.com`. Adding a host is a code change.<br>• Every script or package URL names an **exact version** (`react@18.3.1`, never `react@18` or `latest`).<br>• No `fetch`, XHR or WebSocket: CSP `connect-src 'none'`. No forms that submit, no top navigation.<br>• Theme switches through `:root[data-theme="light"\|"dark"]`.<br>The validator (`packages/shared/src/design/validate.ts`) refuses a mockup that breaks a rule, and the turn fails as `contract_violation` with the reason. | Q9 (a + c), Q17, Q21 |
-| D7 | **How a mockup leaves the turn.** Design turns stay read-only (`--permission-mode plan`, #172 D15). The final message holds the usual `agentdock-plan` JSON block **and** one `agentdock-design` block fenced with four backticks, holding the HTML. The API extracts and validates both (#172 D17). **At most 160 KiB of HTML per variant**, because a turn's whole result travels in one event of at most 192 KiB (`PLAN_TURN_RESULT_MAX_BYTES`) [Confirmed]; one variant per turn keeps it under. | Q10; protocol limit |
+| D7 | **How a mockup leaves the turn.** Design turns stay read-only (`--permission-mode plan`, #172 D15). The final message holds the usual `agentdock-plan` JSON block **and** one `agentdock-design` block fenced with four backticks, holding the HTML. The API extracts and validates both (#172 D17). **At most 160 KiB of HTML per frame, and 1 MiB for all frames of the revision together** (#686) [Confirmed]. A result that fits one event of 192 KiB (`PLAN_TURN_RESULT_MAX_BYTES`) travels in `plan_turn.finished`; a larger one, up to 2 MiB, travels in ordered `plan_turn.result_chunk` events that the API joins before parsing (ADR-0070). A frame over 160 KiB fails `design_too_large` naming the frame; frames over 1 MiB together fail `design_too_large` stating the total limit. | Q10; protocol limit |
 | D8 | **The design turn runs in the task's fork session** (#172 D3), so it sees the plan, the task's conversation and the profile. The prompt carries: the instructions, contract v2, the action `design`, the task, the profile summary, the style kit, the chosen skills, the variant number and, on revise, every open comment with its anchor. | *default*; #172 D3, D16 |
 | D9 | **Comments, three kinds.**<br>• **general** — on the whole design;<br>• **screen** — on one viewport and theme;<br>• **pin** — on a point: viewport, theme, `x`/`y` relative to the document, and the CSS path of the element under the click.<br>Pins come from a **pin helper** the API injects into the served HTML: in pin mode it reports clicks to the parent by `postMessage`. The helper is never part of a published file. | Q6 (b + c), Q14 |
 | D10 | **Revise is batched.** Comments accumulate on the current revision. **Revise design** runs one design turn per variant still in play, with all open comments, and produces the next revision. Earlier revisions stay viewable; a comment records the revision it was left on and the revision that addressed it. | Q19 |
@@ -236,7 +236,8 @@ glass-ui has them is [Unknown] — the web slot checks first.
 
 | Setting | Default | Where |
 |---|---|---|
-| HTML per variant | 160 KiB | `packages/shared/src/design/limits.ts` |
+| HTML per frame | 160 KiB (`DESIGN_HTML_MAX_BYTES`) | `packages/shared/src/design/limits.ts` |
+| HTML of all frames together | 1 MiB (`DESIGN_TOTAL_MAX_BYTES`, #686) | `packages/shared/src/design/limits.ts` |
 | Variants per task | 1–3 | contract v2 |
 | CDN allowlist | D6 | `packages/shared/src/design/cdn.ts` |
 | Profile build timeout | 20 min | `uiprofile.build` `timeoutSec` |
@@ -310,8 +311,9 @@ release, and it says so in its reply.
 - **Medium — cost.** Up to three opus turns per revision, plus profile builds.
   Mitigation: runs with cost and budgets (#28); variants default to 1 unless
   the planner says why; the profile is cached by fingerprint.
-- **Low — the 192 KiB event limit.** A large screen may not fit in 160 KiB of
-  HTML. Mitigation: the CDN allowlist (Tailwind, libraries) keeps the inline
+- **Low — the frame size limit.** A large screen may not fit in 160 KiB of
+  HTML. Since #686 the 192 KiB event limit no longer bounds the design: a
+  larger result travels in chunk events (ADR-0070). Mitigation: the CDN allowlist (Tailwind, libraries) keeps the inline
   part small; the violation names the limit so the planner can split the
   screen.
 - **Low — contract v2 alongside v1.** Mitigation: the parser dispatches on the
@@ -367,9 +369,10 @@ CDN allowlist — are not re-proposed. Line numbers are as of the review commit.
   "builds the profile first" note was wrong for every design not drawn yet —
   fixed below. A busy design with nothing running showed this panel — fixed
   below.
-- **Result handling.** Every frame is validated (D6) and the frames together
-  are held to 160 KiB (`packages/shared/src/planner/contract.ts:743`, checked
-  in `parseDesignBlocks`), under the 192 KiB result event. The mockup endpoint
+- **Result handling.** Every frame is validated (D6) and held to 160 KiB, and
+  the frames together to 1 MiB (#686, checked in `parseDesignBlocks` in
+  `packages/shared/src/planner/contract.ts`). A result over the 192 KiB
+  event travels in chunk events (ADR-0070). The mockup endpoint
   serves each frame with `sandbox allow-scripts` and `connect-src 'none'`; the
   viewer's iframe has `sandbox="allow-scripts"` and trusts a message by its
   source window only (`apps/web/src/lib/design/frame-messages.ts:20`).
