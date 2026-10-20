@@ -176,6 +176,13 @@ export const AUDIT_ACTIONS = [
    * dependency }`).
    */
   'card.pr_retargeted',
+  /**
+   * #709: a stacked PR merged into its dependency's branch after that
+   * branch's own PR had merged; a forward PR of the card's branch was opened
+   * into the project base (`after: { number, pr, mergedPr, into, base,
+   * dependency, alreadyOpen, conflict }`).
+   */
+  'card.pr_forwarded',
   /** #443: the card's Auto-run when ready switch (`after: { autoRunWhenReady }`). */
   'card.auto_run_toggled',
   /**

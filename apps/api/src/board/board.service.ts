@@ -978,6 +978,14 @@ export class BoardService implements OnModuleInit {
       (dto.merge?.deleteBranch ?? false) ||
       (dto.closePr?.deleteBranch ?? false);
     if (!fleet && deleteBranch) this.assertMayDeleteBranch(project, card);
+    // #709 (ADR-0064): Completed means landed — a person confirms leaving
+    // the work out of the base. Closing the PR is that decision already.
+    if (!fleet && !dto.merge && !dto.closePr && dto.confirmUnlanded !== true) {
+      const missing = await this.work.missingLanding(project, card.id);
+      if (missing !== null) {
+        throw boardError(409, BOARD_ERROR.notLanded, missing);
+      }
+    }
     const merge =
       dto.merge && !fleet
         ? await this.merge(

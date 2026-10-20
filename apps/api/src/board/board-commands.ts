@@ -7,6 +7,8 @@ import {
   type CardCommandName,
   type CardPrCloseArgs,
   type CardPrCloseResult,
+  type CardPrOpenArgs,
+  type CardPrOpenResult,
   type CardPrRetargetArgs,
   type CardPrRetargetResult,
   type CommandErrorCode,
@@ -14,6 +16,7 @@ import {
   cardCiRetriggerResultSchema,
   cardCommands,
   cardPrCloseResultSchema,
+  cardPrOpenResultSchema,
   cardPrRetargetResultSchema,
   type DocsPublishSpecsArgs,
   type DocsPublishSpecsResult,
@@ -76,6 +79,7 @@ export class BoardCommands {
       | 'card.ciRetrigger'
       | 'card.prClose'
       | 'card.prRetarget'
+      | 'card.prOpen'
       | 'issue.create'
       | 'plan.close'
       | 'pr.inspect'
@@ -248,6 +252,37 @@ export class BoardCommands {
     );
     if (result.status !== 'ok') return result;
     const output = cardPrRetargetResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
+  }
+
+  /** #709: whether the connected runner advertises `card.prOpen`. */
+  servesPrOpen(runnerId: string): boolean {
+    if (!this.presence.isConnected(runnerId)) return false;
+    return (
+      this.presence.commandSupport(runnerId, 'card.prOpen') === 'supported'
+    );
+  }
+
+  /** #709: opens a card branch's PR into the project base — a forward PR. */
+  async openPr(
+    runnerId: string,
+    args: CardPrOpenArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardPrOpenResult>> {
+    this.assertReady(runnerId, 'card.prOpen');
+    const result = await this.commands.send(
+      runnerId,
+      'card.prOpen',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = cardPrOpenResultSchema.safeParse(result.output);
     return output.success
       ? { status: 'ok', output: output.data }
       : {

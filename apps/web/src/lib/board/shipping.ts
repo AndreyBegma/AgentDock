@@ -51,6 +51,11 @@ export const NEEDS_PERSON_ROUND_TEXT: Record<
 /** #630: the runner pushed nothing — `origin/<branch>` has somebody else's commits. */
 export const BRANCH_DIVERGED_TEXT = 'Branch diverged on origin; not pushed';
 
+/** #709: the forward PR of a merge into a dead dependency branch. */
+export const FORWARD_CONFLICT_TEXT = 'Forward PR conflicts with the base';
+export const FORWARD_FAILED_TEXT =
+  'Merged into a dead branch; forward PR not opened';
+
 /**
  * Why automation stopped: the stored reason, else — a card marked before
  * #542 — no checks at all (#484), or red ones (#359 D6).
@@ -69,6 +74,10 @@ const needsPersonText = (
       return NEEDS_PERSON_ROUND_TEXT[card.needsPersonReason];
     case 'branch_diverged':
       return BRANCH_DIVERGED_TEXT;
+    case 'forward_conflict':
+      return FORWARD_CONFLICT_TEXT;
+    case 'forward_failed':
+      return FORWARD_FAILED_TEXT;
     case null:
       return card.ciState === 'none'
         ? CI_NOT_REPORTED_TEXT

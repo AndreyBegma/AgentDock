@@ -808,8 +808,17 @@ export const BOARD_ERROR = {
   captureNeedsContent: 'capture_needs_content',
   /** 422 (#272 D2): no usable runtime profile; `reason`, `source`, `profileKey`. */
   noProfile: 'no_profile',
-  /** 409 (#273 D13): the runner refused the merge, with `reason` (`CardMergeFailReason`). */
+  /**
+   * 409 (#273 D13): the runner refused the merge, with `reason`
+   * (`CardMergeFailReason`, or #709 `base_merged`: the PR goes into a
+   * dependency branch whose own PR has merged).
+   */
   mergeFailed: 'merge_failed',
+  /**
+   * 409 (#709): Accept of a card whose work has not landed in the project
+   * base, without `confirmUnlanded`; the message names what is missing.
+   */
+  notLanded: 'not_landed',
   /** 409 / 404 (#273 D13): the card has no pull request. */
   noPullRequest: 'no_pull_request',
   /** 422 (#282 D3): `autoCollect` on a card that is not a `terminal` card. */
@@ -978,6 +987,13 @@ export interface AcceptBoardCardRequest {
     /** Close the linked issue as `not planned`; off in the dialog by default. */
     closeIssue: boolean;
   };
+  /**
+   * #709 (ADR-0064): Completed means landed. Accept with neither `merge` nor
+   * `closePr`, of a card with work whose pull request has not merged into the
+   * project base, is refused with 409 `not_landed` — its message names the
+   * missing landing — unless this is `true`: the person confirmed it.
+   */
+  confirmUnlanded?: boolean;
 }
 
 /** #273 D13: how the merge on Accept went. */
