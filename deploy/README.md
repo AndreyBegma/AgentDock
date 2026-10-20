@@ -182,6 +182,11 @@ docker run --rm -v "$PWD/deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro" \
 - **Attachments** of board cards (ADR-0031) live in the `attachments`
   volume, not in the database. Back the volume up together with `pgdata`:
   the database alone no longer restores everything.
+- **Volume names are pinned** in `docker-compose.yml` (`name:`):
+  `agentdock-staging_pgdata`, `agentdock-staging_redis` and
+  `agentdock-staging_attachments`. Without it Docker prefixes a volume with
+  the compose project name, and renaming the project would start an empty
+  database. Never change a pinned name without copying the volume first.
 - **Migrations and the seed** run in the API's entrypoint, so a failed
   migration keeps the API unhealthy. The deploy fails after 240 s and prints
   the API log.
