@@ -258,7 +258,7 @@ export class QueueProjector {
       await tx.issueCache.update({ where: { id: before.id }, data: closure });
       return true;
     }
-    // A dependency closed before AgentDock first saw it: only its closure is known.
+    // A dependency closed before Nautelle first saw it: only its closure is known.
     await tx.issueCache.create({
       data: {
         projectId: project.id,

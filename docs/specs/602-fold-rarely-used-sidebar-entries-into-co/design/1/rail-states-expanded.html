@@ -96,7 +96,7 @@ const more=(open,active)=>group('More','more',open,
  item('fleet','Fleet',{b:1})+item('queue','Queue')+item('approvals','Approvals',{b:2,bt:'danger'})+item('history','History',{a:active==='history'})+item('saver','Token saver')+item('skills','Skills')+item('sched','Schedules')+item('settings','Settings'),{fb:1});
 const wsItems=(a)=>item('overview','Overview')+item('project','Projects')+item('sessions','Sessions',{a:a==='sessions'})+item('activity','Activity');
 const admin=(open)=>`<div class="sep"></div>`+group('Admin','admin',open,item('users','Users')+item('runners','Runners')+item('settings','System'));
-const head=`<div class="head"><span class="sw"></span>AgentDock</div>`;
+const head=`<div class="head"><span class="sw"></span>Nautelle</div>`;
 const proj=(m,a)=>`<div class="sec">Project</div>`+item('project','Project',{a:a==='project'})+item('work','Work')+item('activity','Activity')+m;
 const rails=[
  ['A · Inside a project, everything folded','Default. Fleet’s warn badge rides on the More header.',

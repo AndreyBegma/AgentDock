@@ -139,6 +139,8 @@ steps:
     environment: *turbo_env
     commands:
       - bun run build -- --concurrency=2
+      # C-295: no user-visible "AgentDock" in what the web app serves.
+      - bun scripts/check-brand.ts --web
 
   # `$$` keeps a variable from Woodpecker's own substitution, so the shell
   # expands it.

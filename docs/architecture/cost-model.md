@@ -1,6 +1,6 @@
 # Cost model
 
-AgentDock shows **API-equivalent cost**: what the recorded tokens would cost at
+Nautelle shows **API-equivalent cost**: what the recorded tokens would cost at
 public API prices. It is shown even when the runtime runs on a subscription,
 because it is the only number comparable across runtimes, models and months.
 

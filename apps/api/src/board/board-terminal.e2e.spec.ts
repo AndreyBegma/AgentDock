@@ -67,7 +67,7 @@ describe('terminal cards (e2e)', () => {
     projectId = w.a,
   ) => handlers.table['card.track'](args, call(sessionId, projectId));
 
-  /** The session's hooks reached AgentDock: it is a `manual` session in `root`. */
+  /** The session's hooks reached Nautelle: it is a `manual` session in `root`. */
   const manualSession = async (externalId = MANUAL, root = ROOT_A) => {
     await w.deliver(
       'hook.session_started',

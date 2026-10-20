@@ -574,7 +574,7 @@ describe('action requests (e2e)', () => {
       const request = await create('tool_use', { toolName: 'Bash' });
       const notification = await notificationOf(approverId);
       const answer = await press(`x:${notification.id}:${request.id}`, 999);
-      expect(answer.text).toBe('This chat is not linked to AgentDock.');
+      expect(answer.text).toBe('This chat is not linked to Nautelle.');
       const records = await ctx.prisma.auditRecord.findMany({
         where: { action: 'action_request.decided', targetId: request.id },
       });
@@ -600,7 +600,7 @@ describe('action requests (e2e)', () => {
       const request = await create('tool_use', { toolName: 'Bash' });
       const theirs = await notificationOf(approverId);
       expect((await press(`x:${theirs.id}:${request.id}`)).text).toBe(
-        'This message is not one AgentDock can act on any more. Decide in AgentDock.',
+        'This message is not one Nautelle can act on any more. Decide in Nautelle.',
       );
       // Viewers get no notification; give them one to press.
       const own = await ctx.prisma.notification.create({

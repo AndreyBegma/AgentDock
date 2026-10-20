@@ -318,7 +318,7 @@ function RunnersTable() {
     <>
       <PageHeader
         title="Runners"
-        description="The AgentDock daemon on each machine that holds your repositories."
+        description="The Nautelle daemon on each machine that holds your repositories."
         actions={
           <Button variant="solid" onClick={() => setAdding(true)}>
             Add runner
@@ -332,7 +332,7 @@ function RunnersTable() {
         empty={
           <EmptyState
             title="Pair your first runner"
-            description="A runner is the AgentDock daemon on the machine that holds your repositories: it runs the agents and reads the code, and it dials out to AgentDock, so the machine needs no open port. Add one to get a pairing command to run there."
+            description="A runner is the Nautelle daemon on the machine that holds your repositories: it runs the agents and reads the code, and it dials out to Nautelle, so the machine needs no open port. Add one to get a pairing command to run there."
             action={
               <div className="flex flex-wrap justify-center gap-2">
                 <Button

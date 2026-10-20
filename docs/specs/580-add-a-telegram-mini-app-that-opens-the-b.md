@@ -7,7 +7,7 @@ Add a Telegram Mini App (Web App) so the full Board can be used inside Telegram,
 
 - **API sign-in.** Add an endpoint that takes Telegram `initData`.
   - It validates the HMAC with the bot token, per Telegram's Web App rules, and checks `auth_date` freshness.
-  - It maps the Telegram user to the linked AgentDock user (a private chat id is the user id).
+  - It maps the Telegram user to the linked Nautelle user (a private chat id is the user id).
   - It issues the normal web session, the same cookie the web app uses (`apps/api/src/auth/`).
   - An unlinked Telegram user is refused with a hint to link in Account → Notifications.
   - Add any new variable to `.env.example`.

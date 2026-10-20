@@ -46,7 +46,7 @@ The parts:
 
 ### Out of scope
 - Fleet slots launched by the code-sentinel plugin (`dispatch.sh`, ADR-0005). They get a follow-up issue in the plugin repository that wires the same hook when the runner is installed (Q16).
-- Using or bundling rtk. Its engine is BUSL-1.1 and AgentDock is self-hosted by others.
+- Using or bundling rtk. Its engine is BUSL-1.1 and Nautelle is self-hosted by others.
 - Changing which model a card runs on (#322 recommendation stays).
 - Compressing output tokens (what the model writes) beyond the working-register instructions.
 

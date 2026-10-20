@@ -176,7 +176,7 @@ export function useCardActions({
 
   const dialogConsequence = (): string => {
     if (pending?.kind === 'dismiss-all') {
-      return 'The cards are deleted. AgentDock remembers their titles for 90 days so the same suggestion does not come back.';
+      return 'The cards are deleted. Nautelle remembers their titles for 90 days so the same suggestion does not come back.';
     }
     return pending?.kind === 'stop'
       ? 'The tmux session is killed. The work already committed in the worktree stays; you can run the card again.'

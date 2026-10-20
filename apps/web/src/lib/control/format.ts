@@ -114,7 +114,7 @@ export function commandRunIdOf(error: unknown): string | undefined {
  * never "not deployed yet".
  */
 export const updateRunnerText = (runnerName?: string | null): string =>
-  `Update the AgentDock runner on ${runnerName || 'the project’s machine'} and try again.`;
+  `Update the Nautelle runner on ${runnerName || 'the project’s machine'} and try again.`;
 
 /** Where a failed control request is fixed, when the viewer can open that page. */
 export interface ControlErrorContext {

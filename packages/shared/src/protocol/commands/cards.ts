@@ -482,7 +482,7 @@ export const CARD_PR_CLOSE_COMMENT_MAX_BYTES = CARD_MERGE_COMMENT_MAX_BYTES;
  * #329 D8 (ADR-0010, advertised per ADR-0023): Accept without merging closes
  * the card's PR through the runner's `gh`, in the project root —
  * `gh pr close <pr> --repo <o/r> --comment <comment>`, never a command text
- * (the API words it "Closed from the AgentDock Board (C-<n>)").
+ * (the API words it "Closed from the Nautelle Board (C-<n>)").
  *
  * - `deleteBranch`: then deletes the PR's head branch on GitHub as
  *   `card.merge` does (D7) — the head read from the PR, never the base.

@@ -121,7 +121,7 @@ describe('webhooks and triggers', () => {
     ).toBe('1 of 2 enabled');
   });
 
-  test('a trigger AgentDock turned off is a warning; one a person turned off is not', () => {
+  test('a trigger Nautelle turned off is a warning; one a person turned off is not', () => {
     expect(
       triggersStatus([
         trigger({ enabled: false, disabledReason: 'creator_not_authorized' }),

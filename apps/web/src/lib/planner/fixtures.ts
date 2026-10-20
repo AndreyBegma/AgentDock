@@ -94,7 +94,7 @@ export const plan = (over: Partial<PlanDetail> = {}): PlanDetail => {
     createdAt: '2026-10-13T10:00:00.000Z',
     updatedAt: '2026-10-13T10:05:00.000Z',
     sentAt: null,
-    brief: 'Move cs-spec into AgentDock.',
+    brief: 'Move cs-spec into Nautelle.',
     questions: [],
     instructionsVersion: 1,
     contractVersion: 1,

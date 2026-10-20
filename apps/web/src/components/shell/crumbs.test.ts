@@ -29,22 +29,22 @@ describe('crumbsFor', () => {
   });
 
   test('a project reads as its name, its page as the nav label', () => {
-    const names = new Map([[PROJECT, 'AgentDock']]);
+    const names = new Map([[PROJECT, 'Nautelle']]);
     expect(labels(`/projects/${PROJECT}/fleet`, names)).toEqual([
       'Projects',
-      'AgentDock',
+      'Nautelle',
       'Fleet',
     ]);
   });
 
   test('a skill run reads as its skill', () => {
     const names = new Map([
-      [PROJECT, 'AgentDock'],
+      [PROJECT, 'Nautelle'],
       [RUN, 'review'],
     ]);
     expect(labels(`/projects/${PROJECT}/skills/runs/${RUN}`, names)).toEqual([
       'Projects',
-      'AgentDock',
+      'Nautelle',
       'Skills',
       'Runs',
       'review',
@@ -132,10 +132,10 @@ describe('a plan in the trail', () => {
 });
 
 describe('pageTitleOf', () => {
-  test('a project page is "<Page> · <Project>", once, even for a project named AgentDock', () => {
-    const names = new Map([[PROJECT, 'AgentDock']]);
+  test('a project page is "<Page> · <Project>", once, even for a project named Nautelle', () => {
+    const names = new Map([[PROJECT, 'Nautelle']]);
     const crumbs = crumbsFor(`/projects/${PROJECT}/fleet`, names);
-    expect(pageTitleOf(crumbs, 'AgentDock')).toBe('Fleet · AgentDock');
+    expect(pageTitleOf(crumbs, 'Nautelle')).toBe('Fleet · Nautelle');
     expect(pageTitleOf(crumbs, 'Widget')).toBe('Fleet · Widget');
   });
 
@@ -144,25 +144,23 @@ describe('pageTitleOf', () => {
     expect(
       pageTitleOf(
         crumbsFor(`/projects/${PROJECT}/planner/plan1`, names),
-        'AgentDock',
+        'Nautelle',
       ),
-    ).toBe('Ship the shell · AgentDock');
+    ).toBe('Ship the shell · Nautelle');
   });
 
   test('before the project is known its half is the product, not its kind', () => {
     expect(pageTitleOf(crumbsFor(`/projects/${PROJECT}/queue`))).toBe(
-      'Queue · AgentDock',
+      'Queue · Nautelle',
     );
   });
 
-  test('anywhere else it is "<Page> · AgentDock"', () => {
-    expect(pageTitleOf(crumbsFor('/admin/runners'))).toBe(
-      'Runners · AgentDock',
-    );
-    expect(pageTitleOf(crumbsFor('/projects'))).toBe('Projects · AgentDock');
-    expect(pageTitleOf(crumbsFor('/'))).toBe('Overview · AgentDock');
+  test('anywhere else it is "<Page> · Nautelle"', () => {
+    expect(pageTitleOf(crumbsFor('/admin/runners'))).toBe('Runners · Nautelle');
+    expect(pageTitleOf(crumbsFor('/projects'))).toBe('Projects · Nautelle');
+    expect(pageTitleOf(crumbsFor('/'))).toBe('Overview · Nautelle');
     expect(pageTitleOf(crumbsFor('/admin/planner'))).toBe(
-      'Planner instructions · AgentDock',
+      'Planner instructions · Nautelle',
     );
   });
 });

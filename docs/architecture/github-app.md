@@ -1,6 +1,6 @@
 # GitHub App
 
-How AgentDock learns about issue, pull request and check changes the moment
+How Nautelle learns about issue, pull request and check changes the moment
 they happen, and what happens when GitHub cannot reach it. Decisions:
 [spec 27](../specs/27-github-app.md); actions on GitHub stay on the runner's
 `gh` ([ADR-0004](../adr/0004-github-issues-are-the-task-queue.md)).
@@ -32,7 +32,7 @@ GitHub ──POST /hooks/github──▶ API ──verify, dedupe, map──▶ 
 GitHub must reach `<PUBLIC_URL>/hooks/github` over HTTPS. Only that one path
 needs to be public; everything else can stay on the private network. The
 browser-based registration (manifest flow) needs only the browser to reach
-AgentDock, so it works on a home server either way.
+Nautelle, so it works on a home server either way.
 
 | Option | When | Notes |
 |---|---|---|
@@ -43,10 +43,10 @@ AgentDock, so it works on a home server either way.
 Set `PUBLIC_URL` in `apps/api/.env` to the public HTTPS base **before**
 creating the App: the manifest's hook URL is built from it. Created without
 `PUBLIC_URL`, the App's hook is **inactive**; enable it later in the App's
-settings on GitHub, and re-enter the credentials so AgentDock records the
+settings on GitHub, and re-enter the credentials so Nautelle records the
 hook as active.
 
-## When GitHub cannot reach AgentDock
+## When GitHub cannot reach Nautelle
 
 Nothing breaks. A project is `healthy` only while verified deliveries arrive
 for its installation (or a resync just confirmed that GitHub's latest delivery

@@ -17,7 +17,7 @@ export default function AboutPage() {
       <Section title="Product">
         <KeyValueList
           items={[
-            { key: 'name', label: 'Name', value: 'AgentDock' },
+            { key: 'name', label: 'Name', value: 'Nautelle' },
             {
               key: 'version',
               label: 'Version',

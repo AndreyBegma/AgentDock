@@ -8,7 +8,7 @@
     {
       "name": "agentdock",
       "source": "./plugins/agentdock",
-      "description": "Reports Claude Code sessions to AgentDock through the local runner and gives the model fleet, queue and budget tools."
+      "description": "Reports Claude Code sessions to Nautelle through the local runner and gives the model fleet, queue and budget tools."
     }
   ]
 }

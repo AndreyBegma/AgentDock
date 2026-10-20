@@ -48,7 +48,7 @@ export function prTargetNotice(
   if (merged) {
     return {
       tone: 'warn',
-      text: `The pull request goes into ${label}’s branch (${target.branch}), but ${label}’s own pull request has already merged — merging this one there would never reach the base. AgentDock moves it onto the base; if it stays here, retarget it on GitHub.`,
+      text: `The pull request goes into ${label}’s branch (${target.branch}), but ${label}’s own pull request has already merged — merging this one there would never reach the base. Nautelle moves it onto the base; if it stays here, retarget it on GitHub.`,
     };
   }
   return {

@@ -8,7 +8,7 @@
 
 **Attacker.** Anyone who can write card text: a project member, an imported issue author, a prompt-injected planner or capture run.
 
-**Scenario.** Card text that contains its own `##` sections (for example a fake "How to work" block) reads to the worker as part of AgentDock's instructions; a newline in the title starts a new prompt section.
+**Scenario.** Card text that contains its own `##` sections (for example a fake "How to work" block) reads to the worker as part of Nautelle's instructions; a newline in the title starts a new prompt section.
 
 **Impact.** Instruction injection into an agent that commits and pushes code, and may auto-merge (see D-12, implemented by WI-46).
 

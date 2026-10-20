@@ -148,7 +148,7 @@ describe('board accept with merge (e2e, #273)', () => {
           headSha: HEAD_SHA,
           method: 'squash',
           issue: 41,
-          comment: 'Completed as C-1 on the AgentDock board; merged in #77.',
+          comment: 'Completed as C-1 on the Nautelle board; merged in #77.',
         },
       ]);
       await w.work.settled();
@@ -388,7 +388,7 @@ describe('board accept with merge (e2e, #273)', () => {
           pr: 77,
           deleteBranch: true,
           issue: null,
-          comment: 'Closed from the AgentDock Board (C-1)',
+          comment: 'Closed from the Nautelle Board (C-1)',
         },
       ]);
       expect(w.sent('card.merge')).toEqual([]);

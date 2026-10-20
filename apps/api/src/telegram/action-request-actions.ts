@@ -72,11 +72,11 @@ export type ActionRequestRefusal =
   | 'role';
 
 const REFUSALS: Record<ActionRequestRefusal, string> = {
-  invalid_button: 'This button is no longer valid. Decide in AgentDock.',
-  not_linked: 'This chat is not linked to AgentDock.',
+  invalid_button: 'This button is no longer valid. Decide in Nautelle.',
+  not_linked: 'This chat is not linked to Nautelle.',
   unknown_message:
-    'This message is not one AgentDock can act on any more. Decide in AgentDock.',
-  inactive_user: 'Your AgentDock account is not active.',
+    'This message is not one Nautelle can act on any more. Decide in Nautelle.',
+  inactive_user: 'Your Nautelle account is not active.',
   not_member: 'You are not a member of this project any more.',
   role: 'Only an operator or an admin of this project can decide this request.',
 };
@@ -92,9 +92,9 @@ export const actionRequestErrorText = (code: string | null): string => {
     case 'self_approval':
       return 'You cannot approve your own request. Another operator or an admin has to.';
     case 'not_found':
-      return 'This request is not in AgentDock any more.';
+      return 'This request is not in Nautelle any more.';
     default:
-      return 'The decision could not be recorded. Try again, or decide in AgentDock.';
+      return 'The decision could not be recorded. Try again, or decide in Nautelle.';
   }
 };
 

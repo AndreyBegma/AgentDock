@@ -1079,7 +1079,7 @@ export class BoardService implements OnModuleInit {
           pr,
           deleteBranch: request.deleteBranch,
           issue,
-          comment: `Closed from the AgentDock Board (${cardLabel(card.number)})`,
+          comment: `Closed from the Nautelle Board (${cardLabel(card.number)})`,
         },
         { role: actor.role, ctx: actor.ctx },
       ),

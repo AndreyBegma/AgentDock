@@ -250,7 +250,7 @@ export const ORCHESTRATOR_STATUS_HINT: Record<OrchestratorStatus, string> = {
   absent:
     'No orchestrator session was found on the project’s machine. Start it to dispatch work.',
   unknown:
-    'AgentDock has not heard from the project’s machine yet, so it cannot say.',
+    'Nautelle has not heard from the project’s machine yet, so it cannot say.',
 };
 
 /** One-line hints for the orchestrator card’s facts. */
@@ -317,7 +317,7 @@ export function boardErrorView(error: {
 export const CHANNEL_EXPLANATION: Record<FleetChannel, string | null> = {
   events: null,
   scraped:
-    'Scraped: AgentDock is reading the orchestrator’s markdown files because the Code Sentinel plugin sent no events in the last 24 hours. The facts are right but can lag a minute or two.',
+    'Scraped: Nautelle is reading the orchestrator’s markdown files because the Code Sentinel plugin sent no events in the last 24 hours. The facts are right but can lag a minute or two.',
   both: 'Mixed: some facts come from plugin events, the rest from scraping the orchestrator’s markdown files.',
 };
 

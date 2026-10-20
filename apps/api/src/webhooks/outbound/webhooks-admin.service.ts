@@ -34,7 +34,7 @@ import {
   webhookAuditState,
 } from './webhook-mapper';
 
-const TEST_MESSAGE = 'Test delivery from AgentDock';
+const TEST_MESSAGE = 'Test delivery from Nautelle';
 
 /** A webhook's columns for a view, with its newest delivery. */
 const VIEW_SELECT = {

@@ -160,7 +160,7 @@ export function groupLabel(
 
 /**
  * Spend from sessions that ran outside every project's repository — on a
- * runner, but in no checkout AgentDock knows. Admins see it; members do not.
+ * runner, but in no checkout Nautelle knows. Admins see it; members do not.
  */
 export const MACHINE_WIDE_HINT =
   'Sessions that ran on a runner outside every project’s repository, so no project can be charged with them.';

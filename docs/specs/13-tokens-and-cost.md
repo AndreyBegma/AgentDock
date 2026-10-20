@@ -204,7 +204,7 @@ and pinned in `apps/web` before i13-web starts.
 | Codex OTel attribute names differ from the research notes | medium | D13: fixture first; without one, Codex mapping ships behind `otlp.codexExperimental` and transcripts remain its source |
 | Double counting reasoning tokens or cache writes between OTel and transcripts | high | D5 and D15; the randomized rollup test and the end-to-end dedupe test |
 | Langfuse snapshot goes stale; new models appear unpriced | low | unpriced is visible, not zero; admins add a version; refreshing the snapshot is a future seed version |
-| glass-ui#67 not released when i13-web is due | medium | the orchestrator cannot see it: i13-web reports `blocked` naming the missing component; fallback is existing `Table` / `Card` / `Progress` primitives with a follow-up issue to swap — never components written inside AgentDock (ADR-0011) |
+| glass-ui#67 not released when i13-web is due | medium | the orchestrator cannot see it: i13-web reports `blocked` naming the missing component; fallback is existing `Table` / `Card` / `Progress` primitives with a follow-up issue to swap — never components written inside Nautelle (ADR-0011) |
 | Rollup upsert under concurrent ingestion | medium | `INSERT … ON CONFLICT (hour, dimensionKey) DO UPDATE SET x = x + excluded.x`; a test runs parallel ingests |
 | Plugin change P4 not landed, so dispatched workers send no OTel | low | transcripts (#12) still price everything; only latency differs |
 

@@ -74,7 +74,7 @@ export function ApproveDialog({
       title={`Approve #${pr}?`}
       consequence={
         <>
-          Lets the orchestrator merge this pull request; AgentDock never merges
+          Lets the orchestrator merge this pull request; Nautelle never merges
           itself. The approval is bound to commit{' '}
           <code className="font-mono text-xs">{headSha.slice(0, 12)}</code>, and
           a later push voids it.

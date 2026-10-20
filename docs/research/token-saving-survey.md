@@ -1,4 +1,4 @@
-# Survey: open-source token-saving tools and what AgentDock adopts
+# Survey: open-source token-saving tools and what Nautelle adopts
 
 Issue: [#650](https://github.com/AndreyBegma/AgentDock/issues/650) ·
 Spec: [`docs/specs/650-survey-open-source-token-saving-tools-an.md`](../specs/650-survey-open-source-token-saving-tools-an.md) ·
@@ -7,7 +7,7 @@ Date: 2026-10-19
 ## Scope and method
 
 This survey compares nine open-source projects that cut the tokens a coding
-agent reads or writes with what AgentDock already does:
+agent reads or writes with what Nautelle already does:
 
 - [ADR-0039](../adr/0039-token-saver.md) — the decision;
 - `apps/runner/src/filter/` — the command-output filter (families `js`, `lang`,
@@ -51,7 +51,7 @@ so they cannot be compared across rows.
 | 8 | [Repomix](https://github.com/yamadashy/repomix) | Repo packing; tree-sitter `--compress` | MIT | Fits; packing works against us | **Reject** (folded into 7) |
 | 9 | [context-mode](https://github.com/mksglu/context-mode) | Sandboxed execution; raw output kept out of context | ELv2 (badge, LICENSE not read) | Fits; licence blocks copying | **Adapt** (idea only) |
 
-No project earns a plain **adopt**: AgentDock ships its own binary
+No project earns a plain **adopt**: Nautelle ships its own binary
 (ADR-0017), the licences of the strongest candidates (BUSL-1.1, GPL-3.0, ELv2)
 rule out copying or bundling, and the rest either overlap what ADR-0039
 already does or send code off the machine.
@@ -77,10 +77,10 @@ already does or send code off the machine.
   (ADR-0039 and the card record the engine as BUSL-1.1; the README's wording is
   more nuanced but the conclusion is the same. Re-read the licence files before
   any reuse question comes up.)
-- **Fit.** The technique is already implemented clean-room in AgentDock
+- **Fit.** The technique is already implemented clean-room in Nautelle
   (`filter/families/*`, ADR-0039 decision 1). ADR-0001: runner-side, fits.
   ADR-0010: the hook is a launch setting, not a runner command, fits.
-- **What AgentDock does that rtk does not (per its README).** Read guard and
+- **What Nautelle does that rtk does not (per its README).** Read guard and
   read dedup (`read-guard.ts`), a raw-output file per run, `AGENTDOCK_RAW=1`
   bypass, a regression corpus asserting error lines survive, permission-mode
   aware rewriting (ADR-0039 decision 7).
@@ -112,10 +112,10 @@ already does or send code off the machine.
 - **Licence.** Apache-2.0 (the sidebar also lists MIT; see the repo's
   `LICENSING.md`). Trademarks on the name and logo.
 - **Fit.** Prompt only. ADR-0001 and ADR-0010 not engaged.
-- **Already in AgentDock.** The two-register rule of ADR-0039 decision 4: terse
+- **Already in Nautelle.** The two-register rule of ADR-0039 decision 4: terse
   work, full prose for anything a person reads, enforced on `finish_card`.
   This is the same idea with the same safety carve-out.
-- **Verdict: adapt.** Do not import the skill; AgentDock's register is
+- **Verdict: adapt.** Do not import the skill; Nautelle's register is
   stricter about what stays full-length. Take the one thing it has that we do
   not: *measurement of the register's effect*. See proposal P2.
 
@@ -133,11 +133,11 @@ already does or send code off the machine.
 - **Licence.** Application GPL-3.0-or-later; SolidLSP (`src/solidlsp`) MIT; a
   combination is GPL as a whole; contributions need a CLA. Bundling or linking
   it into the runner binary is out. Running it as a separate process the user
-  installs is not a licence problem for AgentDock.
+  installs is not a licence problem for Nautelle.
 - **Fit.** An agent-side MCP server on the runner machine: ADR-0001 not
   violated, ADR-0010 not engaged. Needs a language server per language per
-  project — a setup cost AgentDock should not own.
-- **Verdict: reject** as something AgentDock ships or wires by default. A
+  project — a setup cost Nautelle should not own.
+- **Verdict: reject** as something Nautelle ships or wires by default. A
   project that wants it already can: the per-project MCP allowlist of ADR-0039
   decision 3 admits any server in the profile. Worth one line in the Token saver
   guide (P5), nothing more.
@@ -156,9 +156,9 @@ already does or send code off the machine.
 - **Fit.** It needs Milvus or Zilliz Cloud (`MILVUS_ADDRESS`, `MILVUS_TOKEN`)
   and an embedding provider (OpenAI, VoyageAI, Gemini or local Ollama), Node
   20+. With a hosted vector DB and hosted embeddings, project source leaves the
-  machine; AgentDock is self-hosted software that promises the opposite
+  machine; Nautelle is self-hosted software that promises the opposite
   (ADR-0001's reason for the runner). With Milvus and Ollama both local it fits
-  technically, but then AgentDock would own a database and an embedding model.
+  technically, but then Nautelle would own a database and an embedding model.
 - **Verdict: reject** as a default. As an opt-in it goes through the same MCP
   allowlist as Serena. Not worth wiring.
 
@@ -195,7 +195,7 @@ already does or send code off the machine.
   — "40 % lower token usage" — is a sponsor's claim about the sponsor's own
   product.) Source: <https://github.com/ryoppippi/ccusage>.
 - **Licence.** MIT.
-- **Fit.** Fits, but AgentDock already does this and more:
+- **Fit.** Fits, but Nautelle already does this and more:
   [`cost-model.md`](../architecture/cost-model.md) records six token buckets
   per request from OTel and transcripts, with a versioned price table seeded
   from Langfuse's MIT price file. ADR-0039 decision 6 shows the filter's
@@ -326,7 +326,7 @@ one engineer familiar with the runner.
 - **Where.** The Token saver guide under `docs/guides/`.
 - **What.** State that Serena, claude-context and similar servers can be
   allowed per project through the MCP allowlist, with the licence (GPL-3.0)
-  and data-egress (hosted vector DB and embeddings) caveats above; AgentDock
+  and data-egress (hosted vector DB and embeddings) caveats above; Nautelle
   neither ships nor configures them.
 - **Size.** S (docs only).
 

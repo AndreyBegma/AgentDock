@@ -1,16 +1,20 @@
 /**
- * The AgentDock mark: a dock (the rounded tile) holding a fleet of slots, the
- * last one carrying the live agent's dot. Drawn on a 32-unit grid so every
- * edge lands on a half pixel at 16 px; the slots and the dot are cut out of
- * the tile (even-odd), so the mark is one colour — `currentColor` — on any
- * surface. `app/icon.svg` and `app/apple-icon.png` are the same geometry.
+ * The Nautelle mark, a placeholder until the real logo arrives (C-295): a
+ * sailboat — mainsail, jib and hull — on the rounded tile, with the live
+ * agent's dot as the sun. Drawn on a 32-unit grid; the boat and the dot are
+ * cut out of the tile (even-odd), so the mark is one colour — `currentColor` —
+ * on any surface. `app/icon.svg` and `app/apple-icon.png` are the same
+ * geometry.
  */
 export const LOGOMARK_PATH =
   'M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H10a8 8 0 0 1-8-8V10a8 8 0 0 1 8-8z' +
-  'M9.75 9h12.5a1.75 1.75 0 0 1 0 3.5H9.75a1.75 1.75 0 0 1 0-3.5z' +
-  'M9.75 14.25h7.5a1.75 1.75 0 0 1 0 3.5h-7.5a1.75 1.75 0 0 1 0-3.5z' +
-  'M9.75 19.5h3.5a1.75 1.75 0 0 1 0 3.5h-3.5a1.75 1.75 0 0 1 0-3.5z' +
-  'M18.5 21.25a2.75 2.75 0 1 0 5.5 0a2.75 2.75 0 1 0-5.5 0z';
+  'M14.5 6v14H7z' +
+  'M16.5 9.5V20h6z' +
+  'M7 22h18l-2.5 3.5h-13z' +
+  'M20 8.25a2.25 2.25 0 1 0 4.5 0a2.25 2.25 0 1 0-4.5 0z';
+
+/** The agent's dot, filled with the accent when the mark asks for it. */
+export const LOGOMARK_DOT = { cx: 22.25, cy: 8.25, r: 2.25 } as const;
 
 type LogomarkProps = {
   /** Rendered width and height in px. */
@@ -31,9 +35,7 @@ export function Logomark({
   const shape = (
     <>
       <path fill="currentColor" fillRule="evenodd" d={LOGOMARK_PATH} />
-      {accent ? (
-        <circle cx="21.25" cy="21.25" r="2.75" fill="var(--color-accent)" />
-      ) : null}
+      {accent ? <circle {...LOGOMARK_DOT} fill="var(--color-accent)" /> : null}
     </>
   );
   return title ? (

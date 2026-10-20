@@ -390,7 +390,7 @@ export class AssistantBoardTools implements OnModuleInit {
         { projectId: p.id, role: p.role, ctx: ctx.ctx, meta: auditor.meta },
         {
           title: card.title,
-          body: `${card.body}\n\n---\nHanded off from ${card.label} by the AgentDock assistant.`,
+          body: `${card.body}\n\n---\nHanded off from ${card.label} by the Nautelle assistant.`,
           labels: [],
           queue: true,
         },

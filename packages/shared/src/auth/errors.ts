@@ -16,7 +16,7 @@ export const AUTH_ERROR = {
   telegramInvalid: 'telegram_init_data_invalid',
   /** #580: Mini App `initData` older than the sign-in allows; reopen the app. */
   telegramExpired: 'telegram_init_data_expired',
-  /** #580: no AgentDock account is linked to this Telegram user. */
+  /** #580: no Nautelle account is linked to this Telegram user. */
   telegramNotLinked: 'telegram_not_linked',
   /** #580: no usable bot token, so no `initData` can be checked. */
   telegramNotConfigured: 'telegram_not_configured',

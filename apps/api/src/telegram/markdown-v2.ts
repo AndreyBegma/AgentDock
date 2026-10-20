@@ -71,7 +71,7 @@ export const formatMessage = (
     ...(headSha
       ? [`${escapeMarkdownV2('Head')} \`${escapeCode(shortSha(headSha))}\``]
       : []),
-    ...linkLine('Open in AgentDock', appLink(appUrl, content.link)),
+    ...linkLine('Open in Nautelle', appLink(appUrl, content.link)),
   ];
   return lines.join('\n');
 };

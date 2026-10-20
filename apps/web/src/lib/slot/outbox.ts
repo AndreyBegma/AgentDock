@@ -42,7 +42,7 @@ export const OUTBOX_CLOCK_SKEW_MS = 60_000;
 /**
  * Whether the conversation already shows `entry`: an orchestrator message,
  * seen no earlier than it was sent (less the skew), whose body carries the
- * text. AgentDock's own message file adds a `From:` / `Date:` header, so the
+ * text. Nautelle's own message file adds a `From:` / `Date:` header, so the
  * body contains the text rather than equals it.
  */
 export function isDelivered(

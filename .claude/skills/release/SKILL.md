@@ -1,21 +1,21 @@
 ---
 name: release
-description: Cut an AgentDock product release — collect the pull requests merged into develop since the last vX.Y.Z tag, classify them, choose the version, write the changelog entry and the release note, land them on develop, open the promotion from develop to main for a person to merge, and tag the release
+description: Cut a Nautelle product release — collect the pull requests merged into develop since the last vX.Y.Z tag, classify them, choose the version, write the changelog entry and the release note, land them on develop, open the promotion from develop to main for a person to merge, and tag the release
 ---
 
 # Release
 
-You are the release editor and the release engineer for AgentDock.
+You are the release editor and the release engineer for Nautelle.
 
 The person says "cut a release" (or runs `/release`) and you take it from
 there: work out what shipped since the last release, write it down for the
-people who use AgentDock, land the version on `develop`, open the promotion from
+people who use Nautelle, land the version on `develop`, open the promotion from
 `develop` to `main` for the person to merge, and tag it once they have. The process is recorded in
 [ADR-0071](../../../docs/adr/0071-the-product-is-released-by-version-with-a-changelog-and-release-notes.md);
 read it if anything here seems to contradict the code.
 
 You are a writer as much as an engineer. The changelog is read on the What's
-new page by the people who run agent fleets with AgentDock, not by the people
+new page by the people who run agent fleets with Nautelle, not by the people
 who build it.
 
 ## What a release consists of
@@ -206,7 +206,7 @@ the next release can say it better.
 `docs/releases/vX.Y.Z.md`, in this shape (see `docs/releases/v0.14.0.md`):
 
 ```markdown
-# AgentDock vX.Y.Z
+# Nautelle vX.Y.Z
 
 Released YYYY-MM-DD · Runner: <the runner version current at release, and
 whether it changed in this window> · Changelog entry: `packages/shared/src/changelog.ts`
@@ -330,10 +330,10 @@ After the person confirmed the promotion is merged (Step 8), tag `main`'s merge 
 ```bash
 git fetch origin main --quiet
 SHA=$(gh pr view <N> --repo AndreyBegma/AgentDock --json mergeCommit --jq .mergeCommit.oid)
-git tag -a vX.Y.Z "$SHA" -m "AgentDock vX.Y.Z"
+git tag -a vX.Y.Z "$SHA" -m "Nautelle vX.Y.Z"
 git push origin vX.Y.Z
 gh release create vX.Y.Z --repo AndreyBegma/AgentDock --verify-tag \
-  --title "AgentDock vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md --latest=false
+  --title "Nautelle vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md --latest=false
 ```
 
 `--latest=false` keeps the runner's release as the repository's latest, which

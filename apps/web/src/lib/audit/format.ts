@@ -115,12 +115,12 @@ export function describeVerification(v: AuditVerification): string {
 
 /**
  * What a broken chain means and what to do (rule R4): records from the break
- * on were changed or removed outside AgentDock, so the log no longer proves
+ * on were changed or removed outside Nautelle, so the log no longer proves
  * them.
  */
 export function brokenChainCopy(v: AuditVerification): string {
   const at = v.firstBrokenSeq ?? '?';
-  return `Record ${at} or one after it was changed or deleted outside AgentDock, directly in the database. From there on this log no longer proves what happened. Export the CSV now to keep what is left, then compare the audit_records table with your latest database backup and check who had database access.`;
+  return `Record ${at} or one after it was changed or deleted outside Nautelle, directly in the database. From there on this log no longer proves what happened. Export the CSV now to keep what is left, then compare the audit_records table with your latest database backup and check who had database access.`;
 }
 
 /** True when any filter is set: "nothing matches" is only said then (rule R3). */

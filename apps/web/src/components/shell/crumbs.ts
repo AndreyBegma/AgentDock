@@ -105,13 +105,13 @@ export function crumbsFor(
 }
 
 /** The product, the second half of every tab title outside a project. */
-export const APP_NAME = 'AgentDock';
+export const APP_NAME = 'Nautelle';
 
 /**
- * The tab title for the trail (#213): `"<Page> · AgentDock"`, and inside a
+ * The tab title for the trail (#213): `"<Page> · Nautelle"`, and inside a
  * project `"<Page> · <Project>"`, so two tabs on Fleet of two projects can be
- * told apart and a project named AgentDock does not read "AgentDock ·
- * AgentDock". `projectName` is the project's real name: until it is known the
+ * told apart and a project named Nautelle does not read "Nautelle ·
+ * Nautelle". `projectName` is the project's real name: until it is known the
  * project half falls back to the product rather than to the crumb's kind.
  */
 export function pageTitleOf(

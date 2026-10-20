@@ -6,7 +6,7 @@ Decisions: [ADR-0008](../adr/0008-local-accounts-with-admin-approved-registratio
 
 ## Summary
 
-AgentDock starts agents on the owner's machines and subscriptions, so nobody
+Nautelle starts agents on the owner's machines and subscriptions, so nobody
 reaches it without an account an admin has approved. This delivers local
 accounts: the first admin is created from the command line, people register
 only while an admin has registration open, every new account waits for an admin

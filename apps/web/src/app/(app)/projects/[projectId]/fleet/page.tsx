@@ -275,7 +275,7 @@ function FleetWorkspace() {
   const queueEmpty = (
     <EmptyState
       title="The queue is empty"
-      description={`${EMPTY_FLEET_DESCRIPTION} AgentDock does not create agents itself: queue an issue and the orchestrator dispatches it.`}
+      description={`${EMPTY_FLEET_DESCRIPTION} Nautelle does not create agents itself: queue an issue and the orchestrator dispatches it.`}
       action={
         <div className="flex flex-wrap items-center justify-center gap-3">
           {canOperate ? (

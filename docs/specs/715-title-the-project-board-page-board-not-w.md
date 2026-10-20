@@ -3,7 +3,7 @@
 Issue: #715
 
 ## What happens
-After C-282 the project navigation, the breadcrumb and the phone top bar call the page **Board**, but the page's own header still says **Work** (`apps/web/src/app/(app)/projects/[projectId]/board/`, the board header / PageHeader title), and the browser title is "Board · AgentDock". Seen on staging at 1440, 820 and 375 px on 2026-10-20.
+After C-282 the project navigation, the breadcrumb and the phone top bar call the page **Board**, but the page's own header still says **Work** (`apps/web/src/app/(app)/projects/[projectId]/board/`, the board header / PageHeader title), and the browser title is "Board · Nautelle". Seen on staging at 1440, 820 and 375 px on 2026-10-20.
 
 ## What to do
 - Make the page header title "Board" inside a project. Keep the workspace-level "Work" page (cross-project) named "Work".

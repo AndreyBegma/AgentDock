@@ -144,7 +144,7 @@ describe('surviving an API restart (spec 353)', () => {
     expect(sleeps).toEqual([]);
     expect(error).toBeInstanceOf(ApiUnreachableError);
     expect(describeError(error)).toBe(
-      'AgentDock was restarting — nothing was changed. Try again',
+      'Nautelle was restarting — nothing was changed. Try again',
     );
   });
 

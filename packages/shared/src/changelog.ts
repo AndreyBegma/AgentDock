@@ -38,7 +38,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       {
         kind: 'new',
-        text: 'AgentDock has versioned releases, and What’s new in the account menu shows what each one brought.',
+        text: 'Nautelle has versioned releases, and What’s new in the account menu shows what each one brought.',
       },
       {
         kind: 'improved',

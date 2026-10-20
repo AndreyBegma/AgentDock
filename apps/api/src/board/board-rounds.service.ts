@@ -260,7 +260,7 @@ export class BoardRoundsService {
   }
 
   /**
-   * #359 D6: AgentDock's own round for a red check or a merge conflict on
+   * #359 D6: Nautelle's own round for a red check or a merge conflict on
    * the card's PR — the system actor, the card's session resumed, the
    * `ci_fix` prompt. Counts one of the PR's `ci_fix` attempts. Refused like
    * any round (running, no room, budget); the poller tries again.

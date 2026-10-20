@@ -74,7 +74,7 @@ const decodePart = (part: string | undefined, bytes?: number): Buffer => {
 };
 
 /**
- * AES-256-GCM sealing of secrets stored by AgentDock (spec 22 D8,
+ * AES-256-GCM sealing of secrets stored by Nautelle (spec 22 D8,
  * security.md "Secrets at rest"). Each value gets a fresh random IV; the GCM
  * tag makes any change to the stored string fail to open. Without a usable key
  * `available` is false and every call throws `key_unavailable` — the features

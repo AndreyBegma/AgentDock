@@ -29,7 +29,7 @@ export class TerminalSetupController {
   }
 
   /**
-   * #719: hide a profile from AgentDock on the project's runner, or show it
+   * #719: hide a profile from Nautelle on the project's runner, or show it
    * again. A project admin's: it changes the checklist of every project on
    * that runner.
    */

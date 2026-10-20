@@ -19,7 +19,7 @@ export const QUEUE_STATE_LABELS: Record<QueueState, string> = {
   no_spec: 'NO SPEC',
 };
 
-/** `computed`: AgentDock's D3 rules; `orchestrator`: a fresher round's verdict (D4). */
+/** `computed`: Nautelle's D3 rules; `orchestrator`: a fresher round's verdict (D4). */
 export const QUEUE_SOURCES = ['computed', 'orchestrator'] as const;
 export type QueueSource = (typeof QUEUE_SOURCES)[number];
 
@@ -46,8 +46,8 @@ export interface QueueItemView extends QueueVerdict {
   assignees: string[];
   source: QueueSource;
   /**
-   * AgentDock's own verdict when `source` is `orchestrator` (D4: the UI notes
-   * "AgentDock computes X" when it differs); null otherwise.
+   * Nautelle's own verdict when `source` is `orchestrator` (D4: the UI notes
+   * "Nautelle computes X" when it differs); null otherwise.
    */
   computed: QueueVerdict | null;
   priority: QueuePriority | null;

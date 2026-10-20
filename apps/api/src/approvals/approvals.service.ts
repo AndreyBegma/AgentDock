@@ -115,7 +115,7 @@ export const voidApprovedRow = async (
  * The approval decisions (spec 20 D5–D8, D10): approve, request changes, and
  * the void of an approval whose PR moved. Every decision is bound to the head
  * the person saw, re-read from GitHub uncached; every outcome is audited.
- * AgentDock never merges (ADR-0005) — it signals the orchestrator.
+ * Nautelle never merges (ADR-0005) — it signals the orchestrator.
  */
 @Injectable()
 export class ApprovalsService {
@@ -474,12 +474,12 @@ export class ApprovalsService {
   private async decider(
     ctx: AuditContext,
   ): Promise<{ userId: string | null; label: string }> {
-    if (ctx.actor.type !== 'user') return { userId: null, label: 'AgentDock' };
+    if (ctx.actor.type !== 'user') return { userId: null, label: 'Nautelle' };
     const user = await this.prisma.user.findUnique({
       where: { id: ctx.actor.userId },
       select: { id: true, name: true, email: true },
     });
-    if (!user) return { userId: null, label: 'AgentDock' };
+    if (!user) return { userId: null, label: 'Nautelle' };
     return { userId: user.id, label: user.name?.trim() || user.email };
   }
 }

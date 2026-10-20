@@ -97,7 +97,7 @@ export function SessionsTab({
       <Card pad="lg" className="flex flex-col gap-6">
         <SectionHeader
           title="Session content"
-          description="Claude Code sessions started by hand report to AgentDock through the agentdock plugin. By default only their metadata is kept."
+          description="Claude Code sessions started by hand report to Nautelle through the agentdock plugin. By default only their metadata is kept."
         />
         <form className="flex flex-col gap-4" onSubmit={save}>
           <div className="flex items-center justify-between gap-4">

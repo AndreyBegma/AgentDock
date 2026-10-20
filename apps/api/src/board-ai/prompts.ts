@@ -20,7 +20,7 @@ export const askQueryPrompt = (input: {
   projects: { displayName: string; repo: string }[];
 }): string =>
   [
-    'You turn a question about an AgentDock Board into a search query. AgentDock is a control plane for agent fleets: each project has a Board of cards (columns inbox, todo, in_progress, finished, completed), cards open pull requests, and an activity feed records what happened.',
+    'You turn a question about a Nautelle Board into a search query. Nautelle is a control plane for agent fleets: each project has a Board of cards (columns inbox, todo, in_progress, finished, completed), cards open pull requests, and an activity feed records what happened.',
     'Answer with one JSON object and nothing else:',
     `{"language": "<BCP 47 primary code of the question, e.g. en, ru>", "projects": [<project names the question names, from the list below; [] for all>], "text": [<at most 8 keywords a matching title must contain, in English>], "columns": [<any of ${list(BOARD_COLUMNS)}>], "kind": <${list(BOARD_CARD_KINDS)} or null>, "prState": <${list(BOARD_ASK_PR_STATES)} or null>, "checks": <${list(BOARD_ASK_CHECKS)} or null>, "withinDays": <number or null>, "sources": [<any of ${list(BOARD_ASK_SOURCES)}; [] for all>]}`,
     'Stored text is English: translate keywords to English. Leave out words that only say what to search ("cards", "show", "which"). Use a field only when the question asks for it; null and [] narrow nothing.',
@@ -51,7 +51,7 @@ export const askAnswerPrompt = (input: {
   total: number;
 }): string =>
   [
-    'You answer a question about an AgentDock Board from search results. Use only the results; never invent cards, pull requests or numbers.',
+    'You answer a question about a Nautelle Board from search results. Use only the results; never invent cards, pull requests or numbers.',
     `Write in the language of the question (code ${input.language}; if that is "und", the question's own language). At most three short sentences, plain text, no Markdown headings or lists.`,
     'Name the cards and pull requests you mention exactly as written in brackets, e.g. [C-12] or [PR #34]; the reader sees them as links.',
     'When there are no results, say nothing matched and suggest one way to ask differently.',
@@ -82,7 +82,7 @@ export const triagePrompt = (input: {
   open: TriageCandidate[];
 }): string =>
   [
-    'You triage a new card on an AgentDock Board. Your answer is shown to a person as hints they may apply or dismiss; it changes nothing by itself.',
+    'You triage a new card on a Nautelle Board. Your answer is shown to a person as hints they may apply or dismiss; it changes nothing by itself.',
     'Answer with one JSON object and nothing else:',
     '{"duplicates": [{"number": <an open card number from the list>, "reason": "<one short sentence>"}], "kind": {"value": "bug" | "feature", "reason": "<one short sentence>"}, "priority": {"value": "high" | "normal" | "low", "reason": "<one short sentence>"}}',
     'A duplicate asks for the same change as the new card, not merely the same area. List none when unsure.',

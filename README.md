@@ -1,6 +1,6 @@
 <div align="center">
 
-# AgentDock
+# Nautelle
 
 **One place to see, steer, approve and pay for every AI coding agent you run.**
 
@@ -21,11 +21,11 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
-  <img alt="You talk to AgentDock from the web app, Telegram or the terminal; AgentDock drives Claude Code agents on your own machines through a runner on each one" src="docs/assets/hero-light.svg">
+  <img alt="You talk to Nautelle from the web app, Telegram or the terminal; Nautelle drives Claude Code agents on your own machines through a runner on each one" src="docs/assets/hero-light.svg">
 </picture>
 
-AgentDock is a **self-hosted control plane for Claude Code agent fleets**. You
-describe work in one sentence. AgentDock interviews you, turns the answer into
+Nautelle is a **self-hosted control plane for Claude Code agent fleets**. You
+describe work in one sentence. Nautelle interviews you, turns the answer into
 cards, can draw a design for them and runs a dedicated agent per card on your
 own machines. Each agent opens a pull request and fixes its own CI. You stay in
 charge of what merges, what it costs and what an agent may do. You do this from
@@ -94,7 +94,7 @@ flowchart LR
   ([ADR-0001](docs/adr/0001-control-plane-and-per-machine-runner.md)).
 - **The runner runs typed commands from an allowlist.** It never runs a shell
   string ([ADR-0010](docs/adr/0010-typed-command-allowlist-on-the-runner.md)).
-- **GitHub is the task queue for the fleet.** Board cards belong to AgentDock
+- **GitHub is the task queue for the fleet.** Board cards belong to Nautelle
   ([ADR-0004](docs/adr/0004-github-issues-are-the-task-queue.md),
   [ADR-0024](docs/adr/0024-board-cards-and-dedicated-card-workers.md)).
 

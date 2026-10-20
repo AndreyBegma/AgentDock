@@ -11,7 +11,7 @@ import {
 import { isHttpsGithubUrl } from '../protocol/github-url';
 
 /**
- * Code Sentinel's `events.jsonl` (spec 16, plugin `EVENTS.md`) → AgentDock's
+ * Code Sentinel's `events.jsonl` (spec 16, plugin `EVENTS.md`) → Nautelle's
  * envelope. The plugin writes the event-schema.md type names, but not every
  * `data` shape: this is the one place that maps them, for the runner's
  * `events` collector to call per line before it assigns `seq`.

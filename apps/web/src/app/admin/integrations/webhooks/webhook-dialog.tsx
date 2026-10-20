@@ -112,7 +112,7 @@ export function WebhookDialog({
     <DialogRoot open={open} onOpenChange={(next) => !next && close()}>
       <DialogContent
         title={webhook ? 'Edit webhook' : 'New webhook'}
-        description="AgentDock POSTs the chosen events to this URL, signed with the webhook’s secret."
+        description="Nautelle POSTs the chosen events to this URL, signed with the webhook’s secret."
         footer={
           <div className="flex flex-col items-end gap-1">
             <div className="flex gap-2">

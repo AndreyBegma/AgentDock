@@ -714,7 +714,7 @@ export class BoardWork implements OnModuleInit {
           headSha,
           method: mergeMethodOf(project.codeSentinelConfig),
           issue: card.issueNumber,
-          comment: `Completed as ${cardLabel(card.number)} on the AgentDock board; merged in #${pr}.`,
+          comment: `Completed as ${cardLabel(card.number)} on the Nautelle board; merged in #${pr}.`,
           // #329 D9: an older runner refuses the arg; it is sent only when asked.
           ...(deleteBranch ? { deleteBranch } : {}),
         },

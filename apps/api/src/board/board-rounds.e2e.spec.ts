@@ -394,7 +394,7 @@ describe('board rounds (e2e)', () => {
       });
       expect(issue).not.toHaveProperty('readyLabel');
       expect(issue.body).toContain(
-        'Tracked on AgentDock board card C-1 — worked by a dedicated worker, not queued for the orchestrator.',
+        'Tracked on Nautelle board card C-1 — worked by a dedicated worker, not queued for the orchestrator.',
       );
       const card = await w.card(1);
       expect(card).toMatchObject({

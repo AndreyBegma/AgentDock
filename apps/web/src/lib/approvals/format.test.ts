@@ -76,22 +76,22 @@ describe('mismatchSentence', () => {
     ).toBeNull();
   });
 
-  test('AgentDock on, config off: the orchestrator merges on its own', () => {
+  test('Nautelle on, config off: the orchestrator merges on its own', () => {
     expect(
       mismatchSentence({ agentdock: true, config: false }, true),
     ).toContain('merge on its own');
   });
 
-  test('AgentDock on, config unread: says so', () => {
+  test('Nautelle on, config unread: says so', () => {
     expect(mismatchSentence({ agentdock: true, config: null }, true)).toContain(
       'could not be read',
     );
   });
 
-  test('config on, AgentDock off: the reverse', () => {
+  test('config on, Nautelle off: the reverse', () => {
     expect(
       mismatchSentence({ agentdock: false, config: true }, true),
-    ).toContain('AgentDock’s merge approval is off');
+    ).toContain('Nautelle’s merge approval is off');
   });
 });
 
@@ -154,7 +154,7 @@ describe('error mapping', () => {
       apiError(503, 'command_unavailable'),
       'laptop',
     );
-    expect(text).toContain('Update the AgentDock runner on laptop');
+    expect(text).toContain('Update the Nautelle runner on laptop');
     expect(text).not.toContain('yet');
   });
 

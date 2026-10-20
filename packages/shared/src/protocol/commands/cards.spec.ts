@@ -34,7 +34,7 @@ const runArgs = {
   shortId: 'ab12cd34',
   branch: 'card/c12-add-login',
   session: { id: '0b7c6a52-3a4f-4e0e-9a2c-5c1e2f3a4b5c', resume: false },
-  prompt: 'You are the dedicated worker for AgentDock board card C-12.',
+  prompt: 'You are the dedicated worker for Nautelle board card C-12.',
   profileKey: 'claude-main',
   model: 'opus',
   permissionMode: 'acceptEdits',
@@ -302,7 +302,7 @@ describe('card.merge (#273 D11, D13)', () => {
     headSha: 'a'.repeat(40),
     method: 'squash',
     issue: 12,
-    comment: 'Completed as C-12 on the AgentDock board; merged in #41.',
+    comment: 'Completed as C-12 on the Nautelle board; merged in #41.',
   };
 
   it('accepts a merge, with or without a method and an issue', () => {
@@ -463,7 +463,7 @@ describe('card.prClose (#329 D8)', () => {
     pr: 41,
     deleteBranch: true,
     issue: null,
-    comment: 'Closed from the AgentDock Board (C-12)',
+    comment: 'Closed from the Nautelle Board (C-12)',
   };
 
   it('accepts a close, with or without the issue', () => {

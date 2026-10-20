@@ -25,7 +25,7 @@ import { BoardWork } from './board-work';
 import { CollectRetryTimer } from './collect-retry-timer';
 
 /**
- * The project Board (issue #242, ADR-0024): cards AgentDock owns, each worked
+ * The project Board (issue #242, ADR-0024): cards Nautelle owns, each worked
  * by a dedicated interactive Claude Code worker outside the orchestrator.
  * `BoardService` is exported for the local `card.finish` method (D6) and for
  * the fleet's `FleetCardEdits` port (#282 D4, set on `FleetCardEditsRef`);

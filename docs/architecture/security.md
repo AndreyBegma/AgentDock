@@ -2,7 +2,7 @@
 
 ## Threat model, briefly
 
-AgentDock can start agents that run in `bypassPermissions` mode on machines
+Nautelle can start agents that run in `bypassPermissions` mode on machines
 holding source code, GitHub credentials and paid model subscriptions. The
 assets are those machines. The main threats:
 
@@ -32,7 +32,7 @@ assets are those machines. The main threats:
 | **Session content** | metadata only by default; per-project opt-in ships hook content redacted on the runner, capped at 16 KiB, kept for a set retention, readable by every project member, purgeable by admins ([ADR-0021](../adr/0021-session-content-is-opt-in-per-project.md), [ADR-0050](../adr/0050-viewers-read-session-content-and-action-request-input.md)) |
 | **Remote approval** | away mode routes permission prompts to action requests; operator to decide; no self-approval of orchestrator or PR actions except admins; every decision audited |
 
-## Verifying an AgentDock webhook
+## Verifying a Nautelle webhook
 
 Every outbound delivery carries `X-AgentDock-Event`, `X-AgentDock-Delivery`
 and `X-AgentDock-Signature: t=<unix seconds>,v1=<hex>`, where hex is
@@ -63,5 +63,5 @@ An inbound trigger is called the same way, with the delivery id signed in:
   fences Claude workers (ADR-0013); the pre-merge ownership check is
   after-the-fact.
 - The cs-init template writes the local PostgreSQL password inline into
-  `docker/docker-compose.yml`. AgentDock moved it to `docker/.env` (ignored);
+  `docker/docker-compose.yml`. Nautelle moved it to `docker/.env` (ignored);
   the template fix is P10 in [plugin changes](../plugin/code-sentinel-changes.md).

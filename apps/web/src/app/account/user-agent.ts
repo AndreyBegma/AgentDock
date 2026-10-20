@@ -33,7 +33,7 @@ const SYSTEMS: readonly [name: string, pattern: RegExp][] = [
 /** Command-line clients a person may sign in with. */
 const TOOLS: readonly [name: string, pattern: RegExp][] = [
   ['curl', /^curl\/(\d+)/i],
-  ['AgentDock CLI', /^agentdock\/(\d+)/i],
+  ['Nautelle CLI', /^agentdock\/(\d+)/i],
 ];
 
 export function parseUserAgent(raw: string | null): DeviceName {

@@ -3,7 +3,7 @@
 Issue: #694
 
 ## What to do
-Extend the glass-ui package (`@andrewbehma/glass-ui`, pinned at 0.35.0, see `docs/ui/glass-ui.md`) with what the redesign needs, then publish a new version and bump the exact pin in `apps/web`. Per ADR-0011 missing components are added to glass-ui, not to AgentDock, and the person allowed changing glass-ui itself.
+Extend the glass-ui package (`@andrewbehma/glass-ui`, pinned at 0.35.0, see `docs/ui/glass-ui.md`) with what the redesign needs, then publish a new version and bump the exact pin in `apps/web`. Per ADR-0011 missing components are added to glass-ui, not to Nautelle, and the person allowed changing glass-ui itself.
 
 Add:
 - A tablet breakpoint (640–1024px) next to the existing phone/desk ones, exposed as tokens and a hook-friendly constant.
@@ -15,11 +15,11 @@ Add:
 - [ ] A new glass-ui version is published and `apps/web` pins it exactly (bunfig convention).
 - [ ] The tablet breakpoint and the collapsed rail variant exist and are documented in `docs/ui/glass-ui.md`.
 - [ ] `PageHeader`, `Section`, `EmptyState` and the list/detail layout exist, import by subpath, and use tokens only (no raw colours).
-- [ ] Existing AgentDock pages still render without visual breakage after the bump.
+- [ ] Existing Nautelle pages still render without visual breakage after the bump.
 - [ ] `bun run check` passes.
 
 ## Out of scope
-- Changing AgentDock pages to use the new primitives (later cards).
+- Changing Nautelle pages to use the new primitives (later cards).
 - A new palette or visual language; the navy glass style stays.
 - Any change to the Board components.
 

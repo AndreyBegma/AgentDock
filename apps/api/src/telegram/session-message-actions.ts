@@ -112,11 +112,11 @@ export type SessionRefusal =
   | 'role';
 
 const REFUSALS: Record<SessionRefusal, string> = {
-  invalid_button: 'This button is no longer valid. Answer in AgentDock.',
-  not_linked: 'This chat is not linked to AgentDock.',
+  invalid_button: 'This button is no longer valid. Answer in Nautelle.',
+  not_linked: 'This chat is not linked to Nautelle.',
   unknown_message:
-    'This message is not one AgentDock can act on any more. Answer in AgentDock.',
-  inactive_user: 'Your AgentDock account is not active.',
+    'This message is not one Nautelle can act on any more. Answer in Nautelle.',
+  inactive_user: 'Your Nautelle account is not active.',
   not_member: 'You are not a member of this project any more.',
   role: 'Messaging a session needs the operator role on the project.',
 };
@@ -131,7 +131,7 @@ const OUTCOMES: Record<SessionMessageOutcome, string> = {
   question:
     'The session shows a question; press an option or reply with your answer.',
   question_changed:
-    'The question has changed or is gone; nothing was sent. Answer in AgentDock.',
+    'The question has changed or is gone; nothing was sent. Answer in Nautelle.',
   not_at_input:
     'The session shows a dialog or a permission prompt; nothing was sent.',
   no_option: 'That option is not offered any more; nothing was sent.',
@@ -150,4 +150,4 @@ const ERRORS: Partial<Record<SessionMessageErrorCode, string>> = {
 
 export const sessionErrorText = (code: string | null): string =>
   (code && ERRORS[code as SessionMessageErrorCode]) ??
-  'The message could not be sent. Try in AgentDock.';
+  'The message could not be sent. Try in Nautelle.';

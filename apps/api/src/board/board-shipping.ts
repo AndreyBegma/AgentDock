@@ -141,7 +141,7 @@ const WATCHED = {
 } satisfies Prisma.BoardCardWhereInput;
 
 /**
- * A card ships itself (issue #359, ADR-0035), the API's half: AgentDock
+ * A card ships itself (issue #359, ADR-0035), the API's half: Nautelle
  * watches the checks of a card's PR through the runner (`card.checks`, D5),
  * turns red CI or a conflict into a `ci_fix` round — at most
  * `CARD_CI_FIX_ATTEMPTS_MAX` per PR, then `needsPerson` (D6) — moves the

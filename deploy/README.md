@@ -198,7 +198,7 @@ docker run --rm -v "$PWD/deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro" \
 - **A pull request with no pipeline** (#484): open the repository's
   *Settings → Webhooks → Recent Deliveries* and look for the PR's delivery.
   A 500, 502, 530 or a timeout there is a delivery Woodpecker never
-  processed; *Redeliver* it, or close and reopen the PR. AgentDock does the
+  processed; *Redeliver* it, or close and reopen the PR. Nautelle does the
   close/reopen by itself for a board card's PR after 5 minutes (ADR-0043).
 - **A pipeline waits for approval on an own-branch PR** (#504): Woodpecker
   shows "This pipeline is awaiting approval from a maintainer!" for a pull
@@ -209,7 +209,7 @@ docker run --rm -v "$PWD/deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro" \
   then answers `"pull_requests"` or `"all_events"` instead of `"forks"`. Set
   *Settings → General → Require approval* to *Forks* (an admin of the
   Woodpecker repository can do it) and approve the pipelines already waiting
-  once; the next pull request starts at once. AgentDock pushes a card's
+  once; the next pull request starts at once. Nautelle pushes a card's
   branch to `origin` and opens the PR with `gh pr create --head <branch>` in
   the same repository, and the close/reopen retrigger (ADR-0043) acts on that
   same PR, so neither one makes a PR look like a fork.

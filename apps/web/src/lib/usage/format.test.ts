@@ -76,7 +76,7 @@ describe('money', () => {
     expect(groupLabel('project', null, null)).toBe('No project (machine-wide)');
     expect(groupLabel('slot', null, null)).toBe('None');
     expect(groupLabel('issue', null, '13')).toBe('#13');
-    expect(groupLabel('project', 'AgentDock', 'p1')).toBe('AgentDock');
+    expect(groupLabel('project', 'Nautelle', 'p1')).toBe('Nautelle');
   });
 });
 

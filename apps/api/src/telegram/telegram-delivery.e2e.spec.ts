@@ -123,7 +123,7 @@ describe('Telegram delivery (e2e, D6 + D10)', () => {
         '*Fix\\_it \\(now\\)\\!*',
         'a\\.b\\-c',
         '_widget · s0 · \\#42_',
-        `[Open in AgentDock](https://dock.example.com/projects/${projectId}/fleet)`,
+        `[Open in Nautelle](https://dock.example.com/projects/${projectId}/fleet)`,
       ].join('\n'),
     );
   });

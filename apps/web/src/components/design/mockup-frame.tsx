@@ -26,7 +26,7 @@ export const MOCKUP_ESCAPED_NOTICE = 'The mockup tried to leave this page';
 /**
  * The mockup (spec 223 D6, D9, D11): an `iframe sandbox="allow-scripts"` on
  * the mockup endpoint — no `allow-same-origin`, so the document has an
- * opaque origin, no cookies and no storage of AgentDock. The viewer talks to
+ * opaque origin, no cookies and no storage of Nautelle. The viewer talks to
  * the pin helper inside it by `postMessage` only: theme, pin mode and the
  * markers go in once the helper says `ready` and again on every change, so
  * flipping the theme never reloads the frame.

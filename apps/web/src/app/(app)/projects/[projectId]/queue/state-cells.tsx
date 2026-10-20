@@ -53,7 +53,7 @@ export function IssueLink({ item }: { item: QueueItemView }) {
   );
 }
 
-/** The muted "AgentDock computes X" note, only when it differs (D4). */
+/** The muted "Nautelle computes X" note, only when it differs (D4). */
 export function ComputedNote({ item }: { item: QueueItemView }) {
   const note = computedNote(item);
   return note ? <span className="text-xs text-ink-3">{note}</span> : null;

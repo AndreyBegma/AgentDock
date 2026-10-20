@@ -364,7 +364,7 @@ describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
   test('wired but silent points at the runner connection, not at setup', () => {
     for (const wiring of ['plugin', 'injected'] as const) {
       const notice = hooksNotice(manual, { wiring });
-      expect(notice.text).toContain('no hook event reached AgentDock');
+      expect(notice.text).toContain('no hook event reached Nautelle');
       expect(notice.text).not.toContain('not set up');
       expect(notice.commands.map((c) => c.code)).toEqual([
         'agentdock-runner status',

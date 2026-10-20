@@ -116,7 +116,7 @@ export const actionRequestArgsSchemas = {
     issue: z.number().int().positive(),
     title: z.string().max(ACTION_REQUEST_ISSUE_TITLE_MAX),
     url: z.url({ protocol: /^https?$/ }),
-    /** The session that filed it (its AgentDock id), when the API knows it. */
+    /** The session that filed it (its Nautelle id), when the API knows it. */
     session: z.string().min(1).max(64).nullable(),
   }),
 } as const satisfies Record<ActionRequestKind, z.ZodType>;

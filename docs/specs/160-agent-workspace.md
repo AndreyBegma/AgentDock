@@ -90,7 +90,7 @@ tests) are drawn by the client from a node's `prChecks`.
   is one `slot.message_seen` event.
 
 The message file is written in two ways:
-- **Replaced.** Orchestrator Phase 6.5 overwrites it, and AgentDock's
+- **Replaced.** Orchestrator Phase 6.5 overwrites it, and Nautelle's
   `slot.message` writes it atomically (spec 17 D7).
 - **Appended.** The orchestrator also appends a `##` section to the existing
   file.
@@ -101,7 +101,7 @@ So:
 - otherwise it is the whole file (`mode: replaced`);
 - whitespace-only growth is no entry.
 
-`sender` and `sentAt` come from AgentDock's `From:` / `Date:` header, or from
+`sender` and `sentAt` come from Nautelle's `From:` / `Date:` header, or from
 the skill's `# From <who>:` title.
 
 The event row in `events` is the store; nothing new is projected. The runner

@@ -35,7 +35,7 @@ describe('mergeApprovalMismatch (D1)', () => {
     expect(mergeApprovalMismatch(project(false, false))).toBe(false);
   });
 
-  it('flags an unread config only when AgentDock expects approval', () => {
+  it('flags an unread config only when Nautelle expects approval', () => {
     expect(mergeApprovalMismatch(project(true, null))).toBe(true);
     expect(mergeApprovalMismatch(project(false, null))).toBe(false);
   });

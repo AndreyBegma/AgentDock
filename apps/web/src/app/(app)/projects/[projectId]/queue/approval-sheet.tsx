@@ -124,7 +124,7 @@ function Detail({ detail }: { detail: ApprovalDetail }) {
           />
           <span className="text-xs text-ink-2">
             {SOURCE_LABEL[detail.source]}
-            {detail.source === 'derived' ? ' (inferred by AgentDock)' : ''} ·
+            {detail.source === 'derived' ? ' (inferred by Nautelle)' : ''} ·
             waiting {formatAgo(detail.waitingSince)}
           </span>
         </span>
