@@ -106,7 +106,8 @@ export function Rail({
   )?.displayName;
 
   const badges: Record<string, RailBadge | undefined> = {
-    approvals: approvalsBadge(waitingApprovals),
+    // Approvals is a tab of the Queue page (C-284); its count rides Queue.
+    queue: approvalsBadge(waitingApprovals),
     fleet: attentionBadge(slotsNeedingAttention),
   };
   const item = (entry: VisibleEntry) => ({
@@ -128,12 +129,9 @@ export function Rail({
       return { id: group.id, title, items };
     }
     const [open, setOpen] = openState[group.id];
-    // NavRailGroup has no badge slot: while folded, Approvals' count rides the title.
-    const flagged =
-      group.id === 'project-more' && !open && waitingApprovals > 0;
     return {
       id: group.id,
-      title: flagged ? `${title} · ${waitingApprovals}` : title,
+      title,
       items,
       collapsible: true,
       open,
@@ -162,9 +160,7 @@ export function Rail({
               icon: Ellipsis,
               onSelect: () => setMoreOpen(true),
               active: activeId !== null && hiddenIds.includes(activeId),
-              badge: hiddenIds.includes('approvals')
-                ? badges.approvals
-                : undefined,
+              badge: hiddenIds.includes('queue') ? badges.queue : undefined,
             },
           ],
         },

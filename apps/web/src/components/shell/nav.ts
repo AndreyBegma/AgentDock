@@ -7,7 +7,6 @@ import {
   ChartColumn,
   FolderGit2,
   Gauge,
-  GitMerge,
   History,
   KanbanSquare,
   LayoutDashboard,
@@ -168,8 +167,9 @@ export const NAV: NavSection[] = [
     id: 'project',
     title: 'Project',
     projectScoped: true,
-    // C-282: five in view, the Board first; the rest under More. Queue and
-    // Activity absorb Approvals and History in later cards of stack S-7.
+    // C-282: five in view, the Board first; the rest under More. Approvals is
+    // a tab of the Queue page (C-284); Activity absorbs History in a later
+    // card of stack S-7.
     entries: [
       {
         id: 'board',
@@ -232,15 +232,6 @@ export const NAV: NavSection[] = [
         minRole: 'viewer',
         enabled: true,
         exact: true,
-      },
-      {
-        id: 'approvals',
-        wide: true,
-        href: '/projects/:projectId/approvals',
-        label: 'Approvals',
-        icon: GitMerge,
-        minRole: 'viewer',
-        enabled: true,
       },
       {
         id: 'history',
