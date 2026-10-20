@@ -123,6 +123,7 @@ function WorkView() {
     <>
       <WorkHeader
         view="list"
+        title="Work"
         eyebrow="Workspace"
         description="Cards, plan tasks and suggestions across every project."
         onSelectList={() => {}}
