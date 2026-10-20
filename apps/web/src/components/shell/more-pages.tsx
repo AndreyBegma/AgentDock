@@ -9,6 +9,7 @@ import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
 import Link from 'next/link';
 import { approvalsBadge } from '../../lib/approvals/format';
 import { attentionBadge } from '../../lib/fleet/format';
+import { approvalsHref } from '../../lib/queue/tabs';
 import type { VisibleSection } from './nav';
 import { ProjectSwitcher } from './project-switcher';
 
@@ -52,25 +53,26 @@ export function MorePages({
   /** The rail draws its own switcher; the capsule has none but this one. */
   switcher?: boolean;
 }) {
-  const counts: Record<'approvals' | 'fleet', RailBadge | undefined> = {
-    approvals: approvalsBadge(waitingApprovals),
+  // Approvals is the Queue page's tab (C-284): its row opens that tab.
+  const counts: Record<'queue' | 'fleet', RailBadge | undefined> = {
+    queue: approvalsBadge(waitingApprovals),
     fleet: attentionBadge(slotsNeedingAttention),
   };
   const entries = sections.flatMap((section) => section.entries);
-  const needsYou = (['approvals', 'fleet'] as const).flatMap((id) => {
+  const needsYou = (['queue', 'fleet'] as const).flatMap((id) => {
     const entry = entries.find((each) => each.id === id);
     const badge = counts[id];
-    return entry && badge
-      ? [
-          {
-            id: `needs-${entry.id}`,
-            label: entry.label,
-            icon: entry.icon,
-            description: badge.label,
-            href: entry.resolvedHref,
-          },
-        ]
-      : [];
+    if (!entry || !badge) return [];
+    const approvals = id === 'queue' && projectId !== null;
+    return [
+      {
+        id: approvals ? 'needs-approvals' : `needs-${entry.id}`,
+        label: approvals ? 'Approvals' : entry.label,
+        icon: entry.icon,
+        description: badge.label,
+        href: approvals ? approvalsHref(projectId) : entry.resolvedHref,
+      },
+    ];
   });
 
   return (

@@ -108,7 +108,7 @@ export function Capsule({
           open: moreOpen,
           onOpenChange: setMoreOpen,
           // BottomCapsuleTab has no `badge` (docs/ui/glass-ui.md): the counts
-          // the rail shows on Approvals and Fleet head More's sheet instead.
+          // the rail shows on Queue and Fleet head More's sheet instead.
           children: (
             <MorePages
               sections={sections}

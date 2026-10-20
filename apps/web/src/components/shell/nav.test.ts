@@ -84,7 +84,6 @@ describe('visibleNav', () => {
       'Fleet',
       'Board',
       'Queue',
-      'Approvals',
       'Activity',
       'Skills',
       'Schedules',
@@ -218,7 +217,7 @@ describe('tabBarSplit', () => {
     expect(split('admin', '/projects/p1/queue')).toEqual({
       tabs: ['Board', 'Queue', 'Activity'],
       more: [
-        'project: Fleet, Settings, Project home, Approvals, Planner, Schedules, Skills, Token saver',
+        'project: Fleet, Settings, Project home, Planner, Schedules, Skills, Token saver',
         'workspace: Overview, Projects, Work, Activity, Sessions, Usage, Workflows, Skills',
       ],
     });
@@ -316,7 +315,6 @@ describe('railGroups (C-247)', () => {
       collapsible: true,
       entries: [
         'Project home',
-        'Approvals',
         'Planner',
         'Schedules',
         'Skills',
@@ -378,7 +376,7 @@ describe('iconRailSplit (C-282)', () => {
         'project: Board, Fleet, Queue, Activity, Settings',
       ],
       more: [
-        'project: Project home, Approvals, Planner, Schedules, Skills, Token saver',
+        'project: Project home, Planner, Schedules, Skills, Token saver',
         'workspace: Activity, Sessions, Usage, Workflows, Skills',
       ],
     });

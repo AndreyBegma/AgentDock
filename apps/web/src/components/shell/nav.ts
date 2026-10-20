@@ -7,7 +7,6 @@ import {
   ChartColumn,
   FolderGit2,
   Gauge,
-  GitMerge,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
@@ -168,7 +167,8 @@ export const NAV: NavSection[] = [
     title: 'Project',
     projectScoped: true,
     // C-282: five in view, the Board first; the rest under More. Activity
-    // absorbed History as its Runs tab (C-285); Queue absorbs Approvals.
+    // absorbed History as its Runs tab (C-285); Queue absorbs Approvals as a
+    // tab (C-284).
     entries: [
       {
         id: 'board',
@@ -231,15 +231,6 @@ export const NAV: NavSection[] = [
         minRole: 'viewer',
         enabled: true,
         exact: true,
-      },
-      {
-        id: 'approvals',
-        wide: true,
-        href: '/projects/:projectId/approvals',
-        label: 'Approvals',
-        icon: GitMerge,
-        minRole: 'viewer',
-        enabled: true,
       },
       // #337 D11 took the Planner off the nav (New work lives on the Board);
       // C-282 brings its read-only pages back under More.

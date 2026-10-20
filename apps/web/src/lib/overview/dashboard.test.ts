@@ -246,7 +246,7 @@ describe('needsYou', () => {
       ['prompt', 'Slot i1'],
       ['blocked', 'Slot i4 · #4'],
     ]);
-    expect(items[0]?.href).toBe('/projects/p1/approvals');
+    expect(items[0]?.href).toBe('/projects/p1/queue?tab=approvals');
     expect(items[2]?.projectName).toBe('Project p1');
   });
 
@@ -322,7 +322,7 @@ describe('tile links (#213)', () => {
           ['p2', waiting],
         ]),
       ),
-    ).toBe('/projects/p2/approvals');
+    ).toBe('/projects/p2/queue?tab=approvals');
     expect(approvalsHref([project('p1')], new Map([['p1', decided]]))).toBe(
       '/projects',
     );

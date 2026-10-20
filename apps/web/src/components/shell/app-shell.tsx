@@ -174,7 +174,7 @@ export function AppShell({
   useDocumentTitle(pageTitleOf(crumbs, projectName));
   const parent = crumbs.length > 1 ? crumbs.at(-2) : undefined;
 
-  // The rail's badges on Approvals and Fleet; More's "Needs you" elsewhere.
+  // The rail's badges on Queue (its Approvals tab) and Fleet; More's "Needs you" elsewhere.
   const waitingApprovals = useWaitingApprovals(projectId);
   const slotsNeedingAttention = useSlotsNeedingAttention(projectId);
 
