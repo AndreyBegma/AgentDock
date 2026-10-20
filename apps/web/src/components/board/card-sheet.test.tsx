@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
+  CardBranchLine,
   cardSheetFooter,
   cardSheetSide,
   focusSheetTitle,
@@ -142,5 +143,43 @@ describe('Card sheet PR target (#709)', () => {
     const html = banner(true);
     expect(html).toContain('C-281’s own pull request has already merged');
     expect(html).toContain('retarget it on GitHub');
+  });
+});
+
+describe('Card sheet PR target after a retarget on GitHub (#722)', () => {
+  const branch = 'feat/722-the-page';
+  const stacked = {
+    branch: 'feat/696-the-shell',
+    stackedOn: { number: 282, label: 'C-282', merged: false },
+  };
+  // The API clears the stored base once GitHub reports the PR on the base.
+  const retargeted = { branch: 'develop', stackedOn: null };
+  const sheet = (target: typeof stacked | typeof retargeted) =>
+    renderToStaticMarkup(
+      <>
+        <CardBranchLine branch={branch} target={target} />
+        <PrTargetBanner target={target} />
+      </>,
+    );
+
+  test('a stacked PR shows the dependency branch it goes into', () => {
+    const html = sheet(stacked);
+    expect(html).toContain('into C-282’s branch');
+    expect(html).toContain('(feat/696-the-shell)');
+  });
+
+  test('once moved onto develop, the sheet shows develop and no stacked banner', () => {
+    const html = sheet(retargeted);
+    expect(html).toContain(branch);
+    expect(html).toContain('→ into develop');
+    expect(html).toContain('The pull request goes into develop');
+    expect(html).not.toContain('C-282');
+    expect(html).not.toContain('feat/696-the-shell');
+  });
+
+  test('no branch yet, no line', () => {
+    expect(
+      renderToStaticMarkup(<CardBranchLine branch={null} target={null} />),
+    ).toBe('');
   });
 });

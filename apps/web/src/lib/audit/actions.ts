@@ -140,7 +140,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'card.ci_retriggered':
     "Reopened a card's pull request because CI reported no checks",
   'card.pr_retargeted':
-    "Moved a stacked card's pull request onto the base after its dependency merged",
+    "Moved a stacked card's pull request onto the base after its dependency merged, or found it moved there on GitHub",
   'card.pr_forwarded':
     'Opened a forward pull request for a card merged into a dependency branch that had already merged',
   'card.auto_run_toggled': 'Switched Auto-run when ready on a card',

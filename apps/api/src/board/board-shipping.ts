@@ -155,6 +155,8 @@ export class BoardShipping
 {
   private readonly logger = new Logger(BoardShipping.name);
   private readonly inFlight = new Set<string>();
+  /** #722: merged cards whose stored base the backfill has read on GitHub. */
+  private readonly basesRead = new Set<string>();
   private timer: NodeJS.Timeout | undefined;
   private polling = false;
 
@@ -207,8 +209,46 @@ export class BoardShipping
         if (!this.commands.servesChecks(card.project.runnerId)) continue;
         await this.check(card.id);
       }
+      await this.backfillMergedBases();
     } finally {
       this.polling = false;
+    }
+  }
+
+  /**
+   * #722: the backfill. Every card recorded as merged with a stored base is
+   * read on GitHub once after the API starts — so once per deploy — when
+   * its project's runner serves `card.checks`: one whose PR went into the
+   * project base after a retarget by hand is no longer stacked. A read the
+   * runner could not answer is tried again by the next poll.
+   */
+  async backfillMergedBases(): Promise<void> {
+    const cards = await this.prisma.boardCard.findMany({
+      where: {
+        mergedAt: { not: null },
+        prBase: { not: null },
+        prNumber: { not: null },
+      },
+      select: {
+        id: true,
+        prNumber: true,
+        projectId: true,
+        project: { select: { runnerId: true } },
+      },
+      orderBy: { number: 'asc' },
+    });
+    const projects = new Map<string, BoardProject>();
+    for (const card of cards) {
+      if (this.basesRead.has(card.id)) continue;
+      if (!this.commands.servesChecks(card.project.runnerId)) continue;
+      let project = projects.get(card.projectId);
+      if (!project) {
+        project = await this.work.project(card.projectId);
+        projects.set(card.projectId, project);
+      }
+      if ((await this.work.refreshMergedBase(project, card)) !== null) {
+        this.basesRead.add(card.id);
+      }
     }
   }
 
@@ -312,6 +352,18 @@ export class BoardShipping
     if (result.state === 'merged') {
       await this.mergedOutside(project, card, result);
       return;
+    }
+    // #722: a stacked PR a person moved onto the base on GitHub.
+    if (
+      card.prBase !== null &&
+      (await this.work.adoptLiveBase(
+        project,
+        card.id,
+        prNumber,
+        result.base ?? null,
+      ))
+    ) {
+      card = { ...card, prBase: null, prBaseCardId: null };
     }
     // A closed PR is a person's decision; there is nothing to ship.
     if (result.state === 'closed') return;

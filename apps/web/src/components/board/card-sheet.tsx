@@ -373,6 +373,35 @@ export function cardSheetSide(narrow: boolean): 'bottom' | 'right' {
 }
 
 /**
+ * #636: the card's branch and its PR's actual target — a stacked card's
+ * dependency, else the base. #722: the target is what GitHub says, so a PR a
+ * person retargeted onto the base reads "into develop".
+ */
+export function CardBranchLine({
+  branch,
+  target,
+}: {
+  branch: string | null;
+  target: CardPrTarget | null;
+}) {
+  if (!branch) return null;
+  return (
+    <p className="break-all text-xs text-ink-2">
+      <span className="font-mono">{branch}</span>
+      {target ? (
+        <span title={`The pull request goes into ${target.branch}`}>
+          {' '}
+          → {prTargetText(target)}
+          {target.stackedOn ? (
+            <span className="font-mono"> ({target.branch})</span>
+          ) : null}
+        </span>
+      ) : null}
+    </p>
+  );
+}
+
+/**
  * #709: a stacked PR's target, prominent on the sheet — and a warning once the
  * dependency's own PR has merged; nothing for a PR into the base.
  */
@@ -675,21 +704,7 @@ export function CardDetailBody({
           ) : null}
         </div>
       ) : null}
-      {card.branch ? (
-        <p className="break-all text-xs text-ink-2">
-          <span className="font-mono">{card.branch}</span>
-          {card.prTarget ? (
-            // #636: the PR's actual target — a stacked card's dependency.
-            <span title={`The pull request goes into ${card.prTarget.branch}`}>
-              {' '}
-              → {prTargetText(card.prTarget)}
-              {card.prTarget.stackedOn ? (
-                <span className="font-mono"> ({card.prTarget.branch})</span>
-              ) : null}
-            </span>
-          ) : null}
-        </p>
-      ) : null}
+      <CardBranchLine branch={card.branch} target={card.prTarget} />
       <PrTargetBanner target={card.prTarget} />
       {card.round?.hooksMissing
         ? (() => {

@@ -221,13 +221,21 @@ export class BoardDependencies {
     // #709: a dependency's PR the board holds as open may have merged or
     // closed on GitHub, unseen by the PR poll — it is read live before the
     // card is stacked on its branch.
+    // #722: one merged into a dependency branch may have been retargeted onto
+    // the base by hand first — GitHub's base counts, not the stored one.
     const live = rows.filter(
-      (r) => !landed(r.dependsOn) && hasOpenPr(r.dependsOn),
+      (r) =>
+        !landed(r.dependsOn) &&
+        (hasOpenPr(r.dependsOn) || r.dependsOn.mergedAt !== null),
     );
     if (live.length > 0) {
       const project = await this.work.project(live[0].dependsOn.projectId);
       for (const { dependsOn } of live) {
-        await this.work.dependencyMergedAt(project, dependsOn.id);
+        if (dependsOn.mergedAt !== null) {
+          await this.work.refreshMergedBase(project, dependsOn);
+        } else {
+          await this.work.dependencyMergedAt(project, dependsOn.id);
+        }
       }
       rows = await this.stackFacts(cardId);
     }

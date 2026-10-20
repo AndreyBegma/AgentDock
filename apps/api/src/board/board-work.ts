@@ -812,6 +812,19 @@ export class BoardWork implements OnModuleInit {
       include: { rounds: { orderBy: { round: 'desc' } } },
     });
     if (!card || card.prBaseCardId === null) return;
+    // #722: a PR a person moved onto the base on GitHub merges into the base.
+    const live = await this.livePr(project, card);
+    if (
+      card.prNumber !== null &&
+      (await this.adoptLiveBase(
+        project,
+        card.id,
+        card.prNumber,
+        live?.base ?? null,
+      ))
+    ) {
+      return;
+    }
     if (!(await this.retargetIfDue(project, card))) return;
     const fresh = await this.prisma.boardCard.findUnique({
       where: { id: cardId },
@@ -849,22 +862,89 @@ export class BoardWork implements OnModuleInit {
     const [{ count }] = await this.prisma.$transaction([
       this.prisma.boardCard.updateMany({
         where: { id: cardId, prNumber: pr },
-        data: {
-          prState: 'merged',
-          mergedAt: facts?.mergedAt ?? new Date(),
-          ...(intoBase ? { prBase: null, prBaseCardId: null } : {}),
-        },
+        data: { prState: 'merged', mergedAt: facts?.mergedAt ?? new Date() },
       }),
       this.prisma.boardCardPullRequest.updateMany({
         where: { cardId, number: pr },
         data: { state: 'merged' },
       }),
     ]);
+    // #722: a stacked PR that went into the base is no longer stacked.
+    if (count > 0 && intoBase) {
+      await this.adoptLiveBase(project, cardId, pr, facts?.base ?? null);
+    }
     if (count > 0 && !intoBase && card.prBaseCardId !== null) {
       await this.settleStacked(project, cardId, card.prBaseCardId);
     }
     this.publish(project.id, cardId);
     await this.restack(cardId);
+  }
+
+  /**
+   * #722: GitHub's base of the card's PR `pr`, read through `card.checks`. A
+   * stacked card whose PR goes (or went) into the project base — a person
+   * retargeted it there by hand, or GitHub did when the dependency's branch
+   * was deleted — is no longer stacked: its stored base is cleared and the
+   * change audited as `card.pr_retargeted` `by: github`. Returns whether it
+   * was.
+   */
+  async adoptLiveBase(
+    project: BoardProject,
+    cardId: string,
+    pr: number,
+    base: string | null,
+  ): Promise<boolean> {
+    if (base === null || base !== project.base) return false;
+    const card = await this.prisma.boardCard.findUnique({
+      where: { id: cardId },
+      select: {
+        number: true,
+        prNumber: true,
+        prBase: true,
+        prBaseCard: { select: { number: true } },
+      },
+    });
+    if (!card || card.prBase === null || card.prNumber !== pr) return false;
+    const { count } = await this.prisma.boardCard.updateMany({
+      where: { id: cardId, prNumber: pr, prBase: card.prBase },
+      data: { prBase: null, prBaseCardId: null },
+    });
+    if (count === 0) return false;
+    await this.audit.record({
+      actor: SYSTEM_ACTOR,
+      action: 'card.pr_retargeted',
+      target: { type: 'board_card', id: cardId },
+      projectId: project.id,
+      after: {
+        number: card.number,
+        pr,
+        from: card.prBase,
+        base,
+        dependency: card.prBaseCard?.number ?? null,
+        by: 'github',
+      },
+      result: 'ok',
+    });
+    this.publish(project.id, cardId);
+    return true;
+  }
+
+  /**
+   * #722: a card recorded as merged with a stored base is read on GitHub
+   * again — its PR may have been retargeted onto the project base by hand
+   * before it merged, so its work is in the base whatever the stored base
+   * says. Returns whether the stored base was cleared, or null when the
+   * runner could not answer.
+   */
+  async refreshMergedBase(
+    project: BoardProject,
+    card: { id: string; prNumber: number | null },
+  ): Promise<boolean | null> {
+    if (card.prNumber === null) return false;
+    const live = await this.livePr(project, card);
+    if (live === null) return null;
+    if (live.state !== 'merged') return false;
+    return this.adoptLiveBase(project, card.id, card.prNumber, live.base);
   }
 
   /**
@@ -1308,6 +1388,17 @@ export class BoardWork implements OnModuleInit {
       const live = await this.livePr(project, card);
       if (live?.state === 'merged') {
         await this.markMerged(card.id, pr, live);
+        card = await this.prisma.boardCard.findUnique({
+          where: { id: cardId },
+          include: {
+            prBaseCard: { select: { number: true, mergedAt: true } },
+          },
+        });
+        if (!card) return null;
+      }
+    } else if (card.mergedAt !== null && card.prBase !== null) {
+      // #722: merged into the base after a retarget by hand on GitHub.
+      if (await this.refreshMergedBase(project, card)) {
         card = await this.prisma.boardCard.findUnique({
           where: { id: cardId },
           include: {
