@@ -1,3 +1,4 @@
+export * from './about';
 export * from './action-requests';
 export * from './activity';
 export * from './ai';
