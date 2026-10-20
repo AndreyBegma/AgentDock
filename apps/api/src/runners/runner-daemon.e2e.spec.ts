@@ -110,7 +110,9 @@ describe('the #5 runner daemon against the API (e2e)', () => {
     admin = await adminSession(ctx);
     home = mkdtempSync(join(tmpdir(), 'nautelle-runner-e2e-'));
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  afterEach(() =>
+    rmSync(home, { recursive: true, force: true, maxRetries: 5 }),
+  );
 
   it('pairs, connects, pings, goes stale and offline, and stops for good on revoke', async () => {
     const created = await createRunner(admin, 'e2e-machine');

@@ -64,7 +64,9 @@ describe('projects against the runner daemon (e2e)', () => {
     admin = await adminSession(ctx);
     home = mkdtempSync(join(tmpdir(), 'nautelle-projects-e2e-'));
   });
-  afterEach(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  afterEach(() =>
+    rmSync(home, { recursive: true, force: true, maxRetries: 5 }),
+  );
 
   it('connects a repository, lists it in the watch list, and deletes it without touching the disk', async () => {
     // A GitHub main checkout whose specDir points in-repo, so detection
