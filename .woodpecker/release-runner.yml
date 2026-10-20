@@ -1,10 +1,11 @@
-# Releases agentdock-runner (ADR-0017).
+# Releases nautelle-runner (ADR-0017).
 #
 # Pushing the tag runner-v<version> builds the four binaries, signs SHA256SUMS
 # (ADR-0049), creates the GitHub Release with the tarballs, SHA256SUMS and
 # SHA256SUMS.sig, publishes the npm packages
-# (the four platform packages before the wrapper) and pushes the Homebrew
-# formula to AndreyBegma/homebrew-tap. The tag must equal the version in
+# (the four platform packages before the wrapper, then the deprecated
+# agentdock-runner, ADR-0073) and pushes the Homebrew formula to
+# AndreyBegma/homebrew-tap. The tag must equal the version in
 # apps/runner/package.json; build-release.sh refuses anything else.
 #
 # A manual run is a dry run: it builds and stops before every publish step.
@@ -109,10 +110,10 @@ steps:
       - |
         if ! gh release view "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock >/dev/null 2>&1; then
           gh release create "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --verify-tag \
-            --title "agentdock-runner $${version}" \
-            --notes "Install: brew install andreybegma/tap/agentdock-runner, or npm i -g agentdock-runner. Checksums: SHA256SUMS, signed by apps/runner/release-key.pub (SHA256SUMS.sig, Ed25519): openssl pkeyutl -verify -pubin -inkey release-key.pub -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig, then sha256sum -c --ignore-missing SHA256SUMS. Release and upgrade notes: https://github.com/AndreyBegma/AgentDock/blob/$${CI_COMMIT_TAG}/apps/runner/CHANGELOG.md"
+            --title "nautelle-runner $${version}" \
+            --notes "Install: brew install andreybegma/tap/nautelle-runner, or npm i -g nautelle-runner. Checksums: SHA256SUMS, signed by apps/runner/release-key.pub (SHA256SUMS.sig, Ed25519): openssl pkeyutl -verify -pubin -inkey release-key.pub -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig, then sha256sum -c --ignore-missing SHA256SUMS. Release and upgrade notes: https://github.com/AndreyBegma/AgentDock/blob/$${CI_COMMIT_TAG}/apps/runner/CHANGELOG.md"
         fi
-      - gh release upload "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --clobber agentdock-runner-*.tar.gz SHA256SUMS SHA256SUMS.sig
+      - gh release upload "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --clobber nautelle-runner-*.tar.gz SHA256SUMS SHA256SUMS.sig
 
   - name: npm-publish
     image: *ci_image
@@ -125,15 +126,18 @@ steps:
       - npm config set //registry.npmjs.org/:_authToken "$${NPM_TOKEN}"
       - version=$${CI_COMMIT_TAG#runner-v}
       # Platform packages first: the wrapper's optionalDependencies name them.
-      # A version already on the registry is skipped, so a re-run resumes.
+      # The deprecated agentdock-runner depends on the wrapper, so it is last
+      # (ADR-0073). A version already on the registry is skipped, so a re-run
+      # resumes.
       - |
-        for pkg in agentdock-runner-darwin-arm64 agentdock-runner-darwin-x64 agentdock-runner-linux-arm64 agentdock-runner-linux-x64 agentdock-runner; do
+        for pkg in nautelle-runner-darwin-arm64 nautelle-runner-darwin-x64 nautelle-runner-linux-arm64 nautelle-runner-linux-x64 nautelle-runner agentdock-runner; do
           if npm view "$${pkg}@$${version}" version >/dev/null 2>&1; then
             echo "$${pkg}@$${version} is already published"
           else
             npm publish --access public "apps/runner/release/npm/$${pkg}"
           fi
         done
+      - npm deprecate "agentdock-runner@$${version}" 'Renamed to nautelle-runner: npm i -g nautelle-runner (ADR-0073)'
 
   - name: homebrew-tap
     image: *ci_image
@@ -148,10 +152,13 @@ steps:
       - version=$${CI_COMMIT_TAG#runner-v}
       - git clone --depth 1 https://github.com/AndreyBegma/homebrew-tap.git /tmp/tap
       - mkdir -p /tmp/tap/Formula
-      - cp apps/runner/release/agentdock-runner.rb /tmp/tap/Formula/agentdock-runner.rb
+      - cp apps/runner/release/nautelle-runner.rb /tmp/tap/Formula/nautelle-runner.rb
+      # ADR-0073: the tap renames the formula, so `brew upgrade` moves an
+      # agentdock-runner install to nautelle-runner.
+      - bun apps/runner/scripts/tap-rename.ts /tmp/tap
       - cd /tmp/tap
-      - git config user.name 'AgentDock release'
-      - git config user.email 'release@agentdock.invalid'
-      - git add Formula/agentdock-runner.rb
-      - git diff --cached --quiet || git commit -m "agentdock-runner $${version}"
+      - git config user.name 'Nautelle release'
+      - git config user.email 'release@nautelle.invalid'
+      - git add -A Formula formula_renames.json
+      - git diff --cached --quiet || git commit -m "nautelle-runner $${version}"
       - git push origin HEAD

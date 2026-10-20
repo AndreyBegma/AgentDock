@@ -1,7 +1,7 @@
 {
-  "name": "agentdock-runner",
+  "name": "nautelle-runner",
   "version": "0.0.0-dev",
-  "description": "The per-machine daemon of AgentDock, a control plane for Claude Code and Codex agent fleets",
+  "description": "The per-machine daemon of Nautelle, a control plane for Claude Code and Codex agent fleets",
   "license": "MIT",
   "homepage": "https://agentdock.luna-realm.com/",
   "repository": {
@@ -10,10 +10,10 @@
     "directory": "apps/runner"
   },
   "bin": {
-    "agentdock-runner": "bin/agentdock-runner.js"
+    "nautelle-runner": "bin/nautelle-runner.js"
   },
   "files": [
-    "bin/agentdock-runner.js",
+    "bin/nautelle-runner.js",
     "README.md",
     "SHA256SUMS",
     "SHA256SUMS.sig"
@@ -22,9 +22,9 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "agentdock-runner-darwin-arm64": "0.0.0-dev",
-    "agentdock-runner-darwin-x64": "0.0.0-dev",
-    "agentdock-runner-linux-arm64": "0.0.0-dev",
-    "agentdock-runner-linux-x64": "0.0.0-dev"
+    "nautelle-runner-darwin-arm64": "0.0.0-dev",
+    "nautelle-runner-darwin-x64": "0.0.0-dev",
+    "nautelle-runner-linux-arm64": "0.0.0-dev",
+    "nautelle-runner-linux-x64": "0.0.0-dev"
   }
 }

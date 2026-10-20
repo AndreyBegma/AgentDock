@@ -1,7 +1,7 @@
 {
-  "name": "agentdock-runner-{{os}}-{{arch}}",
+  "name": "nautelle-runner-{{os}}-{{arch}}",
   "version": "{{version}}",
-  "description": "The agentdock-runner binary for {{os}}-{{arch}}. Install agentdock-runner instead.",
+  "description": "The nautelle-runner binary for {{os}}-{{arch}}. Install nautelle-runner instead.",
   "license": "MIT",
   "homepage": "https://agentdock.luna-realm.com/",
   "repository": {
@@ -11,6 +11,6 @@
   },
   "os": ["{{os}}"],
   "cpu": ["{{arch}}"],
-  "files": ["bin/agentdock-runner"],
+  "files": ["bin/nautelle-runner"],
   "preferUnplugged": true
 }

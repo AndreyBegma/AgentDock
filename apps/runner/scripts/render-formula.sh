@@ -4,7 +4,7 @@
 # checksums of SHA256SUMS and SHA256SUMS.sig filled in. The formula checks the
 # signature itself at install time (ADR-0049).
 #
-#   sh scripts/render-formula.sh <version> <SHA256SUMS> <SHA256SUMS.sig> > agentdock-runner.rb
+#   sh scripts/render-formula.sh <version> <SHA256SUMS> <SHA256SUMS.sig> > nautelle-runner.rb
 #
 # Fails when SHA256SUMS lacks a target's tarball.
 set -eu
@@ -22,11 +22,11 @@ for file in "$sums" "$sig"; do
     exit 1
   fi
 done
-template="$(cd "$(dirname "$0")/.." && pwd)/homebrew/agentdock-runner.rb.template"
+template="$(cd "$(dirname "$0")/.." && pwd)/homebrew/nautelle-runner.rb.template"
 
 # The checksum of one target's tarball; sha256sum may mark binary mode with '*'.
 sha() {
-  file="agentdock-runner-$version-$1.tar.gz"
+  file="nautelle-runner-$version-$1.tar.gz"
   value=$(awk -v f="$file" '{ name = $2; sub(/^\*/, "", name) } name == f { print $1 }' "$sums")
   case $value in
     [0-9a-f]*) ;;

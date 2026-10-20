@@ -15,9 +15,9 @@ const pem = (key: ReturnType<typeof generateKeyPairSync>['publicKey']) =>
   key.export({ type: 'spki', format: 'pem' }).toString();
 
 describe('sign-sums', () => {
-  const release = mkdtempSync(join(tmpdir(), 'agentdock-sign-'));
+  const release = mkdtempSync(join(tmpdir(), 'nautelle-sign-'));
   afterAll(() => rmSync(release, { recursive: true, force: true }));
-  const sums = Buffer.from(`${'1'.repeat(64)}  agentdock-runner.tar.gz\n`);
+  const sums = Buffer.from(`${'1'.repeat(64)}  nautelle-runner.tar.gz\n`);
   writeFileSync(join(release, 'SHA256SUMS'), sums);
 
   it('writes an Ed25519 signature of SHA256SUMS that verifies against the release key', () => {
