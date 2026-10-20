@@ -25,6 +25,8 @@ const prViewSchema = z.looseObject({
   isDraft: z.boolean(),
   headRefOid: z.string().regex(/^[0-9a-f]{40}$/),
   mergeable: z.string(),
+  baseRefName: z.string().min(1).max(255).optional(),
+  mergedAt: z.iso.datetime({ offset: true }).nullish().catch(null),
 });
 
 const checkRowSchema = z.looseObject({
@@ -69,7 +71,9 @@ const checkOf = (row: z.infer<typeof checkRowSchema>): CardCheck | null => {
 
 /**
  * #359 D5 (ADR-0010): a card PR's head and checks through `gh`, argument
- * arrays only — `gh pr view <pr> --json state,isDraft,headRefOid,mergeable`
+ * arrays only — `gh pr view <pr> --json
+ * state,isDraft,headRefOid,mergeable,baseRefName,mergedAt` (#709 reads the
+ * base and the merge time)
  * and `gh pr checks <pr> --json name,bucket,link`. `gh pr checks` exits
  * non-zero while a check fails or runs, so its JSON is read whatever the exit
  * code; a head without checks is `checks: []`. CI logs are never read. A
@@ -100,7 +104,7 @@ export const cardChecks = async (
     '--repo',
     github,
     '--json',
-    'state,isDraft,headRefOid,mergeable',
+    'state,isDraft,headRefOid,mergeable,baseRefName,mergedAt',
   ]);
   const view = viewed?.code === 0 ? parsed(prViewSchema, viewed.stdout) : null;
   if (!view) {
@@ -140,5 +144,7 @@ export const cardChecks = async (
     headSha: view.headRefOid,
     mergeable: mergeable.success ? mergeable.data : 'UNKNOWN',
     checks,
+    ...(view.baseRefName !== undefined ? { base: view.baseRefName } : {}),
+    mergedAt: view.mergedAt ?? null,
   };
 };
