@@ -175,17 +175,29 @@ describe('runner-local policy (ADR-0047)', () => {
     return { run, reached, store };
   };
 
-  const cli = (...args: string[]) => {
+  const cli = (...args: string[]) => cliAnswering(undefined, ...args);
+
+  /** `cli`, with `confirm` answering `answer` and recording each question. */
+  const cliAnswering = (answer: boolean | undefined, ...args: string[]) => {
     const out: string[] = [];
     const err: string[] = [];
+    const asked: string[] = [];
     const code = runPolicy(args, {
       configFile,
       cwd: dir,
       realpath: nodeRealpath,
       stdout: (t) => out.push(t),
       stderr: (t) => err.push(t),
+      ...(answer === undefined
+        ? {}
+        : {
+            confirm: (question: string) => {
+              asked.push(question);
+              return answer;
+            },
+          }),
     });
-    return { code, out: out.join(''), err: err.join('') };
+    return { code, out: out.join(''), err: err.join(''), asked };
   };
 
   it('refuses each dangerous command with policy_refused before any handler, whatever the server sends', async () => {
@@ -421,6 +433,85 @@ describe('runner-local policy (ADR-0047)', () => {
       ]);
       cli('deny-root', link);
       expect(loadConfig(configFile).policy.allowedRoots).toEqual([allowed]);
+    });
+
+    describe('allow-root --watched (#691)', () => {
+      /** A pre-0.13 file: no policy block, three cached projects. */
+      let second = '';
+      beforeEach(() => {
+        second = join(dir, 'work', 'api');
+        mkdirSync(second, { recursive: true });
+        writeFileSync(
+          configFile,
+          JSON.stringify({
+            server: 'https://agentdock.example',
+            runnerId: 'rn_1',
+            projects: [
+              { id: 'prj_a', root: project },
+              { id: 'prj_b', root: second },
+              { id: 'prj_gone', root: join(dir, 'gone') },
+            ],
+          }),
+        );
+      });
+
+      it('shows the cached roots, asks, and adds exactly them once confirmed', () => {
+        const { code, err, asked } = cliAnswering(
+          true,
+          'allow-root',
+          '--watched',
+        );
+        expect(code).toBe(0);
+        expect(asked).toEqual(['Allow them?']);
+        expect(err).toContain(`  ${project} (prj_a)`);
+        expect(err).toContain(`  ${second} (prj_b)`);
+        expect(err).toContain(`Skipped: ${join(dir, 'gone')} does not exist`);
+        const after = loadConfig(configFile);
+        expect(after.policy.allowedRoots).toEqual([project, second]);
+        // Only the policy changed: the cache is as it was.
+        expect(after.projects.map((p) => p.id)).toEqual([
+          'prj_a',
+          'prj_b',
+          'prj_gone',
+        ]);
+      });
+
+      it('changes nothing when the person says no', () => {
+        const before = readFileSync(configFile, 'utf8');
+        const { code, asked } = cliAnswering(false, 'allow-root', '--watched');
+        expect(code).toBe(1);
+        expect(asked).toHaveLength(1);
+        expect(readFileSync(configFile, 'utf8')).toBe(before);
+      });
+
+      it('--yes skips the question; without a terminal it needs --yes', () => {
+        const before = readFileSync(configFile, 'utf8');
+        expect(cli('allow-root', '--watched').code).toBe(2);
+        expect(readFileSync(configFile, 'utf8')).toBe(before);
+        const { code, asked } = cliAnswering(
+          false,
+          'allow-root',
+          '--watched',
+          '--yes',
+        );
+        expect(code).toBe(0);
+        expect(asked).toEqual([]);
+        expect(loadConfig(configFile).policy.allowedRoots).toEqual([
+          project,
+          second,
+        ]);
+      });
+
+      it('leaves out a root an allowed one already covers', () => {
+        expect(cli('allow-root', 'dev').code).toBe(0);
+        const { code, err } = cliAnswering(true, 'allow-root', '--watched');
+        expect(code).toBe(0);
+        expect(err).not.toContain('(prj_a)');
+        expect(loadConfig(configFile).policy.allowedRoots).toEqual([
+          allowed,
+          second,
+        ]);
+      });
     });
 
     it('refuses an unknown key, a bad value and a missing directory, changing nothing', () => {

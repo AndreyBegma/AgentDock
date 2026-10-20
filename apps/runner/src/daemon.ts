@@ -3,8 +3,10 @@ import { loadavg } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   type Capabilities,
+  EVENT_SCHEMA_VERSION,
   type Host,
   PROTOCOL_VERSION,
+  WATCH_REFUSED_EVENT,
 } from '@agentdock/shared/protocol';
 import { accessHeaders, accessOf } from './access';
 import { adapters, SessionWatcher } from './adapters';
@@ -249,6 +251,15 @@ export const runDaemon = async (
       persist: (projects) => updateConfig(options.configFile, { projects }),
       admit: (project) =>
         watchedRootRefusal(project.root, policy.current(), exec, realpath),
+      // #691: the web says why a project is not watched, and what to run.
+      report: (projects) =>
+        connection?.emit({
+          v: EVENT_SCHEMA_VERSION,
+          ts: new Date(clock.now()).toISOString(),
+          type: WATCH_REFUSED_EVENT,
+          source: 'runner',
+          data: { projects },
+        }),
       log,
     });
 

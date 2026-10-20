@@ -98,4 +98,31 @@ describe('WatchList', () => {
     expect(list.current).toEqual([A]);
     expect(lines.join('\n')).toContain('cannot cache the watch list');
   });
+
+  it('reports the refused projects on start and whenever that set changes (#691)', async () => {
+    const reports: { projectId: string; message: string }[][] = [];
+    const refuse = new Set(['prj_b']);
+    const { log } = memoryLogger();
+    const list = new WatchList({
+      initial: [A, B],
+      registry: { setProjects: async () => {} } as never,
+      persist: () => {},
+      admit: async (p) => (refuse.has(p.id) ? `no ${p.id}` : null),
+      report: (refused) => {
+        reports.push(refused);
+      },
+      log,
+    });
+    await list.start();
+    expect(reports).toEqual([[{ projectId: 'prj_b', message: 'no prj_b' }]]);
+    // The same set again: no new report.
+    await list.apply([A, B]);
+    expect(reports).toHaveLength(1);
+    refuse.clear();
+    await list.reapply();
+    expect(reports).toEqual([
+      [{ projectId: 'prj_b', message: 'no prj_b' }],
+      [],
+    ]);
+  });
 });

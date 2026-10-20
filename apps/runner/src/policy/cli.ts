@@ -9,6 +9,7 @@ import { loadConfig, saveConfig } from '../config';
 import { EXIT } from '../service';
 import { type Realpath, rootOutsideAllowed } from './roots';
 import type { PolicyConfig } from './schema';
+import { cachedRoots } from './upgrade';
 
 export interface PolicyCliDeps {
   configFile: string;
@@ -17,12 +18,20 @@ export interface PolicyCliDeps {
   realpath: Realpath;
   stdout: (text: string) => void;
   stderr: (text: string) => void;
+  /**
+   * Asks a yes/no question on the terminal (`allow-root --watched`); Bun's
+   * `confirm` in the CLI. Without it, only `--yes` goes ahead.
+   */
+  confirm?: (question: string) => boolean;
 }
 
 export const POLICY_USAGE = `Usage: agentdock-runner policy <command>
 
   show                         print the effective policy
   allow-root <dir>…            let projects under <dir> be watched
+  allow-root --watched [--yes] allow the roots of the projects in the cached
+                               watch list, after showing them and asking
+                               (--yes skips the question)
   deny-root <dir>…             stop allowing <dir>
   deny-path <pattern>…         never let the assistant's code commands return
                                files matching <pattern> (a glob over paths in
@@ -116,6 +125,73 @@ const showPolicy = (deps: PolicyCliDeps): void => {
 };
 
 /**
+ * `allow-root --watched` (#691): the roots of the cached watch list that the
+ * policy does not allow yet, as real paths. The cache is what the runner
+ * watched last, before an upgrade to 0.13 dropped it all.
+ */
+const watchedRoots = (
+  config: ReturnType<typeof loadConfig>,
+  deps: PolicyCliDeps,
+): { root: string; ids: string[] }[] => {
+  const found = new Map<string, string[]>();
+  for (const root of cachedRoots(config.projects)) {
+    const real = deps.realpath(root);
+    if (real === null) {
+      deps.stderr(`Skipped: ${root} does not exist on this machine.\n`);
+      continue;
+    }
+    if (!rootOutsideAllowed(real, config.policy.allowedRoots, deps.realpath)) {
+      continue;
+    }
+    const ids = config.projects.filter((p) => p.root === root).map((p) => p.id);
+    found.set(real, [...(found.get(real) ?? []), ...ids]);
+  }
+  return [...found].map(([root, ids]) => ({ root, ids }));
+};
+
+const allowWatched = (
+  config: ReturnType<typeof loadConfig>,
+  flags: readonly string[],
+  deps: PolicyCliDeps,
+): PolicyConfig | 'nothing' | 'declined' => {
+  const yes = flags.includes('--yes');
+  if (flags.some((f) => f !== '--watched' && f !== '--yes')) {
+    throw new PolicyUsageError('allow-root --watched takes only --yes');
+  }
+  const roots = watchedRoots(config, deps);
+  if (roots.length === 0) {
+    deps.stderr(
+      config.projects.length === 0
+        ? 'The cached watch list is empty: name the directories with `agentdock-runner policy allow-root <dir>`.\n'
+        : 'Every root of the cached watch list is allowed already.\n',
+    );
+    return 'nothing';
+  }
+  deps.stderr(
+    `These roots of the projects this runner watched will be allowed:\n${roots
+      .map((r) => `  ${r.root} (${r.ids.join(', ')})\n`)
+      .join('')}`,
+  );
+  if (!yes) {
+    if (!deps.confirm) {
+      throw new PolicyUsageError(
+        'no terminal to ask on: pass --yes to allow them',
+      );
+    }
+    if (!deps.confirm('Allow them?')) {
+      deps.stderr('Nothing changed.\n');
+      return 'declined';
+    }
+  }
+  return {
+    ...config.policy,
+    allowedRoots: [
+      ...new Set([...config.policy.allowedRoots, ...roots.map((r) => r.root)]),
+    ],
+  };
+};
+
+/**
  * `agentdock-runner policy …` (ADR-0047): the one writer of the policy. It
  * rewrites `runner.json` with only the policy changed.
  */
@@ -133,6 +209,11 @@ export const runPolicy = (
     let policy: PolicyConfig;
     if (verb === 'set' && rest.length === 2) {
       policy = setPolicyKey(config.policy, rest[0], rest[1]);
+    } else if (verb === 'allow-root' && rest.includes('--watched')) {
+      const allowed = allowWatched(config, rest, deps);
+      if (allowed === 'nothing') return EXIT.ok;
+      if (allowed === 'declined') return EXIT.failure;
+      policy = allowed;
     } else if (verb === 'allow-root' && rest.length > 0) {
       const roots = realRoots(rest, deps);
       policy = {
