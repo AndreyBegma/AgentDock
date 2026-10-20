@@ -5,7 +5,9 @@ Card: C-268 · Issue: #636 ·
 Spec: [`docs/specs/636-branch-a-dependent-card-from-its-depende.md`](../specs/636-branch-a-dependent-card-from-its-depende.md) ·
 Amended by [ADR-0065](0065-run-waits-for-every-dependency-to-have-a-ready-pull-request.md) (§1: no `ignoreDependencies`; an open dependency is refused first) ·
 Amended by C-299 / [#709](https://github.com/AndreyBegma/AgentDock/issues/709) (§5–§7: the base read from GitHub, the forward PR, Completed means landed;
-spec [`docs/specs/709-a-stacked-card-can-ship-into-a-dependenc.md`](../specs/709-a-stacked-card-can-ship-into-a-dependenc.md))
+spec [`docs/specs/709-a-stacked-card-can-ship-into-a-dependenc.md`](../specs/709-a-stacked-card-can-ship-into-a-dependenc.md)) ·
+Amended by C-303 / [#722](https://github.com/AndreyBegma/AgentDock/issues/722) (§8: a card's own PR base read from GitHub;
+spec [`docs/specs/722-read-a-merged-pr-s-real-base-from-github.md`](../specs/722-read-a-merged-pr-s-real-base-from-github.md))
 
 ## Context
 
@@ -88,6 +90,19 @@ it and its PR conflicted with C-1's.
    live counts as landed: it reaches the base with the dependency. The card
    sheet shows a stacked target prominently, and warns once that
    dependency's own PR has merged (`prTarget.stackedOn.merged`).
+8. **A card's own PR base is GitHub's, not the stored one (#722).** A
+   person may move a stacked PR onto the base by hand (`gh pr edit --base`),
+   and GitHub moves it there itself when the dependency's branch is deleted.
+   Whenever the Board reads the card's PR through `card.checks` — the PR
+   poll, a merge the poll finds, Accept's merge of a stacked PR, a Run
+   checking a dependency recorded as merged into a dependency branch, and
+   Completed means landed (§7) — a PR whose `base` is the project base
+   clears `prBase` and `prBaseCardId`, audited as `card.pr_retargeted` with
+   `by: github`. Such a dependency counts as landed (§1), so its dependants
+   run, and the card sheet shows the base as the target. The backfill: after
+   the API starts, the PR poll reads every card recorded as merged with a
+   stored base once, and clears the ones GitHub has on the base; a read the
+   runner could not answer is tried again by the next poll.
 
 ## Consequences
 
@@ -106,3 +121,6 @@ it and its PR conflicted with C-1's.
   `card.prOpen` leaves a dead-branch merge to the person (`forward_failed`).
 - (#709) No column records the forward: the audit entry `card.pr_forwarded`
   is what tells the poll that the card's open PR is a forward PR.
+- (#722) The backfill costs one `card.checks` call per merged stacked card
+  after each start of the API, not one per poll; a card merged into a
+  dependency branch that is still live stays stacked and lands with it.
