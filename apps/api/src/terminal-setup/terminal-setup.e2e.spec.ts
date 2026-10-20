@@ -152,7 +152,7 @@ describe('terminal setup (e2e)', () => {
     expect(stateOf(plugins(view), 'claude-main')).toBe('done');
   });
 
-  it('lists the profiles the runner reports when none is configured and no session exists', async () => {
+  it('lists the profiles the runner reports and the project does not use as other, optional profiles (#719)', async () => {
     await h.ctx.prisma.project.update({
       where: { id: h.projectId },
       data: { defaultProfileId: null },
@@ -174,14 +174,155 @@ describe('terminal setup (e2e)', () => {
       },
     });
     const view = await read();
-    expect(plugins(view).map((p) => [p.profileKey, p.state])).toEqual([
+    expect(view.otherProfiles.map((p) => [p.profileKey, p.state])).toEqual([
       ['claude-alpha', 'todo'],
       ['claude-beta', 'unknown'],
     ]);
-    const alpha = plugins(view)[0];
+    expect(view.otherProfiles.every((p) => p.optional)).toBe(true);
+    const alpha = view.otherProfiles[0];
     expect(
       alpha.steps.flatMap((s) => (s.kind === 'command' ? [s.code] : [])),
     ).toContain('agentdock-runner setup claude --profile claude-alpha');
+    // The project uses none of them: the checklist asks for the key instead.
+    expect(plugins(view)).toHaveLength(1);
+    expect(plugins(view)[0].profileKey).toBeUndefined();
+  });
+
+  describe('profiles the project does not use (#719)', () => {
+    const report = (...profiles: { id: string; plugin: string | null }[]) =>
+      h.ctx.prisma.runner.update({
+        where: { id: h.runnerId },
+        data: {
+          capabilities: {
+            profiles: profiles.map(({ id, plugin }) => ({
+              id,
+              runtime: 'claude',
+              agentdock: { plugin, telemetry: true },
+            })),
+          },
+        },
+      });
+    const done = async () => {
+      await h.ctx.prisma.project.update({
+        where: { id: h.projectId },
+        data: { shipSessionContent: true },
+      });
+      await h.ctx.prisma.boardSettings.create({
+        data: { projectId: h.projectId, captureEnabled: true },
+      });
+    };
+    const ignore = (profileKey: string, ignored = true, session = h.admin) =>
+      session.send('put', `${path()}/ignored-profiles`, {
+        profileKey,
+        ignored,
+      });
+
+    it('a reported profile without the plugin adds no required step', async () => {
+      await done();
+      await report(
+        { id: 'claude-main', plugin: '0.4.0' },
+        { id: 'claude-hatkom', plugin: null },
+      );
+      const view = await read();
+      expect(plugins(view).map((p) => p.profileKey)).toEqual(['claude-main']);
+      expect(view.otherProfiles.map((p) => [p.profileKey, p.state])).toEqual([
+        ['claude-hatkom', 'todo'],
+      ]);
+      expect(view.todo).toBe(0);
+      expect(view.complete).toBe(true);
+    });
+
+    it('the default profile without the plugin is still a required step', async () => {
+      await done();
+      await report(
+        { id: 'claude-main', plugin: null },
+        { id: 'claude-hatkom', plugin: null },
+      );
+      const view = await read();
+      expect(stateOf(plugins(view), 'claude-main')).toBe('todo');
+      expect(view.todo).toBe(1);
+    });
+
+    it('a profile that ran a session in the last 30 days counts; an older one does not', async () => {
+      await done();
+      await report(
+        { id: 'claude-main', plugin: '0.4.0' },
+        { id: 'claude-recent', plugin: null },
+        { id: 'claude-stale', plugin: null },
+      );
+      await session(
+        'claude-recent',
+        'manual',
+        new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+      );
+      await session(
+        'claude-stale',
+        'manual',
+        new Date(Date.now() - 40 * 24 * 60 * 60 * 1000),
+      );
+      const view = await read();
+      expect(plugins(view).map((p) => p.profileKey)).toEqual([
+        'claude-main',
+        'claude-recent',
+      ]);
+      expect(view.otherProfiles.map((p) => p.profileKey)).toEqual([
+        'claude-stale',
+      ]);
+      expect(view.todo).toBe(1);
+    });
+
+    it('an ignored profile leaves the checklist and the other profiles, and comes back', async () => {
+      await done();
+      await report(
+        { id: 'claude-main', plugin: null },
+        { id: 'claude-hatkom', plugin: null },
+      );
+      expect((await read()).todo).toBe(1);
+
+      let response = await ignore('claude-main');
+      expect(response.status).toBe(200);
+      response = await ignore('claude-hatkom');
+      let view = response.body as TerminalSetupView;
+      expect(view.ignoredProfileKeys).toEqual(['claude-main', 'claude-hatkom']);
+      expect(plugins(view).some((p) => p.profileKey === 'claude-main')).toBe(
+        false,
+      );
+      expect(view.otherProfiles).toEqual([]);
+      expect(view.todo).toBe(0);
+      expect(await read()).toEqual(view);
+
+      const runner = await h.ctx.prisma.runner.findUniqueOrThrow({
+        where: { id: h.runnerId },
+      });
+      expect(runner.ignoredProfileKeys).toEqual([
+        'claude-main',
+        'claude-hatkom',
+      ]);
+      const audits = await h.ctx.prisma.auditRecord.count({
+        where: { action: 'runner.update', targetId: h.runnerId },
+      });
+      expect(audits).toBe(2);
+
+      response = await ignore('claude-main', false);
+      view = response.body as TerminalSetupView;
+      expect(view.ignoredProfileKeys).toEqual(['claude-hatkom']);
+      expect(stateOf(plugins(view), 'claude-main')).toBe('todo');
+      expect(view.todo).toBe(1);
+    });
+
+    it('is a project admin’s, and validates the body', async () => {
+      expect((await ignore('claude-main', true, h.viewer)).status).toBe(403);
+      expect((await ignore('claude-main', true, h.author)).status).toBe(403);
+      expect((await ignore('claude-main', true, h.outsider)).status).toBe(404);
+      expect((await ignore('two words')).status).toBe(400);
+      expect(
+        (
+          await h.admin.send('put', `${path()}/ignored-profiles`, {
+            profileKey: 'claude-main',
+          })
+        ).status,
+      ).toBe(400);
+    });
   });
 
   it('emits one unknown plugin item with the listing steps when nothing is known', async () => {
