@@ -55,11 +55,17 @@ export interface NavEntry {
    */
   fill?: boolean;
   /**
-   * Stays in view in the desktop rail (C-247). Inside a section that has any
-   * primary entry, the others fold into its More group. The phone's capsule
-   * ignores it (`tabBarSplit`).
+   * Stays in view (C-247, C-282): a section shows its primary entries and
+   * folds the others into its More group — on the open rail a group of its
+   * own, on the icon rail and the phone's capsule one More sheet. The capsule
+   * holds a subset of them (`TAB_IDS`).
    */
   primary?: boolean;
+  /**
+   * The one entry the product is built around, the Board (C-282): drawn in
+   * glass-ui's primary-entry frame (`NavRailItem.primary`). One per rail.
+   */
+  main?: boolean;
 }
 
 export interface NavSection {
@@ -68,10 +74,12 @@ export interface NavSection {
   title: string;
   /** Shown only under `/projects/[projectId]`. */
   projectScoped?: boolean;
-  /** Folded into one expandable group unless one of its pages is open. */
-  collapsible?: boolean;
-  /** Folded into one expandable group of the rail while inside a project (C-247). */
-  foldedInProject?: boolean;
+  /**
+   * Opened from the account menu (C-282): its pages carry their own
+   * sub-navigation, and it stays out of the rail and the capsule. The palette
+   * and the breadcrumbs still read it.
+   */
+  accountMenu?: boolean;
   entries: NavEntry[];
 }
 
@@ -79,10 +87,10 @@ export const NAV: NavSection[] = [
   {
     id: 'workspace',
     title: 'Workspace',
-    foldedInProject: true,
     entries: [
       {
         id: 'overview',
+        primary: true,
         href: '/',
         label: 'Overview',
         icon: LayoutDashboard,
@@ -92,6 +100,7 @@ export const NAV: NavSection[] = [
       },
       {
         id: 'projects',
+        primary: true,
         href: '/projects',
         label: 'Projects',
         icon: FolderGit2,
@@ -100,20 +109,21 @@ export const NAV: NavSection[] = [
         exact: true,
       },
       {
+        id: 'work',
+        primary: true,
+        wide: true,
+        href: '/work',
+        label: 'Work',
+        icon: KanbanSquare,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      {
         id: 'activity',
         wide: true,
         href: '/activity',
         label: 'Activity',
         icon: Radio,
-        minRole: 'viewer',
-        enabled: true,
-      },
-      {
-        id: 'work',
-        wide: true,
-        href: '/work',
-        label: 'Work',
-        icon: KanbanSquare,
         minRole: 'viewer',
         enabled: true,
       },
@@ -158,21 +168,24 @@ export const NAV: NavSection[] = [
     id: 'project',
     title: 'Project',
     projectScoped: true,
+    // C-282: five in view, the Board first; the rest under More. Queue and
+    // Activity absorb Approvals and History in later cards of stack S-7.
     entries: [
-      // The project's home (card C-6): its figures, then the orchestrator.
       {
-        id: 'project-home',
+        id: 'board',
         primary: true,
+        main: true,
         wide: true,
-        href: '/projects/:projectId',
-        label: 'Project',
-        icon: ChartColumn,
+        fill: true,
+        href: '/projects/:projectId/board',
+        label: 'Board',
+        icon: KanbanSquare,
         minRole: 'viewer',
         enabled: true,
-        exact: true,
       },
       {
         id: 'fleet',
+        primary: true,
         wide: true,
         href: '/projects/:projectId/fleet',
         label: 'Fleet',
@@ -180,34 +193,13 @@ export const NAV: NavSection[] = [
         minRole: 'viewer',
         enabled: true,
       },
-      // #337 D11: no Planner entry — New Card and New Plan live on the Board;
-      // `/projects/:id/planner` stays reachable, read-only, off the nav.
-      {
-        id: 'board',
-        primary: true,
-        wide: true,
-        fill: true,
-        href: '/projects/:projectId/board',
-        label: 'Work',
-        icon: KanbanSquare,
-        minRole: 'viewer',
-        enabled: true,
-      },
       {
         id: 'queue',
+        primary: true,
         wide: true,
         href: '/projects/:projectId/queue',
         label: 'Queue',
         icon: ListChecks,
-        minRole: 'viewer',
-        enabled: true,
-      },
-      {
-        id: 'approvals',
-        wide: true,
-        href: '/projects/:projectId/approvals',
-        label: 'Approvals',
-        icon: GitMerge,
         minRole: 'viewer',
         enabled: true,
       },
@@ -222,6 +214,35 @@ export const NAV: NavSection[] = [
         enabled: true,
       },
       {
+        id: 'project-settings',
+        primary: true,
+        href: '/projects/:projectId/settings',
+        label: 'Settings',
+        icon: Settings,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      // The project's home (card C-6): its figures, then the orchestrator.
+      {
+        id: 'project-home',
+        wide: true,
+        href: '/projects/:projectId',
+        label: 'Project home',
+        icon: ChartColumn,
+        minRole: 'viewer',
+        enabled: true,
+        exact: true,
+      },
+      {
+        id: 'approvals',
+        wide: true,
+        href: '/projects/:projectId/approvals',
+        label: 'Approvals',
+        icon: GitMerge,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      {
         id: 'history',
         wide: true,
         href: '/projects/:projectId/history',
@@ -230,22 +251,13 @@ export const NAV: NavSection[] = [
         minRole: 'viewer',
         enabled: true,
       },
-      // #445 D13: what Token saver kept out of what this project's agents read.
+      // #337 D11 took the Planner off the nav (New work lives on the Board);
+      // C-282 brings its read-only pages back under More.
       {
-        id: 'project-token-saver',
-        wide: true,
-        href: '/projects/:projectId/token-saver',
-        label: 'Token saver',
-        icon: Gauge,
-        minRole: 'viewer',
-        enabled: true,
-      },
-      {
-        id: 'project-skills',
-        wide: true,
-        href: '/projects/:projectId/skills',
-        label: 'Skills',
-        icon: Wand2,
+        id: 'planner',
+        href: '/projects/:projectId/planner',
+        label: 'Planner',
+        icon: Lightbulb,
         minRole: 'viewer',
         enabled: true,
       },
@@ -259,10 +271,21 @@ export const NAV: NavSection[] = [
         enabled: true,
       },
       {
-        id: 'project-settings',
-        href: '/projects/:projectId/settings',
-        label: 'Settings',
-        icon: Settings,
+        id: 'project-skills',
+        wide: true,
+        href: '/projects/:projectId/skills',
+        label: 'Skills',
+        icon: Wand2,
+        minRole: 'viewer',
+        enabled: true,
+      },
+      // #445 D13: what Token saver kept out of what this project's agents read.
+      {
+        id: 'project-token-saver',
+        wide: true,
+        href: '/projects/:projectId/token-saver',
+        label: 'Token saver',
+        icon: Gauge,
         minRole: 'viewer',
         enabled: true,
       },
@@ -271,7 +294,7 @@ export const NAV: NavSection[] = [
   {
     id: 'admin',
     title: 'Admin',
-    collapsible: true,
+    accountMenu: true,
     entries: [
       {
         id: 'runners',
@@ -403,62 +426,108 @@ export function visibleNav(role: Role, pathname: string): VisibleSection[] {
   return sections;
 }
 
-/** One block of the desktop rail: a section, or a section's More. */
+/** The sections the rail and the capsule draw: Admin opens from the account menu. */
+const inNav = (sections: readonly VisibleSection[]): VisibleSection[] =>
+  sections.filter((section) => !section.accountMenu);
+
+/** One block of the open rail: a section, or a section's More. */
 export interface RailGroupSpec {
-  id: 'workspace' | 'project' | 'project-more' | 'admin';
+  id: 'workspace' | 'workspace-more' | 'project' | 'project-more';
   title: string;
   entries: VisibleEntry[];
   /** The heading folds the entries; the rail unfolds it for the active page. */
   collapsible: boolean;
 }
 
+const MORE_ID = {
+  workspace: 'workspace-more',
+  project: 'project-more',
+} as const;
+
 /**
- * The desktop rail's blocks (C-247): the project section keeps its `primary`
- * entries and the rest go to a "More" group right under it; inside a project
- * Workspace and Admin fold, outside a project Workspace is a plain section.
- * An empty block is not drawn.
+ * The open rail's blocks (C-247, C-282): each section keeps its `primary`
+ * entries in view and the rest go to a folding "More" group right under it.
+ * A section that marks none (or only primary ones) is drawn whole. Admin is
+ * not in the rail.
  */
 export function railGroups(
   sections: readonly VisibleSection[],
 ): RailGroupSpec[] {
-  const inProject = sections.some((section) => section.id === 'project');
   const groups: RailGroupSpec[] = [];
-  for (const section of sections) {
-    if (section.id === 'project') {
-      const primary = section.entries.filter((entry) => entry.primary);
-      const rest = section.entries.filter((entry) => !entry.primary);
-      if (rest.length === 0 || primary.length === 0) {
-        groups.push({ ...section, collapsible: false });
-        continue;
-      }
-      groups.push({ ...section, entries: primary, collapsible: false });
-      groups.push({
-        id: 'project-more',
-        title: 'More',
-        entries: rest,
-        collapsible: true,
-      });
-      continue;
-    }
+  for (const section of inNav(sections)) {
+    if (section.id === 'admin') continue;
+    const primary = section.entries.filter((entry) => entry.primary);
+    const rest = section.entries.filter((entry) => !entry.primary);
+    const whole = rest.length === 0 || primary.length === 0;
     groups.push({
       id: section.id,
       title: section.title,
-      entries: section.entries,
-      collapsible:
-        !!section.collapsible || (inProject && !!section.foldedInProject),
+      entries: whole ? section.entries : primary,
+      collapsible: false,
+    });
+    if (whole) continue;
+    groups.push({
+      id: MORE_ID[section.id],
+      title: 'More',
+      entries: rest,
+      collapsible: true,
     });
   }
   return groups;
 }
 
+export interface NavSplit {
+  /** In view, by section; only entries the role can see. */
+  shown: VisibleSection[];
+  /** Behind More, by section, the current project's first. */
+  more: VisibleSection[];
+}
+
+/** `sections` split on `keep`; the project leads More, as the page in hand. */
+function splitBy(
+  sections: readonly VisibleSection[],
+  keep: (entry: VisibleEntry, section: VisibleSection) => boolean,
+): NavSplit {
+  const visible = inNav(sections);
+  const pick = (inView: boolean) =>
+    visible
+      .map((section) => ({
+        ...section,
+        entries: section.entries.filter(
+          (entry) => keep(entry, section) === inView,
+        ),
+      }))
+      .filter((section) => section.entries.length > 0);
+  const more = pick(false);
+  return {
+    shown: pick(true),
+    more: [
+      ...more.filter((section) => section.id === 'project'),
+      ...more.filter((section) => section.id !== 'project'),
+    ],
+  };
+}
+
+/** Whether a section shows `entry` in view: its primary ones, or all when it marks none. */
+const isPrimaryIn = (entry: VisibleEntry, section: VisibleSection) =>
+  !!entry.primary || !section.entries.some((each) => each.primary);
+
 /**
- * The phone's capsule (#163, #521): three places, the rest behind More.
- * Outside a project the workspace's three; inside one, the project's working
- * pages — its home, Queue and Activity behind More.
+ * The rail folded to icons — a tablet, or the desktop rail collapsed (C-14):
+ * each section's primary entries, everything else behind one More (C-282).
+ */
+export const iconRailSplit = (sections: readonly VisibleSection[]): NavSplit =>
+  splitBy(sections, isPrimaryIn);
+
+/**
+ * The phone's capsule (#163, #521, C-282): three places, the rest behind More.
+ * Outside a project the workspace's primary three; inside one the Board,
+ * Queue and Activity — a subset of the project's primary five, which a phone's
+ * width cannot hold beside More and the `+`.
  */
 const TAB_IDS = {
-  workspace: ['overview', 'projects', 'activity'],
-  project: ['board', 'fleet', 'approvals'],
+  workspace: ['overview', 'projects', 'work'],
+  project: ['board', 'queue', 'project-activity'],
 } as const;
 
 export interface TabBarSplit {
@@ -473,16 +542,7 @@ export function tabBarSplit(sections: readonly VisibleSection[]): TabBarSplit {
   const ids: readonly string[] = TAB_IDS[inProject ? 'project' : 'workspace'];
   const entries = sections.flatMap((section) => section.entries);
   const tabs = ids.flatMap((id) => entries.filter((entry) => entry.id === id));
-  const rest = sections
-    .map((section) => ({
-      ...section,
-      entries: section.entries.filter((entry) => !ids.includes(entry.id)),
-    }))
-    .filter((section) => section.entries.length > 0);
-  const more = [
-    ...rest.filter((section) => section.id === 'project'),
-    ...rest.filter((section) => section.id !== 'project'),
-  ];
+  const { more } = splitBy(sections, (entry) => ids.includes(entry.id));
   return { tabs, more };
 }
 

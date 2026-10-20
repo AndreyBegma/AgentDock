@@ -21,8 +21,9 @@ import {
 import { Separator } from '@andrewbehma/glass-ui/separator';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
 import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
-import { ArrowLeft, LogOut, Search, User } from 'lucide-react';
+import { ArrowLeft, LogOut, Search, Shield, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -135,13 +136,15 @@ export function AppShell({
 
   useCommandPaletteShortcut(() => setPaletteOpen(true));
 
-  // From `lg` up the rail narrows to icons and back (C-14); ⌘\ toggles it.
+  // On a desktop the rail narrows to icons and back (C-14); ⌘\ toggles it.
+  // A tablet's rail is always icons (C-282), so the toggle is a desktop's.
+  const desktop = useBreakpoint() === 'desktop';
   const [railCollapsed, setRailCollapsed] = useRailCollapsed();
   const toggleRail = useCallback(
     () => setRailCollapsed(!railCollapsed),
     [railCollapsed, setRailCollapsed],
   );
-  useRailToggleShortcut(!narrow, toggleRail);
+  useRailToggleShortcut(desktop, toggleRail);
 
   // The bell holds the `user:<id>` subscription that keeps the socket (and the dot) alive.
   const { status, closeCode } = useLiveStatus();
@@ -171,11 +174,11 @@ export function AppShell({
   useDocumentTitle(pageTitleOf(crumbs, projectName));
   const parent = crumbs.length > 1 ? crumbs.at(-2) : undefined;
 
-  // The rail's badges on Approvals and Fleet; More's "Needs you" below `lg`.
+  // The rail's badges on Approvals and Fleet; More's "Needs you" elsewhere.
   const waitingApprovals = useWaitingApprovals(projectId);
   const slotsNeedingAttention = useSlotsNeedingAttention(projectId);
 
-  // Below `lg`: three tabs, the rest in More's sheet.
+  // On a phone: Board, Queue and Activity (C-282), the rest in More's sheet.
   const { tabs, more } = useMemo(() => tabBarSplit(sections), [sections]);
 
   const logout = useCallback(async () => {
@@ -226,7 +229,7 @@ export function AppShell({
           Skip to content
         </a>
         <div
-          // Below `lg` the page sits on a 16 px gutter (#213).
+          // On a phone the page sits on a 16 px gutter (#213).
           className={`flex ${fill ? 'h-screen overflow-hidden' : 'min-h-screen'} ${narrow ? 'gap-2 px-4 py-2' : 'gap-3 p-3'}`}
         >
           {narrow ? null : (
@@ -328,6 +331,13 @@ export function AppShell({
                       <User size={16} aria-hidden="true" />
                       Account
                     </MenuItem>
+                    {user.role === 'admin' ? (
+                      // C-282: the admin pages left the rail for this entry.
+                      <MenuItem onSelect={() => router.push('/admin')}>
+                        <Shield size={16} aria-hidden="true" />
+                        Admin
+                      </MenuItem>
+                    ) : null}
                     <MenuSeparator />
                     <MenuLabel>Theme</MenuLabel>
                     <MenuRadioGroup
@@ -390,9 +400,10 @@ export function AppShell({
             </main>
 
             {narrow && !keyboard ? (
-              // Below `lg` the capsule replaces the rail; its spacer keeps the
+              // On a phone the capsule replaces the rail; its spacer keeps the
               // page's end clear of it. #526: the soft keyboard hides it.
               <Capsule
+                sections={sections}
                 tabs={tabs}
                 more={more}
                 activeId={activeId}

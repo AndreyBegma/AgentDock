@@ -2,43 +2,27 @@
 
 import type { ProjectSummary, Role } from '@agentdock/shared';
 import { ActionList } from '@andrewbehma/glass-ui/action-list';
-import {
-  BottomCapsule,
-  type BottomCapsuleProps,
-} from '@andrewbehma/glass-ui/bottom-capsule';
+import { BottomCapsule } from '@andrewbehma/glass-ui/bottom-capsule';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Plus, SquarePen } from 'lucide-react';
-import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { approvalsBadge } from '../../lib/approvals/format';
 import { boardNewWorkHref } from '../../lib/board/href';
-import { attentionBadge } from '../../lib/fleet/format';
+import { MorePages, renderLink } from './more-pages';
 import type { VisibleEntry, VisibleSection } from './nav';
 import { capsuleAction, type PageAction } from './page-actions';
-import { ProjectSwitcher } from './project-switcher';
 import { useRegisteredPageActions } from './use-page-actions';
 
 /** The `+` sheet grows out of the circle (`morphFrom`). */
 const ACTIONS_MORPH = 'shell-page-actions';
 
-/** The capsule's and More's anchors are Next links. */
-const renderLink: NonNullable<BottomCapsuleProps['link']> = ({
-  href,
-  className,
-  children: content,
-  ...rest
-}) => (
-  <Link href={href} className={className} {...rest}>
-    {content}
-  </Link>
-);
-
 /**
- * Below `lg` (#521): glass-ui's floating BottomCapsule — three places, More's
- * sheet for the rest, and the page's create action on the `+` beside it.
+ * On a phone, below `sm` (#521, C-282): glass-ui's floating BottomCapsule —
+ * three places, More's sheet for the rest, and the page's create action on the
+ * `+` beside it.
  */
 export function Capsule({
+  sections,
   tabs,
   more,
   activeId,
@@ -49,6 +33,8 @@ export function Capsule({
   waitingApprovals,
   slotsNeedingAttention,
 }: {
+  /** Every section the role sees here. */
+  sections: VisibleSection[];
   tabs: VisibleEntry[];
   more: VisibleSection[];
   activeId: string | null;
@@ -86,28 +72,6 @@ export function Capsule({
   );
   const plus = capsuleAction(registered, role, fallback);
 
-  // BottomCapsuleTab has no `badge` (docs/ui/glass-ui.md): the counts the
-  // rail shows on Approvals and Fleet head More's sheet instead, Approvals first.
-  const counts = {
-    approvals: approvalsBadge(waitingApprovals),
-    fleet: attentionBadge(slotsNeedingAttention),
-  };
-  const needsYou = (['approvals', 'fleet'] as const).flatMap((id) => {
-    const entry = tabs.find((tab) => tab.id === id);
-    const badge = counts[id];
-    return entry && badge
-      ? [
-          {
-            id: `needs-${entry.id}`,
-            label: entry.label,
-            icon: entry.icon,
-            description: badge.label,
-            href: entry.resolvedHref,
-          },
-        ]
-      : [];
-  });
-
   return (
     <>
       <BottomCapsule
@@ -143,36 +107,18 @@ export function Capsule({
           title: 'More pages',
           open: moreOpen,
           onOpenChange: setMoreOpen,
+          // BottomCapsuleTab has no `badge` (docs/ui/glass-ui.md): the counts
+          // the rail shows on Approvals and Fleet head More's sheet instead.
           children: (
-            <div className="flex flex-col gap-4">
-              <ProjectSwitcher projects={projects} projectId={projectId} />
-              {needsYou.length > 0 ? (
-                <ActionList
-                  surface="content"
-                  heading="Needs you"
-                  link={renderLink}
-                  items={needsYou}
-                />
-              ) : null}
-              {more.map((section) => (
-                <ActionList
-                  key={section.id}
-                  surface="content"
-                  heading={
-                    section.id === 'project' && projectName
-                      ? projectName
-                      : section.title
-                  }
-                  link={renderLink}
-                  items={section.entries.map((entry) => ({
-                    id: entry.id,
-                    label: entry.label,
-                    icon: entry.icon,
-                    href: entry.resolvedHref,
-                  }))}
-                />
-              ))}
-            </div>
+            <MorePages
+              sections={sections}
+              more={more}
+              projects={projects}
+              projectId={projectId}
+              projectName={projectName}
+              waitingApprovals={waitingApprovals}
+              slotsNeedingAttention={slotsNeedingAttention}
+            />
           ),
         }}
       />
