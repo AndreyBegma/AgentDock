@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import { formatAgo } from '../../../../../lib/fleet/format';
+import { runHref } from '../../../../../lib/history/format';
 import {
   DISABLED_REASON_LABEL,
   describeSchedulesError,
@@ -108,7 +109,7 @@ function Detail({ detail }: { detail: ScheduleDetail }) {
                   ) : null}
                   {firing.runId ? (
                     <Link
-                      href={`/projects/${detail.projectId}/history/${firing.runId}`}
+                      href={runHref(detail.projectId, firing.runId)}
                       className="text-xs text-accent-ink underline underline-offset-2"
                     >
                       Open the run

@@ -2,7 +2,7 @@
 
 import type { PlanSummary } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
+import type { Column } from '@andrewbehma/glass-ui/data-table';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -14,7 +14,7 @@ import {
   taskCountsText,
 } from '../../lib/planner/format';
 import { planHref } from '../../lib/planner/href';
-import { ScrollX } from '../scroll-x/scroll-x';
+import { ResponsiveRows } from '../responsive-rows/responsive-rows';
 import { VisibilityChip } from './plan-header';
 
 /** What a row needs to offer **Retry** on a plan whose newest turn failed. */
@@ -34,7 +34,7 @@ export function planColumns(retry?: PlanRetry): Column<PlanSummary>[] {
       cell: (plan) => {
         const reason = planAttentionReason(plan);
         return (
-          <span className="flex min-w-64 flex-col gap-0.5 py-1">
+          <span className="flex min-w-0 flex-col tablet:min-w-64 gap-0.5 py-1">
             <span className="flex min-w-0 items-center gap-2">
               <Link
                 href={planHref(plan.projectId, plan.id)}
@@ -105,11 +105,11 @@ export function planColumns(retry?: PlanRetry): Column<PlanSummary>[] {
 }
 
 /**
- * The plans the person may read (spec 172 UI), a `DataTable` (#213): title
- * with its visibility (a lock for a private one), author, mode and version
- * under it and, when the newest turn failed, the reason; status; task
- * counts; when it last moved. Four columns, so it fits at 1440 beside the
- * rail; below that the table scrolls in its own box.
+ * The plans the person may read (spec 172 UI): a table from tablet up, with
+ * the title and its visibility (a lock for a private one), author, mode and
+ * version under it and, when the newest turn failed, the reason; status; task
+ * counts; when it last moved. On a phone each plan is a stacked row (stack
+ * S-7), so nothing scrolls sideways.
  */
 export function PlanList({
   plans,
@@ -119,15 +119,27 @@ export function PlanList({
   retry?: PlanRetry;
 }) {
   const router = useRouter();
+  const columns = planColumns(retry);
   return (
-    <ScrollX label="Plans">
-      <DataTable
-        rows={[...plans]}
-        getRowId={(plan) => plan.id}
-        columns={planColumns(retry)}
-        stickyHeader={false}
-        onRowActivate={(plan) => router.push(planHref(plan.projectId, plan.id))}
-      />
-    </ScrollX>
+    <ResponsiveRows
+      label="Plans"
+      rows={[...plans]}
+      getRowId={(plan) => plan.id}
+      columns={columns}
+      onRowActivate={(plan) => router.push(planHref(plan.projectId, plan.id))}
+      stacked={(plan) => {
+        const pill = planPill(plan);
+        return (
+          <div className="flex flex-col gap-2">
+            {columns[0]?.cell(plan)}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-2">
+              <StatusPill size="sm" status={pill.status} label={pill.label} />
+              <span>{taskCountsText(plan.taskCounts) ?? 'No tasks yet'}</span>
+              <Time value={plan.updatedAt} />
+            </div>
+          </div>
+        );
+      }}
+    />
   );
 }

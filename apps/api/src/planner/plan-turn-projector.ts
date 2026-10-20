@@ -35,6 +35,7 @@ import {
   designTurnPlanOf,
   withDesign,
 } from '../design/design-rules';
+import { withMockupScriptCheck } from '../design/design-scripts';
 import {
   applySuggestions,
   cardDesignTaskKey,
@@ -552,13 +553,15 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
           'contract_violation: invalid_shape: the design turn lost its variant; generate it again',
         );
       }
-      const parsed = parsePlannerOutput(resultText ?? '', 'design', {
-        contractVersion: CARD_DESIGN_CONTRACT_VERSION,
-        taskKey: host.taskKey,
-        variant: designPlan.variant,
-        openCommentIds: designPlan.comments,
-        previousFrames: await previousFramesOf(tx, owner, designPlan),
-      });
+      const parsed = withMockupScriptCheck(
+        parsePlannerOutput(resultText ?? '', 'design', {
+          contractVersion: CARD_DESIGN_CONTRACT_VERSION,
+          taskKey: host.taskKey,
+          variant: designPlan.variant,
+          openCommentIds: designPlan.comments,
+          previousFrames: await previousFramesOf(tx, owner, designPlan),
+        }),
+      );
       if (!parsed.ok) {
         return fail(
           'failed',
@@ -665,17 +668,19 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
             },
           };
         }
-        return parsePlannerOutput(body, 'design', {
-          contractVersion,
-          taskKey: task.key,
-          variant: designPlan.variant,
-          openCommentIds: designPlan.comments,
-          previousFrames: await previousFramesOf(
-            tx,
-            { planId: plan.id, taskKey: task.key },
-            designPlan,
-          ),
-        });
+        return withMockupScriptCheck(
+          parsePlannerOutput(body, 'design', {
+            contractVersion,
+            taskKey: task.key,
+            variant: designPlan.variant,
+            openCommentIds: designPlan.comments,
+            previousFrames: await previousFramesOf(
+              tx,
+              { planId: plan.id, taskKey: task.key },
+              designPlan,
+            ),
+          }),
+        );
       case 'clarify':
       case 'decompose':
       case 'discuss':

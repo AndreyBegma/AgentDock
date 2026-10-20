@@ -5,11 +5,9 @@ import {
   type PlanListView,
   projectRoleAtLeast,
 } from '@agentdock/shared';
-import { Banner } from '@andrewbehma/glass-ui/banner';
-import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
-import Link from 'next/link';
+import { Plus } from 'lucide-react';
+import NextLink from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';
@@ -52,50 +50,42 @@ export default function PlannerPage() {
     [projectId, version],
   );
 
+  const primaryAction = canOperate
+    ? { label: 'New work', href: boardNewWorkHref(projectId), icon: Plus }
+    : { label: 'Open the Board', href: boardHref(projectId) };
+
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <PageHeader
         className="mb-0"
         title="Plans"
-        description="Plans made before the Planner moved onto the Board. They are read-only; their tasks show on the Board until a plan is archived."
+        description="Plans made before the Planner moved onto the Board. They are read-only; new work starts on the Board."
+        link={NextLink}
+        primaryAction={primaryAction}
       />
-      <Banner
-        tone="info"
-        title="New work starts on the Board"
-        action={
-          <Link
-            href={
-              canOperate ? boardNewWorkHref(projectId) : boardHref(projectId)
-            }
-            className={buttonClassName({ variant: 'glass', size: 'sm' })}
-          >
-            {canOperate ? 'New work on the Board' : 'Open the Board'}
-          </Link>
+      <AsyncSection
+        section={plans}
+        unavailable={{
+          title: 'Plans could not be loaded',
+          stillWorks: 'The Board is still available.',
+        }}
+        isEmpty={(view) => view.items.length === 0}
+        empty={
+          <EmptyState
+            title="No plans"
+            description="Plans are private to their author until shared, so a colleague’s plan shows here once they share it. New work starts on the Board."
+            link={NextLink}
+            action={{
+              label: canOperate ? 'New work on the Board' : 'Open the Board',
+              href: canOperate
+                ? boardNewWorkHref(projectId)
+                : boardHref(projectId),
+            }}
+          />
         }
       >
-        New work interviews you and writes one card — or, when you ask for
-        several things at once, proposes several cards.
-      </Banner>
-
-      <section aria-labelledby="plans" className="flex flex-col gap-3">
-        <SectionHeader title="Plans" headingId="plans" />
-        <AsyncSection
-          section={plans}
-          unavailable={{
-            title: 'Plans could not be loaded',
-            stillWorks: 'The Board is still available.',
-          }}
-          isEmpty={(view) => view.items.length === 0}
-          empty={
-            <EmptyState
-              title="No plans"
-              description="Plans are private to their author until shared, so a colleague’s plan shows here once they share it."
-            />
-          }
-        >
-          {(view) => <PlanList plans={view.items} />}
-        </AsyncSection>
-      </section>
+        {(view) => <PlanList plans={view.items} />}
+      </AsyncSection>
     </div>
   );
 }

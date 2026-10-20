@@ -7,7 +7,6 @@ import {
   ChartColumn,
   FolderGit2,
   Gauge,
-  History,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
@@ -45,7 +44,7 @@ export interface NavEntry {
   exact?: boolean;
   /**
    * A data page (#213): the shell gives it the wide column (max-w-7xl), and
-   * so every page below it (a run under History, a session under Sessions).
+   * so every page below it (a skill run under Skills, a session under Sessions).
    */
   wide?: boolean;
   /**
@@ -167,9 +166,9 @@ export const NAV: NavSection[] = [
     id: 'project',
     title: 'Project',
     projectScoped: true,
-    // C-282: five in view, the Board first; the rest under More. Approvals is
-    // a tab of the Queue page (C-284); Activity absorbs History in a later
-    // card of stack S-7.
+    // C-282: five in view, the Board first; the rest under More. Activity
+    // absorbed History as its Runs tab (C-285); Queue absorbs Approvals as a
+    // tab (C-284).
     entries: [
       {
         id: 'board',
@@ -232,15 +231,6 @@ export const NAV: NavSection[] = [
         minRole: 'viewer',
         enabled: true,
         exact: true,
-      },
-      {
-        id: 'history',
-        wide: true,
-        href: '/projects/:projectId/history',
-        label: 'History',
-        icon: History,
-        minRole: 'viewer',
-        enabled: true,
       },
       // #337 D11 took the Planner off the nav (New work lives on the Board);
       // C-282 brings its read-only pages back under More.

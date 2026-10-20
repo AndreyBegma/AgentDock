@@ -1,20 +1,16 @@
 'use client';
 
 import type { OrchestratorStatus } from '@agentdock/shared';
-import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import {
-  MenuContent,
-  MenuLabel,
-  MenuRadioGroup,
-  MenuRadioItem,
-  MenuRoot,
-  MenuTrigger,
-} from '@andrewbehma/glass-ui/menu';
 import { MetaBar } from '@andrewbehma/glass-ui/meta-bar';
+import type { PageHeaderOverflowItem } from '@andrewbehma/glass-ui/page-header';
+import {
+  SegmentedControl,
+  SegmentedControlItem,
+} from '@andrewbehma/glass-ui/segmented-control';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
-import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
-import { LayoutGrid, Maximize, Settings } from 'lucide-react';
-import Link from 'next/link';
+import { Maximize, Settings } from 'lucide-react';
+import NextLink from 'next/link';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { useLivePaused } from '../../../../../components/shell/live-status';
 import { LiveStatusBadge } from '../../../../../components/shell/live-status-badge';
@@ -28,14 +24,16 @@ import type { WorkspaceView } from '../../../../../lib/fleet/workspace-url';
 import { ORCHESTRATOR_PILL_STATUS } from '../../../../../lib/status/pill';
 
 const VIEW_LABEL: Record<WorkspaceView, string> = {
+  list: 'Slots',
   canvas: 'Agent tree',
-  list: 'All slots (table)',
 };
 
 /**
- * The workspace's header (#160, #213): the shared `PageHeader`, the
+ * The Fleet's header (#160, #213, C-283): the shared `PageHeader`, the
  * orchestrator's state beside the title in the one vocabulary the card and
- * the canvas use, and the fleet's counters in `meta`.
+ * the canvas use, the fleet's counters in `meta`, New issue as the one solid
+ * action and everything else — fit, settings — behind the `…` menu. The view
+ * switch is the one quiet control beside it.
  */
 export function FleetHeader({
   projectId,
@@ -65,14 +63,27 @@ export function FleetHeader({
   onFit?: () => void;
   onViewChange: (view: WorkspaceView) => void;
 }) {
+  const router = useRouter();
   const live = useLivePaused();
   // The top bar's dot says "live"; the page speaks up only when it is not.
   const notLive = live.status !== 'connected' || live.paused;
+  const overflow: PageHeaderOverflowItem[] = [
+    ...(onFit
+      ? [{ id: 'fit', label: 'Fit to view', icon: Maximize, onSelect: onFit }]
+      : []),
+    {
+      id: 'settings',
+      label: 'Orchestrator settings',
+      icon: Settings,
+      onSelect: () => router.push(orchestratorSettingsHref(projectId)),
+    },
+  ];
   return (
     <PageHeader
       className="mb-0"
       title={title}
       description="The orchestrator and the agents it runs on this project."
+      link={NextLink}
       {...(orchestrator
         ? {
             status: (
@@ -89,58 +100,40 @@ export function FleetHeader({
       actions={
         <div className="flex flex-wrap items-center gap-2">
           {notLive ? <LiveStatusBadge /> : null}
-          {canOperate ? (
-            <Button
-              variant={newIssuePrimary ? 'solid' : 'glass'}
-              onClick={onNewIssue}
-            >
-              New issue
-            </Button>
-          ) : null}
-          {onFit ? (
-            <Tooltip content="Fit to view">
-              <Button
-                variant="ghost"
-                icon
-                aria-label="Fit to view"
-                onClick={onFit}
+          <SegmentedControl size="sm" role="group" aria-label="View">
+            {(['list', 'canvas'] as const).map((v) => (
+              <SegmentedControlItem
+                key={v}
+                active={v === view}
+                layoutId="fleet-view"
               >
-                <Maximize aria-hidden="true" className="size-4" />
-              </Button>
-            </Tooltip>
-          ) : null}
-          <Tooltip content="Orchestrator settings">
-            <Link
-              href={orchestratorSettingsHref(projectId)}
-              aria-label="Orchestrator settings"
-              className={buttonClassName({ variant: 'ghost', icon: true })}
-            >
-              <Settings aria-hidden="true" className="size-4" />
-            </Link>
-          </Tooltip>
-          <MenuRoot>
-            <MenuTrigger asChild>
-              <Button variant="ghost" icon aria-label="View">
-                <LayoutGrid aria-hidden="true" className="size-4" />
-              </Button>
-            </MenuTrigger>
-            <MenuContent align="end">
-              <MenuLabel>View</MenuLabel>
-              <MenuRadioGroup
-                value={view}
-                onValueChange={(value) =>
-                  onViewChange(value === 'list' ? 'list' : 'canvas')
-                }
-              >
-                {(['canvas', 'list'] as const).map((v) => (
-                  <MenuRadioItem key={v} value={v}>
-                    {VIEW_LABEL[v]}
-                  </MenuRadioItem>
-                ))}
-              </MenuRadioGroup>
-            </MenuContent>
-          </MenuRoot>
+                <button
+                  type="button"
+                  aria-pressed={v === view}
+                  className="w-full px-3 text-sm whitespace-nowrap"
+                  onClick={() => onViewChange(v)}
+                >
+                  {VIEW_LABEL[v]}
+                </button>
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
         </div>
+      }
+      {...(canOperate && newIssuePrimary
+        ? {
+            // The capsule's `+` carries New issue below the tablet edge.
+            primaryAction: { label: 'New issue', onClick: onNewIssue },
+            primaryActionOnPhone: 'hidden' as const,
+          }
+        : {})}
+      overflow={
+        canOperate && !newIssuePrimary
+          ? [
+              { id: 'new-issue', label: 'New issue', onSelect: onNewIssue },
+              ...overflow,
+            ]
+          : overflow
       }
     />
   );

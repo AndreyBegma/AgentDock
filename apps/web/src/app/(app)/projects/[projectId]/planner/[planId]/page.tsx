@@ -1,7 +1,6 @@
 'use client';
 
 import type { PlannerSettingsView, UiProfileView } from '@agentdock/shared';
-import { Banner } from '@andrewbehma/glass-ui/banner';
 import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import Link from 'next/link';
@@ -10,7 +9,6 @@ import { PlanWorkspace } from '../../../../../../components/planner/plan-workspa
 import { AsyncSection } from '../../../../../../components/prerequisites/async-section';
 import { useCurrentUser } from '../../../../../../components/shell/user-context';
 import { api } from '../../../../../../lib/api';
-import { boardHref } from '../../../../../../lib/board/href';
 import { uiProfileApi } from '../../../../../../lib/design/href';
 import { isNotFound } from '../../../../../../lib/planner/format';
 import { planHref, plannerHref } from '../../../../../../lib/planner/href';
@@ -69,21 +67,6 @@ export default function PlanPage() {
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <Banner
-        tone="info"
-        title="This plan is read-only"
-        action={
-          <Link
-            href={boardHref(projectId)}
-            className={buttonClassName({ variant: 'glass', size: 'sm' })}
-          >
-            Open the Board
-          </Link>
-        }
-      >
-        The Planner moved onto the Board: New work starts there. This plan’s
-        tasks still show on the Board until it is archived.
-      </Banner>
       <AsyncSection
         section={section}
         unavailable={{

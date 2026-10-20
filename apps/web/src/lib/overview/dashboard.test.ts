@@ -298,7 +298,7 @@ describe('needsYou', () => {
     expect(items[0]?.href).toBe('/projects/p2/settings?tab=orchestrator');
     expect(items[0]?.since).toBeNull();
     expect(items[1]?.title).toBe('Slot i7 · #7');
-    expect(items[1]?.href).toBe('/projects/p1/history/fresh');
+    expect(items[1]?.href).toBe('/projects/p1/activity?tab=runs&run=fresh');
     expect(items[2]?.title).toBe('Nightly audit');
   });
 });
