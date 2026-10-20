@@ -11,6 +11,7 @@ export * from './auth';
 export * from './board';
 export * from './board-ai';
 export * from './budgets';
+export * from './changelog';
 export * from './control';
 export * from './design';
 export * from './fleet';

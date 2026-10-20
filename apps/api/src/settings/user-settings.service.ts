@@ -1,7 +1,10 @@
 import {
+  APP_VERSION,
   isPlanningModel,
   resolvePlanningModel,
   type UserSettingsView,
+  type WhatsNewView,
+  whatsNewView,
 } from '@agentdock/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
@@ -59,5 +62,28 @@ export class UserSettingsService {
       result: 'ok',
     });
     return after;
+  }
+
+  /** C-294: this build's version, and whether the caller has seen it. */
+  async whatsNew(userId: string): Promise<WhatsNewView> {
+    const row = await this.prisma.userSettings.findUnique({
+      where: { userId },
+      select: { seenVersion: true },
+    });
+    return whatsNewView(row?.seenVersion);
+  }
+
+  /**
+   * C-294: the caller opened What's new on this build. Always the API's own
+   * `APP_VERSION`, never a version the client names; not audited, as a read
+   * receipt changes nothing anyone else sees.
+   */
+  async markWhatsNewSeen(userId: string): Promise<WhatsNewView> {
+    await this.prisma.userSettings.upsert({
+      where: { userId },
+      update: { seenVersion: APP_VERSION },
+      create: { userId, seenVersion: APP_VERSION },
+    });
+    return whatsNewView(APP_VERSION);
   }
 }

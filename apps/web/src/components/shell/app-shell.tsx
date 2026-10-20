@@ -1,33 +1,18 @@
 'use client';
 
-import {
-  LIVE_CLOSE_CODES,
-  type PublicUser,
-  presentContacts,
-} from '@agentdock/shared';
-import { Avatar } from '@andrewbehma/glass-ui/avatar';
+import { LIVE_CLOSE_CODES, type PublicUser } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Breadcrumb } from '@andrewbehma/glass-ui/breadcrumb';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CommandPalette } from '@andrewbehma/glass-ui/command-palette';
 import { KeyHint } from '@andrewbehma/glass-ui/key-hint';
-import {
-  MenuContent,
-  MenuItem,
-  MenuLabel,
-  MenuRadioGroup,
-  MenuRadioItem,
-  MenuRoot,
-  MenuSeparator,
-  MenuTrigger,
-} from '@andrewbehma/glass-ui/menu';
 import { Separator } from '@andrewbehma/glass-ui/separator';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
 import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
-import { ArrowLeft, Info, LogOut, Search, Shield, User } from 'lucide-react';
+import { ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -39,13 +24,9 @@ import {
 } from 'react';
 import { api, describeError } from '../../lib/api';
 import { useLiveStatus } from '../../lib/live/use-live';
-import {
-  CONTACT_ICON,
-  contactName,
-  EXTERNAL_LINK,
-} from '../about/contact-links';
 import { Assistant } from '../assistant/assistant';
 import { AskBoardDialog } from '../board-ai/ask-board-dialog';
+import { AccountMenu } from './account-menu';
 import { Capsule } from './capsule';
 import { crumbsFor, pageTitleOf } from './crumbs';
 import { useKeyboardOpen } from './keyboard';
@@ -70,7 +51,6 @@ import { Rail } from './rail';
 import { useRailCollapsed, useRailToggleShortcut } from './rail-collapse';
 import {
   applyTheme,
-  isThemeMode,
   readStoredTheme,
   storeTheme,
   THEME_LABEL,
@@ -84,6 +64,7 @@ import { usePlans, useProjects, useRecent } from './use-shell-data';
 import { useSlotsNeedingAttention } from './use-slots-needing-attention';
 import { useWaitingApprovals } from './use-waiting-approvals';
 import { UserProvider } from './user-context';
+import { WhatsNewProvider } from './whats-new-context';
 
 function useTheme(): [ThemeMode, (mode: ThemeMode) => void] {
   const [mode, setMode] = useState<ThemeMode>('system');
@@ -183,7 +164,7 @@ export function AppShell({
   useDocumentTitle(pageTitleOf(crumbs, projectName));
   const parent = crumbs.length > 1 ? crumbs.at(-2) : undefined;
 
-  // The rail's badges on Queue (its Approvals tab) and Fleet; More's "Needs you" elsewhere.
+  // The rail's badges on Approvals and Fleet; More's "Needs you" elsewhere.
   const waitingApprovals = useWaitingApprovals(projectId);
   const slotsNeedingAttention = useSlotsNeedingAttention(projectId);
 
@@ -230,240 +211,183 @@ export function AppShell({
 
   return (
     <UserProvider value={user}>
-      <PageActionsProvider>
-        <a
-          href="#main-content"
-          className="glass-strong sr-only z-overlay rounded-control px-3 py-2 text-sm text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
-        >
-          Skip to content
-        </a>
-        <div
-          // On a phone the page sits on a 16 px gutter (#213).
-          className={`flex ${fill ? 'h-screen overflow-hidden' : 'min-h-screen'} ${narrow ? 'gap-2 px-4 py-2' : 'gap-3 p-3'}`}
-        >
-          {narrow ? null : (
-            <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
-              <Rail
-                sections={sections}
-                activeId={activeId}
-                projects={projects}
-                projectId={projectId}
-                waitingApprovals={waitingApprovals}
-                slotsNeedingAttention={slotsNeedingAttention}
-                collapsed={railCollapsed}
-                onCollapsedChange={setRailCollapsed}
-              />
-            </aside>
-          )}
+      <WhatsNewProvider>
+        <PageActionsProvider>
+          <a
+            href="#main-content"
+            className="glass-strong sr-only z-overlay rounded-control px-3 py-2 text-sm text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
+          >
+            Skip to content
+          </a>
+          <div
+            // On a phone the page sits on a 16 px gutter (#213).
+            className={`flex ${fill ? 'h-screen overflow-hidden' : 'min-h-screen'} ${narrow ? 'gap-2 px-4 py-2' : 'gap-3 p-3'}`}
+          >
+            {narrow ? null : (
+              <aside className="sticky top-3 h-[calc(100vh-1.5rem)] shrink-0">
+                <Rail
+                  sections={sections}
+                  activeId={activeId}
+                  projects={projects}
+                  projectId={projectId}
+                  waitingApprovals={waitingApprovals}
+                  slotsNeedingAttention={slotsNeedingAttention}
+                  collapsed={railCollapsed}
+                  onCollapsedChange={setRailCollapsed}
+                />
+              </aside>
+            )}
 
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-            <header
-              // #654: one row of `--size-control` controls on a shared centre
-              // line — the trail and its live dot left, one group right.
-              className={`glass rounded-surface flex h-14 shrink-0 items-center ${narrow ? 'gap-1 px-2' : 'gap-3 pr-3 pl-4'}`}
-            >
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                {narrow ? (
-                  // A phone has no room for the trail: the page, and a way up.
-                  <>
-                    {parent?.href ? (
-                      <Link
-                        href={parent.href}
-                        aria-label={`Back to ${parent.label}`}
-                        className="flex size-(--size-control) shrink-0 items-center justify-center rounded-control text-ink-2 hover:bg-hover hover:text-ink"
-                      >
-                        <ArrowLeft size={16} aria-hidden="true" />
-                      </Link>
-                    ) : null}
-                    <span className="truncate text-section text-ink">
-                      {crumbs.at(-1)?.label}
-                    </span>
-                  </>
-                ) : (
-                  <Breadcrumb
-                    items={crumbs}
-                    aria-label="Breadcrumb"
-                    overflowLabel="Show the path"
-                    // The page itself is set in the section style (S-4 mockup).
-                    className="min-w-0 [&_[aria-current=page]]:text-section [&_[aria-current=page]]:font-semibold"
-                    link={({ href, className, children: content, ...rest }) => (
-                      <Link href={href} className={className} {...rest}>
-                        {content}
-                      </Link>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+              <header
+                // #654: one row of `--size-control` controls on a shared centre
+                // line — the trail and its live dot left, one group right.
+                className={`glass rounded-surface flex h-14 shrink-0 items-center ${narrow ? 'gap-1 px-2' : 'gap-3 pr-3 pl-4'}`}
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  {narrow ? (
+                    // A phone has no room for the trail: the page, and a way up.
+                    <>
+                      {parent?.href ? (
+                        <Link
+                          href={parent.href}
+                          aria-label={`Back to ${parent.label}`}
+                          className="flex size-(--size-control) shrink-0 items-center justify-center rounded-control text-ink-2 hover:bg-hover hover:text-ink"
+                        >
+                          <ArrowLeft size={16} aria-hidden="true" />
+                        </Link>
+                      ) : null}
+                      <span className="truncate text-section text-ink">
+                        {crumbs.at(-1)?.label}
+                      </span>
+                    </>
+                  ) : (
+                    <Breadcrumb
+                      items={crumbs}
+                      aria-label="Breadcrumb"
+                      overflowLabel="Show the path"
+                      // The page itself is set in the section style (S-4 mockup).
+                      className="min-w-0 [&_[aria-current=page]]:text-section [&_[aria-current=page]]:font-semibold"
+                      link={({
+                        href,
+                        className,
+                        children: content,
+                        ...rest
+                      }) => (
+                        <Link href={href} className={className} {...rest}>
+                          {content}
+                        </Link>
+                      )}
+                    />
+                  )}
+                  <ConnectionDot {...live} />
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    variant={narrow ? 'ghost' : 'glass'}
+                    size="md"
+                    icon={narrow}
+                    onClick={() => setPaletteOpen(true)}
+                    aria-label="Open command palette"
+                    className={
+                      narrow ? undefined : 'mr-1 w-56 justify-start gap-2 px-2'
+                    }
+                  >
+                    <Search size={14} aria-hidden="true" />
+                    {narrow ? null : (
+                      <>
+                        <span className="flex-1 text-left font-normal text-ink-3">
+                          Search…
+                        </span>
+                        <KeyHint keys="mod+k" />
+                      </>
                     )}
+                  </Button>
+                  <NotificationBell />
+                  <Separator orientation="vertical" className="mx-1 h-4" />
+                  <AccountMenu
+                    displayName={displayName}
+                    role={user.role}
+                    theme={theme}
+                    onThemeChange={setTheme}
+                    onLogout={() => void logout()}
                   />
-                )}
-                <ConnectionDot {...live} />
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  variant={narrow ? 'ghost' : 'glass'}
-                  size="md"
-                  icon={narrow}
-                  onClick={() => setPaletteOpen(true)}
-                  aria-label="Open command palette"
-                  className={
-                    narrow ? undefined : 'mr-1 w-56 justify-start gap-2 px-2'
+                </div>
+              </header>
+
+              {restarting ? (
+                <Banner tone="warn">{RESTARTING_BANNER_TEXT}</Banner>
+              ) : null}
+
+              {!restarting &&
+              live.paused &&
+              closeCode !== LIVE_CLOSE_CODES.unauthorized ? (
+                <Banner
+                  tone="warn"
+                  title="Live updates paused."
+                  action={
+                    <Button
+                      variant="glass"
+                      size="sm"
+                      onClick={() => window.location.reload()}
+                    >
+                      Reload
+                    </Button>
                   }
                 >
-                  <Search size={14} aria-hidden="true" />
-                  {narrow ? null : (
-                    <>
-                      <span className="flex-1 text-left font-normal text-ink-3">
-                        Search…
-                      </span>
-                      <KeyHint keys="mod+k" />
-                    </>
-                  )}
-                </Button>
-                <NotificationBell />
-                <Separator orientation="vertical" className="mx-1 h-4" />
-                <MenuRoot>
-                  <MenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="rounded-full"
-                      aria-label="Account menu"
-                    >
-                      <Avatar
-                        size="sm"
-                        name={displayName}
-                        className="size-(--size-control)"
-                      />
-                    </button>
-                  </MenuTrigger>
-                  <MenuContent align="end">
-                    <MenuLabel>
-                      {displayName} · {user.role}
-                    </MenuLabel>
-                    <MenuItem onSelect={() => router.push('/account')}>
-                      <User size={16} aria-hidden="true" />
-                      Account
-                    </MenuItem>
-                    {user.role === 'admin' ? (
-                      // C-282: the admin pages left the rail for this entry.
-                      <MenuItem onSelect={() => router.push('/admin')}>
-                        <Shield size={16} aria-hidden="true" />
-                        Admin
-                      </MenuItem>
-                    ) : null}
-                    <MenuSeparator />
-                    <MenuLabel>Theme</MenuLabel>
-                    <MenuRadioGroup
-                      value={theme}
-                      onValueChange={(value) => {
-                        if (isThemeMode(value)) setTheme(value);
-                      }}
-                    >
-                      {THEME_MODES.map((mode) => (
-                        <MenuRadioItem key={mode} value={mode}>
-                          {THEME_LABEL[mode]}
-                        </MenuRadioItem>
-                      ))}
-                    </MenuRadioGroup>
-                    <MenuSeparator />
-                    <MenuItem onSelect={() => router.push('/account/about')}>
-                      <Info size={16} aria-hidden="true" />
-                      About
-                    </MenuItem>
-                    {presentContacts().map((contact) => {
-                      // C-293: the author's links, each a real anchor.
-                      const Icon = CONTACT_ICON[contact.kind];
-                      return (
-                        <MenuItem key={contact.kind} asChild>
-                          <a
-                            href={contact.href}
-                            {...EXTERNAL_LINK}
-                            aria-label={contactName(contact)}
-                          >
-                            <Icon size={16} aria-hidden="true" />
-                            {contact.label}
-                          </a>
-                        </MenuItem>
-                      );
-                    })}
-                    <MenuSeparator />
-                    <MenuItem tone="danger" onSelect={() => void logout()}>
-                      <LogOut size={16} aria-hidden="true" />
-                      Log out
-                    </MenuItem>
-                  </MenuContent>
-                </MenuRoot>
-              </div>
-            </header>
+                  This page may be out of date.
+                </Banner>
+              ) : null}
 
-            {restarting ? (
-              <Banner tone="warn">{RESTARTING_BANNER_TEXT}</Banner>
-            ) : null}
-
-            {!restarting &&
-            live.paused &&
-            closeCode !== LIVE_CLOSE_CODES.unauthorized ? (
-              <Banner
-                tone="warn"
-                title="Live updates paused."
-                action={
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    onClick={() => window.location.reload()}
-                  >
-                    Reload
-                  </Button>
+              <main
+                id="main-content"
+                tabIndex={-1}
+                // A data page (the registry's `wide`) gets the wide column.
+                className={
+                  fill
+                    ? 'flex min-h-0 w-full flex-1 flex-col focus:outline-none'
+                    : `mx-auto w-full pb-6 focus:outline-none ${wide ? 'max-w-7xl' : 'max-w-5xl'}`
                 }
               >
-                This page may be out of date.
-              </Banner>
-            ) : null}
+                {children}
+              </main>
 
-            <main
-              id="main-content"
-              tabIndex={-1}
-              // A data page (the registry's `wide`) gets the wide column.
-              className={
-                fill
-                  ? 'flex min-h-0 w-full flex-1 flex-col focus:outline-none'
-                  : `mx-auto w-full pb-6 focus:outline-none ${wide ? 'max-w-7xl' : 'max-w-5xl'}`
-              }
-            >
-              {children}
-            </main>
-
-            {narrow && !keyboard ? (
-              // On a phone the capsule replaces the rail; its spacer keeps the
-              // page's end clear of it. #526: the soft keyboard hides it.
-              <Capsule
-                sections={sections}
-                tabs={tabs}
-                more={more}
-                activeId={activeId}
-                projects={projects}
-                projectId={projectId}
-                projectName={projectName}
-                role={role}
-                waitingApprovals={waitingApprovals}
-                slotsNeedingAttention={slotsNeedingAttention}
-              />
-            ) : null}
+              {narrow && !keyboard ? (
+                // On a phone the capsule replaces the rail; its spacer keeps the
+                // page's end clear of it. #526: the soft keyboard hides it.
+                <Capsule
+                  sections={sections}
+                  tabs={tabs}
+                  more={more}
+                  activeId={activeId}
+                  projects={projects}
+                  projectId={projectId}
+                  projectName={projectName}
+                  role={role}
+                  waitingApprovals={waitingApprovals}
+                  slotsNeedingAttention={slotsNeedingAttention}
+                />
+              ) : null}
+            </div>
           </div>
-        </div>
 
-        <Assistant projects={projects} />
+          <Assistant projects={projects} />
 
-        <CommandPalette
-          open={paletteOpen}
-          onOpenChange={setPaletteOpen}
-          search={search}
-          onSelect={onSelect}
-          placeholder="Go to a page, a project or a run — or ask the Board"
-        />
-        <AskBoardDialog
-          question={asking}
-          onOpenChange={(open) => {
-            if (!open) setAsking(null);
-          }}
-        />
-      </PageActionsProvider>
+          <CommandPalette
+            open={paletteOpen}
+            onOpenChange={setPaletteOpen}
+            search={search}
+            onSelect={onSelect}
+            placeholder="Go to a page, a project or a run — or ask the Board"
+          />
+          <AskBoardDialog
+            question={asking}
+            onOpenChange={(open) => {
+              if (!open) setAsking(null);
+            }}
+          />
+        </PageActionsProvider>
+      </WhatsNewProvider>
     </UserProvider>
   );
 }
