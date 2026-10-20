@@ -1,6 +1,6 @@
 # Activity feed and execution history
 
-Issue: [#21](https://github.com/AndreyBegma/AgentDock/issues/21) · Roadmap: M2.6 ·
+Issue: [#21](https://github.com/AndreyBegma/Nautelle/issues/21) · Roadmap: M2.6 ·
 Decisions: [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
 [ADR-0007](../adr/0007-postgresql-only.md), [data-model.md](../architecture/data-model.md),
 [event-schema.md](../architecture/event-schema.md)

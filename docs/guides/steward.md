@@ -1,6 +1,6 @@
 # Steward
 
-Steward ([#447](https://github.com/AndreyBegma/AgentDock/issues/447),
+Steward ([#447](https://github.com/AndreyBegma/Nautelle/issues/447),
 [ADR-0040](../adr/0040-steward.md), [spec](../specs/447-steward.md)) watches
 the work your agents do, fixes the few things that are safe to fix without you,
 and tells you in one line when it needs a person. It is not a chat assistant

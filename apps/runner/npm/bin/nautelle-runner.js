@@ -37,7 +37,7 @@ const noMatchMessage = (platform, arch) => {
     `Supported targets: ${TARGETS.join(', ')}.`,
     'Other ways to install it:',
     '  brew install andreybegma/tap/nautelle-runner',
-    '  build from source: https://github.com/AndreyBegma/AgentDock/tree/main/apps/runner',
+    '  build from source: https://github.com/AndreyBegma/Nautelle/tree/main/apps/runner',
     '',
   ].join('\n');
 };
@@ -166,7 +166,7 @@ const main = () => {
     );
   } catch (error) {
     process.stderr.write(
-      `nautelle-runner: refusing to run ${binary}: ${error.message}. Reinstall nautelle-runner; if it happens again, do not run the binary and report it at https://github.com/AndreyBegma/AgentDock/security.\n`,
+      `nautelle-runner: refusing to run ${binary}: ${error.message}. Reinstall nautelle-runner; if it happens again, do not run the binary and report it at https://github.com/AndreyBegma/Nautelle/security.\n`,
     );
     process.exit(1);
   }

@@ -1,6 +1,6 @@
 # Every card session carries Nautelle hooks and finish_card
 
-Issue: [#367](https://github.com/AndreyBegma/AgentDock/issues/367)
+Issue: [#367](https://github.com/AndreyBegma/Nautelle/issues/367)
 
 ## Summary
 

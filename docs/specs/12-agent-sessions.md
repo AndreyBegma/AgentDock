@@ -1,6 +1,6 @@
 # Agent sessions — Claude and Codex transcripts, session tree
 
-Issue: [#12](https://github.com/AndreyBegma/AgentDock/issues/12) · Roadmap: M1.6 ·
+Issue: [#12](https://github.com/AndreyBegma/Nautelle/issues/12) · Roadmap: M1.6 ·
 Decisions: [ADR-0003](../adr/0003-usage-from-opentelemetry-transcripts-as-backfill.md),
 [ADR-0006](../adr/0006-runtime-adapters-and-runtime-profiles.md),
 [event-schema.md](../architecture/event-schema.md), [cost-model.md](../architecture/cost-model.md)

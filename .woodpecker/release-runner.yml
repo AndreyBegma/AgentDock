@@ -108,12 +108,12 @@ steps:
       - version=$${CI_COMMIT_TAG#runner-v}
       # A re-run finds the release and replaces its assets.
       - |
-        if ! gh release view "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock >/dev/null 2>&1; then
-          gh release create "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --verify-tag \
+        if ! gh release view "$${CI_COMMIT_TAG}" --repo AndreyBegma/Nautelle >/dev/null 2>&1; then
+          gh release create "$${CI_COMMIT_TAG}" --repo AndreyBegma/Nautelle --verify-tag \
             --title "nautelle-runner $${version}" \
-            --notes "Install: brew install andreybegma/tap/nautelle-runner, or npm i -g nautelle-runner. Checksums: SHA256SUMS, signed by apps/runner/release-key.pub (SHA256SUMS.sig, Ed25519): openssl pkeyutl -verify -pubin -inkey release-key.pub -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig, then sha256sum -c --ignore-missing SHA256SUMS. Release and upgrade notes: https://github.com/AndreyBegma/AgentDock/blob/$${CI_COMMIT_TAG}/apps/runner/CHANGELOG.md"
+            --notes "Install: brew install andreybegma/tap/nautelle-runner, or npm i -g nautelle-runner. Checksums: SHA256SUMS, signed by apps/runner/release-key.pub (SHA256SUMS.sig, Ed25519): openssl pkeyutl -verify -pubin -inkey release-key.pub -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig, then sha256sum -c --ignore-missing SHA256SUMS. Release and upgrade notes: https://github.com/AndreyBegma/Nautelle/blob/$${CI_COMMIT_TAG}/apps/runner/CHANGELOG.md"
         fi
-      - gh release upload "$${CI_COMMIT_TAG}" --repo AndreyBegma/AgentDock --clobber nautelle-runner-*.tar.gz SHA256SUMS SHA256SUMS.sig
+      - gh release upload "$${CI_COMMIT_TAG}" --repo AndreyBegma/Nautelle --clobber nautelle-runner-*.tar.gz SHA256SUMS SHA256SUMS.sig
 
   - name: npm-publish
     image: *ci_image

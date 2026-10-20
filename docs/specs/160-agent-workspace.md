@@ -1,6 +1,6 @@
 # Agent workspace — data contract, runner and API
 
-Issue: [#160](https://github.com/AndreyBegma/AgentDock/issues/160) (slot
+Issue: [#160](https://github.com/AndreyBegma/Nautelle/issues/160) (slot
 `i160-data`, the lead) · Decisions:
 [ADR-0001](../adr/0001-control-plane-and-per-machine-runner.md),
 [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),

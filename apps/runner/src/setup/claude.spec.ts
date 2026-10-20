@@ -85,7 +85,7 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
     expect(await run({ dryRun: true })).toBe(0);
     const text = stdout.join('');
     expect(text).toContain(
-      'claude plugin marketplace add AndreyBegma/AgentDock',
+      'claude plugin marketplace add AndreyBegma/Nautelle',
     );
     expect(text).toContain(
       'claude plugin install nautelle@nautelle --scope user',
@@ -103,7 +103,7 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
     writeOriginal();
     expect(await run()).toBe(0);
     expect(calls()).toEqual([
-      `${configDir()} plugin marketplace add AndreyBegma/AgentDock`,
+      `${configDir()} plugin marketplace add AndreyBegma/Nautelle`,
       `${configDir()} plugin install nautelle@nautelle --scope user`,
     ]);
     const settings = JSON.parse(readFileSync(settingsPath(), 'utf8'));
@@ -170,7 +170,7 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
     expect(calls()).toEqual([
       `${configDir()} plugin uninstall agentdock@agentdock --scope user`,
       `${configDir()} plugin marketplace remove agentdock`,
-      `${configDir()} plugin marketplace add AndreyBegma/AgentDock`,
+      `${configDir()} plugin marketplace add AndreyBegma/Nautelle`,
       `${configDir()} plugin install nautelle@nautelle --scope user`,
     ]);
   });

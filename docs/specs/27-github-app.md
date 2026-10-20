@@ -1,6 +1,6 @@
 # GitHub App — issue, PR and check events
 
-Issue: [#27](https://github.com/AndreyBegma/AgentDock/issues/27) · Roadmap: M3.4 ·
+Issue: [#27](https://github.com/AndreyBegma/Nautelle/issues/27) · Roadmap: M3.4 ·
 Decisions: [ADR-0004](../adr/0004-github-issues-are-the-task-queue.md),
 [ADR-0007](../adr/0007-postgresql-only.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
@@ -123,7 +123,7 @@ as an optional key.
 - [ ] The manifest built for `PUBLIC_URL=https://dock.example` contains exactly the D2 permissions (all `read`), the D2 events, the hook URL and the redirect URL; without `PUBLIC_URL` the hook is `active: false`.
 - [ ] The callback exchanges the code (against a mocked GitHub endpoint), stores the private key, webhook secret and client secret as ciphertext, and none of them appear in any response, log or audit `after` value.
 - [ ] **Signature:** a delivery signed with the stored secret is accepted; a wrong signature, a modified body, or a missing header returns 401 and triggers no poll; the same `X-GitHub-Delivery` twice returns 200 `duplicate` and triggers one poll in total.
-- [ ] An `issues.labeled` delivery for `AndreyBegma/AgentDock` sends `collector.poll { collectors: ["issues"] }` to the runner of every project with that repo, within 5 s, and writes one `events` row with `source: github`; a `check_run` burst of 20 deliveries in 3 s produces one poll (debounce).
+- [ ] An `issues.labeled` delivery for `AndreyBegma/Nautelle` sends `collector.poll { collectors: ["issues"] }` to the runner of every project with that repo, within 5 s, and writes one `events` row with `source: github`; a `check_run` burst of 20 deliveries in 3 s produces one poll (debounce).
 - [ ] A `push` to the base branch polls `prs` and `worktrees`; a push to another branch polls nothing.
 - [ ] On the runner, `collector.poll` restarts exactly the named collectors for that project and no others (fake collectors in the registry).
 - [ ] With health `healthy`, the `issues` and `prs` collectors poll every 10 minutes (fake clock); switching to `unhealthy` restores 60 s on the next tick without a runner restart.

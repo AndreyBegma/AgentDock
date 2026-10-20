@@ -1,6 +1,6 @@
 # Auth and access — admin seed, approved registration, roles
 
-Issue: [#3](https://github.com/AndreyBegma/AgentDock/issues/3) · Roadmap: M1.1 ·
+Issue: [#3](https://github.com/AndreyBegma/Nautelle/issues/3) · Roadmap: M1.1 ·
 Decisions: [ADR-0008](../adr/0008-local-accounts-with-admin-approved-registration.md),
 [security.md](../architecture/security.md)
 

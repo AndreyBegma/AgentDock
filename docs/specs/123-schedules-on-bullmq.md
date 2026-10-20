@@ -1,6 +1,6 @@
 # Run cron schedules on BullMQ (Redis)
 
-Issue: [#123](https://github.com/AndreyBegma/AgentDock/issues/123) · Roadmap: M3.2 (rework) ·
+Issue: [#123](https://github.com/AndreyBegma/Nautelle/issues/123) · Roadmap: M3.2 (rework) ·
 Decisions: [ADR-0015](../adr/0015-schedules-run-on-bullmq.md) (amends
 [ADR-0007](../adr/0007-postgresql-only.md)),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md) ·

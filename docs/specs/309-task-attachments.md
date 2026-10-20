@@ -1,6 +1,6 @@
 # Attachments on board cards — files and screenshots, delivered to the card worker
 
-Issue: [#309](https://github.com/AndreyBegma/AgentDock/issues/309) ·
+Issue: [#309](https://github.com/AndreyBegma/Nautelle/issues/309) ·
 Decision: [ADR-0031](../adr/0031-attachments-are-stored-by-the-api-on-a-local-volume.md)
 
 ## Summary
@@ -20,7 +20,7 @@ Today the only way to show an agent a screenshot is to describe it in words.
 - Attachments on every **board card** in To Do, In progress, Finished and
   Completed. That covers all card sources: manual cards, cards accepted from
   the Inbox, and the terminal-tracked and fleet-mirrored cards of
-  [#282](https://github.com/AndreyBegma/AgentDock/issues/282).
+  [#282](https://github.com/AndreyBegma/Nautelle/issues/282).
 - Attachments on a **round's feedback** (the text sent with Approve & continue
   or Send feedback).
 - Upload: paste, drag and drop, file picker. The places are:
@@ -205,7 +205,7 @@ HTTP server; the real route arrives with i309-api.
 ## Live contention
 
 Checked against the published plan of
-[#282](https://github.com/AndreyBegma/AgentDock/issues/282) (`cs:ready`, docs
+[#282](https://github.com/AndreyBegma/Nautelle/issues/282) (`cs:ready`, docs
 PR #308). #282 and this spec own the same files:
 
 | File(s) | #282 owner | Rule |

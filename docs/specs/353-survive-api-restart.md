@@ -1,6 +1,6 @@
 # Survive an API restart in the web app
 
-Issue: [#353](https://github.com/AndreyBegma/AgentDock/issues/353)
+Issue: [#353](https://github.com/AndreyBegma/Nautelle/issues/353)
 
 ## Summary
 

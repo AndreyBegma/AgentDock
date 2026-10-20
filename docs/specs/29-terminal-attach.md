@@ -1,6 +1,6 @@
 # Interactive terminal attach (admin, audited)
 
-Issue: [#29](https://github.com/AndreyBegma/AgentDock/issues/29) · Roadmap: M3.6 ·
+Issue: [#29](https://github.com/AndreyBegma/Nautelle/issues/29) · Roadmap: M3.6 ·
 Decisions: [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
 [ADR-0008](../adr/0008-local-accounts-with-admin-approved-registration.md),
 [runner-protocol.md](../architecture/runner-protocol.md) (`terminal.attach`), [security.md](../architecture/security.md) (terminal attach)

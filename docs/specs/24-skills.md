@@ -1,6 +1,6 @@
 # Skills — skills.sh catalog, install, run on a project
 
-Issue: [#24](https://github.com/AndreyBegma/AgentDock/issues/24) · Roadmap: M3.1 ·
+Issue: [#24](https://github.com/AndreyBegma/Nautelle/issues/24) · Roadmap: M3.1 ·
 Decisions: [ADR-0006](../adr/0006-runtime-adapters-and-runtime-profiles.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
 [runner-protocol.md](../architecture/runner-protocol.md), [security.md](../architecture/security.md)

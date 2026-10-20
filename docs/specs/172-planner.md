@@ -1,6 +1,6 @@
 # Planner — from a brief to reviewed tasks, grilled per task, sent to the fleet
 
-Issue: [#172](https://github.com/AndreyBegma/AgentDock/issues/172) · Roadmap: M3.7 ·
+Issue: [#172](https://github.com/AndreyBegma/Nautelle/issues/172) · Roadmap: M3.7 ·
 Decisions: [ADR-0019](../adr/0019-planner-instructions-live-in-agentdock.md),
 [ADR-0004](../adr/0004-github-issues-are-the-task-queue.md),
 [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),

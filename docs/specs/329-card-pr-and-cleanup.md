@@ -1,6 +1,6 @@
 # A card always reaches a pull request, and Accept cleans up its branch
 
-Issue: [#329](https://github.com/AndreyBegma/AgentDock/issues/329)
+Issue: [#329](https://github.com/AndreyBegma/Nautelle/issues/329)
 
 ## Summary
 

@@ -317,7 +317,7 @@ always present on the wire.
       "ts": "2026-10-07T18:36:02.335Z",
       "type": "slot.checkpoint",
       "source": "code-sentinel",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "slot": "i5-protocol",
       "issue": 5,
       "session": { "runtime": "claude", "id": "8f0c2a", "name": "cs-i5-protocol" },
@@ -373,7 +373,7 @@ does not fit is stored but projects nothing; it never fails the batch.
       "ts": "2026-10-08T14:30:05.000Z",
       "type": "session.appeared",
       "source": "runner",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "slot": "i11-api",
       "issue": 11,
       "data": { "name": "cs-i11-api" }
@@ -384,14 +384,14 @@ does not fit is stored but projects nothing; it never fails the batch.
       "ts": "2026-10-08T14:31:10.000Z",
       "type": "slot.checkpoint",
       "source": "scraped",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "slot": "i11-api",
       "data": {
         "checkpoint": "pr_open",
-        "heading": "pull request open — https://github.com/AndreyBegma/AgentDock/pull/46",
+        "heading": "pull request open — https://github.com/AndreyBegma/Nautelle/pull/46",
         "summary": "Projector and routes.",
         "position": 3,
-        "prUrl": "https://github.com/AndreyBegma/AgentDock/pull/46"
+        "prUrl": "https://github.com/AndreyBegma/Nautelle/pull/46"
       }
     },
     {
@@ -400,7 +400,7 @@ does not fit is stored but projects nothing; it never fails the batch.
       "ts": "2026-10-08T14:31:15.000Z",
       "type": "pane.idle",
       "source": "runner",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "data": { "target": "orchestrator", "polls": 3 }
     },
     {
@@ -409,7 +409,7 @@ does not fit is stored but projects nothing; it never fails the batch.
       "ts": "2026-10-08T14:32:00.000Z",
       "type": "slot.message_seen",
       "source": "scraped",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "slot": "i11-api",
       "issue": 11,
       "data": {
@@ -932,7 +932,7 @@ daemon relays their request. Schemas are in `local.ts`.
   "type": "local.response",
   "id": "lr_7f3a",
   "ok": true,
-  "data": { "number": 214, "url": "https://github.com/AndreyBegma/AgentDock/issues/214", "queued": true }
+  "data": { "number": 214, "url": "https://github.com/AndreyBegma/Nautelle/issues/214", "queued": true }
 }
 ```
 
@@ -1024,9 +1024,9 @@ D2–D8 and D10.
     "gitCommonDir": "/home/archi/dev/AgentDock/.git",
     "isMainCheckout": true,
     "remote": {
-      "url": "git@github.com:AndreyBegma/AgentDock",
+      "url": "git@github.com:AndreyBegma/Nautelle",
       "forge": "github",
-      "repo": "AndreyBegma/AgentDock"
+      "repo": "AndreyBegma/Nautelle"
     },
     "baseBranch": "develop",
     "baseSource": "config",
@@ -1038,7 +1038,7 @@ D2–D8 and D10.
     "docs": {
       "kind": "in_repo",
       "localPath": "/home/archi/dev/AgentDock/docs",
-      "repo": "AndreyBegma/AgentDock",
+      "repo": "AndreyBegma/Nautelle",
       "isGitRepo": true,
       "detectedBy": "spec_dir",
       "evidence": [{ "file": "/home/archi/dev/AgentDock/.code-analyzer-config.json", "line": 28 }],
@@ -1253,7 +1253,7 @@ How the runner serves them:
 ### Board cards
 
 Schemas in `commands/cards.ts` (`cardCommands`) and `events/cards.ts`; the
-rules are issue [#242](https://github.com/AndreyBegma/AgentDock/issues/242)
+rules are issue [#242](https://github.com/AndreyBegma/Nautelle/issues/242)
 and [ADR-0024](../adr/0024-board-cards-and-dedicated-card-workers.md).
 `cardCommands` is defined but enters the `commands` map only together with
 its runner handlers (`apps/runner/src/cards/`).
@@ -1512,7 +1512,7 @@ carry no `projectId`: the API resolves the project.
     {
       "v": 1, "seq": 18412, "ts": "2026-12-02T10:14:03.000Z",
       "type": "filter.stats", "source": "runner",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "data": {
         "rows": [
           { "id": "f_9c2e1a", "runId": "cmrun0001", "runKind": "card", "filter": "js/jest",
@@ -1610,7 +1610,7 @@ the record.
     {
       "v": 1, "seq": 20117, "ts": "2026-12-03T09:41:07.000Z",
       "type": "steward.observed", "source": "runner",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "data": {
         "projectId": "prj_agentdock", "at": "2026-12-03T09:41:06.000Z",
         "subject": { "kind": "card_round", "cardId": "cmcard0001", "runId": "cmrun0001" },
@@ -1620,7 +1620,7 @@ the record.
     {
       "v": 1, "seq": 20118, "ts": "2026-12-03T09:41:09.000Z",
       "type": "steward.acted", "source": "runner",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "data": {
         "projectId": "prj_agentdock", "at": "2026-12-03T09:41:09.000Z",
         "subject": { "kind": "card_round", "cardId": "cmcard0001", "runId": "cmrun0001" },
@@ -1749,7 +1749,7 @@ started) and `ms`. A round that never edits sends none.
     {
       "v": 1, "seq": 31002, "ts": "2026-12-04T08:02:11.000Z",
       "type": "round.restart", "source": "runner",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "data": {
         "projectId": "prj_agentdock", "cardId": "cmcard0001", "runId": "cmrun0002",
         "at": "2026-12-04T08:02:10.000Z", "mode": "fresh",
@@ -1761,7 +1761,7 @@ started) and `ms`. A round that never edits sends none.
     {
       "v": 1, "seq": 31007, "ts": "2026-12-04T08:03:40.000Z",
       "type": "round.warmup", "source": "runner",
-      "project": { "repo": "AndreyBegma/AgentDock", "root": "/home/archi/dev/AgentDock" },
+      "project": { "repo": "AndreyBegma/Nautelle", "root": "/home/archi/dev/AgentDock" },
       "data": {
         "projectId": "prj_agentdock", "cardId": "cmcard0001", "runId": "cmrun0002",
         "at": "2026-12-04T08:03:39.000Z", "tokens": 9100, "ms": 89000

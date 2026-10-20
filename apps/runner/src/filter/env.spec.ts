@@ -40,8 +40,8 @@ describe('filter env (#445 amendment 5)', () => {
   });
 
   it('leaves the run out for the orchestrator, and reads back what it wrote', () => {
-    const runDir = orchestratorFilterDir('/state', 'AndreyBegma/AgentDock');
-    expect(runDir).toBe('/state/orchestrator/AndreyBegma__AgentDock');
+    const runDir = orchestratorFilterDir('/state', 'AndreyBegma/Nautelle');
+    expect(runDir).toBe('/state/orchestrator/AndreyBegma__Nautelle');
     const env = filterEnv({
       runDir,
       projectId: 'p1',
@@ -88,7 +88,7 @@ describe('filter env (#445 amendment 5)', () => {
   it('takes a manual (/cs-eco) session with or without a run (#475)', () => {
     const env = {
       [FILTER_STATS_ENV]: '/eco/sessions/s1/filter-stats.jsonl',
-      [FILTER_PROJECT_ENV]: 'AndreyBegma/AgentDock',
+      [FILTER_PROJECT_ENV]: 'AndreyBegma/Nautelle',
       [FILTER_RUN_KIND_ENV]: 'manual',
     };
     expect(statsTarget(env)?.runId).toBeNull();

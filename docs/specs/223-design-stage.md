@@ -1,6 +1,6 @@
 # Design stage — a mockup per task, from the project's UI profile, approved before the work
 
-Issue: [#223](https://github.com/AndreyBegma/AgentDock/issues/223) · Roadmap: M3.9 ·
+Issue: [#223](https://github.com/AndreyBegma/Nautelle/issues/223) · Roadmap: M3.9 ·
 Decisions: [ADR-0022](../adr/0022-design-stage-html-mockups-from-a-ui-profile.md),
 [ADR-0019](../adr/0019-planner-instructions-live-in-agentdock.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
@@ -9,7 +9,7 @@ Decisions: [ADR-0022](../adr/0022-design-stage-html-mockups-from-a-ui-profile.md
 Builds on: [#172](172-planner.md), [#24](24-skills.md), [#28](28-budgets.md)
 
 > **Amended by [ADR-0025](../adr/0025-a-design-has-one-owner-a-plan-task-or-a-board-card.md)
-> ([#243](https://github.com/AndreyBegma/AgentDock/issues/243)).** A design
+> ([#243](https://github.com/AndreyBegma/Nautelle/issues/243)).** A design
 > now has exactly one owner: a plan task, as this spec describes, or a board
 > card. Everything below applies to a task's design unchanged; a card's design
 > reuses the profile, mockups, comments, pins, revise and approve, chains no

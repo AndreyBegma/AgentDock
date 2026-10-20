@@ -2,20 +2,22 @@
 
 # Nautelle
 
+_Nautelle, formerly AgentDock._
+
 **One place to see, steer, approve and pay for every AI coding agent you run.**
 
-[![Website](https://img.shields.io/badge/website-agentdock.luna--realm.com-black)](https://agentdock.luna-realm.com/)
-[![Docs: Wiki](https://img.shields.io/badge/docs-wiki-6d5dfc)](https://github.com/AndreyBegma/AgentDock/wiki)
+[![Website](https://img.shields.io/badge/website-nautelle.luna--realm.com-black)](https://nautelle.luna-realm.com/)
+[![Docs: Wiki](https://img.shields.io/badge/docs-wiki-6d5dfc)](https://github.com/AndreyBegma/Nautelle/wiki)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![nautelle-runner on npm](https://img.shields.io/npm/v/nautelle-runner?label=nautelle-runner)](https://www.npmjs.com/package/nautelle-runner)
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/mkQARkBs4C)
 
-[**Wiki**](https://github.com/AndreyBegma/AgentDock/wiki) ·
-[Getting started](https://github.com/AndreyBegma/AgentDock/wiki/Getting-Started) ·
-[How work flows](https://github.com/AndreyBegma/AgentDock/wiki/How-Work-Flows) ·
-[Token Saver](https://github.com/AndreyBegma/AgentDock/wiki/Token-Saver) ·
-[Self-hosting](https://github.com/AndreyBegma/AgentDock/wiki/Self-Hosting) ·
-[Architecture](https://github.com/AndreyBegma/AgentDock/wiki/Architecture)
+[**Wiki**](https://github.com/AndreyBegma/Nautelle/wiki) ·
+[Getting started](https://github.com/AndreyBegma/Nautelle/wiki/Getting-Started) ·
+[How work flows](https://github.com/AndreyBegma/Nautelle/wiki/How-Work-Flows) ·
+[Token Saver](https://github.com/AndreyBegma/Nautelle/wiki/Token-Saver) ·
+[Self-hosting](https://github.com/AndreyBegma/Nautelle/wiki/Self-Hosting) ·
+[Architecture](https://github.com/AndreyBegma/Nautelle/wiki/Architecture)
 
 </div>
 
@@ -38,20 +40,20 @@ orchestrator, and GitHub issues and pull requests stay the source of truth.
 
 | | |
 |---|---|
-| **[Board and cards](https://github.com/AndreyBegma/AgentDock/wiki/Board-and-Cards)** | A per-project board (To Do → In progress → Finished → Completed). Cards have dependencies and Auto-run, and support bulk actions. |
-| **[New work intake](https://github.com/AndreyBegma/AgentDock/wiki/New-Work-Intake)** | One sentence goes in. A short interview follows. Out comes one card, a split or a staged stack, and you accept it before anything runs. |
-| **[Design and stacks](https://github.com/AndreyBegma/AgentDock/wiki/Design-and-Stacks)** | HTML mockups drawn from your project's UI profile, with pinned comments, revisions and approval. A stack shares one design. |
-| **[Card workers and shipping](https://github.com/AndreyBegma/AgentDock/wiki/Card-Workers-and-Shipping)** | Each card gets its own worktree and Claude session. It opens a draft PR, fixes red CI on its own and can auto-merge. |
-| **[Fleet and orchestrator](https://github.com/AndreyBegma/AgentDock/wiki/Fleet-and-Orchestrator)** | Code Sentinel slots, the queue of ready issues, PR approvals, a live terminal pane and an audited terminal attach. |
-| **[Sessions, usage and budgets](https://github.com/AndreyBegma/AgentDock/wiki/Sessions-Usage-and-Budgets)** | Every session is shown as a tree of turns, tools and subagents, priced at API-equivalent cost. Budgets can alert or stop new runs. |
-| **[Token Saver](https://github.com/AndreyBegma/AgentDock/wiki/Token-Saver)** | Agents read less: command output is filtered, oversized and repeated reads are guarded, history is compacted early, and the savings are measured. |
-| **[Steward](https://github.com/AndreyBegma/AgentDock/wiki/Steward)** | Spots stuck agent work, applies the few fixes that are safe and asks a person for the rest. |
-| **[Context handoff](https://github.com/AndreyBegma/AgentDock/wiki/Context-Handoff)** | A short note per card, so the next round or session starts in context and costs less. |
-| **[Claude Code integration](https://github.com/AndreyBegma/AgentDock/wiki/Claude-Code-Integration)** | A plugin with MCP tools and hooks. Terminal sessions appear on the board, and away mode sends permission prompts to your phone. |
-| **[Telegram](https://github.com/AndreyBegma/AgentDock/wiki/Telegram)** | Browse, run and accept cards, answer agents, approve PRs and send voice notes. A Mini App opens the board. |
-| **[AI assistant](https://github.com/AndreyBegma/AgentDock/wiki/AI-Assistant)** | A floating chat on every page that reads your board and fleet and drafts cards. It uses your own provider keys and spend caps. |
-| **[Automation](https://github.com/AndreyBegma/AgentDock/wiki/Automation)** | Skills from skills.sh, cron schedules, signed webhooks and a GitHub App. |
-| **[Security and access](https://github.com/AndreyBegma/AgentDock/wiki/Security-and-Access)** | Roles, an approval-gated sign-up and a hash-chained audit log. The runner keeps a local policy the server cannot change. |
+| **[Board and cards](https://github.com/AndreyBegma/Nautelle/wiki/Board-and-Cards)** | A per-project board (To Do → In progress → Finished → Completed). Cards have dependencies and Auto-run, and support bulk actions. |
+| **[New work intake](https://github.com/AndreyBegma/Nautelle/wiki/New-Work-Intake)** | One sentence goes in. A short interview follows. Out comes one card, a split or a staged stack, and you accept it before anything runs. |
+| **[Design and stacks](https://github.com/AndreyBegma/Nautelle/wiki/Design-and-Stacks)** | HTML mockups drawn from your project's UI profile, with pinned comments, revisions and approval. A stack shares one design. |
+| **[Card workers and shipping](https://github.com/AndreyBegma/Nautelle/wiki/Card-Workers-and-Shipping)** | Each card gets its own worktree and Claude session. It opens a draft PR, fixes red CI on its own and can auto-merge. |
+| **[Fleet and orchestrator](https://github.com/AndreyBegma/Nautelle/wiki/Fleet-and-Orchestrator)** | Code Sentinel slots, the queue of ready issues, PR approvals, a live terminal pane and an audited terminal attach. |
+| **[Sessions, usage and budgets](https://github.com/AndreyBegma/Nautelle/wiki/Sessions-Usage-and-Budgets)** | Every session is shown as a tree of turns, tools and subagents, priced at API-equivalent cost. Budgets can alert or stop new runs. |
+| **[Token Saver](https://github.com/AndreyBegma/Nautelle/wiki/Token-Saver)** | Agents read less: command output is filtered, oversized and repeated reads are guarded, history is compacted early, and the savings are measured. |
+| **[Steward](https://github.com/AndreyBegma/Nautelle/wiki/Steward)** | Spots stuck agent work, applies the few fixes that are safe and asks a person for the rest. |
+| **[Context handoff](https://github.com/AndreyBegma/Nautelle/wiki/Context-Handoff)** | A short note per card, so the next round or session starts in context and costs less. |
+| **[Claude Code integration](https://github.com/AndreyBegma/Nautelle/wiki/Claude-Code-Integration)** | A plugin with MCP tools and hooks. Terminal sessions appear on the board, and away mode sends permission prompts to your phone. |
+| **[Telegram](https://github.com/AndreyBegma/Nautelle/wiki/Telegram)** | Browse, run and accept cards, answer agents, approve PRs and send voice notes. A Mini App opens the board. |
+| **[AI assistant](https://github.com/AndreyBegma/Nautelle/wiki/AI-Assistant)** | A floating chat on every page that reads your board and fleet and drafts cards. It uses your own provider keys and spend caps. |
+| **[Automation](https://github.com/AndreyBegma/Nautelle/wiki/Automation)** | Skills from skills.sh, cron schedules, signed webhooks and a GitHub App. |
+| **[Security and access](https://github.com/AndreyBegma/Nautelle/wiki/Security-and-Access)** | Roles, an approval-gated sign-up and a hash-chained audit log. The runner keeps a local policy the server cannot change. |
 
 > [!NOTE]
 > Orchestrator slots and card workers run **Claude Code** today. Codex sessions
@@ -74,7 +76,7 @@ flowchart LR
   merge --> done(["Completed<br/>worktree cleaned up"])
 ```
 
-The full walkthrough is in **[How work flows](https://github.com/AndreyBegma/AgentDock/wiki/How-Work-Flows)**.
+The full walkthrough is in **[How work flows](https://github.com/AndreyBegma/Nautelle/wiki/How-Work-Flows)**.
 
 ## How it is built
 
@@ -98,14 +100,14 @@ flowchart LR
   ([ADR-0004](docs/adr/0004-github-issues-are-the-task-queue.md),
   [ADR-0024](docs/adr/0024-board-cards-and-dedicated-card-workers.md)).
 
-More in **[Architecture](https://github.com/AndreyBegma/AgentDock/wiki/Architecture)**.
+More in **[Architecture](https://github.com/AndreyBegma/Nautelle/wiki/Architecture)**.
 
 ## Quick start
 
 Requirements: [Bun](https://bun.sh) 1.4.0+, Node.js 24+ and Docker.
 
 ```sh
-git clone https://github.com/AndreyBegma/AgentDock && cd AgentDock
+git clone https://github.com/AndreyBegma/Nautelle && cd Nautelle
 bun install
 cp docker/.env.example docker/.env
 cp apps/api/.env.example apps/api/.env
@@ -126,22 +128,22 @@ nautelle-runner install-service
 ```
 
 Step-by-step guides:
-**[Getting started](https://github.com/AndreyBegma/AgentDock/wiki/Getting-Started)**,
-**[Installing the runner](https://github.com/AndreyBegma/AgentDock/wiki/Installing-the-Runner)**
-and **[Self-hosting](https://github.com/AndreyBegma/AgentDock/wiki/Self-Hosting)**.
+**[Getting started](https://github.com/AndreyBegma/Nautelle/wiki/Getting-Started)**,
+**[Installing the runner](https://github.com/AndreyBegma/Nautelle/wiki/Installing-the-Runner)**
+and **[Self-hosting](https://github.com/AndreyBegma/Nautelle/wiki/Self-Hosting)**.
 
 ## Documentation
 
 | Where | What |
 |---|---|
-| [**Wiki**](https://github.com/AndreyBegma/AgentDock/wiki) | User guides: setup, every feature, self-hosting, FAQ |
+| [**Wiki**](https://github.com/AndreyBegma/Nautelle/wiki) | User guides: setup, every feature, self-hosting, FAQ |
 | [`docs/`](docs/README.md) | The engineering source of truth: [ADRs](docs/adr), [specs](docs/specs), [architecture](docs/architecture), [product](docs/product) |
 | [`apps/runner`](apps/runner/README.md) | Runner commands, files and environment |
 | [`deploy/`](deploy/README.md) | CI pipelines, the reference deployment, runner releases |
 
 ## Contributing
 
-Pull requests target `develop`. Read **[Contributing](https://github.com/AndreyBegma/AgentDock/wiki/Contributing)**
+Pull requests target `develop`. Read **[Contributing](https://github.com/AndreyBegma/Nautelle/wiki/Contributing)**
 and [CLAUDE.md](CLAUDE.md) for the conventions. An architectural change records
 a new ADR in the same pull request.
 

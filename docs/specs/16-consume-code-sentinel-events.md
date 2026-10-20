@@ -1,6 +1,6 @@
 # Consume code-sentinel events.jsonl and state.json
 
-Issue: [#16](https://github.com/AndreyBegma/AgentDock/issues/16) · Roadmap: M2.1 ·
+Issue: [#16](https://github.com/AndreyBegma/Nautelle/issues/16) · Roadmap: M2.1 ·
 Decisions: [ADR-0002](../adr/0002-structured-orchestrator-events-markdown-as-fallback.md),
 [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
 [event-schema.md](../architecture/event-schema.md), [plugin changes](../plugin/code-sentinel-changes.md) (P1–P3)

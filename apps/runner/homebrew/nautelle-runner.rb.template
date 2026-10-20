@@ -6,40 +6,40 @@ require "openssl"
 
 class NautelleRunner < Formula
   desc "Per-machine daemon of Nautelle, a control plane for agent fleets"
-  homepage "https://agentdock.luna-realm.com/"
+  homepage "https://nautelle.luna-realm.com/"
   version "@VERSION@"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/nautelle-runner-@VERSION@-darwin-arm64.tar.gz"
+      url "https://github.com/AndreyBegma/Nautelle/releases/download/runner-v@VERSION@/nautelle-runner-@VERSION@-darwin-arm64.tar.gz"
       sha256 "@SHA256_DARWIN_ARM64@"
     end
     on_intel do
-      url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/nautelle-runner-@VERSION@-darwin-x64.tar.gz"
+      url "https://github.com/AndreyBegma/Nautelle/releases/download/runner-v@VERSION@/nautelle-runner-@VERSION@-darwin-x64.tar.gz"
       sha256 "@SHA256_DARWIN_X64@"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/nautelle-runner-@VERSION@-linux-arm64.tar.gz"
+      url "https://github.com/AndreyBegma/Nautelle/releases/download/runner-v@VERSION@/nautelle-runner-@VERSION@-linux-arm64.tar.gz"
       sha256 "@SHA256_LINUX_ARM64@"
     end
     on_intel do
-      url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/nautelle-runner-@VERSION@-linux-x64.tar.gz"
+      url "https://github.com/AndreyBegma/Nautelle/releases/download/runner-v@VERSION@/nautelle-runner-@VERSION@-linux-x64.tar.gz"
       sha256 "@SHA256_LINUX_X64@"
     end
   end
 
   # SHA256SUMS of the release and its Ed25519 signature (ADR-0049).
   resource "SHA256SUMS" do
-    url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/SHA256SUMS"
+    url "https://github.com/AndreyBegma/Nautelle/releases/download/runner-v@VERSION@/SHA256SUMS"
     sha256 "@SHA256_SUMS@"
   end
 
   resource "SHA256SUMS.sig" do
-    url "https://github.com/AndreyBegma/AgentDock/releases/download/runner-v@VERSION@/SHA256SUMS.sig"
+    url "https://github.com/AndreyBegma/Nautelle/releases/download/runner-v@VERSION@/SHA256SUMS.sig"
     sha256 "@SHA256_SUMS_SIG@"
   end
 

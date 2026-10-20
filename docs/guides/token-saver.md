@@ -1,6 +1,6 @@
 # Token saver
 
-Token saver ([#445](https://github.com/AndreyBegma/AgentDock/issues/445),
+Token saver ([#445](https://github.com/AndreyBegma/Nautelle/issues/445),
 [ADR-0039](../adr/0039-token-saver.md), [spec](../specs/445-token-saver.md))
 cuts the tokens an agent spends re-reading things nobody needs in full. It
 changes what **agents read**. It never changes what **people read**: questions
@@ -43,7 +43,7 @@ agent exactly as it was launched before the feature.
 
 ## The launch prefix
 
-[#663](https://github.com/AndreyBegma/AgentDock/issues/663),
+[#663](https://github.com/AndreyBegma/Nautelle/issues/663),
 [ADR-0068](../adr/0068-the-token-saver-targets-context-residency-and-is-judged-by-cost-per-round.md).
 Cache reads are almost all of what a session spends, and the fixed prefix is
 re-read on every turn. The runner sets these on each launch; every name was

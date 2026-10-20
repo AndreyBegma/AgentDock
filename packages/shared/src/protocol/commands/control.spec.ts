@@ -67,8 +67,8 @@ describe('slotNameSchema', () => {
 
 describe('orchestratorSessionName', () => {
   it('slugs owner/name per D1', () => {
-    expect(orchestratorSessionName('AndreyBegma/AgentDock')).toBe(
-      'nautelle-orch-andreybegma-agentdock',
+    expect(orchestratorSessionName('AndreyBegma/Nautelle')).toBe(
+      'nautelle-orch-andreybegma-nautelle',
     );
     expect(orchestratorSessionName('acme/my.repo_v2')).toBe(
       'nautelle-orch-acme-my-repo-v2',
