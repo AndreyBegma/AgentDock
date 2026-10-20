@@ -89,6 +89,7 @@ function WorkStats({ stats }: { stats: WorkStatsValues }) {
  */
 export function WorkHeader({
   view,
+  title,
   eyebrow,
   description,
   stats,
@@ -98,6 +99,8 @@ export function WorkHeader({
   children,
 }: {
   view: 'list' | 'board';
+  /** "Work" across projects, "Board" inside one. */
+  title: 'Work' | 'Board';
   eyebrow: string;
   description?: string;
   stats?: WorkStatsValues;
@@ -112,13 +115,13 @@ export function WorkHeader({
     <PageHeader
       className="mb-0"
       eyebrow={eyebrow}
-      title="Work"
+      title={title}
       description={description}
       meta={stats ? <WorkStats stats={stats} /> : undefined}
       actions={
         <>
           {status}
-          <SegmentedControl size="sm" aria-label="Work view">
+          <SegmentedControl size="sm" aria-label={`${title} view`}>
             <Segment
               size="sm"
               layoutId="work-view"
