@@ -4,7 +4,7 @@ argument-hint: [short title]
 ---
 
 Hand this work off to the Nautelle fleet by calling the `handoff` tool of the
-`agentdock` MCP server (`mcp__plugin_agentdock_agentdock__handoff`).
+`nautelle` MCP server (`mcp__plugin_nautelle_nautelle__handoff`).
 
 1. Title: `$ARGUMENTS` if given, otherwise a short title you derive from the work so far.
 2. Body: what is done, what remains, and what a fresh agent must know to continue. Self-contained; no references to this conversation.

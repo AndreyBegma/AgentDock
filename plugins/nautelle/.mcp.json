@@ -1,7 +1,7 @@
 {
   "mcpServers": {
-    "agentdock": {
-      "command": "agentdock-runner",
+    "nautelle": {
+      "command": "nautelle-runner",
       "args": ["mcp"]
     }
   }

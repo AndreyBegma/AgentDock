@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook session-start || true",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook session-start || true",
             "timeout": 10
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook permission-request || true",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook permission-request || true",
             "timeout": 300
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook user-prompt-submit || true",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook user-prompt-submit || true",
             "async": true
           }
         ]
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook post-tool-use || true",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook post-tool-use || true",
             "async": true
           }
         ]
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook post-tool-use-failure || true",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook post-tool-use-failure || true",
             "async": true
           }
         ]
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook notification || true",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook notification || true",
             "async": true
           }
         ]
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook stop || true",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook stop || true",
             "async": true
           }
         ]
@@ -82,7 +82,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook pre-compact || true",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook pre-compact || true",
             "async": true
           }
         ]
@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v agentdock-runner >/dev/null 2>&1 && agentdock-runner hook session-end || true",
+            "command": "command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook session-end || true",
             "async": true
           }
         ]

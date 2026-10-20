@@ -6,8 +6,8 @@ description: Track the work a person asks for as a card on the Nautelle Board. U
 # Track work on the Nautelle Board
 
 When the person asks you to **do work** — implement a feature, fix a bug,
-change or refactor code — call the `track_card` tool of the `agentdock` MCP server
-(`mcp__plugin_agentdock_agentdock__track_card`) **once**, before you start. It
+change or refactor code — call the `track_card` tool of the `nautelle` MCP server
+(`mcp__plugin_nautelle_nautelle__track_card`) **once**, before you start. It
 puts the work on the Nautelle Board as a card In progress, linked to this
 session.
 

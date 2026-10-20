@@ -1,13 +1,13 @@
 {
-  "name": "agentdock",
+  "name": "nautelle",
   "owner": {
-    "name": "AgentDock",
+    "name": "Nautelle",
     "url": "https://github.com/AndreyBegma/AgentDock"
   },
   "plugins": [
     {
-      "name": "agentdock",
-      "source": "./plugins/agentdock",
+      "name": "nautelle",
+      "source": "./plugins/nautelle",
       "description": "Reports Claude Code sessions to Nautelle through the local runner and gives the model fleet, queue and budget tools."
     }
   ]
