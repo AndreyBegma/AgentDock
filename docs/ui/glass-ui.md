@@ -43,7 +43,7 @@ process state.
 
 - From `lg` (1024 px) up: `NavRail` — Workspace, the current project's working
   pages (titled with its name: Project, Work, Activity), a **More** group under
-  them (Fleet, Queue, Approvals, History, Token saver, Skills, Schedules,
+  them (Fleet, Queue, Approvals, Token saver, Skills, Schedules,
   Settings) and Admin. More and Admin are `collapsible` groups; inside a
   project Workspace is one too. Each folds by default, unfolds by itself while
   one of its pages is open and remembers its state per browser under its own
