@@ -1,10 +1,9 @@
+import { APP_VERSION } from '@agentdock/shared';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
 import { Section } from '@andrewbehma/glass-ui/section';
 import { ContactList } from '../../../components/about/contact-links';
 import { PageHeader } from '../../../components/page-header/page-header';
-
-/** Set by `next.config.ts` from this app's `package.json`. */
-const VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev';
+import { versionLabel } from '../../../lib/whats-new/whats-new';
 
 /** C-293: the product, its version and the author's links (S-7 calm layout). */
 export default function AboutPage() {
@@ -19,7 +18,11 @@ export default function AboutPage() {
         <KeyValueList
           items={[
             { key: 'name', label: 'Name', value: 'AgentDock' },
-            { key: 'version', label: 'Version', value: VERSION },
+            {
+              key: 'version',
+              label: 'Version',
+              value: versionLabel(APP_VERSION),
+            },
           ]}
         />
       </Section>

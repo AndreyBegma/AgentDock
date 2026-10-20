@@ -50,8 +50,12 @@ merged pull request.
    refactors, tests, documentation, security hardening with no visible
    change), picks the version, writes 3 to 8 one-sentence items, the
    `CHANGELOG` entry and the note, opens `release/vX.Y.Z` into `develop`, then
-   the release pull request `develop` → `main`, and tags `vX.Y.Z` on `main`
-   after the merge. It never commits to `develop` or `main` directly.
+   the release pull request `develop` → `main`. It never merges that promotion:
+   `main` is production, and a person merges into it. Once its checks are
+   green the skill stops, asks the person to merge it with the pull
+   request's link, and after the person confirms the merge it tags `vX.Y.Z`
+   on `main`'s merge commit. It never commits to `develop` or `main`
+   directly.
 6. **The runner keeps its own cycle.** `runner-v*` tags, the runner's
    `package.json` version and `apps/runner/CHANGELOG.md` are unchanged
    (ADR-0049). A product release names the runner release that shipped in its
@@ -61,7 +65,8 @@ merged pull request.
 ## Consequences
 
 - Every promotion to `main` is a titled release pull request whose body is the
-  user-facing entry and the list of pull requests it carries.
+  user-facing entry and the list of pull requests it carries, merged by a
+  person; a release is not finished, and not tagged, until they have.
 - `vX.Y.Z` tags trigger nothing in CI: the release-runner pipeline matches
   `runner-v*` only, and a push to `main` runs the full suite as before.
 - A new user sees the dot once, for the version current when they sign up.

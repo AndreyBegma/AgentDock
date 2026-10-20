@@ -1,6 +1,6 @@
 ---
 name: release
-description: Cut an AgentDock product release — collect the pull requests merged into develop since the last vX.Y.Z tag, classify them, choose the version, write the changelog entry and the release note, land them on develop, promote develop to main and tag the release
+description: Cut an AgentDock product release — collect the pull requests merged into develop since the last vX.Y.Z tag, classify them, choose the version, write the changelog entry and the release note, land them on develop, open the promotion from develop to main for a person to merge, and tag the release
 ---
 
 # Release
@@ -9,8 +9,8 @@ You are the release editor and the release engineer for AgentDock.
 
 The person says "cut a release" (or runs `/release`) and you take it from
 there: work out what shipped since the last release, write it down for the
-people who use AgentDock, land the version on `develop`, promote `develop` to
-`main`, and tag it. The process is recorded in
+people who use AgentDock, land the version on `develop`, open the promotion from
+`develop` to `main` for the person to merge, and tag it once they have. The process is recorded in
 [ADR-0071](../../../docs/adr/0071-the-product-is-released-by-version-with-a-changelog-and-release-notes.md);
 read it if anything here seems to contradict the code.
 
@@ -27,8 +27,8 @@ who build it.
 | The release note | `docs/releases/vX.Y.Z.md` | this skill |
 | The index row | `docs/releases/README.md`, top of the table | this skill |
 | The release branch | `release/vX.Y.Z` → `develop` | this skill |
-| The promotion | `develop` → `main` | this skill |
-| The tag | `vX.Y.Z` on `main`'s merge commit | this skill, after the merge |
+| The promotion | `develop` → `main` | opened by this skill, merged by a person |
+| The tag | `vX.Y.Z` on `main`'s merge commit | this skill, after the person merged the promotion |
 
 Repository: `AndreyBegma/AgentDock`. Run every command from the repository
 root.
@@ -303,16 +303,29 @@ deploying** section with the migrations and environment variables of Step 0
 (or "No migrations and no new environment variables.").
 
 Wait for its checks with `gh pr checks <N> --watch`. A push to `main` runs the
-full suite. Green: merge it with a merge commit (`gh pr merge <N> --merge`),
-as every promotion so far. Red: **stop** and report; the release branch has
-already landed on `develop`, so say that the release is landed but not
-promoted, and that Step 0's first stop will offer to finish it.
+full suite.
+
+**Never merge the promotion yourself.** `main` is production, and a person
+merges into it. Green: **stop** and ask the person to merge it with a merge
+commit, as every promotion so far, giving the pull request's link and the
+**Before deploying** list. Wait for the person to confirm it is merged, then
+check that it is before Step 9:
+
+```bash
+gh pr view <N> --repo AndreyBegma/AgentDock --json state,mergeCommit \
+  --jq '"\(.state) \(.mergeCommit.oid)"'
+```
+
+Anything but `MERGED` with a merge commit: do not tag; say what you see and
+wait again. Red checks: **stop** and report; the release branch has already
+landed on `develop`, so say that the release is landed but not promoted, and
+that Step 0's first stop will offer to finish it.
 
 ---
 
 ## Step 9 — Tag
 
-After the promotion merged, tag `main`'s merge commit:
+After the person confirmed the promotion is merged (Step 8), tag `main`'s merge commit:
 
 ```bash
 git fetch origin main --quiet
@@ -340,7 +353,7 @@ in this shape:
 
 ```
 landed:      release/vX.Y.Z into develop (#N, merged)
-not landed:  develop → main (#M open, checks red)
+not landed:  develop → main (#M open, checks red, or waiting for a person to merge)
 not tagged:  vX.Y.Z
 ```
 
@@ -365,6 +378,10 @@ Tell the person:
 - Change the version anywhere but by adding an entry.
 - Commit to `develop` or `main` directly, or force-push either.
 - Open the promotion before the release branch merged into `develop`.
+- Merge the `develop` → `main` promotion, or anything else into `main`: a
+  person does that.
+- Tag before the person confirmed the promotion is merged and `gh pr view`
+  shows it merged.
 - Bump, tag or edit the runner's version or `apps/runner/CHANGELOG.md`.
 - Move, delete or re-push a `vX.Y.Z` tag.
 - Put implementation detail, ids or pull request numbers in a changelog item.
