@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S-7 · Workspace</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-canvas:#0a1022;--color-content:rgb(27 38 71/.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246/.62);--color-ink-3:rgb(242 242 246/.53);--color-line:rgb(255 255 255/.1);--color-line-strong:rgb(255 255 255/.18);--color-hover:rgb(255 255 255/.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246/.2);--color-accent-ink:#b4b2ff;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246/.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148/.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90/.18);--color-hue-3-ink:#ade58f;--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0/.18);--color-hue-4-ink:#f5c25c;--color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59/.18);--color-hue-5-ink:#f9a77c;--color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110/.18);--color-hue-6-ink:#ff9da5;--color-hue-7:#a68bfa;--color-hue-8:#cc79a7;--glass-scrim:rgb(9 9 12/.55);--glass-sheen:rgb(255 255 255/.06);--glass-edge:rgb(255 255 255/.14);--glass-spec:rgb(255 255 255/.2);--glass-shadow:rgb(0 0 0/.35);--glass-shadow-clear:rgb(0 0 0/.15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-canvas:#e9eef8;--color-content:rgb(255 255 255/.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27/.72);--color-ink-3:rgb(24 24 27/.64);--color-line:rgb(0 0 0/.1);--color-line-strong:rgb(0 0 0/.23);--color-hover:rgb(0 0 0/.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229/.12);--color-accent-ink:#4338ca;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214/.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94/.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28/.12);--color-hue-3-ink:#2f6617;--color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0/.12);--color-hue-4-ink:#8a5200;--color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0/.12);--color-hue-5-ink:#9c3d00;--color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62/.12);--color-hue-6-ink:#ad1f31;--color-hue-7:#7244e0;--color-hue-8:#b0457f;--glass-scrim:rgb(255 255 255/.52);--glass-sheen:rgb(0 0 0/.06);--glass-edge:rgb(0 0 0/.18);--glass-spec:rgb(0 0 0/.2);--glass-shadow:rgb(0 0 0/.12);--glass-shadow-clear:rgb(0 0 0/.08);--canvas-glow:10%}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;font:14px/20px "SF Pro Text",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;color:var(--color-ink);background:var(--color-canvas)}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:12.5px}
+.num{font-variant-numeric:tabular-nums}
+.i2{color:var(--color-ink-2)}.i3{color:var(--color-ink-3)}.sm{font-size:12px;line-height:16px}
+.ic{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.doc{padding:24px 24px 64px}
+.dh{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;max-width:1280px}
+.dh h1{font-size:20px;line-height:28px;font-weight:600}.dh p{max-width:96ch;margin-top:4px}
+.dt{font-size:15px;line-height:22px;font-weight:600;margin:36px 0 12px}
+.boards{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;max-width:1300px}
+.abl{font-size:12px;font-weight:500;color:var(--color-ink-3);margin-bottom:8px}
+.dev{container-type:inline-size;position:relative;overflow:hidden;border-radius:16px;border:1px solid var(--color-line-strong);isolation:isolate;display:flex}
+.cv{position:absolute;inset:0;z-index:-1;background:radial-gradient(60% 50% at 15% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50% 45% at 85% 10%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%),var(--color-canvas)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);-webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.surf{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear);border-radius:8px}
+.ct{font-size:15px;line-height:22px;font-weight:600}
+.row{display:flex;align-items:center;gap:8px;min-width:0}.sp{flex:1}
+.g{display:grid;gap:12px}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;height:28px;padding:0 14px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:500;line-height:1;cursor:pointer;border:1px solid var(--color-line-strong);color:var(--color-ink);background:var(--color-raised);text-decoration:none}
+.btn.p{background:var(--color-accent);border-color:transparent;color:var(--color-on-accent)}
+.btn.gh{background:transparent;border-color:transparent;color:var(--color-ink-2)}.btn.gh:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn.sm{height:24px;padding:0 10px;font-size:12px;border-radius:4px}.btn.io{padding:0;width:28px}
+.badge{display:inline-flex;align-items:center;justify-content:center;height:20px;min-width:20px;padding:0 6px;border-radius:999px;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;background:var(--color-hover);color:var(--color-ink-2)}
+.bs{height:18px;min-width:18px;padding:0 5px;font-size:10px}.b-sd{background:var(--color-danger);color:var(--color-ground)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--hue,var(--color-hue-1));flex:none}
+.pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;line-height:1;white-space:nowrap;border:1px solid color-mix(in oklab,var(--s) 45%,transparent);background:var(--s-soft);color:var(--s-ink);flex:none}
+.pill::before{content:"";width:6px;height:6px;border-radius:999px;background:var(--s);flex:none}
+.live::before{animation:ping 1.6s infinite}@keyframes ping{0%{box-shadow:0 0 0 0 var(--s)}80%,100%{box-shadow:0 0 0 5px transparent}}
+.s-run{--s:var(--color-hue-2);--s-soft:var(--color-hue-2-soft);--s-ink:var(--color-hue-2-ink)}.s-wait{--s:var(--color-hue-1);--s-soft:var(--color-hue-1-soft);--s-ink:var(--color-hue-1-ink)}.s-pause{--s:var(--color-hue-4);--s-soft:var(--color-hue-4-soft);--s-ink:var(--color-hue-4-ink)}.s-block{--s:var(--color-hue-5);--s-soft:var(--color-hue-5-soft);--s-ink:var(--color-hue-5-ink)}.s-done{--s:var(--color-hue-3);--s-soft:var(--color-hue-3-soft);--s-ink:var(--color-hue-3-ink)}.s-err{--s:var(--color-hue-6);--s-soft:var(--color-hue-6-soft);--s-ink:var(--color-hue-6-ink)}
+.li{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:12px 16px;border-bottom:1px solid var(--color-line)}.li:last-child{border-bottom:0}
+.mn{flex:1 1 180px;min-width:0}.tt{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tbl{width:100%;border-collapse:collapse}.tbl th{height:32px;padding:0 12px;border-bottom:1px solid var(--color-line);text-align:left;font-size:12px;font-weight:500;color:var(--color-ink-3);white-space:nowrap}
+.tbl td{height:44px;padding:6px 12px;border-bottom:1px solid var(--color-line);white-space:nowrap}.tbl tr:last-child td{border-bottom:0}.tbl tbody tr:hover{background:var(--color-hover)}
+.tbl .num{text-align:right}.tbl td.w{width:100%;max-width:0}
+.in,.sel{height:28px;padding:0 10px;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:6px;font:inherit;width:100%}
+.sel{appearance:none;padding-right:26px;background-image:linear-gradient(45deg,transparent 50%,var(--color-ink-3) 50%),linear-gradient(135deg,var(--color-ink-3) 50%,transparent 50%);background-position:calc(100% - 14px) 50%,calc(100% - 10px) 50%;background-size:4px 4px;background-repeat:no-repeat}
+.tb{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}.tb .sel{width:auto;min-width:150px}
+.srch{position:relative;flex:1 1 220px;max-width:280px}.srch .ic{position:absolute;left:8px;top:6px;color:var(--color-ink-3)}.srch .in{padding-left:30px}
+.kbd{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;border:1px solid var(--color-line-strong);font-size:11px;color:var(--color-ink-3)}
+.stat{padding:14px 16px}.sl{font-size:12px;font-weight:500;color:var(--color-ink-3)}.sv{margin-top:4px;font-size:24px;line-height:28px;font-weight:600;font-variant-numeric:tabular-nums}.sd{margin-top:2px;font-size:12px;color:var(--color-ink-2)}
+.prog{height:6px;margin-top:10px;border-radius:999px;background:var(--color-hover);overflow:hidden}.prog span{display:block;height:100%;border-radius:inherit;background:var(--color-accent)}
+.pc{display:flex;flex-direction:column;gap:12px;padding:16px;text-decoration:none;color:inherit;border-color:color-mix(in oklab,var(--hue) 40%,var(--color-line));box-shadow:0 0 24px -14px var(--hue)}
+.pc .ft{display:flex;align-items:center;gap:8px;padding-top:12px;border-top:1px solid var(--color-line);font-size:12px;color:var(--color-ink-2)}
+.sh{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:32px 0 12px}.sh h2{font-size:16px;line-height:22px;font-weight:600}.sh p{font-size:12px;color:var(--color-ink-3);margin-top:2px}
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);width:100%}
+.rail{margin:8px 0 8px 8px;border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.brand{display:flex;align-items:center;gap:8px;padding:4px 8px 10px;font-weight:600}.logo{width:18px;height:18px;border-radius:5px;background:var(--color-accent);flex:none}
+.grp{margin:16px 0 4px;padding:0 8px;font-size:11px;font-weight:500;color:var(--color-ink-3)}
+.it{position:relative;display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;color:var(--color-ink-2);font-size:13px;font-weight:500;text-decoration:none;cursor:pointer;list-style:none}
+.it::-webkit-details-marker{display:none}.it:hover{background:var(--color-hover);color:var(--color-ink)}
+.it[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}.it .badge{margin-left:auto}
+.more>.it~.it{padding-left:16px}
+.psw{all:unset;display:flex;align-items:center;gap:8px;height:32px;padding:0 8px;margin-bottom:6px;border-radius:6px;border:1px solid var(--color-line);font-size:13px;font-weight:600;cursor:pointer}.psw .ic{margin-left:auto;color:var(--color-ink-3)}
+.it.bd{height:38px;margin-bottom:6px;color:var(--color-ink);font-weight:600;font-size:14px;background:color-mix(in oklab,var(--color-accent) 8%,transparent);border:1px solid color-mix(in oklab,var(--color-accent) 40%,transparent)}
+.bt{display:grid;place-items:center;width:24px;height:24px;border-radius:6px;background:var(--color-accent);color:var(--color-on-accent);flex:none}.bt .ic{width:14px;height:14px}
+.top{display:flex;align-items:center;gap:8px;height:52px;padding:0 32px}
+.crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--color-ink-3);min-width:0;white-space:nowrap}.crumbs b{color:var(--color-ink);font-weight:500}
+.main{padding:4px 32px 48px;max-width:1120px}
+.ph{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin:12px 0 28px}
+.eb{font-size:12px;font-weight:500;color:var(--color-ink-3);margin-bottom:4px}
+.ph h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600}
+.ph .d{margin-top:6px;color:var(--color-ink-2);max-width:62ch}
+.cap{display:none;position:absolute;left:12px;bottom:14px;gap:2px;padding:4px;border-radius:999px;z-index:40}
+.cap a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;border-radius:999px;font-size:11px;font-weight:500;color:var(--color-ink-2);text-decoration:none}
+.cap a[aria-current=page]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.fab{position:absolute;right:12px;bottom:16px;width:48px;height:48px;border-radius:999px;display:none;place-items:center;background:var(--color-accent);color:var(--color-on-accent);border:0;box-shadow:0 8px 24px var(--glass-shadow);z-index:40}.fab .ic{width:20px;height:20px}
+@container (max-width:1023px){
+.shell{grid-template-columns:64px minmax(0,1fr)}.rail{align-items:center;padding:12px 6px}
+.lbl,.grp{display:none}.grp+.psw{margin-top:12px}
+.it,.more>.it~.it{width:40px;height:36px;padding:0;justify-content:center}.it.bd{width:44px;height:44px;padding:0}
+.it .badge{position:absolute;top:0;right:-2px;height:14px;min-width:14px;padding:0 3px;font-size:9px}
+.psw{width:36px;height:36px;padding:0;justify-content:center}.psw .ic{display:none}.brand{padding:4px 0 10px}
+.top,.main{padding-left:24px;padding-right:24px}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}.ht{display:none}}
+@container (max-width:639px){
+.shell{display:block}.rail,.hp{display:none}.cap{display:flex}.fab{display:grid}
+.top,.main{padding-left:16px;padding-right:16px}.main{padding-bottom:104px}
+.ph{margin-bottom:20px}.ph h1{font-size:24px;line-height:30px}.ph .acts .p{display:none}
+.g3{grid-template-columns:minmax(0,1fr)}.crumbs .c0{display:none}.srch{max-width:none;flex-basis:100%}.tb .sel{flex:1;min-width:0}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style></head><body><div class="doc">
+<header class="dh"><div><div class="i3 sm">Stack S-7 · C-288</div><h1>Workspace Overview, Projects, Work</h1><p class="i2">Overview is still the landing page after sign-in. It shows three stat tiles, one cross-project “Needs you” list, then project cards with their identity hue and a direct “Board” link. Projects is the card grid with search. Work is one filterable table of open cards across projects. On phones the capsule keeps the last project’s tabs, and the Workspace pages open from More.</p></div><button class="btn" type="button" id="tt"><i data-i="moon"></i>Theme</button></header>
+<template data-a="overview" data-c="Workspace/Overview" data-t="Workspace Overview">
+<header class="ph"><div><div class="eb">Workspace</div><h1>Overview</h1><p class="d">Every project at a glance, and what needs you first.</p></div><div class="acts"><button class="btn" type="button"><i data-i="plus"></i>New project</button></div></header>
+<div class="g g3"><div class="stat surf"><div class="sl">Live slots</div><div class="sv">5 / 8</div><div class="sd">3 projects running</div></div><div class="stat surf"><div class="sl">Spend today</div><div class="sv">$18.40</div><div class="prog"><span style="width:37%"></span></div></div><div class="stat surf"><div class="sl">Merged today</div><div class="sv">6</div><div class="sd">+2 vs yesterday</div></div></div>
+<div class="sh"><div><h2>Needs you</h2><p>Across every project, oldest first.</p></div></div>
+<div class="surf">
+<div class="li"><span class="sw" style="--hue:var(--color-hue-7)"></span><div class="mn"><div class="tt">Run the database migration on staging</div><div class="i3 sm">AgentDock · <span class="mono">#684</span> · 4 min ago</div></div><span class="pill s-wait">Approval</span><button class="btn sm" type="button">Review</button></div>
+<div class="li"><span class="sw" style="--hue:var(--color-hue-2)"></span><div class="mn"><div class="tt">Checks failed on the tablet breakpoint PR</div><div class="i3 sm">glass-ui · <span class="mono">#212</span> · 22 min ago</div></div><span class="pill s-err">Failed</span><button class="btn sm" type="button">Open run</button></div>
+</div>
+<div class="sh"><div><h2>Projects</h2></div><a class="btn gh sm" href="#">All projects</a></div>
+<div class="g g3">
+<a class="surf pc" href="#" style="--hue:var(--color-hue-7)"><div class="row"><span class="sw" style="--hue:var(--color-hue-7)"></span><span class="ct">AgentDock</span><span class="sp"></span><span class="pill live s-run">Running</span></div><p class="i2 sm">3 of 4 slots busy · 12 open cards</p><div class="ft">2 need you<span class="sp"></span>Board<i data-i="right"></i></div></a>
+<a class="surf pc" href="#" style="--hue:var(--color-hue-2)"><div class="row"><span class="sw" style="--hue:var(--color-hue-2)"></span><span class="ct">glass-ui</span><span class="sp"></span><span class="pill s-wait">Waiting</span></div><p class="i2 sm">1 of 2 slots busy · 5 open cards</p><div class="ft">1 needs you<span class="sp"></span>Board<i data-i="right"></i></div></a>
+<a class="surf pc" href="#" style="--hue:var(--color-hue-4)"><div class="row"><span class="sw" style="--hue:var(--color-hue-4)"></span><span class="ct">FilesDrop</span><span class="sp"></span><span class="pill s-pause">Paused</span></div><p class="i2 sm">0 of 2 slots · 3 open cards</p><div class="ft">Budget reached<span class="sp"></span>Board<i data-i="right"></i></div></a>
+</div>
+</template>
+<template data-a="projects" data-c="Workspace/Projects" data-f="New project" data-t="Projects">
+<header class="ph"><div><div class="eb">Workspace</div><h1>Projects</h1><p class="d">Repositories this control plane runs agents for.</p></div><div class="acts"><button class="btn p" type="button"><i data-i="plus"></i>New project</button></div></header>
+<div class="tb"><label class="srch"><i data-i="search"></i><input class="in" placeholder="Search projects" aria-label="Search projects"></label><select class="sel" aria-label="Status"><option>Any status</option></select></div>
+<div class="g g3">
+<a class="surf pc" href="#" style="--hue:var(--color-hue-7)"><div class="row"><span class="sw" style="--hue:var(--color-hue-7)"></span><span class="ct">AgentDock</span><span class="sp"></span><span class="pill live s-run">Running</span></div><p class="i2 sm mono">AndreyBegma/AgentDock</p><div class="ft"><span class="num">12</span> open · <span class="num">4</span> slots<span class="sp"></span>Board<i data-i="right"></i></div></a>
+<a class="surf pc" href="#" style="--hue:var(--color-hue-2)"><div class="row"><span class="sw" style="--hue:var(--color-hue-2)"></span><span class="ct">glass-ui</span><span class="sp"></span><span class="pill s-wait">Waiting</span></div><p class="i2 sm mono">AndreyBegma/glass-ui</p><div class="ft"><span class="num">5</span> open · <span class="num">2</span> slots<span class="sp"></span>Board<i data-i="right"></i></div></a>
+<a class="surf pc" href="#" style="--hue:var(--color-hue-4)"><div class="row"><span class="sw" style="--hue:var(--color-hue-4)"></span><span class="ct">FilesDrop</span><span class="sp"></span><span class="pill s-pause">Paused</span></div><p class="i2 sm mono">AndreyBegma/FilesDrop</p><div class="ft"><span class="num">3</span> open · <span class="num">2</span> slots<span class="sp"></span>Board<i data-i="right"></i></div></a>
+<a class="surf pc" href="#" style="--hue:var(--color-hue-8)"><div class="row"><span class="sw" style="--hue:var(--color-hue-8)"></span><span class="ct">code-sentinel</span><span class="sp"></span><span class="pill s-done">Idle</span></div><p class="i2 sm mono">AndreyBegma/code-sentinel</p><div class="ft"><span class="num">0</span> open · <span class="num">1</span> slot<span class="sp"></span>Board<i data-i="right"></i></div></a>
+<a class="surf pc" href="#" style="--hue:var(--color-hue-1)"><div class="row"><span class="sw" style="--hue:var(--color-hue-1)"></span><span class="ct">landing</span><span class="sp"></span><span class="pill s-done">Idle</span></div><p class="i2 sm mono">AndreyBegma/landing</p><div class="ft"><span class="num">1</span> open · <span class="num">1</span> slot<span class="sp"></span>Board<i data-i="right"></i></div></a>
+</div>
+</template>
+<template data-a="work" data-c="Workspace/Work" data-t="Work">
+<header class="ph"><div><div class="eb">Workspace</div><h1>Work</h1><p class="d">Open cards across every project.</p></div></header>
+<div class="tb"><label class="srch"><i data-i="search"></i><input class="in" placeholder="Search cards" aria-label="Search cards"></label><select class="sel" aria-label="Project"><option>All projects</option></select><select class="sel" aria-label="Status"><option>Any status</option></select></div>
+<div class="surf"><table class="tbl"><thead><tr><th>Card</th><th class="hp">Project</th><th>Status</th><th class="ht">Slot</th><th class="hp num">Updated</th></tr></thead><tbody>
+<tr><td class="w"><div class="tt">Redesign project home and Fleet</div><div class="i3 sm mono">#683</div></td><td class="hp"><span class="row"><span class="sw" style="--hue:var(--color-hue-7)"></span>AgentDock</span></td><td><span class="pill live s-run">Running</span></td><td class="ht mono i2">slot-1</td><td class="hp num i3">2 min</td></tr>
+<tr><td class="w"><div class="tt">Add tablet breakpoint and calm page primitives</div><div class="i3 sm mono">#212</div></td><td class="hp"><span class="row"><span class="sw" style="--hue:var(--color-hue-2)"></span>glass-ui</span></td><td><span class="pill s-err">Failed</span></td><td class="ht mono i2">slot-1</td><td class="hp num i3">22 min</td></tr>
+<tr><td class="w"><div class="tt">Run the database migration on staging</div><div class="i3 sm mono">#684</div></td><td class="hp"><span class="row"><span class="sw" style="--hue:var(--color-hue-7)"></span>AgentDock</span></td><td><span class="pill s-wait">Waiting</span></td><td class="ht mono i2">slot-2</td><td class="hp num i3">4 min</td></tr>
+<tr><td class="w"><div class="tt">Resumable uploads over 2 GB</div><div class="i3 sm mono">#88</div></td><td class="hp"><span class="row"><span class="sw" style="--hue:var(--color-hue-4)"></span>FilesDrop</span></td><td><span class="pill s-block">Blocked</span></td><td class="ht i3">—</td><td class="hp num i3">1 d</td></tr>
+<tr><td class="w"><div class="tt">Regroup project settings into four sections</div><div class="i3 sm mono">#686</div></td><td class="hp"><span class="row"><span class="sw" style="--hue:var(--color-hue-7)"></span>AgentDock</span></td><td><span class="pill s-wait">Ready</span></td><td class="ht i3">—</td><td class="hp num i3">1 h</td></tr>
+</tbody></table></div>
+</template>
+</div>
+<script>
+(()=>{'use strict';
+const I={grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.910a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',board:'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>',home:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',bot:'<path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',list:'<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>',activity:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',sparkles:'<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/>',clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',book:'<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',gauge:'<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',sliders:'<path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/>',more:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',chev:'<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',right:'<path d="m9 18 6-6-6-6"/>',search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'};
+const S=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${I[n]||''}</svg>`;
+const WS=[['overview','grid','Overview'],['projects','folder','Projects'],['work','layers','Work']];
+const PR=[['home','home','Overview'],['fleet','bot','Fleet',1],['queue','list','Queue',2],['activity','activity','Activity']];
+const MO=[['planner','sparkles','Planner'],['schedules','clock','Schedules'],['skills','book','Skills'],['tokens','gauge','Token saver'],['settings','sliders','Settings']];
+const cur=(k,a)=>k==a?' aria-current="page"':'';
+const it=a=>([k,i,l,b])=>`<a class="it" href="#" title="${l}"${cur(k,a)}>${S(i)}<span class="lbl">${l}</span>${b?`<span class="badge bs${k=='queue'?' b-sd':''}">${b}</span>`:''}</a>`;
+const rail=a=>`<nav class="rail glass" aria-label="Main"><div class="brand"><span class="logo"></span><span class="lbl">AgentDock</span></div>${WS.map(it(a)).join('')}<div class="grp">Project</div><button class="psw" type="button" title="Switch project"><span class="sw" style="--hue:var(--color-hue-7)"></span><span class="lbl">AgentDock</span>${S('chev')}</button><a class="it bd" href="#" title="Board"${cur('board',a)}><span class="bt">${S('board')}</span><span class="lbl">Board</span><span class="badge bs">12</span></a>${PR.map(it(a)).join('')}<details class="more"${MO.some(m=>m[0]==a)?' open':''}><summary class="it" title="More">${S('more')}<span class="lbl">More</span></summary>${MO.map(it(a)).join('')}</details><div class="sp"></div>${it(a)(['admin','shield','Admin'])}</nav>`;
+const CP=[['board','board','Board'],['queue','list','Queue'],['activity','activity','Activity']];
+const cap=(a,f)=>`<nav class="cap glass" aria-label="Main">${CP.map(([k,i,l])=>`<a href="#"${cur(k,a)}>${S(i)}${l}</a>`).join('')}<a href="#"${CP.some(c=>c[0]==a)?'':' aria-current="page"'}>${S('more')}More</a></nav>${f?`<button class="fab" type="button" aria-label="${f}">${S('plus')}</button>`:''}`;
+const topBar=c=>`<div class="top"><nav class="crumbs" aria-label="Breadcrumb">${c.split('/').map((x,i,r)=>i==r.length-1?`<b aria-current="page">${x}</b>`:`<span class="c${i}">${x}</span><span class="c${i}">/</span>`).join('')}</nav><span class="sp"></span><button class="btn gh io" type="button" aria-label="Search">${S('search')}</button><span class="kbd hp">⌘K</span></div>`;
+const W=[[1280,'Desktop','≥1024px',720],[820,'Tablet','640–1023px',900],[390,'Phone','<640px',844]];
+document.querySelectorAll('template').forEach(t=>{const d=t.dataset,b=document.createElement('section');b.innerHTML=`<h2 class="dt">${d.t}</h2><div class="boards">${W.map(([w,n,r,h])=>`<div><div class="abl">${n} · ${r}</div><div class="dev" style="width:${w}px;min-height:${h}px"><div class="cv"></div><div class="shell">${rail(d.a)}<div>${topBar(d.c)}<main class="main">${t.innerHTML}</main></div></div>${cap(d.a,d.f)}</div></div>`).join('')}</div>`;t.replaceWith(b)});
+document.querySelectorAll('i[data-i]').forEach(e=>e.outerHTML=S(e.dataset.i));
+document.getElementById('tt').addEventListener('click',()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme=='dark'?'light':'dark'});
+})();
+</script></body></html>
