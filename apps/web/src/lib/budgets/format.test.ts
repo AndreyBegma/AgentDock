@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { BudgetView } from '@agentdock/shared';
+import type { BudgetView } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   budgetExceededOf,

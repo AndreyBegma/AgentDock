@@ -4,7 +4,7 @@ import {
   SKILL_RUN_FINISHED_MAX_BYTES,
   SKILL_RUN_PATCH_MAX_BYTES,
   SKILL_RUN_REPORT_MAX_BYTES,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { finishedData, parsePorcelain, truncateUtf8 } from './finished';
 
 const base = {

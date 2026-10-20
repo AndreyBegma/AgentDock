@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import {
   CARD_ASSESS_ERROR_MAX,
   CARD_ASSESS_RESULT_MAX_BYTES,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   AGENTDOCK_HOOKS_ENV,
   AGENTDOCK_HOOKS_OFF,
@@ -13,7 +13,7 @@ import {
   cardAssessFinishedDataSchema,
   skillRunIdSchema,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   bunSpawn,
   CAPTURE_CLAUDE_FLAGS,

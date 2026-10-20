@@ -1,4 +1,4 @@
-import type { PaneDialog } from '@agentdock/shared/protocol';
+import type { PaneDialog } from '@nautelle/shared/protocol';
 import type { PaneReading } from './classify';
 
 /** `watch.sh` reports IDLE after this many empty polls in a row. */

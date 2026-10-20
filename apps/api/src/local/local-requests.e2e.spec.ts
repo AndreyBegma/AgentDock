@@ -5,7 +5,7 @@ import {
   localMethods,
   MANUAL_HANDOFF_EVENT,
   MANUAL_NOTE_EVENT,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { seedProject } from '../fleet/testing/fleet-e2e';
 import {
   adminSession,

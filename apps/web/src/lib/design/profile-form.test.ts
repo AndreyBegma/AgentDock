@@ -3,7 +3,7 @@ import {
   UI_PROFILE_KIT_MAX_BYTES,
   UI_PROFILE_SNIPPET_MAX_BYTES,
   type UiProfileVersionView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { blankSnippet, readProfileForm, toForm } from './profile-form';
 
 const profile: UiProfileVersionView = {

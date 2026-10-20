@@ -1,4 +1,4 @@
-import { DEEPL_PLACEHOLDER_TAG } from '@agentdock/shared';
+import { DEEPL_PLACEHOLDER_TAG } from '@nautelle/shared';
 
 /** Not a real key: no suite ever reaches DeepL. A free one, so the host is `api-free`. */
 export const FAKE_DEEPL_KEY = 'e2e-fake-deepl-key-4f1c:fx';

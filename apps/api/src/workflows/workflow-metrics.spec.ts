@@ -1,4 +1,4 @@
-import { WORKFLOW_AGENT_TYPE } from '@agentdock/shared';
+import { WORKFLOW_AGENT_TYPE } from '@nautelle/shared';
 import {
   erroredOf,
   orchestration,

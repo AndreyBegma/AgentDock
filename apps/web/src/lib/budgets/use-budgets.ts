@@ -1,6 +1,6 @@
 'use client';
 
-import { BUDGET_UPDATED_LIVE_EVENT, type BudgetView } from '@agentdock/shared';
+import { BUDGET_UPDATED_LIVE_EVENT, type BudgetView } from '@nautelle/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, api } from '../api';
 import { useLive } from '../live/use-live';

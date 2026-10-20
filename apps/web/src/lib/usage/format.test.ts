@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ModelPriceInput } from '@agentdock/shared';
+import type { ModelPriceInput } from '@nautelle/shared';
 import {
   compilePattern,
   costChartSeries,

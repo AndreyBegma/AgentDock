@@ -4,7 +4,7 @@ import {
   type DesignSettingsUpdateRequest,
   type DesignSettingsView,
   viewportPresetsSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';

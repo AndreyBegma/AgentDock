@@ -2,7 +2,7 @@ import type {
   CommandArgs,
   CommandResult,
   SkillCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { SkillCatalog } from './catalog';
 import type { SkillsDeps } from './deps';
 import { inspectSkills, installSkill, uninstallSkill } from './install';

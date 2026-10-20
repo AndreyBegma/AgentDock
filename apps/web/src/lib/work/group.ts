@@ -3,7 +3,7 @@ import {
   type BoardColumn,
   type WorkCardItem,
   type WorkItem,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** A fleet slot row: a `fleet` card that carries its issue. */
 export type WorkFleetSlot = WorkCardItem & {

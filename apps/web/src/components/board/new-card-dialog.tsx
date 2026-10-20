@@ -1,5 +1,8 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import {
   type BoardSettingsView,
   type BoardView,
@@ -7,10 +10,7 @@ import {
   claudeModelOptions,
   type PlanSummary,
   type ProjectDetail,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import { Field, Select, Textarea } from '@andrewbehma/glass-ui/field';
+} from '@nautelle/shared';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ApiError, api } from '../../lib/api';
 import { describeUploadFailure } from '../../lib/attachments/format';

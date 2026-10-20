@@ -3,7 +3,7 @@ import {
   CARD_CONTINUE_PROMPT,
   CARD_WORKER_PROMPT_VERSION,
   cardFeedbackPrompt,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { Feed } from '../budgets/testing/budgets-e2e';
 import { seedPrices } from '../prices/seed-prices';

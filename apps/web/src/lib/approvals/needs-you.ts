@@ -2,7 +2,7 @@ import type {
   ActionRequestSummary,
   ApprovalItemView,
   ApprovalsView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { pendingRequests } from './action-requests';
 
 /**

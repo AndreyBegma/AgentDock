@@ -1,11 +1,5 @@
 'use client';
 
-import type {
-  CurrentPricesResponse,
-  ModelPriceInput,
-  PriceVersionListResponse,
-  UsageBreakdownResponse,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -21,6 +15,12 @@ import {
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
+import type {
+  CurrentPricesResponse,
+  ModelPriceInput,
+  PriceVersionListResponse,
+  UsageBreakdownResponse,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';

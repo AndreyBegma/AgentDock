@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { type AuditResult, RUNNER_ERROR } from '@agentdock/shared';
+import { type AuditResult, RUNNER_ERROR } from '@nautelle/shared';
 import {
   type CommandErrorCode,
   type CommandName,
@@ -9,7 +9,7 @@ import {
   parseCommand,
   type Role,
   roleAtLeast,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';

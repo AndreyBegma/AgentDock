@@ -1,4 +1,4 @@
-import { effectiveProjectRole, type Role } from '@agentdock/shared';
+import { effectiveProjectRole, type Role } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { userActor } from '../audit/audit.types';

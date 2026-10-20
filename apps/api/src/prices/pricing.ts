@@ -4,8 +4,8 @@ import type {
   PriceBucket,
   PriceTier,
   TierCondition,
-} from '@agentdock/shared';
-import type { TokenBuckets } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { TokenBuckets } from '@nautelle/shared/protocol';
 import { Prisma } from '@prisma/client';
 
 const Decimal = Prisma.Decimal;

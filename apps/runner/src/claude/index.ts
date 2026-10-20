@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { MANUAL_TMUX_SESSION_PREFIX } from '@agentdock/shared/protocol';
+import { MANUAL_TMUX_SESSION_PREFIX } from '@nautelle/shared/protocol';
 import type { LocalCommandDeps } from '../local/subcommand';
 
 /** Runs a binary with the terminal's own stdio; resolves its exit code. */

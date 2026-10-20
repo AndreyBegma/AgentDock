@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CARD_ASSESS_RESULT_MAX_BYTES } from '@agentdock/shared';
+import { CARD_ASSESS_RESULT_MAX_BYTES } from '@nautelle/shared';
 import type {
   CardAssessArgs,
   CardAssessFinishedData,
   UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CaptureProcess, CaptureSpawn } from '../capture/executor';
 import { CAPTURE_CLAUDE_FLAGS } from '../capture/executor';
 import { CommandFailure } from '../commands/failure';

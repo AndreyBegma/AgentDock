@@ -1,7 +1,7 @@
 import {
   AUDIT_LAST_VERIFICATION_KEY,
   type AuditVerification,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { SettingsService } from '../settings/settings.service';

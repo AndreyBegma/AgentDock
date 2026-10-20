@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import { CollectorRegistry } from '../collectors';
 import { memoryLogger } from '../testing/fixtures';
 import { WatchList } from './watch-list';

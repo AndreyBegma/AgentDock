@@ -1,11 +1,11 @@
 'use client';
 
-import type { ApproveRequest, RequestChangesRequest } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { ApproveRequest, RequestChangesRequest } from '@nautelle/shared';
 import { useState } from 'react';
 import { api } from '../../../../../lib/api';
 import {

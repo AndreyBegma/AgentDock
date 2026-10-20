@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import type { PlanTurnPhase } from '@agentdock/shared';
+import type { PlanTurnPhase } from '@nautelle/shared';
 import {
   chunkResultText,
   jsonStringBytes,
@@ -15,7 +15,7 @@ import {
   planTurnPhaseChangedDataSchema,
   planTurnResultChunkDataSchema,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type AttachmentSource, syncAttachments } from '../cards/attachments';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';

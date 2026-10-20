@@ -1,5 +1,9 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   BOARD_CHANGED_EVENT,
   type BoardCardView,
@@ -8,11 +12,7 @@ import {
   PLANNER_LIVE_EVENT,
   type PlanSummary,
   QUEUE_LIVE_EVENT,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
 import { MessagesSquare, SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import {

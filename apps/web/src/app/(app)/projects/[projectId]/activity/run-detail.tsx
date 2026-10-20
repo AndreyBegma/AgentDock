@@ -1,10 +1,5 @@
 'use client';
 
-import {
-  RUN_UPDATED_LIVE_EVENT,
-  type RunDetail,
-  type RunSession,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
@@ -20,6 +15,11 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { Timeline } from '@andrewbehma/glass-ui/timeline';
+import {
+  RUN_UPDATED_LIVE_EVENT,
+  type RunDetail,
+  type RunSession,
+} from '@nautelle/shared';
 import { X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';

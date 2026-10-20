@@ -8,7 +8,7 @@ import {
   MAX_LIVE_MESSAGE_BYTES,
   MAX_LIVE_SUBSCRIPTIONS,
   SESSION_COOKIE,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Inject, Logger } from '@nestjs/common';
 import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';

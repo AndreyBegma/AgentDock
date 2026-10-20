@@ -5,8 +5,8 @@ import {
   CARD_PR_DESCRIPTION_FILE,
   cardDraftPullRequest,
   cardPullRequestBody,
-} from '@agentdock/shared';
-import type { CardCollectArgs } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CardCollectArgs } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import {

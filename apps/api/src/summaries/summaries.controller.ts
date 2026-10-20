@@ -1,4 +1,4 @@
-import type { AiSummaryView } from '@agentdock/shared';
+import type { AiSummaryView } from '@nautelle/shared';
 import {
   applyDecorators,
   Body,

@@ -1,4 +1,4 @@
-import { cardLabel } from '@agentdock/shared';
+import { cardLabel } from '@nautelle/shared';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { BoardCard } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

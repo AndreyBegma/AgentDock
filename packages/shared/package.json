@@ -1,5 +1,5 @@
 {
-  "name": "@agentdock/shared",
+  "name": "@nautelle/shared",
   "version": "0.0.1",
   "private": true,
   "main": "./dist/index.js",

@@ -1,4 +1,4 @@
-import type { AuditResult } from '@agentdock/shared';
+import type { AuditResult } from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { ANONYMOUS_ACTOR, userActor } from '../audit/audit.types';

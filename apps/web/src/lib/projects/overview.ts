@@ -1,4 +1,4 @@
-import type { FleetView, UsageSeries } from '@agentdock/shared';
+import type { FleetView, UsageSeries } from '@nautelle/shared';
 
 /**
  * The Projects list columns that `GET /projects` does not carry (issue #159):

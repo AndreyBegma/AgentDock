@@ -6,7 +6,7 @@ import {
   hookEndReasonSchema,
   hookStartSourceSchema,
   manualTmuxSessionSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { z } from 'zod';
 import type {
   Ancestor,

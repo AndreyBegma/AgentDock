@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { SESSION_MESSAGE_MAX_CHARS } from '@agentdock/shared';
+import { SESSION_MESSAGE_MAX_CHARS } from '@nautelle/shared';
 import { ApiError } from '../api';
 import { draftProblem, sessionMessageError } from './format';
 

@@ -1,9 +1,9 @@
 'use client';
 
-import type { ModelPriceInput } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
+import type { ModelPriceInput } from '@nautelle/shared';
 import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import {
   defaultTier,

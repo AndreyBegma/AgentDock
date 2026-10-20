@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { BoardPlanTaskView } from '@agentdock/shared';
+import type { BoardPlanTaskView } from '@nautelle/shared';
 import { matchesFilter, NO_FILTER } from './filter';
 import { card, round } from './fixtures';
 import { toItem } from './format';

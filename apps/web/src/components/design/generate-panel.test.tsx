@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { STACK_GATE_REASON } from '@agentdock/shared';
+import { STACK_GATE_REASON } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { design } from '../../lib/design/fixtures';
 import { UserProvider } from '../shell/user-context';

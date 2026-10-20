@@ -2,7 +2,7 @@ import {
   LOCAL_MAX_CONCURRENT_PER_RUNNER,
   type LocalRequestMessage,
   type LocalResponseMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { RunnerLocalRequests } from './runner-local-requests';
 
 const request = (id: string): LocalRequestMessage =>

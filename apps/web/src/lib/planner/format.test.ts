@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { STATUSES } from '@andrewbehma/glass-ui/status-pill';
 import {
   PLAN_STATUSES,
   PLAN_TASK_LIVE_STATUSES,
@@ -6,8 +7,7 @@ import {
   PLAN_TURN_ACTIONS,
   PLAN_TURN_PHASES,
   type PlanTaskIssueView,
-} from '@agentdock/shared';
-import { STATUSES } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import { plan, task, turn } from './fixtures';
 import {

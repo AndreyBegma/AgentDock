@@ -1,4 +1,4 @@
-import type { InstalledSkillView } from '@agentdock/shared';
+import type { InstalledSkillView } from '@nautelle/shared';
 
 /** Searches offered before the person types (#159): one tap fills the field. */
 export const SUGGESTED_SEARCHES = [

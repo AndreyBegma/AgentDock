@@ -2,7 +2,7 @@ import type {
   SessionBackfillArgs,
   SessionBackfillResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { BackfillScope } from '../adapters';
 import { CommandFailure } from './failure';
 

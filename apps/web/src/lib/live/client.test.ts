@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { BOARD_CHANGED_EVENT, type LiveEventMessage } from '@agentdock/shared';
+import { BOARD_CHANGED_EVENT, type LiveEventMessage } from '@nautelle/shared';
 import {
   BACKOFF_MAX_MS,
   backoffDelay,

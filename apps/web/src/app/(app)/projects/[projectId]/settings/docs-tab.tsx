@@ -1,13 +1,13 @@
 'use client';
 
-import type { ProjectDetail } from '@agentdock/shared';
-import type { DocsSourceKind } from '@agentdock/shared/protocol';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { ProjectDetail } from '@nautelle/shared';
+import type { DocsSourceKind } from '@nautelle/shared/protocol';
 import { useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';
 import {

@@ -1,4 +1,4 @@
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import type { Exec } from '../detect/exec';
 import type { PolicyConfig } from '../policy/schema';
 

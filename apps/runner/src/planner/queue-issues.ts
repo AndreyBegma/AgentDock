@@ -1,9 +1,9 @@
-import { DEFAULT_READY_LABEL } from '@agentdock/shared';
+import { DEFAULT_READY_LABEL } from '@nautelle/shared';
 import type {
   PlanQueueIssuesArgs,
   PlanQueueIssuesResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { readyLabelOf, watchedById } from '../commands/queue/project';
 import type { Exec } from '../detect/exec';

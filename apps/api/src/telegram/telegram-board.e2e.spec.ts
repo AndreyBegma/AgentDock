@@ -1,4 +1,4 @@
-import type { BoardView } from '@agentdock/shared';
+import type { BoardView } from '@nautelle/shared';
 import { SYSTEM_ACTOR, userActor } from '../audit/audit.types';
 import { BoardService } from '../board/board.service';
 import { BoardCommands } from '../board/board-commands';

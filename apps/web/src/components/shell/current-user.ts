@@ -3,7 +3,7 @@ import {
   AUTH_ERROR,
   type PublicUser,
   SESSION_COOKIE,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 

@@ -6,7 +6,7 @@ import {
   type TaskDesignSummary,
   type UiProfileSnippet,
   uiProfileSnippetSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Prisma, TaskDesignStatus, UiProfile } from '@prisma/client';
 import { z } from 'zod';
 import type { PrismaService } from '../database/prisma.service';

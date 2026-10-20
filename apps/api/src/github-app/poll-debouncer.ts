@@ -1,4 +1,4 @@
-import type { PollableCollector } from '@agentdock/shared/protocol';
+import type { PollableCollector } from '@nautelle/shared/protocol';
 
 /** One poll, as the debouncer hands it out. */
 export interface DebouncedPoll {

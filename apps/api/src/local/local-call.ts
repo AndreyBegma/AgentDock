@@ -1,10 +1,10 @@
-import type { Role } from '@agentdock/shared';
+import type { Role } from '@nautelle/shared';
 import type {
   LocalMethodArgs,
   LocalMethodName,
   LocalMethodResult,
   LocalRequestMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { AuditContext } from '../audit/audit.types';
 import { LocalError } from './local-error';
 

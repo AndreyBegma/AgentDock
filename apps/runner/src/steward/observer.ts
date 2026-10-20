@@ -5,12 +5,12 @@ import {
   type StewardIncidentKind,
   type StewardRunnerConfig,
   type StewardSubject,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   HOOK_STOPPED_EVENT,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CardRecord } from '../cards/record';
 import type { Cancel, Clock } from '../clock';
 import type { ConfigProfile } from '../config';

@@ -1,5 +1,5 @@
-import type { BackfillResponse, SessionErrorBody } from '@agentdock/shared';
-import type { CommandErrorCode } from '@agentdock/shared/protocol';
+import type { BackfillResponse, SessionErrorBody } from '@nautelle/shared';
+import type { CommandErrorCode } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import {
   adminSession,

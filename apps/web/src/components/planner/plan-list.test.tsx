@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { PlanSummary } from '@agentdock/shared';
+import type { PlanSummary } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { type PlanRetry, planColumns } from './plan-list';
 

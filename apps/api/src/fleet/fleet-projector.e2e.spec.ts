@@ -1,4 +1,4 @@
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { RunsProjector } from '../history/runs-projector.service';
 import { createE2eApp, type E2eContext, resetDatabase } from '../test/e2e-app';
 import { FleetProjector } from './fleet-projector.service';

@@ -1,4 +1,4 @@
-import { PLANNER_BLOCK_TAG, type PlanDetail } from '@agentdock/shared';
+import { PLANNER_BLOCK_TAG, type PlanDetail } from '@nautelle/shared';
 import {
   chunkResultText,
   commandSupport,
@@ -8,7 +8,7 @@ import {
   type PlannerCommandName,
   type RunnerCommands,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { seedProject } from '../../fleet/testing/fleet-e2e';
 import { RunnerEventSinks } from '../../runners/runner-event-sinks';
 import { RunnerIngestService } from '../../runners/runner-ingest.service';

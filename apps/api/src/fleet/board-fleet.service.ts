@@ -10,13 +10,13 @@ import {
   type FleetCardEdits,
   type FleetStage,
   stageOf,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   isFleetEventType,
   parseQueueEvent,
   type RunnerEvent,
   SLOT_MESSAGE_MAX_BYTES,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

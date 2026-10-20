@@ -1,4 +1,4 @@
-import { TEXT_NORMALIZE_QUEUE, textNormalizeJobId } from '@agentdock/shared';
+import { TEXT_NORMALIZE_QUEUE, textNormalizeJobId } from '@nautelle/shared';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Optional } from '@nestjs/common';
 import type { JobsOptions, Queue } from 'bullmq';

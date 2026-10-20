@@ -9,11 +9,11 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type FilterStatRow, filterStatsDataSchema } from '@agentdock/shared';
+import { type FilterStatRow, filterStatsDataSchema } from '@nautelle/shared';
 import type {
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { createLogger } from '../log';
 import {
   type EcoSession,

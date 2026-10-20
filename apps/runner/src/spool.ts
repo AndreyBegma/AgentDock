@@ -21,7 +21,7 @@ import {
   seqCursorSchema,
   type UnsequencedEvent,
   unsequencedEventSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import type { Logger } from './log';
 

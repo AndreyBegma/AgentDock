@@ -9,7 +9,7 @@ import {
   type SkillCatalogView,
   type SkillInspectView,
   type SkillProfileInstallView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   profileKeySchema,
   type Runtime,
@@ -17,7 +17,7 @@ import {
   type SkillInstallArgs,
   skillInstallMinRole,
   skillNameSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';

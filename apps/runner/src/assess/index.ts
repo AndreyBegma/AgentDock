@@ -2,7 +2,7 @@ import type {
   AssessCommandName,
   CommandArgs,
   CommandResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { AssessExecutor } from './executor';
 
 export {

@@ -1,4 +1,4 @@
-import type { FleetLiveChange } from '@agentdock/shared';
+import type { FleetLiveChange } from '@nautelle/shared';
 
 const KINDS: readonly FleetLiveChange['kind'][] = [
   'slot',

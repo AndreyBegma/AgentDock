@@ -1,5 +1,5 @@
 {
-  "name": "@agentdock/api",
+  "name": "@nautelle/api",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -21,7 +21,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@agentdock/shared": "workspace:*",
+    "@nautelle/shared": "workspace:*",
     "@anthropic-ai/sdk": "0.135.0",
     "@nestjs/bullmq": "11.0.5",
     "@nestjs/common": "^11.1.0",

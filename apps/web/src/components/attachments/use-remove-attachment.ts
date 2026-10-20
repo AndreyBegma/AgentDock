@@ -1,7 +1,7 @@
 'use client';
 
-import type { AttachmentView } from '@agentdock/shared';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { AttachmentView } from '@nautelle/shared';
 import { useState } from 'react';
 import { removeAttachment } from '../../lib/attachments/actions';
 import { describeBoardError } from '../../lib/board/format';

@@ -1,7 +1,7 @@
 import type {
   TextNormalizationsQuery,
   UpdateTextSettingsBody,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { IsBoolean, IsOptional, Matches } from 'class-validator';
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;

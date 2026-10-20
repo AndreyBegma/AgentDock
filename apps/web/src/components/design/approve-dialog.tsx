@@ -1,10 +1,10 @@
 'use client';
 
-import type { DesignRevisionView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Radio, RadioGroup } from '@andrewbehma/glass-ui/radio-group';
+import type { DesignRevisionView } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { revisionLabel } from '../../lib/design/format';
 

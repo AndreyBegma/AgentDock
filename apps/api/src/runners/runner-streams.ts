@@ -9,7 +9,7 @@ import type {
   TerminalHistoryRequestMessage,
   TerminalResizeMessage,
   UnsubscribeMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { type LiveConnection, RunnerConnections } from './runner-connections';
 

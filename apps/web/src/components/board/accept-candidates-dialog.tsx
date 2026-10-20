@@ -1,10 +1,10 @@
 'use client';
 
-import type { AcceptCandidatesResponse } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Select } from '@andrewbehma/glass-ui/select';
+import type { AcceptCandidatesResponse } from '@nautelle/shared';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { acceptCandidates } from '../../lib/board/candidate-actions';

@@ -2,11 +2,11 @@ import {
   LIVE_SOCKET_PATH,
   type LiveServerMessage,
   runTopic,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   RUN_LOG_LIVE_EVENTS,
   type RunLogFrame,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { allowedLiveOrigin } from '../live/live-options';
 import { TestLiveSocket } from '../live/testing/live-e2e';
 import { PaneRelay } from '../pane/pane-relay';

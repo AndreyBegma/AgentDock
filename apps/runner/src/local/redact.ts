@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
-import { ACTION_REQUEST_TOOL_INPUT_MAX } from '@agentdock/shared';
+import { ACTION_REQUEST_TOOL_INPUT_MAX } from '@nautelle/shared';
 import {
   HOOK_CONTENT_MAX_CHARS,
   type HookContent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { redactText } from '../pane/redact';
 
 /**

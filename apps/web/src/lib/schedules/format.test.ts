@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ScheduleView } from '@agentdock/shared';
+import type { ScheduleView } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   DISABLED_REASON_LABEL,

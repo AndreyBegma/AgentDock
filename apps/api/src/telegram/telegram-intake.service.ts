@@ -10,7 +10,7 @@ import {
   type PlanTurnInput,
   planTurnInputSchema,
   withRecommendations,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   HttpException,
   Inject,

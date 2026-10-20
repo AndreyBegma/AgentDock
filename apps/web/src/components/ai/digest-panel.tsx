@@ -1,9 +1,9 @@
 'use client';
 
-import type { AiDigestItem, AiDigestView } from '@agentdock/shared';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { AiDigestItem, AiDigestView } from '@nautelle/shared';
 import Link from 'next/link';
 import { fetchLatestAiDigest } from '../../lib/ai/actions';
 import { Time } from '../../lib/format/time';

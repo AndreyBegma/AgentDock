@@ -1,4 +1,4 @@
-import type { AuditAction, AuditResult } from '@agentdock/shared';
+import type { AuditAction, AuditResult } from '@nautelle/shared';
 
 /** Rule R5: every audited action in words. A new action fails the type here. */
 export const ACTION_LABEL: Record<AuditAction, string> = {

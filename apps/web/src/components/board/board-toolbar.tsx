@@ -1,8 +1,8 @@
 'use client';
 
-import { BOARD_CARD_KINDS } from '@agentdock/shared';
 import { Input, Select } from '@andrewbehma/glass-ui/field';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import { BOARD_CARD_KINDS } from '@nautelle/shared';
 import { Search } from 'lucide-react';
 import {
   type BoardFilter,

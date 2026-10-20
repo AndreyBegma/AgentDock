@@ -2,7 +2,7 @@ import type {
   UpdateUserSettingsRequest,
   UserSettingsView,
   WhatsNewView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Body, Controller, Get, HttpCode, Post, Put } from '@nestjs/common';
 import { IsDefined, IsString, MaxLength, ValidateIf } from 'class-validator';
 import type { AuditContext } from '../audit/audit.types';

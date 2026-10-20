@@ -1,4 +1,4 @@
-import { type LiveTopic, parseLiveTopic } from '@agentdock/shared';
+import { type LiveTopic, parseLiveTopic } from '@nautelle/shared';
 
 export interface PaneTarget {
   projectId: string;

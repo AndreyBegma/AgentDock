@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test';
+import { STATUSES } from '@andrewbehma/glass-ui/status-pill';
 import {
   ORCHESTRATOR_STATUSES,
   QUEUE_STATES,
   RUN_STATUSES,
   SLOT_STATUSES,
-} from '@agentdock/shared';
-import { skillRunPhaseSchema } from '@agentdock/shared/protocol';
-import { STATUSES } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
+import { skillRunPhaseSchema } from '@nautelle/shared/protocol';
 import {
   ORCHESTRATOR_PILL_STATUS,
   QUEUE_PILL_STATUS,

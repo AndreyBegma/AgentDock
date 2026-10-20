@@ -1,4 +1,4 @@
-import type { LlmDefaultModel } from '@agentdock/shared';
+import type { LlmDefaultModel } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { LlmStore } from '../llm/llm-store';
 import { boardAiError } from './board-ai-error';

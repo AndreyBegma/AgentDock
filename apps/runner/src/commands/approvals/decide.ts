@@ -4,7 +4,7 @@ import type {
   PrRequestChangesArgs,
   PrVoidApprovalArgs,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Exec } from '../../detect/exec';
 import { CommandFailure } from '../failure';
 import { watchedById } from '../queue/project';

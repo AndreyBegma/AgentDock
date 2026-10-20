@@ -1,5 +1,9 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   FLEET_LIVE_EVENT,
   type FleetGraph,
@@ -7,11 +11,7 @@ import {
   type OrchestratorSettingsView,
   projectRoleAtLeast,
   type QueueView,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+} from '@nautelle/shared';
 import { CirclePlus } from 'lucide-react';
 import Link from 'next/link';
 import {

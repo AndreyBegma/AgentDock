@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { CardDraftPullRequest } from '@agentdock/shared/protocol';
+import type { CardDraftPullRequest } from '@nautelle/shared/protocol';
 import { GH_TIMEOUT_MS, gitOk, parsePrUrl, stderrLine } from '../skills/deps';
 import { githubOf } from '../skills/run/collect';
 import {

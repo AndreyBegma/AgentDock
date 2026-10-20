@@ -1,6 +1,5 @@
 'use client';
 
-import { ACTIVITY_CATEGORIES, type ProjectSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DateInput } from '@andrewbehma/glass-ui/date-input';
@@ -11,6 +10,7 @@ import {
   PopoverTrigger,
 } from '@andrewbehma/glass-ui/popover';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import { ACTIVITY_CATEGORIES, type ProjectSummary } from '@nautelle/shared';
 import { ListFilter } from 'lucide-react';
 import { useMemo } from 'react';
 import {

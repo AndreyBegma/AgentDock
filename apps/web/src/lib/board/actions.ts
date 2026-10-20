@@ -25,7 +25,7 @@ import type {
   UpdateBoardCardRequest,
   UpdateBoardSettingsRequest,
   UpdateBoardStackRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { api } from '../api';
 
 /** The Board's routes (issue #242 "API"); a card is addressed by its number. */

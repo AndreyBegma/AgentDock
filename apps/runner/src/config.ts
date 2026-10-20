@@ -17,7 +17,7 @@ import {
   runtimeProfileSchema,
   SKILL_RUN_MAX_TIMEOUT_SEC,
   SKILL_RUN_MIN_TIMEOUT_SEC,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { policyConfigSchema } from './policy/schema';
 

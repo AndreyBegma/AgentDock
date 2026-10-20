@@ -1,13 +1,13 @@
 'use client';
 
-import type {
-  CreatePriceVersionRequest,
-  ModelPriceInput,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  CreatePriceVersionRequest,
+  ModelPriceInput,
+} from '@nautelle/shared';
 import { type FormEvent, useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { describeUsageError } from '../../../lib/usage/format';

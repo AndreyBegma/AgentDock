@@ -1,5 +1,5 @@
-import { CARD_WAITING_EVENT, type PendingQuestion } from '@agentdock/shared';
-import type { SessionMessageArgs } from '@agentdock/shared/protocol';
+import { CARD_WAITING_EVENT, type PendingQuestion } from '@nautelle/shared';
+import type { SessionMessageArgs } from '@nautelle/shared/protocol';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BotTokenStore } from '../notifications';
 import {

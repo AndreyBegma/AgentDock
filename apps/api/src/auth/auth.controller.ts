@@ -4,7 +4,7 @@ import {
   type RegisterResponse,
   type RegistrationState,
   type SessionInfo,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

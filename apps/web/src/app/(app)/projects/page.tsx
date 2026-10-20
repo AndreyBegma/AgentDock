@@ -1,6 +1,5 @@
 'use client';
 
-import type { FleetView, ProjectSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -9,6 +8,7 @@ import { SearchField } from '@andrewbehma/glass-ui/field';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import type { FleetView, ProjectSummary } from '@nautelle/shared';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';

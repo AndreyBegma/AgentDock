@@ -25,8 +25,8 @@ import {
   type WebhookEventType,
   type WebhookUpdateRequest,
   type WebhookView,
-} from '@agentdock/shared';
-import type { OrchestratorPermissionMode } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { OrchestratorPermissionMode } from '@nautelle/shared/protocol';
 import { ApiError, describeError } from '../api';
 import { ENCRYPTION_KEY_REMEDY } from '../prerequisites/copy';
 

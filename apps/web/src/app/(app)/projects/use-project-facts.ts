@@ -1,6 +1,6 @@
 'use client';
 
-import type { FleetView } from '@agentdock/shared';
+import type { FleetView } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 

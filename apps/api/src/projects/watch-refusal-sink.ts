@@ -3,7 +3,7 @@ import {
   WATCH_REFUSED_EVENT,
   type WatchRefusal,
   watchRefusedDataSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {

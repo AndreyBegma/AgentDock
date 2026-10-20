@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { type ConversationEntry, FLEET_ERROR } from '@agentdock/shared';
+import { type ConversationEntry, FLEET_ERROR } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   briefRoundLabel,

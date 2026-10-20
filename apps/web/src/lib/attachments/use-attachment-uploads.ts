@@ -1,11 +1,11 @@
 'use client';
 
-import type { AttachmentView } from '@agentdock/shared';
 import {
   type UploadItem,
   type UseFileUpload,
   useFileUpload,
 } from '@andrewbehma/glass-ui/use-file-upload';
+import type { AttachmentView } from '@nautelle/shared';
 import { useCallback, useMemo } from 'react';
 import { removeAttachment } from './actions';
 import { csrfHeaders, uploadedView, uploadUrl } from './format';

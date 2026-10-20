@@ -1,5 +1,5 @@
-import type { FleetLiveChange } from '@agentdock/shared';
-import type { FleetEvent } from '@agentdock/shared/protocol';
+import type { FleetLiveChange } from '@nautelle/shared';
+import type { FleetEvent } from '@nautelle/shared/protocol';
 import type { Prisma } from '@prisma/client';
 
 export type Tx = Prisma.TransactionClient;

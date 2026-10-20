@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { PlanCandidateView } from '@agentdock/shared';
+import type { PlanCandidateView } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { plan } from '../../lib/planner/fixtures';
 import { CandidateGroup } from './candidate-group';

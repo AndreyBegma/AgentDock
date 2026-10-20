@@ -1,6 +1,6 @@
 'use client';
 
-import { APPROVALS_LIVE_EVENT, type ApprovalsView } from '@agentdock/shared';
+import { APPROVALS_LIVE_EVENT, type ApprovalsView } from '@nautelle/shared';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import { useLive } from '../../lib/live/use-live';

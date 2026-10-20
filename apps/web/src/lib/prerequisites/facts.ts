@@ -4,7 +4,7 @@ import type {
   OrchestratorSettingsView,
   ProjectSummary,
   RunnerStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** One fact as it loads: each is fetched, and can fail, on its own. */
 export type Loadable<T> =

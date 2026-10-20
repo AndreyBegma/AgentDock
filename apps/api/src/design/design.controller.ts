@@ -5,7 +5,7 @@ import type {
   UiProfileVersionsView,
   UiProfileVersionView,
   UiProfileView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

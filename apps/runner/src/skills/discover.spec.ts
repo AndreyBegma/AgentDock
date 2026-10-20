@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { skillContentHashInput } from '@agentdock/shared/protocol';
+import { skillContentHashInput } from '@nautelle/shared/protocol';
 import { tempDir } from '../testing/fixtures';
 import {
   copySkillFiles,

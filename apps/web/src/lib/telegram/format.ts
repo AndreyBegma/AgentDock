@@ -1,4 +1,4 @@
-import type { TelegramIntegrationStatus } from '@agentdock/shared';
+import type { TelegramIntegrationStatus } from '@nautelle/shared';
 import { ApiError, type Described, describeError } from '../api';
 import { ENCRYPTION_KEY_REMEDY } from '../prerequisites/copy';
 

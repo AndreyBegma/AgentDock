@@ -7,7 +7,7 @@ import {
   stewardActedDataSchema,
   stewardActionCount,
   stewardObservedDataSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   HOOK_PROMPT_SUBMITTED_EVENT,
   HOOK_SESSION_STARTED_EVENT,
@@ -15,7 +15,7 @@ import {
   HOOK_TOOL_FINISHED_EVENT,
   isCardPushEventType,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

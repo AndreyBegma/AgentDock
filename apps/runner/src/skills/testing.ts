@@ -1,6 +1,6 @@
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { createExec, type Exec, type ExecResult } from '../detect/exec';
 import { FakeClock } from '../testing/fake-clock';

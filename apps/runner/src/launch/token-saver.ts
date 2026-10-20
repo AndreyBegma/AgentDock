@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { TokenSaverConfig, TokenSaverRunKind } from '@agentdock/shared';
+import type { TokenSaverConfig, TokenSaverRunKind } from '@nautelle/shared';
 import type { ConfigProfile } from '../config';
 import {
   FILTER_RAW_DIR,

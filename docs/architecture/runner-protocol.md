@@ -2,7 +2,7 @@
 
 Status: draft (M1.3), protocol version `1`. Types live in
 `packages/shared/src/protocol/` as zod schemas, imported as
-`@agentdock/shared/protocol`; this document is their rationale.
+`@nautelle/shared/protocol`; this document is their rationale.
 
 Every ` ```json ` block in this document is a complete wire message and is
 parsed by the schemas in the package's tests — an example that drifts from the
@@ -359,7 +359,7 @@ only: nothing the server sends back can change the policy.
 The fleet collectors (spec 11) send the types of
 [event-schema.md → Fleet](event-schema.md#fleet-spec-11) in ordinary `events`
 batches; their `data` schemas are `fleetEventDataSchemas` in
-`@agentdock/shared/protocol`. Markdown-derived events carry source `scraped`.
+`@nautelle/shared/protocol`. Markdown-derived events carry source `scraped`.
 The API projects each batch before storing it, so a fleet event whose `data`
 does not fit is stored but projects nothing; it never fails the batch.
 

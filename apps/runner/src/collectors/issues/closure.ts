@@ -1,4 +1,4 @@
-import type { IssueClosedData } from '@agentdock/shared/protocol';
+import type { IssueClosedData } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import type { Exec } from '../../detect/exec';
 import { GH_API_TIMEOUT_MS } from './listing';

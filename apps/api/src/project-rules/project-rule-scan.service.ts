@@ -3,8 +3,8 @@ import {
   type ProjectRuleImportResult,
   type ProjectRuleScanResult,
   ruleTitleKey,
-} from '@agentdock/shared';
-import type { ProjectScanRulesResult } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { ProjectScanRulesResult } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';

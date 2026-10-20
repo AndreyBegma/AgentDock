@@ -19,7 +19,7 @@ slot added for the two web slots (`i160-canvas`, `i160-panel`):
 It also explains why the new command stays within ADR-0001 and ADR-0010.
 No schema change, no new Nest module.
 
-## Shared types (`@agentdock/shared`, `fleet/`)
+## Shared types (`@nautelle/shared`, `fleet/`)
 
 | Type | File | What it is |
 |---|---|---|

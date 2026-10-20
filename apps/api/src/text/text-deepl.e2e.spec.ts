@@ -1,4 +1,4 @@
-import { captureFingerprint, textNormalizeJobId } from '@agentdock/shared';
+import { captureFingerprint, textNormalizeJobId } from '@nautelle/shared';
 import { Logger } from '@nestjs/common';
 import {
   DEEPL_FAKE_URL,

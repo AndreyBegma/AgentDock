@@ -6,7 +6,7 @@ import {
   type BulkCardOutcome,
   type BulkCardSkipReason,
   bulkCardRule,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { isSuggestion } from './format';
 import { isPlanItem, type WorkBoardItem } from './plan-tasks';
 

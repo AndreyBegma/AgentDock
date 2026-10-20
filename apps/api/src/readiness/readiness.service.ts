@@ -4,8 +4,8 @@ import {
   projectReadiness,
   READINESS_ACTION_COMMANDS,
   suggestRuntimeProfile,
-} from '@agentdock/shared';
-import type { CommandName } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CommandName } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { resolveSpecTarget } from '../planner/spec-target';

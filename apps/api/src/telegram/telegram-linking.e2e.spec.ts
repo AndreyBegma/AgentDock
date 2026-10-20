@@ -1,4 +1,4 @@
-import type { Role, TelegramLinkCode } from '@agentdock/shared';
+import type { Role, TelegramLinkCode } from '@nautelle/shared';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BotTokenStore } from '../notifications';
 import { seedUser } from '../notifications/testing/notifications-e2e';

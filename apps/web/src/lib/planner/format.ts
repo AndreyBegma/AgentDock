@@ -1,3 +1,5 @@
+import type { Hue } from '@andrewbehma/glass-ui/hue';
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import {
   PLANNER_ERROR,
   type PlanAttention,
@@ -14,9 +16,7 @@ import {
   type PlanTurnAction,
   type PlanTurnPhase,
   type PlanTurnView,
-} from '@agentdock/shared';
-import type { Hue } from '@andrewbehma/glass-ui/hue';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import { pluralize } from '../format';
 import { describeNoProfile } from '../readiness/copy';

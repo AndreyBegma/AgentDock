@@ -1,4 +1,4 @@
-import { projectRoleAtLeast, type Role } from '@agentdock/shared';
+import { projectRoleAtLeast, type Role } from '@nautelle/shared';
 import {
   type CanActivate,
   createParamDecorator,

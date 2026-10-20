@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { AiDigestView } from '@agentdock/shared';
+import type { AiDigestView } from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { answer } from '../assistant/testing/scripted-answers';
 import { SYSTEM_ACTOR } from '../audit/audit.types';

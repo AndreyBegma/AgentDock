@@ -7,7 +7,7 @@ import {
   type WebhookEventType,
   type WebhookSettingsView,
   type WebhookUpdateRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   ArrayMaxSize,
   ArrayMinSize,

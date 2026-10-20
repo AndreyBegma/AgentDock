@@ -1,10 +1,5 @@
 'use client';
 
-import type {
-  InstalledSkillsView,
-  InstalledSkillView,
-  ProjectRuntimeProfile,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
@@ -13,6 +8,11 @@ import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Section } from '@andrewbehma/glass-ui/section';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type {
+  InstalledSkillsView,
+  InstalledSkillView,
+  ProjectRuntimeProfile,
+} from '@nautelle/shared';
 import { Play, RefreshCw, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';

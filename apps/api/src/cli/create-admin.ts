@@ -2,7 +2,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   type PublicUser,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { PrismaClient } from '@prisma/client';
 import { isEmail } from 'class-validator';
 import { hashPassword } from '../auth/password';

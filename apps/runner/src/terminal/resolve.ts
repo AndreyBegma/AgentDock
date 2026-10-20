@@ -4,7 +4,7 @@ import {
   orchestratorSessionName,
   type TerminalTarget,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { correlateCwd } from '../adapters/correlate';
 import { CommandFailure } from '../commands/failure';
 import { resolveSlot, watchedProject } from '../control/target';

@@ -4,7 +4,7 @@ import {
   HANDOFF_NOTE_PATH,
   handoffNoteSchema,
   handoffUpdatedBySchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { z } from 'zod';
 import { readJson, writeJsonAtomic } from '../skills/run/record';
 

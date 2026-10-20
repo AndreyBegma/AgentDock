@@ -3,7 +3,7 @@ import {
   type InstalledSkillView,
   type ProjectRuntimeProfile,
   SKILLS_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   allowedToolsOf,

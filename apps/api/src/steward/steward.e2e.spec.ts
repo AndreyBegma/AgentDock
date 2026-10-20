@@ -4,8 +4,8 @@ import {
   STEWARD_NUDGE_TEXT,
   type StewardIncidentView,
   type StewardSettingsView,
-} from '@agentdock/shared';
-import type { StewardCommandName } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { StewardCommandName } from '@nautelle/shared/protocol';
 import { UnprocessableEntityException } from '@nestjs/common';
 import { BoardWorld, ROOT_B } from '../board/testing/board-e2e';
 import { NotificationMatcher } from '../notifications/notification-matcher';

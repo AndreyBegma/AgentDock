@@ -5,8 +5,8 @@ import {
   type CardMergeOutcome,
   type CardPrCloseOutcome,
   type CardPullRequestView,
-} from '@agentdock/shared';
-import type { RunnerCommands } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RunnerCommands } from '@nautelle/shared/protocol';
 import { ApiError } from '../api';
 
 // `CardMergeMethod` is not exported from the package root; it is the view's.

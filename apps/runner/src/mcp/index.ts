@@ -1,5 +1,5 @@
-import { LOCAL_REQUEST_TIMEOUT_MS } from '@agentdock/shared/protocol';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { LOCAL_REQUEST_TIMEOUT_MS } from '@nautelle/shared/protocol';
 import { FinishGuard, parseFinishGuardArgs } from '../cards/finish-guard';
 import { cardsDirOf, sessionCardNote } from '../handoff/context';
 import { localRequest } from '../local/client';

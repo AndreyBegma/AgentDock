@@ -4,7 +4,7 @@ import {
   GITHUB_HOOK_PATH,
   INBOUND_BODY_MAX_BYTES,
   INBOUND_HOOK_PATH_PREFIX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * Raw request body capture for signed webhooks (docs/specs/26-webhooks.md D8).

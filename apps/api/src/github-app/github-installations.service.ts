@@ -1,4 +1,4 @@
-import { GITHUB_APP_ERROR, type GitHubResyncResult } from '@agentdock/shared';
+import { GITHUB_APP_ERROR, type GitHubResyncResult } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { githubAppError } from './github-app-error';

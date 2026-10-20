@@ -1,6 +1,6 @@
 import { realpathSync } from 'node:fs';
 import { sep } from 'node:path';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import { parseWorktreeList } from '../collectors/worktrees/worktrees';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';

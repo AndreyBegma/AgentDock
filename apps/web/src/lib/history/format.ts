@@ -7,7 +7,7 @@ import {
   type RunStatus,
   type RunSummary,
   type RunUsage,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { dayBoundary } from '../activity/format';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
 import { CHECKS_LABEL } from '../fleet/format';

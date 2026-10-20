@@ -4,7 +4,7 @@ import type {
   DesignTheme,
   PlanTaskStatus,
   TaskDesignStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { z } from 'zod';
 
 /**

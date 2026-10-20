@@ -3,7 +3,7 @@ import {
   CAPTURE_PROMPT_HEAD_BYTES,
   CAPTURE_RESPONSE_TAIL_BYTES,
   type CaptureContentRow,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { prepareCaptureInput } from './capture-input';
 
 const words = (n: number, word = 'note') =>

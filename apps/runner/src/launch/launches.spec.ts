@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { TokenSaverConfig } from '@agentdock/shared';
-import type { CardRunArgs, SkillRunArgs } from '@agentdock/shared/protocol';
+import type { TokenSaverConfig } from '@nautelle/shared';
+import type { CardRunArgs, SkillRunArgs } from '@nautelle/shared/protocol';
 import { cardLaunchSpec, cardTokenSaver } from '../cards/launch';
 import type { CardWiring } from '../cards/wiring';
 import type { ConfigProfile } from '../config';

@@ -3,7 +3,7 @@ import {
   type PlanAnswer,
   type PlanQuestion,
   withRecommendations,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { isAnswered, type RoundAnswers, toAnswers } from './answers';
 
 /**

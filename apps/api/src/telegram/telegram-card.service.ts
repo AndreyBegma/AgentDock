@@ -10,7 +10,7 @@ import {
   cardReviewActions,
   type Role,
   type SessionMessageInput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Inject, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { userActor } from '../audit/audit.types';

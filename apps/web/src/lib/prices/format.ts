@@ -2,7 +2,7 @@ import type {
   PriceSource,
   PriceTestRequest,
   RecomputeStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 export type TokenBucket = keyof NonNullable<PriceTestRequest['tokens']>;
 

@@ -4,7 +4,7 @@ import {
   type LocalErrorCode,
   type LocalRequestMessage,
   type LocalResponseMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 
 /**

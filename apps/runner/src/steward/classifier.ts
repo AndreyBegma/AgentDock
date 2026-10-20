@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import {
   AGENTDOCK_HOOKS_ENV,
   AGENTDOCK_HOOKS_OFF,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   bunSpawn,
   CAPTURE_CLAUDE_FLAGS,

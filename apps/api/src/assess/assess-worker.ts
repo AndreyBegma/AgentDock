@@ -1,4 +1,4 @@
-import { CARD_ASSESS_QUEUE } from '@agentdock/shared';
+import { CARD_ASSESS_QUEUE } from '@nautelle/shared';
 import {
   Injectable,
   Logger,

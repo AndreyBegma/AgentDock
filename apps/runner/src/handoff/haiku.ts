@@ -4,11 +4,11 @@ import { join } from 'node:path';
 import {
   HANDOFF_NOTE_MAX_TOKENS,
   HANDOFF_NOTE_TEMPLATE,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   AGENTDOCK_HOOKS_ENV,
   AGENTDOCK_HOOKS_OFF,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   bunSpawn,
   CAPTURE_CLAUDE_FLAGS,

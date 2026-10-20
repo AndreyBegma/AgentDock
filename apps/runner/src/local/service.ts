@@ -11,7 +11,7 @@ import {
   manualTmuxSessionSchema,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { correlateCwd } from '../adapters/correlate';
 import type { CardRecord } from '../cards/record';

@@ -5,7 +5,7 @@ import {
   WEBHOOK_HEADERS,
   WEBHOOK_WORKER_INTERVAL_MS,
   type WebhookCircuitState,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Inject,
   Injectable,

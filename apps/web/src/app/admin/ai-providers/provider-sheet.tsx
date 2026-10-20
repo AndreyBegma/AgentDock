@@ -1,11 +1,5 @@
 'use client';
 
-import type {
-  LlmDefaultModel,
-  LlmKeyTestResult,
-  LlmProviderView,
-  LlmSettingsView,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -13,6 +7,12 @@ import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  LlmDefaultModel,
+  LlmKeyTestResult,
+  LlmProviderView,
+  LlmSettingsView,
+} from '@nautelle/shared';
 import { type FormEvent, useState } from 'react';
 import { api, errorText } from '../../../lib/api';
 import { formatCost, formatNumber, formatTokens } from '../../../lib/format';

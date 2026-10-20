@@ -1,4 +1,4 @@
-import type { BoardCardDetail, BoardView } from '@agentdock/shared';
+import type { BoardCardDetail, BoardView } from '@nautelle/shared';
 import { BoardWorld } from './testing/board-e2e';
 
 describe('board (e2e)', () => {

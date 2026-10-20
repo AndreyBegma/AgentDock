@@ -1,3 +1,4 @@
+import type { FileRejection } from '@andrewbehma/glass-ui/file-dropzone';
 import {
   ATTACHMENT_IMAGE_MIMES,
   ATTACHMENT_MAX_BYTES,
@@ -8,8 +9,7 @@ import {
   CSRF_COOKIE,
   CSRF_HEADER,
   isAttachmentMime,
-} from '@agentdock/shared';
-import type { FileRejection } from '@andrewbehma/glass-ui/file-dropzone';
+} from '@nautelle/shared';
 
 /** Spec "Copy": under every dropzone. */
 export const ATTACHMENT_NOTE =

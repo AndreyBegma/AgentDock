@@ -1,4 +1,4 @@
-import { TEXT_OFFLINE_GIVE_UP_MS } from '@agentdock/shared';
+import { TEXT_OFFLINE_GIVE_UP_MS } from '@nautelle/shared';
 import { RU_BODY, RU_TITLE, TextWorld, textBlock } from './testing/text-e2e';
 
 describe('text normalization limits and failures (e2e)', () => {

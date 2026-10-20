@@ -1,7 +1,7 @@
 import type {
   IssuesRefreshResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   type IssuesRefreshers,
   issuesRefreshers,

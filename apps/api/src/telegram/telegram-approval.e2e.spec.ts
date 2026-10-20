@@ -1,4 +1,4 @@
-import type { PrInspection } from '@agentdock/shared/protocol';
+import type { PrInspection } from '@nautelle/shared/protocol';
 import { ApprovalCommands } from '../approvals';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BotTokenStore } from '../notifications';

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { PlanCandidateView, PlanDetail } from '@agentdock/shared';
+import type { PlanCandidateView, PlanDetail } from '@nautelle/shared';
 import { ApiError } from '../api';
 import { plan } from '../planner/fixtures';
 import {

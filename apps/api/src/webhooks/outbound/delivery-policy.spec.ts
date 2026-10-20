@@ -1,7 +1,7 @@
 import {
   WEBHOOK_CIRCUIT_THRESHOLD,
   WEBHOOK_MAX_ATTEMPTS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type Circuit,
   circuitAfterAttempt,

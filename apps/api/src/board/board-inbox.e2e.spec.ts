@@ -1,5 +1,5 @@
-import type { BoardCardDetail, BoardView } from '@agentdock/shared';
-import { captureFingerprint } from '@agentdock/shared';
+import type { BoardCardDetail, BoardView } from '@nautelle/shared';
+import { captureFingerprint } from '@nautelle/shared';
 import { CaptureWorld } from '../capture/testing/capture-e2e';
 
 describe('board Inbox (e2e)', () => {

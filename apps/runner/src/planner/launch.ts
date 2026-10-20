@@ -1,5 +1,5 @@
 import { basename, dirname, join } from 'node:path';
-import type { PlanTurnArgs, PlanTurnSession } from '@agentdock/shared/protocol';
+import type { PlanTurnArgs, PlanTurnSession } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { runEnv } from '../skills/run/launch';

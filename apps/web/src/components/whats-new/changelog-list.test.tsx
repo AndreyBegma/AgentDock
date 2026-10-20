@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { APP_VERSION, CHANGELOG } from '@agentdock/shared';
+import { APP_VERSION, CHANGELOG } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   accountMenuLabel,

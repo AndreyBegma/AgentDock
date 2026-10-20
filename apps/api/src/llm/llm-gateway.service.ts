@@ -3,8 +3,8 @@ import {
   type LlmErrorCode,
   type LlmProviderId,
   llmNextReset,
-} from '@agentdock/shared';
-import type { TokenBuckets } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { TokenBuckets } from '@nautelle/shared/protocol';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { LlmCallOutcome } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

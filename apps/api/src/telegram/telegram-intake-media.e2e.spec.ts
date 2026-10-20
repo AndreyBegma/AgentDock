@@ -2,7 +2,7 @@ import {
   ATTACHMENT_MAX_BYTES,
   ATTACHMENTS_PER_CARD_MAX,
   PLANNER_BLOCK_TAG,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   FILES,
   useTempAttachmentsDir,

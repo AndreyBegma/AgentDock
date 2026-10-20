@@ -11,7 +11,7 @@ import {
   type CollectBoardCardResponse,
   type DismissAllResult,
   type SessionMessageView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

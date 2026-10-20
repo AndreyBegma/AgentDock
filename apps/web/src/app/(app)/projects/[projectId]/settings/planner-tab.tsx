@@ -1,16 +1,16 @@
 'use client';
 
 import {
-  PLANNER_SPEC_OUTPUTS,
-  type PlannerSettingsUpdateRequest,
-  type PlannerSettingsView,
-  type PlannerSpecOutput,
-} from '@agentdock/shared';
-import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  PLANNER_SPEC_OUTPUTS,
+  type PlannerSettingsUpdateRequest,
+  type PlannerSettingsView,
+  type PlannerSpecOutput,
+} from '@nautelle/shared';
 import { useState } from 'react';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { api } from '../../../../../lib/api';

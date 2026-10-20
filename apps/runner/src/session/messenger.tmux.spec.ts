@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { SessionMessageInput } from '@agentdock/shared';
+import type { SessionMessageInput } from '@nautelle/shared';
 import type { CardRecord } from '../cards/record';
 import { createExec } from '../detect/exec';
 import { FakeClock } from '../testing/fake-clock';

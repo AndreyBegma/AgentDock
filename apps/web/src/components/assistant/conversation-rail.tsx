@@ -1,6 +1,5 @@
 'use client';
 
-import type { AssistantConversationView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { InlineEdit } from '@andrewbehma/glass-ui/inline-edit';
@@ -11,6 +10,7 @@ import {
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { AssistantConversationView } from '@nautelle/shared';
 import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { groupConversations } from '../../lib/assistant/group-conversations';

@@ -4,8 +4,8 @@ import type {
   ScheduleFiringView,
   ScheduleView,
   SystemJobView,
-} from '@agentdock/shared';
-import type { CommandName } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CommandName } from '@nautelle/shared/protocol';
 import type { ScheduleFiring } from '@prisma/client';
 import { seedProject } from '../fleet/testing/fleet-e2e';
 import {

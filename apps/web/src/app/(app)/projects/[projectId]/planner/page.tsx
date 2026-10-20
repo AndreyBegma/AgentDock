@@ -1,11 +1,11 @@
 'use client';
 
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import {
   PLANNER_LIVE_EVENT,
   type PlanListView,
   projectRoleAtLeast,
-} from '@agentdock/shared';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+} from '@nautelle/shared';
 import { Plus } from 'lucide-react';
 import NextLink from 'next/link';
 import { useParams } from 'next/navigation';

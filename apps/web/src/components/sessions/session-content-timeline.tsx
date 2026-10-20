@@ -1,6 +1,5 @@
 'use client';
 
-import type { SessionContentItem, SessionContentPage } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -8,6 +7,7 @@ import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { SessionContentItem, SessionContentPage } from '@nautelle/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import { Time } from '../../lib/format/time';

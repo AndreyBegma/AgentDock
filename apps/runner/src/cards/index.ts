@@ -2,7 +2,7 @@ import type {
   CardCommandName,
   CommandArgs,
   CommandResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CardExecutor } from './executor';
 
 export { type CardChecksDeps, cardChecks } from './checks';

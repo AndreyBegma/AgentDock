@@ -1,4 +1,4 @@
-import type { RunnerStatus } from '@agentdock/shared';
+import type { RunnerStatus } from '@nautelle/shared';
 
 export interface StatusInput {
   revokedAt: Date | null;

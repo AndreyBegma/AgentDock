@@ -1,4 +1,4 @@
-import type { WorkItem, WorkPage } from '@agentdock/shared';
+import type { WorkItem, WorkPage } from '@nautelle/shared';
 import type { Session } from '../test/e2e-app';
 import { at, WorkWorld } from './testing/work-e2e';
 

@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
-import { CAPTURE_RESULT_MAX_BYTES } from '@agentdock/shared';
+import { CAPTURE_RESULT_MAX_BYTES } from '@nautelle/shared';
 import {
   AGENTDOCK_HOOKS_ENV,
   AGENTDOCK_HOOKS_OFF,
@@ -11,7 +11,7 @@ import {
   cardsExtractFinishedDataSchema,
   skillRunIdSchema,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { Env } from '../env';

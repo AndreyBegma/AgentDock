@@ -1,5 +1,5 @@
-import type { ActivityItem, ActivityPage } from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { ActivityItem, ActivityPage } from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { EventStream, ROOT, seedProject } from '../fleet/testing/fleet-e2e';
 import { LiveService } from '../live/live.service';
 import {

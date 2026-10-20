@@ -1,4 +1,4 @@
-import type { SlotRuntime } from '@agentdock/shared/protocol';
+import type { SlotRuntime } from '@nautelle/shared/protocol';
 import { fail, type Parsed } from './parse-board';
 
 /** What a brief `round-<HHMM>-<slot>.md` says about its slot (D4). */

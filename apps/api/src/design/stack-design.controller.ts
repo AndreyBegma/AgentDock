@@ -1,4 +1,4 @@
-import type { TaskDesignView } from '@agentdock/shared';
+import type { TaskDesignView } from '@nautelle/shared';
 import {
   Body,
   Controller,

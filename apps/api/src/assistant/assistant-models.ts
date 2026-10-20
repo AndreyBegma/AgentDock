@@ -2,7 +2,7 @@ import {
   type AssistantModelOption,
   type LlmProviderId,
   llmModelSeesImages,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { LlmStore } from '../llm/llm-store';
 import { emptyUsage } from '../llm/types';

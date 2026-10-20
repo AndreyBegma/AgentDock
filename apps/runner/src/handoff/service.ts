@@ -11,7 +11,7 @@ import {
   ROUND_WARMUP_EVENT,
   roundRestartDataSchema,
   roundWarmupDataSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardHandoffSetArgs,
   type CardHandoffSetResult,
@@ -22,7 +22,7 @@ import {
   HOOK_TOOL_FINISHED_EVENT,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { isoNow } from '../clock';
 import type { ConfigProfile } from '../config';
 import { claudeConfigDir } from '../detect/profiles';

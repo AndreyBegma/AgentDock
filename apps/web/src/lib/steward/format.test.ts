@@ -3,7 +3,7 @@ import {
   STEWARD_DEFAULTS,
   type StewardActionRecord,
   type StewardDigestView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   actionLine,

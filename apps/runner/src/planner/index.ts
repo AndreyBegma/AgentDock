@@ -2,7 +2,7 @@ import type {
   CommandArgs,
   CommandResult,
   PlannerCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Logger } from '../log';
 import type { SkillsDeps } from '../skills/deps';
 import type { PlanTurnExecutor } from './executor';

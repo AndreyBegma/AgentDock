@@ -4,7 +4,7 @@ import type {
   BoardColumn,
   PlanStatus,
   PlanTaskStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Role } from '@prisma/client';
 import { REPO, seedProject } from '../../fleet/testing/fleet-e2e';
 import {

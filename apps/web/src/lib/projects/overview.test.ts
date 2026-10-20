@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { FleetView, UsageSeries } from '@agentdock/shared';
+import type { FleetView, UsageSeries } from '@nautelle/shared';
 import {
   costQuery,
   costTrend,

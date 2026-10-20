@@ -1,9 +1,9 @@
 'use client';
 
-import type { DesignFrameView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Tab, TabList } from '@andrewbehma/glass-ui/tabs';
+import type { DesignFrameView } from '@nautelle/shared';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { framePath } from '../../lib/design/frames';
 

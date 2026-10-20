@@ -1,10 +1,10 @@
 'use client';
 
-import { projectRoleAtLeast } from '@agentdock/shared';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { projectRoleAtLeast } from '@nautelle/shared';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';

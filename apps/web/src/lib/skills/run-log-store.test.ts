@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { type LiveTopic, runTopic } from '@agentdock/shared';
+import { type LiveTopic, runTopic } from '@nautelle/shared';
 import {
   RUN_LOG_LIVE_EVENTS,
   type RunLogFrame,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { LiveClient, type LiveSocket } from '../live/client';
 import { Reachability } from '../live/reachability';
 import { RunLogRegistry } from './run-log-store';

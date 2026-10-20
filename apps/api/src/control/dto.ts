@@ -5,7 +5,7 @@ import {
   type OrchestratorSettingsRequest,
   type OrchestratorStartRequest,
   type SlotMessageRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   ORCHESTRATOR_MESSAGE_MAX_BYTES,
   type OrchestratorMode,
@@ -13,7 +13,7 @@ import {
   orchestratorModeSchema,
   orchestratorPermissionModeSchema,
   SLOT_MESSAGE_MAX_BYTES,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Type } from 'class-transformer';
 import {
   IsIn,

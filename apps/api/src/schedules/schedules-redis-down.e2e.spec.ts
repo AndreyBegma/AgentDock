@@ -1,4 +1,4 @@
-import type { CommandName } from '@agentdock/shared/protocol';
+import type { CommandName } from '@nautelle/shared/protocol';
 import { Queue } from 'bullmq';
 import { redisConnection } from '../bullmq/bullmq-options';
 import { obliterateQueues } from '../bullmq/bullmq-testing';

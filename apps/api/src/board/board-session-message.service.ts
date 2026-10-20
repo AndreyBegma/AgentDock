@@ -4,7 +4,7 @@ import {
   type SessionMessageInput,
   type SessionMessageVia,
   type SessionMessageView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import {
   SessionMessageService,

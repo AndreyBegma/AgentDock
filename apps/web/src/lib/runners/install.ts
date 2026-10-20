@@ -1,4 +1,4 @@
-import { pairCommand } from '@agentdock/shared';
+import { pairCommand } from '@nautelle/shared';
 
 /**
  * The commands a first-time admin runs on the machine that holds the

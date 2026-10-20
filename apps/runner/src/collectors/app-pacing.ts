@@ -1,4 +1,4 @@
-import type { GitHubAppHealth } from '@agentdock/shared/protocol';
+import type { GitHubAppHealth } from '@nautelle/shared/protocol';
 import type { Clock } from '../clock';
 
 /** Spec 27 D12: the cadence of `issues` and `prs` while the GitHub App is healthy. */

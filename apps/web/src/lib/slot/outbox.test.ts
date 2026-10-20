@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ConversationEntry } from '@agentdock/shared';
+import type { ConversationEntry } from '@nautelle/shared';
 import {
   isDelivered,
   OUTBOX_CLOCK_SKEW_MS,

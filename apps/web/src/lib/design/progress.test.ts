@@ -3,7 +3,7 @@ import {
   type DesignFailureView,
   type DesignProgressView,
   STALL_AFTER_MS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { design } from './fixtures';
 import {
   failureSentence,

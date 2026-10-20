@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import {
   INBOUND_DELIVERY_ID_MAX_CHARS,
   INBOUND_TIMESTAMP_TOLERANCE_SEC,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * Webhook signatures (docs/specs/26-webhooks.md D2, D13). The HMAC key is the

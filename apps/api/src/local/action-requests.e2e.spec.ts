@@ -1,5 +1,5 @@
-import type { ActionRequestKind } from '@agentdock/shared';
-import type { CommandName, PrInspection } from '@agentdock/shared/protocol';
+import type { ActionRequestKind } from '@nautelle/shared';
+import type { CommandName, PrInspection } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { ApprovalCommands } from '../approvals/approval-commands';
 import { Feed } from '../budgets/testing/budgets-e2e';

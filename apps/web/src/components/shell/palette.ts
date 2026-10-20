@@ -1,12 +1,12 @@
+import type { CommandPaletteGroup } from '@andrewbehma/glass-ui/command-palette';
 import type {
   PlanSummary,
   ProjectSummary,
   Role,
   RunSummary,
   SessionSummary,
-} from '@agentdock/shared';
-import { BOARD_ASK_QUESTION_MAX } from '@agentdock/shared';
-import type { CommandPaletteGroup } from '@andrewbehma/glass-ui/command-palette';
+} from '@nautelle/shared';
+import { BOARD_ASK_QUESTION_MAX } from '@nautelle/shared';
 import {
   FolderGit2,
   Lightbulb,

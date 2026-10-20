@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { BoardAskHit, BoardAskQuery } from '@agentdock/shared';
+import type { BoardAskHit, BoardAskQuery } from '@nautelle/shared';
 import { ApiError } from '../api';
 import { answerParts, askNotice, queryChips, withoutChip } from './answer';
 

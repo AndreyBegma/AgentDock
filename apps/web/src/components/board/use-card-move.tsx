@@ -1,10 +1,10 @@
 'use client';
 
-import type { BoardCardView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { BoardCardView } from '@nautelle/shared';
 import { type ReactNode, useState } from 'react';
 import { moveCard } from '../../lib/board/actions';
 import {

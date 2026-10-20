@@ -1,7 +1,7 @@
 import {
   AI_DIGEST_TIME_PATTERN,
   type UpdateAiDigestSettings,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   IsBoolean,
   IsOptional,

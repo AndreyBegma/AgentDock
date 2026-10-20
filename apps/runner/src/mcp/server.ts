@@ -1,10 +1,10 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   RESUME_CONTEXT_TOOL,
   resumeContextResultSchema,
-} from '@agentdock/shared';
-import type { LocalMethodName } from '@agentdock/shared/protocol';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+} from '@nautelle/shared';
+import type { LocalMethodName } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { ARTIFACT_INCOMPLETE, type FinishGuard } from '../cards/finish-guard';
 import {

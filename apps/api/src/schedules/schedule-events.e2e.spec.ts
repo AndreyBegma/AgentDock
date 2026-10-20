@@ -1,5 +1,5 @@
-import type { ActivityItem } from '@agentdock/shared';
-import { API_EVENT_SOURCE, type CommandName } from '@agentdock/shared/protocol';
+import type { ActivityItem } from '@nautelle/shared';
+import { API_EVENT_SOURCE, type CommandName } from '@nautelle/shared/protocol';
 import {
   ACTIVITY_OPTIONS,
   type ActivityOptions,

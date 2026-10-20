@@ -10,7 +10,7 @@ import {
   type PlanTaskVersionsView,
   type PlanVisibility,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Injectable,
   Logger,

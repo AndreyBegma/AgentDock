@@ -1,4 +1,4 @@
-import type { OrchestratorStatus } from '@agentdock/shared';
+import type { OrchestratorStatus } from '@nautelle/shared';
 import { RUNNERS_PAGE } from '../prerequisites/copy';
 
 /** Why a control is off, as the next step (rule R1). */

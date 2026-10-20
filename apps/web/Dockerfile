@@ -54,7 +54,7 @@ COPY tsconfig.json turbo.json ./
 COPY packages/shared/ packages/shared/
 COPY apps/web/ apps/web/
 
-RUN bunx turbo run build --filter=@agentdock/web...
+RUN bunx turbo run build --filter=@nautelle/web...
 
 # ─── runtime ─────────────────────────────────────────────────────────────────
 FROM ${NODE_IMAGE} AS runtime

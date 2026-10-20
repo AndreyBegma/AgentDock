@@ -1,10 +1,10 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
 import { DateInput } from '@andrewbehma/glass-ui/date-input';
 import { Select } from '@andrewbehma/glass-ui/field';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import type { ProjectSummary } from '@nautelle/shared';
 import { useMemo } from 'react';
 import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import {

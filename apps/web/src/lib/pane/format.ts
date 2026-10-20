@@ -1,4 +1,4 @@
-import type { LiveErrorCode } from '@agentdock/shared';
+import type { LiveErrorCode } from '@nautelle/shared';
 
 const ERROR_SENTENCE: Partial<Record<LiveErrorCode, string>> = {
   forbidden: 'You are not a member of this project, so you cannot watch it.',

@@ -1,7 +1,7 @@
 import {
   INBOUND_RATE_PER_HOUR,
   INBOUND_REFILL_INTERVAL_MS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { fullBucket, refill, type TokenBucket, take } from './token-bucket';
 
 const t0 = new Date('2026-10-09T12:00:00Z');

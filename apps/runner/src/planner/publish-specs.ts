@@ -5,7 +5,7 @@ import { basename, dirname, join, sep } from 'node:path';
 import type {
   PlanPublishSpecsArgs,
   PlanPublishSpecsResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
 import { resolveFleetProject } from '../fleet/project';

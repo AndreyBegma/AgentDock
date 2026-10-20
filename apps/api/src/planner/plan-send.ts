@@ -2,7 +2,7 @@ import {
   type PlanQuestion,
   type PlanTaskKind,
   parseDependsOn,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** A task as send orders and renders it. */
 export interface SendTask {

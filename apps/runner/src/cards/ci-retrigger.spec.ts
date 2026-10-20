@@ -3,7 +3,7 @@ import {
   type CardCiRetriggerArgs,
   cardCiRetriggerResultSchema,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ExecResult } from '../detect/exec';
 import { ciRetriggerComment, retriggerCardCi } from './ci-retrigger';
 

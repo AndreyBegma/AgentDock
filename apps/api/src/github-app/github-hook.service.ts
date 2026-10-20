@@ -1,5 +1,5 @@
-import type { GitHubHookAnswer } from '@agentdock/shared';
-import type { PollableCollector } from '@agentdock/shared/protocol';
+import type { GitHubHookAnswer } from '@nautelle/shared';
+import type { PollableCollector } from '@nautelle/shared/protocol';
 import {
   BadRequestException,
   Inject,

@@ -1,10 +1,10 @@
 import { basename, dirname, join } from 'node:path';
-import { CARD_ENV_ID, CARD_ENV_PORT } from '@agentdock/shared';
+import { CARD_ENV_ID, CARD_ENV_PORT } from '@nautelle/shared';
 import type {
   CardRunArgs,
   CardSession,
   OrchestratorPermissionMode,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { SESSION_TOKEN_ENV } from '../local/session-tokens';

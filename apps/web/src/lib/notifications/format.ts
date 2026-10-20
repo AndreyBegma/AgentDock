@@ -8,7 +8,7 @@ import {
   type NotificationReadLive,
   type NotificationRuleView,
   type NotificationView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { formatRelative } from '../format';
 
 export const BELL_LIMIT = 20;

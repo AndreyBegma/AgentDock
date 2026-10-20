@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import {
   type UiProfileFingerprintArgs,
   uiProfileFingerprintArgsSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { skillsWorkspace } from '../skills/testing';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';

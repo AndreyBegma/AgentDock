@@ -1,15 +1,15 @@
 'use client';
 
-import type {
-  ProjectRuntimeProfile,
-  TokenSaverSettingsView,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import type {
+  ProjectRuntimeProfile,
+  TokenSaverSettingsView,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { Time } from '../../../../../lib/format/time';

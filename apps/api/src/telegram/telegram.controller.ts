@@ -3,7 +3,7 @@ import type {
   TelegramLinkCode,
   TelegramLinkStatus,
   TelegramSignInResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

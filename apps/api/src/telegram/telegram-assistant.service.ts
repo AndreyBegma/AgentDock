@@ -2,7 +2,7 @@ import {
   ASSISTANT_MESSAGE_MAX,
   type AssistantMessageView,
   ATTACHMENT_MAX_BYTES,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { streamError } from '../assistant/assistant.controller';
 import { AssistantAttachments } from '../assistant/assistant-attachments.service';

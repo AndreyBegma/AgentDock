@@ -9,13 +9,13 @@ import type {
   PlanSummary,
   PlanTaskKind,
   PlanTurnView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   CARD_DRAFT_TITLE_MAX,
   INTAKE_SPLIT_MAX,
   STACK_STAGE_TITLE_MAX,
   STACK_TITLE_MAX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { pluralize } from '../format';
 import { activeTurn, failedTurn } from '../planner/format';
 

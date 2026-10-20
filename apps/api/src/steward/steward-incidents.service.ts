@@ -12,8 +12,8 @@ import {
   type StewardSubject,
   type StewardSubjectKind,
   stewardActionRecordsSchema,
-} from '@agentdock/shared';
-import { API_EVENT_SOURCE } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { API_EVENT_SOURCE } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { Prisma, type StewardIncident } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

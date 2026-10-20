@@ -1,4 +1,4 @@
-import type { LlmProviderId } from '@agentdock/shared';
+import type { LlmProviderId } from '@nautelle/shared';
 import { Logger, Module } from '@nestjs/common';
 import { PricesModule } from '../prices/prices.module';
 import { SettingsModule } from '../settings/settings.module';

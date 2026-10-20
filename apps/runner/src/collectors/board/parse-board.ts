@@ -1,4 +1,4 @@
-import type { BoardRow, RoundDecisions } from '@agentdock/shared/protocol';
+import type { BoardRow, RoundDecisions } from '@nautelle/shared/protocol';
 
 /** The header line of a board, minus what the file name already says. */
 export interface BoardHeader {

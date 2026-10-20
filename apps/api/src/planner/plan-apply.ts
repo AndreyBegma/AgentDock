@@ -5,7 +5,7 @@ import {
   type PlanTaskKind,
   type PlanTaskStatus,
   type ReviseOutput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type DesignGate,
   designBlocks,

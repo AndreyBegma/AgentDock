@@ -1,7 +1,7 @@
 import type {
   TelegramBotTokenUpdate,
   TelegramSignInRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator';
 
 /**

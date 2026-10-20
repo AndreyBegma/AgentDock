@@ -1,5 +1,10 @@
 'use client';
 
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import type { PageHeaderOverflowItem } from '@andrewbehma/glass-ui/page-header';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import {
   type ActivityPage,
   type ApprovalsView,
@@ -9,12 +14,7 @@ import {
   type QueueView,
   RUN_UPDATED_LIVE_EVENT,
   type RunPage,
-} from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import type { PageHeaderOverflowItem } from '@andrewbehma/glass-ui/page-header';
-import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import { ArrowRight, Plus } from 'lucide-react';
 import NextLink from 'next/link';
 import { useParams, useRouter } from 'next/navigation';

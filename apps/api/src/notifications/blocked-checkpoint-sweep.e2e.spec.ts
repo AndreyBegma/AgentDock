@@ -1,4 +1,4 @@
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { FleetProjector } from '../fleet/fleet-projector.service';
 import { EventStream } from '../fleet/testing/fleet-e2e';
 import { BlockedCheckpointSweep } from './blocked-checkpoint-sweep';

@@ -27,7 +27,7 @@ means.
 1. **A dependency is satisfied in Finished or Completed.** Finished means the
    agent's pull request is ready; Completed means the card was accepted. Any
    other column — Inbox, To Do, In progress — leaves the dependency open.
-   The one definition is `isDependencySatisfied` in `@agentdock/shared`; the
+   The one definition is `isDependencySatisfied` in `@nautelle/shared`; the
    API's Run check, the auto-run claim, readiness, the face's dependency chip
    and the web app's Run all read it.
 2. **An open dependency blocks Run, with no override.** `POST …/run` on a card

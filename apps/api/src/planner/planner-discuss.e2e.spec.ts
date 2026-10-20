@@ -1,4 +1,4 @@
-import { PLANNER_DISCUSS_CONTRACT, type PlanDetail } from '@agentdock/shared';
+import { PLANNER_DISCUSS_CONTRACT, type PlanDetail } from '@nautelle/shared';
 import { block, PlannerHarness } from './testing/planner-e2e';
 
 /** #590 (ADR-0056): a discussion is a `discuss` plan — replies, maybe proposals, never a card. */

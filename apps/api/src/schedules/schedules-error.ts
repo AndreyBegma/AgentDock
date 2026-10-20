@@ -1,4 +1,4 @@
-import type { SchedulesErrorBody, SchedulesErrorCode } from '@agentdock/shared';
+import type { SchedulesErrorBody, SchedulesErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the schedules routes, shaped like every other API error. */

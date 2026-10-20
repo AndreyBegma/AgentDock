@@ -1,6 +1,6 @@
 'use client';
 
-import type { ProjectDetail } from '@agentdock/shared';
+import type { ProjectDetail } from '@nautelle/shared';
 import { useEffect } from 'react';
 import { api } from '../../../../lib/api';
 import { useSection } from '../../../../lib/section/use-section';

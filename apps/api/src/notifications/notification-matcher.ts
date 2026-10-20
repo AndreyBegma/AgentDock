@@ -1,7 +1,7 @@
 import {
   NOTIFICATION_KIND_SPECS,
   QUEUE_DRY_INTERVAL_MS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Inject,
   Injectable,

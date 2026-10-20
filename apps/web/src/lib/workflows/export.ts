@@ -3,7 +3,7 @@ import {
   type WorkflowsOrchestrationResponse,
   type WorkflowsSummaryResponse,
   type WorkflowsToolsResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { UsageRange } from '../usage/format';
 import { formatFlow } from './format';
 

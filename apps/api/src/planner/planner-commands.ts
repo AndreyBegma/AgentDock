@@ -1,4 +1,4 @@
-import { PLANNER_ERROR } from '@agentdock/shared';
+import { PLANNER_ERROR } from '@nautelle/shared';
 import {
   type CommandErrorCode,
   type DocsCommandName,
@@ -8,7 +8,7 @@ import {
   isCommandName,
   type PlannerCommandName,
   plannerCommands,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
 import {

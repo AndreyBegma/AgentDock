@@ -2,7 +2,7 @@ import {
   CARD_COLLECT_AUTO_ATTEMPTS_MAX,
   CARD_COLLECT_RETRY_DELAY_MS,
   divergedBranchMessage,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BoardWorld, failed, ok } from './testing/board-e2e';
 
 const PR_URL = 'https://github.com/acme/widget/pull/77';

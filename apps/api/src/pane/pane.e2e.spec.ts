@@ -3,14 +3,14 @@ import {
   LIVE_SOCKET_PATH,
   type LiveServerMessage,
   MAX_LIVE_MESSAGE_BYTES,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   PANE_LIVE_EVENTS,
   PANE_MAX_VIEWERS_PER_SLOT,
   type PaneFrame,
   paneTopic,
   type ServerMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { LiveConnections } from '../live/live-connections';
 import { allowedLiveOrigin } from '../live/live-options';
 import { TestLiveSocket } from '../live/testing/live-e2e';

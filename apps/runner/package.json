@@ -1,5 +1,5 @@
 {
-  "name": "@agentdock/runner",
+  "name": "@nautelle/runner",
   "version": "0.13.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "test": "tsc --noEmit && bun test"
   },
   "dependencies": {
-    "@agentdock/shared": "workspace:*",
+    "@nautelle/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "1.31.0",
     "protobufjs": "8.8.0",
     "zod": "4.6.5"

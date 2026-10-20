@@ -9,7 +9,7 @@ import {
   prInspectArgsSchema,
   prRequestChangesArgsSchema,
   prVoidApprovalArgsSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Exec, ExecResult } from '../../detect/exec';
 import { FakeClock } from '../../testing/fake-clock';
 import { REAL_PROCESS_TIMEOUT_MS, workspace } from '../../testing/projects';

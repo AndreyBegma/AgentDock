@@ -1,6 +1,5 @@
 'use client';
 
-import type { NotificationMuteView, ProjectSummary } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { DateInput } from '@andrewbehma/glass-ui/date-input';
@@ -13,6 +12,7 @@ import {
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
+import type { NotificationMuteView, ProjectSummary } from '@nautelle/shared';
 import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
 import { AsyncSection } from '../../../components/prerequisites/async-section';

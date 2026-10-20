@@ -1,4 +1,4 @@
-import { CAPTURE_DISMISSAL_DEDUPE_DAYS } from '@agentdock/shared';
+import { CAPTURE_DISMISSAL_DEDUPE_DAYS } from '@nautelle/shared';
 import {
   Injectable,
   Logger,

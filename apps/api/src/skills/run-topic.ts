@@ -1,4 +1,4 @@
-import { type LiveTopic, parseLiveTopic } from '@agentdock/shared';
+import { type LiveTopic, parseLiveTopic } from '@nautelle/shared';
 import type { AuthUser } from '../auth';
 import type { PrismaService } from '../database/prisma.service';
 import type { TopicVerdict } from '../live/topic-authorizer.registry';

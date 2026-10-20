@@ -1,8 +1,8 @@
 'use client';
 
-import type { PlannerSettingsView, UiProfileView } from '@agentdock/shared';
 import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import type { PlannerSettingsView, UiProfileView } from '@nautelle/shared';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { PlanWorkspace } from '../../../../../../components/planner/plan-workspace';

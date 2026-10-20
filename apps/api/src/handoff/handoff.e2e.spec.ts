@@ -2,8 +2,8 @@ import {
   type CardHandoffView,
   HANDOFF_PERSON_MARK,
   HANDOFF_SECTIONS,
-} from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { BoardWorld } from '../board/testing/board-e2e';
 import { RunnerCommandService } from '../runners/runner-command.service';
 import { RunnerIngestService } from '../runners/runner-ingest.service';

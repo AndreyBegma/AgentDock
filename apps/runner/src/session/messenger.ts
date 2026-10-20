@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { SessionMessageOutcome } from '@agentdock/shared';
+import type { SessionMessageOutcome } from '@nautelle/shared';
 import type {
   SessionMessageArgs,
   SessionMessageResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CardRecord } from '../cards/record';
 import { type Clock, isoNow } from '../clock';
 import { EVENTS_FILE } from '../collectors/events/events';

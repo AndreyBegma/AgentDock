@@ -1,12 +1,12 @@
 'use client';
 
-import type { BoardCardDetail, CardDependenciesView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { BoardCardDetail, CardDependenciesView } from '@nautelle/shared';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import {

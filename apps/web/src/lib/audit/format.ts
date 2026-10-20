@@ -4,7 +4,7 @@ import {
   type AuditRecordView,
   type AuditResult,
   type AuditVerification,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import { formatDate } from '../format';
 import { type NameIndex, runnerActorName } from './targets';

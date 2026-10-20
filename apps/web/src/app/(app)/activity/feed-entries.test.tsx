@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ActivityItem } from '@agentdock/shared';
+import type { ActivityItem } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { type FeedRow } from '../../../lib/activity/format';
 import { toEntries } from './feed-entries';

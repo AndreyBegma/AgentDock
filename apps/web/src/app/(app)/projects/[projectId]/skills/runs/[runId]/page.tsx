@@ -1,10 +1,5 @@
 'use client';
 
-import {
-  type ProjectDetail,
-  RUN_UPDATED_LIVE_EVENT,
-  type SkillRunDetail,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -21,6 +16,11 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  type ProjectDetail,
+  RUN_UPDATED_LIVE_EVENT,
+  type SkillRunDetail,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';

@@ -1,7 +1,7 @@
-import type { SlotSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { SlotSummary } from '@nautelle/shared';
 import {
   CHECKS_LABEL,
   CHECKS_TONE,

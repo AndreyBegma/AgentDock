@@ -3,7 +3,7 @@ import type {
   Role,
   SessionContentItem,
   SessionContentKind,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 
 export const CONTENT_KIND_LABEL: Record<SessionContentKind, string> = {

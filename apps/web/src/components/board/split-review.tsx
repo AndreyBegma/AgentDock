@@ -1,11 +1,5 @@
 'use client';
 
-import {
-  type ConfirmSplitRequest,
-  PLAN_TASK_KINDS,
-  type PlanIntakeSplitView,
-  type PlanTaskKind,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
@@ -14,6 +8,12 @@ import {
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import {
+  type ConfirmSplitRequest,
+  PLAN_TASK_KINDS,
+  type PlanIntakeSplitView,
+  type PlanTaskKind,
+} from '@nautelle/shared';
 import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import {

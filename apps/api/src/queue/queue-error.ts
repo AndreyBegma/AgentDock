@@ -1,4 +1,4 @@
-import type { QueueErrorBody, QueueErrorCode } from '@agentdock/shared';
+import type { QueueErrorBody, QueueErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the queue routes, shaped like every other API error. */

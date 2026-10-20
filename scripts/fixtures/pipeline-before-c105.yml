@@ -108,7 +108,7 @@ steps:
     volumes: *caches
     environment: *cache_env
     commands:
-      - bun run typecheck --filter=@agentdock/web
+      - bun run typecheck --filter=@nautelle/web
 
   - name: build
     image: *ci_image

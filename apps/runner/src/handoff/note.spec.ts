@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { HANDOFF_NOTE_MAX_CHARS, HANDOFF_PERSON_MARK } from '@agentdock/shared';
+import { HANDOFF_NOTE_MAX_CHARS, HANDOFF_PERSON_MARK } from '@nautelle/shared';
 import { judgeNote, noteFileText } from './note';
 import type { StoredNote } from './state';
 import { validNote } from './testing';

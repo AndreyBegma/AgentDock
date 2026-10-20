@@ -27,7 +27,7 @@ import {
   planQuestionRoundSchema,
   planTurnInputSchema,
   type TaskDesignSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { type PlanStatusTurn, planAttention } from './plan-status';
 

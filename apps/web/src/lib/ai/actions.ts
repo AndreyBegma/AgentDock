@@ -4,7 +4,7 @@ import {
   type AiSummaryView,
   aiReaderLanguage,
   type UpdateAiDigestSettings,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, api } from '../api';
 
 const project = (projectId: string) =>

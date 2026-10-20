@@ -1,10 +1,10 @@
 'use client';
 
-import type { AiSummaryView } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { AiSummaryView } from '@nautelle/shared';
 import { useState } from 'react';
 import type { SummaryNotice } from '../../lib/ai/format';
 import { summaryMeta, summaryNotice } from '../../lib/ai/format';

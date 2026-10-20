@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { TerminalTarget } from '@agentdock/shared/protocol';
+import type { TerminalTarget } from '@nautelle/shared/protocol';
 import type { Exec } from '../detect/exec';
 import { type ResolveDeps, resolveTerminalTarget } from './resolve';
 

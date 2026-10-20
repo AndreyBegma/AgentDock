@@ -1,8 +1,8 @@
-import { TERMINAL_CLOSE_CODES } from '@agentdock/shared';
+import { TERMINAL_CLOSE_CODES } from '@nautelle/shared';
 import {
   TERMINAL_WS_PATH,
   type TerminalAttachArgs,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';

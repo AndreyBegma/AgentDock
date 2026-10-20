@@ -1,5 +1,5 @@
-import type { TokenSaverSummary } from '@agentdock/shared';
 import { StatTile } from '@andrewbehma/glass-ui/stat-tile';
+import type { TokenSaverSummary } from '@nautelle/shared';
 import { formatNumber, formatTokens } from '../../lib/format';
 import {
   cacheReadShare,

@@ -8,7 +8,7 @@
 /**
  * A slot name as the orchestrator writes it: `slotNameSchema`, 64 at most.
  * Spelled out here because the schema lives in the protocol entry point, which
- * the web's root `@agentdock/shared` import does not carry.
+ * the web's root `@nautelle/shared` import does not carry.
  */
 const SLOT_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
 /** More tabs than this is a pasted link, not a workspace. */

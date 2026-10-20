@@ -1,9 +1,9 @@
-import { BOARD_ERROR } from '@agentdock/shared';
+import { BOARD_ERROR } from '@nautelle/shared';
 import type {
   CardCommandName,
   IssueCreateArgs,
   RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { seedProject } from '../../fleet/testing/fleet-e2e';
 import { RunnerConnectHooks } from '../../runners/runner-connect-hooks';
 import { RunnerEventSinks } from '../../runners/runner-event-sinks';

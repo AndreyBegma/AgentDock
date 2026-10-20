@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { filterStatRowSchema } from '@agentdock/shared';
+import { filterStatRowSchema } from '@nautelle/shared';
 import { tempDir } from '../testing/fixtures';
 import {
   FILTER_PROJECT_ENV,

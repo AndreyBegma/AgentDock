@@ -1,14 +1,14 @@
 'use client';
 
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   type BoardCardView,
   BULK_CARDS_MAX,
   type BulkBoardCardsResponse,
   type BulkCardAction,
   type BulkCardOutcome,
-} from '@agentdock/shared';
-import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
 import { type ReactNode, useState } from 'react';
 import { bulkCards } from '../../lib/board/actions';
 import { describeBoardError } from '../../lib/board/format';

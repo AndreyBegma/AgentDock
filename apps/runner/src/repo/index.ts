@@ -2,7 +2,7 @@ import type {
   CommandArgs,
   CommandResult,
   RepoCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CodeAsker } from './ask';
 import { repoRead } from './read';
 import { repoSearch } from './search';

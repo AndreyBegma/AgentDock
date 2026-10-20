@@ -3,7 +3,7 @@ import type {
   BoardSearchResponse,
   BoardTriageCounts,
   CardTriageView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   applyDecorators,
   Body,

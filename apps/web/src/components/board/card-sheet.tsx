@@ -1,16 +1,5 @@
 'use client';
 
-import {
-  type AttachmentView,
-  BOARD_CARD_KINDS,
-  BOARD_CARD_TITLE_MAX,
-  type BoardCardDetail,
-  type BoardCardKind,
-  CARD_FEEDBACK_MAX,
-  type CardPrTarget,
-  type CardRoundView,
-  isActiveRoundPhase,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
@@ -24,6 +13,17 @@ import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  type AttachmentView,
+  BOARD_CARD_KINDS,
+  BOARD_CARD_TITLE_MAX,
+  type BoardCardDetail,
+  type BoardCardKind,
+  CARD_FEEDBACK_MAX,
+  type CardPrTarget,
+  type CardRoundView,
+  isActiveRoundPhase,
+} from '@nautelle/shared';
 import { ExternalLink, Move, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';

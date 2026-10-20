@@ -1,14 +1,14 @@
 'use client';
 
-import type {
-  WorkflowsToolsResponse,
-  WorkflowToolTransition,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { DataTable } from '@andrewbehma/glass-ui/data-table';
 import { Sankey } from '@andrewbehma/glass-ui/sankey';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type {
+  WorkflowsToolsResponse,
+  WorkflowToolTransition,
+} from '@nautelle/shared';
 import { type ReactNode, useMemo } from 'react';
 import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import { formatNumber } from '../../../lib/format';

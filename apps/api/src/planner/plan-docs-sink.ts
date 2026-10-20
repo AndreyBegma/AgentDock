@@ -4,7 +4,7 @@ import {
   prClosedDataSchema,
   prMergedDataSchema,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

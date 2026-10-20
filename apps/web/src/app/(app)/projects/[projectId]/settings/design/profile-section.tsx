@@ -1,12 +1,5 @@
 'use client';
 
-import type {
-  ProjectDetail,
-  UiProfileRebuildResult,
-  UiProfileVersionsView,
-  UiProfileVersionView,
-  UiProfileView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -17,6 +10,13 @@ import { Select } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  ProjectDetail,
+  UiProfileRebuildResult,
+  UiProfileVersionsView,
+  UiProfileVersionView,
+  UiProfileView,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';

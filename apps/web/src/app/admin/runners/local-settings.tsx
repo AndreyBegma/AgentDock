@@ -1,13 +1,13 @@
 'use client';
 
+import { Field, Select } from '@andrewbehma/glass-ui/field';
+import { toast } from '@andrewbehma/glass-ui/toast';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import type {
   AdminRunnerDetail,
   AdminUser,
   UpdateRunnerSettingsRequest,
-} from '@agentdock/shared';
-import { Field, Select } from '@andrewbehma/glass-ui/field';
-import { toast } from '@andrewbehma/glass-ui/toast';
-import { Toggle } from '@andrewbehma/glass-ui/toggle';
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { describeRunnerError } from '../../../lib/runners/format';

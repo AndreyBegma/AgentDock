@@ -12,7 +12,7 @@ import {
   skillRunIdSchema,
   skillRunPhaseSchema,
   skillRunShortIdSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 
 /** Files of a run directory, `$XDG_STATE_HOME/agentdock/runs/<runId>/` (D7). */

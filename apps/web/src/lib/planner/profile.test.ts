@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ProjectRuntimeProfile } from '@agentdock/shared';
+import type { ProjectRuntimeProfile } from '@nautelle/shared';
 import { initialProfileKey, planProfileReason } from './profile';
 
 const profile = (

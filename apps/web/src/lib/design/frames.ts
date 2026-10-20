@@ -1,4 +1,4 @@
-import type { DesignFrameView } from '@agentdock/shared';
+import type { DesignFrameView } from '@nautelle/shared';
 
 /**
  * #441: where a frame is published on approve, relative to the design's

@@ -1,7 +1,7 @@
-import type { QueueItemView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { QueueItemView } from '@nautelle/shared';
 import {
   computedNote,
   STATE_CHIP_LABEL,

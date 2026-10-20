@@ -2,7 +2,7 @@ import {
   STEWARD_DEFAULTS,
   type StewardSettings,
   type StewardSettingsView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { StewardSettings as StewardSettingsRow } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

@@ -3,7 +3,7 @@ import {
   type CaptureContentRow,
   type CaptureInputSelection,
   selectCaptureInput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * Content rows loaded per extraction, newest first, after the watermark. The

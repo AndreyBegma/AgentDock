@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { RUN_KINDS, RUN_STATUSES, type RunUsage } from '@agentdock/shared';
+import { RUN_KINDS, RUN_STATUSES, type RunUsage } from '@nautelle/shared';
 import {
   abandonedHiddenLabel,
   costLabel,

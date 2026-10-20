@@ -1,6 +1,6 @@
-import type { SessionSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { SessionSummary } from '@nautelle/shared';
 import {
   LIVE_STATE_LABEL,
   LIVE_STATE_PILL,

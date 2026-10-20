@@ -1,4 +1,4 @@
-import { ACTIVITY_RETENTION_DAYS_DEFAULT } from '@agentdock/shared';
+import { ACTIVITY_RETENTION_DAYS_DEFAULT } from '@nautelle/shared';
 import type { ConfigService } from '@nestjs/config';
 
 /** Timings of the activity and run projectors (spec 21 "Configuration"). */

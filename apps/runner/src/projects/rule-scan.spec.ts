@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import {
   projectScanRulesResultSchema,
   RULE_SCAN_FILE_MAX_BYTES,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { spyFs, workspace } from '../testing/projects';
 import {

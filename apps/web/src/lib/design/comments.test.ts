@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { type CardStackRef, STACK_GATE_REASON } from '@agentdock/shared';
+import { type CardStackRef, STACK_GATE_REASON } from '@nautelle/shared';
 import {
   anchorLabel,
   approveBlock,

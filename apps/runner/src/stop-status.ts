@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { RUNNER_CLOSE_CODES } from '@agentdock/shared/protocol';
+import { RUNNER_CLOSE_CODES } from '@nautelle/shared/protocol';
 
 /**
  * Why the daemon last stopped for good — a terminal close — so

@@ -1,4 +1,4 @@
-import { PAIRING_CODE_PATTERN } from '@agentdock/shared/protocol';
+import { PAIRING_CODE_PATTERN } from '@nautelle/shared/protocol';
 import {
   createUser,
   login,

@@ -12,11 +12,11 @@ import {
   SESSION_CONTENT_RETENTION_DAYS,
   type UpdateProjectMemberRequest,
   type UpdateProjectRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type DocsSourceKind,
   docsSourceKindSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,

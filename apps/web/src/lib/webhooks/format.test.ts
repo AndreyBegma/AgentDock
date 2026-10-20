@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { InboundTriggerView, WebhookView } from '@agentdock/shared';
+import type { InboundTriggerView, WebhookView } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   circuitReopensIn,

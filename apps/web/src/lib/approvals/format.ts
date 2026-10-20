@@ -1,12 +1,12 @@
+import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
 import {
   APPROVALS_ERROR,
   type ApprovalItemView,
   type ApprovalSource,
   type ApprovalStatus,
   type MergeApprovalFlags,
-} from '@agentdock/shared';
-import { APPROVAL_NOTE_MAX_BYTES } from '@agentdock/shared/protocol';
-import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
+} from '@nautelle/shared';
+import { APPROVAL_NOTE_MAX_BYTES } from '@nautelle/shared/protocol';
 import { ApiError, describeError, type ErrorHint } from '../api';
 import { updateRunnerText } from '../control/format';
 

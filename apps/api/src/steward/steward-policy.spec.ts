@@ -2,7 +2,7 @@ import {
   STEWARD_DEFAULTS,
   STEWARD_NUDGE_REPEAT_DELAY_MS,
   type StewardActionRecord,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { nextStep, PENDING_DETAIL, type PolicyInput } from './steward-policy';
 
 const NOW = new Date('2026-10-16T12:00:00.000Z');

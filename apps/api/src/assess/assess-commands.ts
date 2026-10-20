@@ -2,8 +2,8 @@ import type {
   AssessCommandName,
   CardAssessArgs,
   CommandName,
-} from '@agentdock/shared/protocol';
-import { isCommandName } from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
+import { isCommandName } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { RunnerCommandService } from '../runners/runner-command.service';

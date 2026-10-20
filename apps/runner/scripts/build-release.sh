@@ -34,9 +34,9 @@ if [ -n "${RUNNER_TAG:-}" ] && [ -z "${RUNNER_SIGNING_KEY:-}" ]; then
   exit 1
 fi
 
-# The runner imports @agentdock/shared's built output, so build it first; on a
+# The runner imports @nautelle/shared's built output, so build it first; on a
 # clean checkout nothing else has.
-(cd "$runner/../.." && bunx turbo run build --filter=@agentdock/shared)
+(cd "$runner/../.." && bunx turbo run build --filter=@nautelle/shared)
 
 targets="darwin-arm64 darwin-x64 linux-x64 linux-arm64"
 out="$runner/release"

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { NotificationRuleView, NotificationView } from '@agentdock/shared';
+import type { NotificationRuleView, NotificationView } from '@nautelle/shared';
 import {
   applyNew,
   applyRead,

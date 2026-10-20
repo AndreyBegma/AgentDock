@@ -1,4 +1,4 @@
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import type { PrismaService } from '../database/prisma.service';
 import { RunnerEventSinks } from './runner-event-sinks';

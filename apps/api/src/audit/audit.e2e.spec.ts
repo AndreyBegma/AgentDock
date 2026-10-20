@@ -2,7 +2,7 @@ import type {
   AuditPage,
   AuditRecordView,
   AuditVerificationState,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { AuditRecord } from '@prisma/client';
 import { generatePairingCode } from '../runners/credentials';
 import {

@@ -1,4 +1,4 @@
-import type { UsageBreakdownRow, UsageDimension } from '@agentdock/shared';
+import type { UsageBreakdownRow, UsageDimension } from '@nautelle/shared';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
 import {
   BREAKDOWN_DIMENSIONS,

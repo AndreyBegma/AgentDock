@@ -1,12 +1,12 @@
 'use client';
 
-import type { OrchestratorStatus } from '@agentdock/shared';
 import {
   ActionList,
   type ActionListItem,
 } from '@andrewbehma/glass-ui/action-list';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import type { OrchestratorStatus } from '@nautelle/shared';
 import {
   FilePlus2,
   ListCollapse,

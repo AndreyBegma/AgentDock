@@ -1,6 +1,5 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import {
@@ -12,6 +11,7 @@ import {
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { ProjectSummary } from '@nautelle/shared';
 import { ChevronsUpDown, FolderGit2, List } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { RUNNER_STATUS_LABEL, STATUS_TONE } from '../../lib/runners/format';

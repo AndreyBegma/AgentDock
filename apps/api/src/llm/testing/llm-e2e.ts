@@ -1,4 +1,4 @@
-import type { LlmProviderId } from '@agentdock/shared';
+import type { LlmProviderId } from '@nautelle/shared';
 import { INestApplication } from '@nestjs/common';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { Prisma } from '@prisma/client';

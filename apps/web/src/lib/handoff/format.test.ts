@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { HANDOFF_NOTE_TEMPLATE } from '@agentdock/shared';
+import { HANDOFF_NOTE_TEMPLATE } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   describeHandoffError,

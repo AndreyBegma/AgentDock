@@ -1,4 +1,4 @@
-import { isValidTimeZone } from '@agentdock/shared';
+import { isValidTimeZone } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 
 export const BUDGET_OPTIONS = Symbol('BUDGET_OPTIONS');

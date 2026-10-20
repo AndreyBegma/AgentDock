@@ -4,7 +4,7 @@ import {
   type InboundTriggerView,
   type InboundTriggerWithSecret,
   TRIGGER_PUBLIC_ID_LENGTH,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { SecretCipher } from '../../common/crypto';
 import {
   createUser,

@@ -1,4 +1,4 @@
-import type { WhatsNewView } from '@agentdock/shared';
+import type { WhatsNewView } from '@nautelle/shared';
 import { fetchWhatsNew, markWhatsNewSeen } from './whats-new';
 
 /** C-294: the shell's unread dot, framework-free so it is testable on its own. */

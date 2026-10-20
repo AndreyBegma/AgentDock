@@ -1,4 +1,4 @@
-import { BOARD_ERROR } from '@agentdock/shared';
+import { BOARD_ERROR } from '@nautelle/shared';
 import { boardFailureOf } from './board-commands';
 
 describe('boardFailureOf', () => {

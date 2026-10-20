@@ -3,7 +3,7 @@ import {
   PROJECT_RULE_DESCRIPTION_MAX,
   PROJECT_RULE_IMPORT_MAX,
   PROJECT_RULE_TITLE_MAX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BadRequestException, type Type, ValidationPipe } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';

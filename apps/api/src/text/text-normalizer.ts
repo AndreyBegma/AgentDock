@@ -30,11 +30,11 @@ import {
   textSourceHash,
   textViolationError,
   toDeepLXml,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   TextNormalizeArgs,
   TextNormalizeFinishedData,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Prisma, RunStatus, TextNormalization } from '@prisma/client';
 import { BudgetGate } from '../budgets/budget-gate';

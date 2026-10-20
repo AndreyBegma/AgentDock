@@ -6,7 +6,7 @@ import {
   type PlanIntakeSplitView,
   type PlanQuestion,
   type PlanTaskKind,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { callbackCodec } from './callback-data';
 import { appLink, escapeLinkUrl, escapeMarkdownV2 } from './markdown-v2';
 import type { InlineKeyboardButton } from './telegram-client';

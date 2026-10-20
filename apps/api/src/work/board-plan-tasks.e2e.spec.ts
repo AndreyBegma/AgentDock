@@ -1,7 +1,7 @@
 import {
   BOARD_COMPLETED_PAGE_SIZE,
   type BoardPlanTasksView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { at, type TaskSeed, WorkWorld } from './testing/work-e2e';
 
 /** `GET /projects/:projectId/work/plan-tasks` (issue #270 D2–D4, D8, D11). */

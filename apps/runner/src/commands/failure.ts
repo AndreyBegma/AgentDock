@@ -1,4 +1,4 @@
-import type { CommandErrorCode } from '@agentdock/shared/protocol';
+import type { CommandErrorCode } from '@nautelle/shared/protocol';
 
 /**
  * Thrown by a handler to answer with a specific error code instead of

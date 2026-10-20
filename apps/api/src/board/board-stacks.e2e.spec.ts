@@ -7,8 +7,8 @@ import {
   STACK_GATE_REASON,
   stackDesignPath,
   type TaskDesignView,
-} from '@agentdock/shared';
-import type { CardRunFile } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CardRunFile } from '@nautelle/shared/protocol';
 import { CardDesignHarness } from '../design/testing/card-design-e2e';
 import { designResult, MOCKUP } from '../design/testing/design-e2e';
 import { block } from '../planner/testing/planner-e2e';

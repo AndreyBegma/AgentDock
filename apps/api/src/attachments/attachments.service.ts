@@ -17,7 +17,7 @@ import {
   detectAttachmentMime,
   isAttachmentMime,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   BadRequestException,
   ForbiddenException,

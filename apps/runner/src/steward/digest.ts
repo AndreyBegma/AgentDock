@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DIGEST_PROSE_MAX, oneLine } from '@agentdock/shared';
+import { DIGEST_PROSE_MAX, oneLine } from '@nautelle/shared';
 import {
   AGENTDOCK_HOOKS_ENV,
   AGENTDOCK_HOOKS_OFF,
@@ -10,7 +10,7 @@ import {
   type DigestComposeResult,
   type DigestComposeSection,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   bunSpawn,
   CAPTURE_CLAUDE_FLAGS,

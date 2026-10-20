@@ -8,8 +8,8 @@ import {
   type UiProfileView,
   uiProfileSnippetSchema,
   validateProfileContent,
-} from '@agentdock/shared';
-import { uiProfileBuildArgsSchema } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { uiProfileBuildArgsSchema } from '@nautelle/shared/protocol';
 import { Injectable, Optional } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';

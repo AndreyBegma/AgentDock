@@ -1,10 +1,10 @@
 import { readFileSync, statSync } from 'node:fs';
-import { CARD_BACKGROUND_COMMAND_MAX, CARD_ENV_ID } from '@agentdock/shared';
+import { CARD_BACKGROUND_COMMAND_MAX, CARD_ENV_ID } from '@nautelle/shared';
 import {
   type HookCliName,
   hookCliNameSchema,
   hooksDisabled,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   cardsDirOf,
   compactRefreshOwed,

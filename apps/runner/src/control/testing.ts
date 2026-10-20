@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import type { Exec, ExecResult } from '../detect/exec';
 import type { PolicyConfig } from '../policy/schema';

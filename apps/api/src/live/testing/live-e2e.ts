@@ -4,7 +4,7 @@ import {
   type LiveServerMessage,
   liveServerMessageSchema,
   SESSION_COOKIE,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';

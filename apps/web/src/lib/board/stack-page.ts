@@ -1,3 +1,4 @@
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import {
   type BoardCardView,
   type BoardStackDetail,
@@ -10,8 +11,7 @@ import {
   stackRunText,
   stageName,
   type TaskDesignView,
-} from '@agentdock/shared';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import { describeBoardError } from './format';
 

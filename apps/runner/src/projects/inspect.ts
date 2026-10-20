@@ -3,7 +3,7 @@ import type {
   BaseSource,
   ProjectInspection,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
 import { stripUrlCredentials } from '../redact-url';

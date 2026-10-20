@@ -1,16 +1,16 @@
 'use client';
 
-import type {
-  AdminRunner,
-  AdminRunnerDetail,
-  PairingCodeResponse,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { type Column, DataTable } from '@andrewbehma/glass-ui/data-table';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
+import type {
+  AdminRunner,
+  AdminRunnerDetail,
+  PairingCodeResponse,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';

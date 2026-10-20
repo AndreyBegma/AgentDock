@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReadinessBlocker } from '@agentdock/shared';
+import type { ReadinessBlocker } from '@nautelle/shared';
 import { readinessCopy } from '../../lib/readiness/copy';
 import type { Readiness } from '../../lib/readiness/use-readiness';
 import { PrerequisiteBanner } from '../prerequisites/prerequisite-banner';

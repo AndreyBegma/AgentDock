@@ -1,7 +1,7 @@
 import type {
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Clock } from '../clock';
 import type { RunnerConfig } from '../config';
 import type { Exec } from '../detect/exec';

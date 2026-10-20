@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AdminRunner } from '@agentdock/shared';
+import type { AdminRunner } from '@nautelle/shared';
 import {
   gitHubAppFact,
   profileFact,

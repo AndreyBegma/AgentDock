@@ -3,7 +3,7 @@ import {
   AUDIT_RESULTS,
   type AuditFilters,
   type AuditResult,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Type } from 'class-transformer';
 import {
   IsIn,

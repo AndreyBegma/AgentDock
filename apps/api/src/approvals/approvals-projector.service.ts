@@ -4,8 +4,8 @@ import {
   CURRENT_APPROVAL_STATUSES,
   configMergeApproval,
   FLEET_CHANNEL_WINDOW_MS,
-} from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

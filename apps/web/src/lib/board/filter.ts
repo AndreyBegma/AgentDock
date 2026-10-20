@@ -2,7 +2,7 @@ import {
   BOARD_CARD_KINDS,
   type BoardCardKind,
   type BoardCardView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { FilterCodec } from '../filters/url-filters';
 import { roundPill } from './format';
 import { isPlanItem, type WorkBoardItem } from './plan-tasks';

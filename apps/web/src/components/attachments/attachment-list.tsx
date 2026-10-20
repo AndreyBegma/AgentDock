@@ -1,8 +1,8 @@
 'use client';
 
-import type { AttachmentView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { FileItem } from '@andrewbehma/glass-ui/file-item';
+import type { AttachmentView } from '@nautelle/shared';
 import {
   attachmentHref,
   canRemoveAttachment,

@@ -4,7 +4,7 @@ import {
   type LlmKeyUpdate,
   type LlmProviderId,
   type LlmProviderUpdate,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,

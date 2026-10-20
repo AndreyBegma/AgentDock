@@ -3,7 +3,7 @@ import type {
   BoardAskResponse,
   BoardTriageCounts,
   CardTriageView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { answer, english, OPUS } from '../assistant/testing/scripted-answers';
 import { LLM_SECRETS_KEY_ENV } from '../llm/llm-secrets';

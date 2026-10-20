@@ -1,7 +1,7 @@
 import {
   ACTION_REQUEST_SUMMARY_MAX,
   requestableActionRequestKindSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   LOCAL_CARD_BODY_MAX,
   LOCAL_CARD_KINDS,
@@ -9,7 +9,7 @@ import {
   LOCAL_CARD_TITLE_MAX,
   LOCAL_NOTE_MAX,
   type LocalMethodName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 
 /**

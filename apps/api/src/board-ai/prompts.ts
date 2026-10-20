@@ -6,7 +6,7 @@ import {
   BOARD_COLUMNS,
   type BoardAskHit,
   type BoardAskQuery,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 const list = (values: readonly string[]) =>
   values.map((v) => `"${v}"`).join(', ');

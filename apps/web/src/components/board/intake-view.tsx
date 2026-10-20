@@ -1,9 +1,9 @@
 'use client';
 
-import type { BoardCardView, BoardView, PlanAnswer } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { BoardCardView, BoardView, PlanAnswer } from '@nautelle/shared';
 import NextLink from 'next/link';
 import { fetchBoard } from '../../lib/board/actions';
 import { boardStackPageHref } from '../../lib/board/href';

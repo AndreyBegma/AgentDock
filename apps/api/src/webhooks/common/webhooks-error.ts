@@ -1,4 +1,4 @@
-import type { WebhooksErrorBody, WebhooksErrorCode } from '@agentdock/shared';
+import type { WebhooksErrorBody, WebhooksErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the webhooks routes, shaped like every other API error. */

@@ -7,7 +7,7 @@ import {
   type HookCliName,
   parseHookEvent,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { LocalService } from '../local/service';
 import { SessionTokens } from '../local/session-tokens';
 import { HookSessions } from '../local/sessions';

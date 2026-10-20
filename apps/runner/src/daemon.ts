@@ -7,7 +7,7 @@ import {
   type Host,
   PROTOCOL_VERSION,
   WATCH_REFUSED_EVENT,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { accessHeaders, accessOf } from './access';
 import { adapters, SessionWatcher } from './adapters';
 import { resolveIngestSince } from './adapters/ingest-since';

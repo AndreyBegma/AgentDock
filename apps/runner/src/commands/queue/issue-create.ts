@@ -1,12 +1,12 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DEFAULT_READY_LABEL, specGap } from '@agentdock/shared';
+import { DEFAULT_READY_LABEL, specGap } from '@nautelle/shared';
 import type {
   IssueCreateArgs,
   IssueCreateResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Exec } from '../../detect/exec';
 import { resolveFleetProject } from '../../fleet/project';
 import { CommandFailure } from '../failure';

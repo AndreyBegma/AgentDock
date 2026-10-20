@@ -3,7 +3,7 @@ import type {
   PlanListView,
   PlanTaskVersionsView,
   TaskPage,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Session } from '../test/e2e-app';
 import { decomposed, PlannerHarness, task } from './testing/planner-e2e';
 

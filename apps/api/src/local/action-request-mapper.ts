@@ -6,7 +6,7 @@ import {
   type PrApproveBoundArgs,
   prDiffUrl,
   shortHeadSha,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { ActionRequest } from '@prisma/client';
 
 /**

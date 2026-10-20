@@ -5,7 +5,7 @@ import {
   type BoardView,
   type CardRoundBrief,
   type CardRoundPhase,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** Test builders for the Board's wire shapes. */
 

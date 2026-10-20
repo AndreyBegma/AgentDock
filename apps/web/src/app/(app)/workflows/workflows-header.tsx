@@ -1,12 +1,5 @@
 'use client';
 
-import {
-  WORKFLOW_STATUSES,
-  type WorkflowStatus,
-  type WorkflowsOrchestrationResponse,
-  type WorkflowsSummaryResponse,
-  type WorkflowsToolsResponse,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import {
   MenuContent,
@@ -19,6 +12,13 @@ import { MetaBar, type MetaBarCounter } from '@andrewbehma/glass-ui/meta-bar';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import {
+  WORKFLOW_STATUSES,
+  type WorkflowStatus,
+  type WorkflowsOrchestrationResponse,
+  type WorkflowsSummaryResponse,
+  type WorkflowsToolsResponse,
+} from '@nautelle/shared';
 import { Download, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { formatNumber } from '../../../lib/format';

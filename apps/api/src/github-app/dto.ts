@@ -2,7 +2,7 @@ import {
   GITHUB_LOGIN_PATTERN,
   type GitHubAppCredentialsRequest,
   type GitHubManifestRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   IsInt,
   IsNotEmpty,

@@ -47,7 +47,7 @@ COPY packages/shared/ packages/shared/
 COPY apps/api/ apps/api/
 
 RUN cd apps/api && bunx prisma generate
-RUN bunx turbo run build --filter=@agentdock/api...
+RUN bunx turbo run build --filter=@nautelle/api...
 
 # ─── runtime ─────────────────────────────────────────────────────────────────
 FROM ${NODE_IMAGE} AS runtime

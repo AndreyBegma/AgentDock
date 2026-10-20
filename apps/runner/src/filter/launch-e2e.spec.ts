@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { FilterStatRow } from '@agentdock/shared';
-import type { UnsequencedEvent } from '@agentdock/shared/protocol';
+import type { FilterStatRow } from '@nautelle/shared';
+import type { UnsequencedEvent } from '@nautelle/shared/protocol';
 import { tokenSaverLaunch } from '../launch/token-saver';
 import { createLogger } from '../log';
 import { tempDir } from '../testing/fixtures';

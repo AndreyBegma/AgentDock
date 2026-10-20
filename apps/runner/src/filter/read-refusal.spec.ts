@@ -185,7 +185,7 @@ describe('agentdock-runner register (#663 D3)', () => {
       stderr: () => {},
     } as unknown as CliDeps;
     expect(await runCli(['register'], deps)).toBe(0);
-    const { TERSE_REGISTER } = await import('@agentdock/shared');
+    const { TERSE_REGISTER } = await import('@nautelle/shared');
     expect(stdout.join('')).toBe(`${TERSE_REGISTER}\n`);
   });
 });

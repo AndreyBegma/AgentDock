@@ -8,7 +8,7 @@ import {
   type ScheduleMissedPolicy,
   type ScheduleTarget,
   type ScheduleView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';
 import { MODE_SHORT } from '../control/format';

@@ -1,4 +1,4 @@
-import type { ActivityItem } from '@agentdock/shared';
+import type { ActivityItem } from '@nautelle/shared';
 import type { ActivityItem as ActivityItemRow } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
 

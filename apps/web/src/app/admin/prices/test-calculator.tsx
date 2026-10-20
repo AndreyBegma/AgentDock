@@ -1,9 +1,9 @@
 'use client';
 
-import type { PriceTestRequest, PriceTestResponse } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import type { PriceTestRequest, PriceTestResponse } from '@nautelle/shared';
 import { type FormEvent, useState } from 'react';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
 import { api } from '../../../lib/api';

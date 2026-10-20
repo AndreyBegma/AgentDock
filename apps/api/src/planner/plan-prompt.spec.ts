@@ -4,8 +4,8 @@ import {
   PLANNER_INTAKE_CONTRACT,
   type PlanQuestion,
   plannerOutputContract,
-} from '@agentdock/shared';
-import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 import { readCardInstructions } from './plan-intake';
 import {
   assemblePrompt,

@@ -4,7 +4,7 @@ import {
   type AuthErrorCode,
   CSRF_COOKIE,
   CSRF_HEADER,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { reachability } from './live/reachability';
 
 export class ApiError extends Error {

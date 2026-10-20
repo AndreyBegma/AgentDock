@@ -3,7 +3,7 @@ import {
   type BoardCardDetail,
   type BoardView,
   type CardDependenciesView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BoardWorld } from './testing/board-e2e';
 
 /** #337 D8: a card's Depends-on links, and Run's warning about an open one. */

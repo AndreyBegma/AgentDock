@@ -1,6 +1,6 @@
 'use client';
 
-import { textAnswerField } from '@agentdock/shared';
+import { textAnswerField } from '@nautelle/shared';
 import { formatDate } from '../../lib/format';
 import {
   answerText,

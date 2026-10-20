@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { skillSearchArgsSchema } from '@agentdock/shared/protocol';
+import { skillSearchArgsSchema } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { FakeClock } from '../testing/fake-clock';
 import {

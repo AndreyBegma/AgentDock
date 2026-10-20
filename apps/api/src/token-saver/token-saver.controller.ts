@@ -1,7 +1,7 @@
 import type {
   TokenSaverSettingsView,
   TokenSaverSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';

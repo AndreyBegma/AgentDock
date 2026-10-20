@@ -1,10 +1,10 @@
 'use client';
 
-import type { ScheduleDetail } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { ScheduleDetail } from '@nautelle/shared';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../../../../../lib/api';

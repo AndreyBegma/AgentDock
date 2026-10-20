@@ -2,7 +2,7 @@ import {
   CAPTURE_EVIDENCE_EXCERPT_MAX,
   type CaptureSuggestion,
   captureFingerprint,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type DedupeCard,
   type DedupeDismissal,

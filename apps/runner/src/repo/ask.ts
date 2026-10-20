@@ -8,7 +8,7 @@ import {
   type CodeAskArgs,
   type CodeAskResult,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { bunSpawn, type CaptureSpawn } from '../capture/executor';
 import type { Clock } from '../clock';
 import { CommandFailure } from '../commands/failure';

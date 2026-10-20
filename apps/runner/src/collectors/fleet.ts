@@ -1,5 +1,5 @@
 import { type FSWatcher, watch } from 'node:fs';
-import type { GitHubAppHealth } from '@agentdock/shared/protocol';
+import type { GitHubAppHealth } from '@nautelle/shared/protocol';
 import type { Cancel } from '../clock';
 import {
   type FleetEmitter,

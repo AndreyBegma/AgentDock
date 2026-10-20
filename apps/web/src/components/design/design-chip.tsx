@@ -1,6 +1,5 @@
 'use client';
 
-import type { PlanTaskView, TaskDesignPatchRequest } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -12,6 +11,7 @@ import {
 } from '@andrewbehma/glass-ui/menu';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { PlanTaskView, TaskDesignPatchRequest } from '@nautelle/shared';
 import { Ellipsis } from 'lucide-react';
 import Link from 'next/link';
 import { useId, useState } from 'react';

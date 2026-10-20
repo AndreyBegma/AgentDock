@@ -1,10 +1,5 @@
 'use client';
 
-import type {
-  AdminScheduleView,
-  ScheduleView,
-  SystemJobView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
@@ -18,6 +13,11 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import type {
+  AdminScheduleView,
+  ScheduleView,
+  SystemJobView,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';

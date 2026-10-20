@@ -3,7 +3,7 @@ import {
   type LocalErrorCode,
   type LocalRequestMessage,
   localErrorCodeSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { SESSION_TOKEN_MAX } from './session-tokens';
 

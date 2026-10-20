@@ -6,7 +6,7 @@ import type {
   SlotMessageResult,
   SlotStopArgs,
   StoppedResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { isoNow } from '../clock';
 import { appendSlotMessage } from '../session/messenger';
 import type { ControlDeps } from './deps';

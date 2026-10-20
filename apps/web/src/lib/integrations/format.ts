@@ -3,7 +3,7 @@ import type {
   InboundTriggerView,
   TelegramIntegrationStatus,
   WebhookView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 

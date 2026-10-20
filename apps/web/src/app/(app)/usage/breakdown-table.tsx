@@ -1,6 +1,5 @@
 'use client';
 
-import type { UsageBreakdownRow, UsageDimension } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import {
   DataTable,
@@ -8,6 +7,7 @@ import {
   sortRows,
 } from '@andrewbehma/glass-ui/data-table';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { UsageBreakdownRow, UsageDimension } from '@nautelle/shared';
 import { type ReactNode, useMemo, useState } from 'react';
 import { ScrollX } from '../../../components/scroll-x/scroll-x';
 import {

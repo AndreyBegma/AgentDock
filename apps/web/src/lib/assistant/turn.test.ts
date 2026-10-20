@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AssistantMessageView } from '@agentdock/shared';
+import type { AssistantMessageView } from '@nautelle/shared';
 import { applyEvent, startTurn } from './turn';
 
 describe('applyEvent', () => {

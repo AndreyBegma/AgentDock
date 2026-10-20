@@ -1,4 +1,4 @@
-import type { PairingCodeResponse } from '@agentdock/shared';
+import type { PairingCodeResponse } from '@nautelle/shared';
 import {
   type Capabilities,
   type HelloMessage,
@@ -7,7 +7,7 @@ import {
   type RunnerMessage,
   type ServerMessage,
   serverMessageSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { INestApplication, LoggerService } from '@nestjs/common';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import request from 'supertest';

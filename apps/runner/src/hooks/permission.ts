@@ -3,8 +3,8 @@ import {
   ACTION_REQUEST_POLL_MS,
   ACTION_REQUEST_SUMMARY_MAX,
   type ActionRequestSummary,
-} from '@agentdock/shared';
-import type { LocalErrorCode } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { LocalErrorCode } from '@nautelle/shared/protocol';
 import type { LocalClient } from '../local/client';
 
 /**

@@ -9,7 +9,7 @@ import {
   type StewardSettings,
   stewardActionCount,
   stewardDigestTimeSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 
 export function describeStewardError(error: unknown): string {

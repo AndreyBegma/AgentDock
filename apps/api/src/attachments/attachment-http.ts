@@ -2,7 +2,7 @@ import {
   type AttachmentErrorBody,
   attachmentDisposition,
   attachmentSafeName,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type ArgumentsHost,
   Catch,

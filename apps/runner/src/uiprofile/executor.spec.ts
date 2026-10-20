@@ -5,7 +5,7 @@ import type {
   UiProfileBuildArgs,
   UiProfileBuildFinishedData,
   UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { HandoffWriter, RunNotes } from '../handoff';

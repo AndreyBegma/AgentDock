@@ -1,5 +1,5 @@
-import type { SessionContentPage, SessionSummary } from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { SessionContentPage, SessionSummary } from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import {
   adminSession,

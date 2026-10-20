@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type {
   ProjectRuleCandidateView,
   ProjectRuleView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   candidateSelectionSummary,
   filterRules,

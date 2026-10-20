@@ -2,7 +2,7 @@ import type {
   AssistantMessageView,
   AssistantStreamEvent,
   AssistantToolStep,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** The reply being written: what the stream has sent so far. */
 export interface LiveTurn {

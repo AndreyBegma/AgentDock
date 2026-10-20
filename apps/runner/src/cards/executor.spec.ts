@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { CardCollectArgs } from '@agentdock/shared/protocol';
+import type { CardCollectArgs } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   ISSUES_SNAPSHOT_PART_MAX_BYTES,
   issuesSnapshotDataSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Listing } from './listing';
 import { splitSnapshot } from './split';
 

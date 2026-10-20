@@ -1,12 +1,12 @@
 'use client';
 
-import type {
-  OrchestratorSettingsView,
-  OrchestratorStatusView,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type {
+  OrchestratorSettingsView,
+  OrchestratorStatusView,
+} from '@nautelle/shared';
 import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';

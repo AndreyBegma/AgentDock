@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import type { PlanPublishSpecsArgs } from '@agentdock/shared/protocol';
+import type { PlanPublishSpecsArgs } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
 import { skillsWorkspace, withFakeGh } from '../skills/testing';

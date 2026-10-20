@@ -1,6 +1,6 @@
-import { APP_VERSION } from '@agentdock/shared';
 import { KeyValueList } from '@andrewbehma/glass-ui/key-value-list';
 import { Section } from '@andrewbehma/glass-ui/section';
+import { APP_VERSION } from '@nautelle/shared';
 import { ContactList } from '../../../components/about/contact-links';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { versionLabel } from '../../../lib/whats-new/whats-new';

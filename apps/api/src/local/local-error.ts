@@ -1,5 +1,5 @@
-import { BUDGET_ERROR } from '@agentdock/shared';
-import type { LocalErrorCode } from '@agentdock/shared/protocol';
+import { BUDGET_ERROR } from '@nautelle/shared';
+import type { LocalErrorCode } from '@nautelle/shared/protocol';
 import { HttpException } from '@nestjs/common';
 
 /** A typed refusal of a local request: becomes `local.response {ok: false}`. */

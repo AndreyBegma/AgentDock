@@ -1,4 +1,4 @@
-import type { ProjectReadinessView } from '@agentdock/shared';
+import type { ProjectReadinessView } from '@nautelle/shared';
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import {
   ProjectAccess,

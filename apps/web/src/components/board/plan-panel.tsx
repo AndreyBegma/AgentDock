@@ -1,5 +1,9 @@
 'use client';
 
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import {
   type CreatePlanCardsResponse,
   type CreatePlanRequest,
@@ -9,11 +13,7 @@ import {
   type ProjectRuntimeProfile,
   projectRoleAtLeast,
   type UiProfileView,
-} from '@agentdock/shared';
-import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+} from '@nautelle/shared';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { uiProfileApi } from '../../lib/design/href';

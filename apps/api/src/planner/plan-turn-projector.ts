@@ -14,7 +14,7 @@ import {
   parsePlannerOutput,
   type ReviseOutput,
   type WriteOutput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   isPlanTurnEventType,
   type PlanTurnFinishedData,
@@ -23,7 +23,7 @@ import {
   planTurnEventDataSchemas,
   planTurnResultChunkDataSchema,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { Plan, PlanTask, PlanTurn, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

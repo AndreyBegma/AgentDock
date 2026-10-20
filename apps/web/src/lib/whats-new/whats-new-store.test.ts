@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { WhatsNewView } from '@agentdock/shared';
+import type { WhatsNewView } from '@nautelle/shared';
 import { createWhatsNewStore } from './whats-new-store';
 
 const view = (unread: boolean): WhatsNewView => ({

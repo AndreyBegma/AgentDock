@@ -1,4 +1,4 @@
-import { APPROVALS_ERROR } from '@agentdock/shared';
+import { APPROVALS_ERROR } from '@nautelle/shared';
 import { fitsInt8 } from './callback-data';
 import type { InlineKeyboardButton } from './telegram-client';
 

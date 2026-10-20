@@ -6,7 +6,7 @@ import {
   type UpdateUserRequest,
   USER_STATUSES,
   type UserStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 
 export class ListUsersQuery {

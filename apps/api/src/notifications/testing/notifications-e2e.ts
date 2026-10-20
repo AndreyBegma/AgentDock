@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { Role } from '@agentdock/shared';
+import type { Role } from '@nautelle/shared';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { Prisma } from '@prisma/client';

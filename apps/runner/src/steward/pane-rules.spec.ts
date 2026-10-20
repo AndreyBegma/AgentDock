@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { STEWARD_PANE_TAIL_MAX_BYTES } from '@agentdock/shared';
+import { STEWARD_PANE_TAIL_MAX_BYTES } from '@nautelle/shared';
 import { paneTail, readPane } from './pane-rules';
 
 const fixture = (name: string): string =>

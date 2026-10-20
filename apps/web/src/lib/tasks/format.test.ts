@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { PLANNER_ERROR, type TaskRow } from '@agentdock/shared';
+import { PLANNER_ERROR, type TaskRow } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   describePlannerError,

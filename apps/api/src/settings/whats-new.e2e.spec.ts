@@ -1,4 +1,4 @@
-import { APP_VERSION, type WhatsNewView } from '@agentdock/shared';
+import { APP_VERSION, type WhatsNewView } from '@nautelle/shared';
 import {
   createE2eApp,
   createUser,

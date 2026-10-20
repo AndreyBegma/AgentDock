@@ -1,4 +1,4 @@
-import { BOARD_ERROR } from '@agentdock/shared';
+import { BOARD_ERROR } from '@nautelle/shared';
 import { BoardFailure } from './board-error';
 import { BoardWorld, HEAD_SHA, ok, prInspection } from './testing/board-e2e';
 

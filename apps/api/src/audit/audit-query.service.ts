@@ -6,7 +6,7 @@ import {
   type AuditFilters,
   type AuditPage,
   type AuditRecordView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Injectable } from '@nestjs/common';
 import type { AuditRecord, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

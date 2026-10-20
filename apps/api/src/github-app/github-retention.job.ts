@@ -1,4 +1,4 @@
-import { GITHUB_DELIVERY_RETENTION_DAYS } from '@agentdock/shared';
+import { GITHUB_DELIVERY_RETENTION_DAYS } from '@nautelle/shared';
 import {
   Injectable,
   Logger,

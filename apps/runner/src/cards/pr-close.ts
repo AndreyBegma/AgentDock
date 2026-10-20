@@ -2,7 +2,7 @@ import type {
   CardPrCloseArgs,
   CardPrCloseResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { watchedProject } from '../control/target';
 import type { Exec } from '../detect/exec';

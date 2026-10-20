@@ -3,7 +3,7 @@ import {
   CSRF_COOKIE,
   SESSION_COOKIE,
   type TelegramSignInResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BotTokenStore } from '../notifications';
 import {

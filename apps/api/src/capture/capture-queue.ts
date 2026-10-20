@@ -1,4 +1,4 @@
-import { captureJobId } from '@agentdock/shared';
+import { captureJobId } from '@nautelle/shared';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { JobsOptions, Queue } from 'bullmq';

@@ -5,7 +5,7 @@ import {
   type UserSettingsView,
   type WhatsNewView,
   whatsNewView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';

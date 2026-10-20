@@ -1,5 +1,5 @@
-import type { Role } from '@agentdock/shared';
-import { roleAtLeast } from '@agentdock/shared/protocol';
+import type { Role } from '@nautelle/shared';
+import { roleAtLeast } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { ProjectAccessService } from '../projects';

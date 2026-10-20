@@ -1,9 +1,9 @@
 'use client';
 
-import type { PlanTurnView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import type { PlanTurnView } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { formatDuration } from '../../lib/format';
 import { turnActionText } from '../../lib/planner/format';

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { AUTH_ERROR } from '@agentdock/shared';
+import { AUTH_ERROR } from '@nautelle/shared';
 import {
   ApiError,
   ApiUnreachableError,

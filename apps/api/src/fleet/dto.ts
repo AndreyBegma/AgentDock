@@ -2,7 +2,7 @@ import {
   FLEET_SLOTS_PAGE_MAX,
   SLOT_STATUSES,
   type SlotStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Type } from 'class-transformer';
 import {
   IsIn,

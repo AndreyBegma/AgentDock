@@ -3,7 +3,7 @@ import type {
   InboundTriggerDetail,
   InboundTriggerView,
   InboundTriggerWithSecret,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

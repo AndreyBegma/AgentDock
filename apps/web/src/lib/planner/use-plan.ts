@@ -1,5 +1,6 @@
 'use client';
 
+import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   type ConfirmSplitRequest,
   type ConfirmSplitResponse,
@@ -10,8 +11,7 @@ import {
   type PlanReviewDecision,
   type PlanTurnRequest,
   type PlanVisibility,
-} from '@agentdock/shared';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { useLive } from '../live/use-live';

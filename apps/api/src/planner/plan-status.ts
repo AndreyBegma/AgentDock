@@ -2,7 +2,7 @@ import type {
   PlanAttention,
   PlanStatus,
   PlanTurnPhase,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** The fields of a `plan_turns` row the derivation reads. */
 export interface PlanStatusTurn {

@@ -10,7 +10,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { dirname } from 'node:path';
-import { sessionObservedDataSchema } from '@agentdock/shared/protocol';
+import { sessionObservedDataSchema } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { errorMessage, type Logger } from '../log';
 import type { FileState } from './types';

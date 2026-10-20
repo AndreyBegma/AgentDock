@@ -4,7 +4,7 @@ import {
   EVENT_SCHEMA_VERSION,
   SESSION_OBSERVED_EVENT,
   type SessionObservedData,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../../config';
 import { codexHome } from '../../detect/profiles';
 import { correlateCwd } from '../correlate';

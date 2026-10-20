@@ -1,4 +1,4 @@
-import type { RunDetail, RunPage, RunSummary } from '@agentdock/shared';
+import type { RunDetail, RunPage, RunSummary } from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { resetActivity } from '../activity/testing/activity-e2e';
 import { seedProject } from '../fleet/testing/fleet-e2e';

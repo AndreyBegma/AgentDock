@@ -6,7 +6,7 @@ import {
   type ScheduleDisabledReason,
   type ScheduleFiringLiveChange,
   type ScheduleLiveChange,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { ScheduleFiring } from '@prisma/client';
 import { LiveService } from '../live/live.service';

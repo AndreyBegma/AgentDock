@@ -8,7 +8,7 @@ import {
   mayDecideActionRequest,
   prApproveBoundArgsSchema,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { ActionRequest, Prisma } from '@prisma/client';
 import { z } from 'zod';

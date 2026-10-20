@@ -1,4 +1,4 @@
-import type { ControlCommandName } from '@agentdock/shared/protocol';
+import type { ControlCommandName } from '@nautelle/shared/protocol';
 
 /** Overrides of the D11 timeouts; e2e tests shorten them. */
 export interface ControlOptions {

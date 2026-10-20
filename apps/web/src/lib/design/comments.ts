@@ -4,7 +4,7 @@ import type {
   DesignTheme,
   MockupPinMarker,
   TaskDesignView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** D10: a comment is open until a revision lists it in `addressed`. */
 export const isOpen = (comment: DesignCommentView): boolean =>

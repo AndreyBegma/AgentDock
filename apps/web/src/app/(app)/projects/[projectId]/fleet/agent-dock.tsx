@@ -1,7 +1,7 @@
 'use client';
 
-import { type FleetGraph, slotNodeId } from '@agentdock/shared';
 import { type DockTab, DockTabs } from '@andrewbehma/glass-ui/dock-tabs';
+import { type FleetGraph, slotNodeId } from '@nautelle/shared';
 import { useMemo } from 'react';
 import { PILL_STATUS, runningSentence } from '../../../../../lib/fleet/graph';
 

@@ -4,7 +4,7 @@ import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { ATTACHMENT_MAX_BYTES } from '@agentdock/shared';
+import { ATTACHMENT_MAX_BYTES } from '@nautelle/shared';
 import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 import type { AttachmentStore } from './attachment-store';
 

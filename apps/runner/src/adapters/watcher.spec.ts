@@ -13,7 +13,7 @@ import type {
   SessionObservedData,
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger, tempDir } from '../testing/fixtures';

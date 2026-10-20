@@ -10,7 +10,7 @@ import {
   type Role,
   renderArgsTemplate,
   WEBHOOKS_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import type { InboundTrigger, Prisma } from '@prisma/client';
 import { AuditService } from '../../audit/audit.service';

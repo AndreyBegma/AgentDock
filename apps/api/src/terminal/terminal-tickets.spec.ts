@@ -1,4 +1,4 @@
-import type { TerminalTarget } from '@agentdock/shared/protocol';
+import type { TerminalTarget } from '@nautelle/shared/protocol';
 import { TerminalTickets } from './terminal-tickets';
 
 const TTL = 30_000;

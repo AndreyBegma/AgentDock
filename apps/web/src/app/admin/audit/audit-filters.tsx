@@ -1,10 +1,5 @@
 'use client';
 
-import {
-  type AdminUser,
-  AUDIT_ACTIONS,
-  AUDIT_RESULTS,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Combobox } from '@andrewbehma/glass-ui/combobox';
@@ -16,6 +11,7 @@ import {
   PopoverTrigger,
 } from '@andrewbehma/glass-ui/popover';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import { type AdminUser, AUDIT_ACTIONS, AUDIT_RESULTS } from '@nautelle/shared';
 import { ListFilter } from 'lucide-react';
 import { useMemo } from 'react';
 import {

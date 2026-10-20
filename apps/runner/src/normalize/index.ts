@@ -2,7 +2,7 @@ import type {
   CommandArgs,
   CommandResult,
   TextCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { NormalizeExecutor } from './executor';
 
 export {

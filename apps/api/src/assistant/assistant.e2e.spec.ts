@@ -3,7 +3,7 @@ import type {
   AssistantConversationView,
   AssistantMessageView,
   AssistantStreamEvent,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import type request from 'supertest';
 import { ControlService } from '../control/control.service';

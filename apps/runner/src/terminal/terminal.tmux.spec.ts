@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type {
   TerminalAttachArgs,
   TerminalCloseReason,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { systemClock } from '../clock';
 import { createExec, type Exec } from '../detect/exec';
 import { memoryLogger } from '../testing/fixtures';

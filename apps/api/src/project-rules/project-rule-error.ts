@@ -2,7 +2,7 @@ import {
   PROJECT_RULE_ERROR,
   type ProjectRuleErrorBody,
   type ProjectRuleErrorCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the rule routes, shaped like every other API error. */

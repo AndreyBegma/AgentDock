@@ -1,5 +1,5 @@
-import { STEWARD_DEFAULTS, stewardRunnerConfigOf } from '@agentdock/shared';
-import type { RunnerServerConfig } from '@agentdock/shared/protocol';
+import { STEWARD_DEFAULTS, stewardRunnerConfigOf } from '@nautelle/shared';
+import type { RunnerServerConfig } from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { RunnerConnections } from './runner-connections';

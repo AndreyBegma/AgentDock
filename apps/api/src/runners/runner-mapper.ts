@@ -3,12 +3,12 @@ import type {
   AdminRunnerEvent,
   AdminRuntimeProfile,
   RunnerStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type Capabilities,
   type EventSource,
   scrubProfileEnv,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Event, Runner, RuntimeProfile } from '@prisma/client';
 
 // Explicit field lists: tokenHash / tokenPrefix never leak by default.

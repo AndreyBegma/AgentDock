@@ -1,4 +1,4 @@
-import type { PlanTaskIssueView } from '@agentdock/shared';
+import type { PlanTaskIssueView } from '@nautelle/shared';
 import { ExternalLink } from 'lucide-react';
 
 /** A sent task's issue and pull request, as links out to GitHub. */

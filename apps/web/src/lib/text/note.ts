@@ -2,7 +2,7 @@ import type {
   TextFieldView,
   TextNoteReason,
   TextOwnerType,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** What a `NormalizedNote` shows under one stored text (#271 "UI"). */
 export type NoteModel =

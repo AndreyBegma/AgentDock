@@ -6,8 +6,8 @@ import type {
   SlotCheckpointView,
   SlotDetail,
   SlotSummary,
-} from '@agentdock/shared';
-import type { RoundDecisions } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RoundDecisions } from '@nautelle/shared/protocol';
 import type {
   FleetOrchestrator,
   Prisma,

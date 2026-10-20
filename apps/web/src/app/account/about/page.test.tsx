@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { APP_VERSION } from '@agentdock/shared';
+import { APP_VERSION } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { versionLabel } from '../../../lib/whats-new/whats-new';
 import AboutPage from './page';

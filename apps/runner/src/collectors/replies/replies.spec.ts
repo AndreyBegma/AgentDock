@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { appendFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CHECKPOINT_SUMMARY_MAX_BYTES } from '@agentdock/shared/protocol';
+import { CHECKPOINT_SUMMARY_MAX_BYTES } from '@nautelle/shared/protocol';
 import { brief, fleetFixture } from '../../fleet/testing';
 import { tempDir } from '../../testing/fixtures';
 import {

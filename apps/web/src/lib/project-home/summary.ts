@@ -3,7 +3,7 @@ import type {
   FleetView,
   RunKind,
   RunSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { slotHref } from '../fleet/workspace-url';
 import { runHref } from '../history/format';
 

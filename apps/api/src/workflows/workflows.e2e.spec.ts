@@ -2,8 +2,8 @@ import type {
   WorkflowsOrchestrationResponse,
   WorkflowsSummaryResponse,
   WorkflowsToolsResponse,
-} from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { RunnerEventSinks } from '../runners/runner-event-sinks';
 import { adminSession } from '../runners/testing/runner-e2e';

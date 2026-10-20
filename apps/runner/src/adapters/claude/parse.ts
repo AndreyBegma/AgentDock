@@ -17,7 +17,7 @@ import {
   TURN_STARTED_EVENT,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { correlateCwd } from '../correlate';
 import type { FileState, TranscriptSource } from '../types';

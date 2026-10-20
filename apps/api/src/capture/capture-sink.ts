@@ -1,7 +1,7 @@
 import {
   CAPTURE_IDLE_DELAY_MS,
   CAPTURE_SESSION_END_DELAY_MS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   captureEventDataSchemas,
   HOOK_SESSION_ENDED_EVENT,
@@ -9,7 +9,7 @@ import {
   isCaptureEventType,
   parseHookEvent,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

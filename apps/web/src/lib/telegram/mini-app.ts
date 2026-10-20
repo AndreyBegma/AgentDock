@@ -3,7 +3,7 @@ import {
   MINI_APP_TARGET_PARAM,
   miniAppTargetHref,
   parseMiniAppStartParam,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 
 /** Telegram's Web App script (#580); the CSP allows its origin on `/tg` only. */

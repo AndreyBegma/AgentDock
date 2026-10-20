@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { CardMergeOutcome, CardPrCloseOutcome } from '@agentdock/shared';
+import type { CardMergeOutcome, CardPrCloseOutcome } from '@nautelle/shared';
 import {
   acceptedMessage,
   branchCleanupGate,

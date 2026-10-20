@@ -2,7 +2,7 @@ import {
   NOTIFICATION_NEW_EVENT,
   NOTIFICATION_READ_EVENT,
   type NotificationNewLive,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { allowedLiveOrigin } from '../live/live-options';
 import {
   createLiveE2eApp,

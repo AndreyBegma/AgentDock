@@ -14,12 +14,12 @@ import {
   FILTER_STATS_MAX_ROWS,
   type FilterStatRow,
   filterStatRowSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   EVENT_SCHEMA_VERSION,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { correlateCwd } from '../adapters/correlate';
 import { errorMessage, type Logger } from '../log';

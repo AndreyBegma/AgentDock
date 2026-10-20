@@ -1,12 +1,12 @@
 'use client';
 
-import { claudeModelOptions, PLANNING_MODEL_DEFAULT } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Field, Select } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { claudeModelOptions, PLANNING_MODEL_DEFAULT } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { AsyncSection } from '../../components/prerequisites/async-section';
 import { describeError } from '../../lib/api';

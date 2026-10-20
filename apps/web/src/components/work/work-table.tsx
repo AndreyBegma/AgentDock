@@ -1,11 +1,11 @@
 'use client';
 
-import type { WorkItem } from '@agentdock/shared';
-import { workItemStatus } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DataTable } from '@andrewbehma/glass-ui/data-table';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { WorkItem } from '@nautelle/shared';
+import { workItemStatus } from '@nautelle/shared';
 import { Bug, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';

@@ -67,7 +67,7 @@ steps:
     image: *ci_image
     environment: *turbo_env
     commands:
-      - bunx turbo run test --filter=@agentdock/runner
+      - bunx turbo run test --filter=@nautelle/runner
 
   # A tag run signs with the release key; build-release.sh fails without it.
   # TURBO_FORCE: the released binaries are built from source, never restored

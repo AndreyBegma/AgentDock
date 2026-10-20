@@ -1,4 +1,4 @@
-import type { SystemJobView } from '@agentdock/shared';
+import type { SystemJobView } from '@nautelle/shared';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';

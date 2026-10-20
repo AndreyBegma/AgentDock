@@ -1,4 +1,4 @@
-import type { AdminUser } from '@agentdock/shared';
+import type { AdminUser } from '@nautelle/shared';
 
 /** "Ann (ann@example.com)", or the email alone for a user with no name. */
 export const userOptionLabel = (

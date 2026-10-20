@@ -1,10 +1,10 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { ProjectSummary } from '@nautelle/shared';
 import Link from 'next/link';
 import { type ComponentProps, useEffect } from 'react';
 import { GettingStarted } from '../../components/onboarding/getting-started';

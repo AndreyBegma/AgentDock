@@ -1,10 +1,10 @@
 'use client';
 
-import type { UiProfileVersionView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import type { UiProfileVersionView } from '@nautelle/shared';
 import { useId, useState } from 'react';
 import { api } from '../../../../../../lib/api';
 import { describeDesignError } from '../../../../../../lib/design/format';

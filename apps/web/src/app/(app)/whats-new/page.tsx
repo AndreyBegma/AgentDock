@@ -1,6 +1,6 @@
 'use client';
 
-import { APP_VERSION, CHANGELOG } from '@agentdock/shared';
+import { APP_VERSION, CHANGELOG } from '@nautelle/shared';
 import { useEffect } from 'react';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { useWhatsNew } from '../../../components/shell/whats-new-context';

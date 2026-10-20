@@ -4,7 +4,7 @@ import {
   POLICY_CODE_DENY_MAX,
   POLICY_GATED_COMMANDS,
   policyCodeDenySchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { loadConfig, saveConfig } from '../config';
 import { EXIT } from '../service';
 import { type Realpath, rootOutsideAllowed } from './roots';

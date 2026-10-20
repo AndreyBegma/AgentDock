@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { RunLogFrame } from '@agentdock/shared/protocol';
+import type { RunLogFrame } from '@nautelle/shared/protocol';
 import {
   applyRunLogFrame,
   beginReplay,

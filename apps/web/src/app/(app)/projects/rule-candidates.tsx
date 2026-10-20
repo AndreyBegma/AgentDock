@@ -1,9 +1,9 @@
 'use client';
 
-import type { ProjectRuleCandidateView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
+import type { ProjectRuleCandidateView } from '@nautelle/shared';
 import { useId } from 'react';
 import {
   candidateSelectionSummary,

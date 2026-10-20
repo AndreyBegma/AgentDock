@@ -4,7 +4,7 @@ import type {
   OrchestratorSettingsView,
   OrchestratorStatusView,
   SessionMessageView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

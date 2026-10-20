@@ -5,7 +5,7 @@ import {
   type ProfileCandidate,
   pickRuntimeProfile,
   type RuntimeProfilePick,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 

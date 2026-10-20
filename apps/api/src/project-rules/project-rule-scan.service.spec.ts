@@ -1,7 +1,7 @@
 import type {
   ProjectRuleImportResult,
   ProjectRuleView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import type { PrismaService } from '../database/prisma.service';

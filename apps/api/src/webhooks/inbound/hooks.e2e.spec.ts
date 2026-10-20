@@ -3,7 +3,7 @@ import {
   INBOUND_RATE_PER_HOUR,
   type InboundTriggerWithSecret,
   WEBHOOK_HEADERS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { systemActorFor } from '../../audit/audit.types';
 import { BudgetGate } from '../../budgets/budget-gate';
 import { SkillRunService } from '../../skills';

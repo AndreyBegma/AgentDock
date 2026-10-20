@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { LlmProviderView } from '@agentdock/shared';
+import type { LlmProviderView } from '@nautelle/shared';
 import {
   capPercent,
   capTone,

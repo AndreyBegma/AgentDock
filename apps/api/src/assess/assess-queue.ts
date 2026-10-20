@@ -1,4 +1,4 @@
-import { CARD_ASSESS_QUEUE, cardAssessJobId } from '@agentdock/shared';
+import { CARD_ASSESS_QUEUE, cardAssessJobId } from '@nautelle/shared';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Optional } from '@nestjs/common';
 import type { JobsOptions, Queue } from 'bullmq';

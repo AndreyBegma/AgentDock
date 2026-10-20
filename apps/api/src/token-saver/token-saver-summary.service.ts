@@ -5,7 +5,7 @@ import {
   type TokenSaverBeforeAfter,
   type TokenSaverPromptCache,
   type TokenSaverSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { runCostsByKind, runPromptCacheByKind } from '../history/run-usage';

@@ -7,8 +7,8 @@ import type {
   SessionTotals,
   SessionTreeNode,
   SessionTurnNode,
-} from '@agentdock/shared';
-import type { QuerySource, Runtime } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { QuerySource, Runtime } from '@nautelle/shared/protocol';
 import type { Prisma } from '@prisma/client';
 
 export interface SessionRow {

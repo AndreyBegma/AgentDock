@@ -1,4 +1,4 @@
-import { type InboundHookAccepted, WEBHOOK_HEADERS } from '@agentdock/shared';
+import { type InboundHookAccepted, WEBHOOK_HEADERS } from '@nautelle/shared';
 import {
   Controller,
   HttpCode,

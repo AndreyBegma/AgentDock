@@ -1,6 +1,6 @@
 'use client';
 
-import type { ViewportPreset } from '@agentdock/shared';
+import type { ViewportPreset } from '@nautelle/shared';
 import { Maximize2 } from 'lucide-react';
 import Link from 'next/link';
 import { previewBox } from '../../lib/design/mobile-preview';

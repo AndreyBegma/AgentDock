@@ -1,4 +1,4 @@
-import type { ActivityErrorBody, ActivityErrorCode } from '@agentdock/shared';
+import type { ActivityErrorBody, ActivityErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the activity and history routes, shaped like every other API error. */

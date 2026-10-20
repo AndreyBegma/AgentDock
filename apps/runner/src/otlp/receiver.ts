@@ -1,5 +1,5 @@
 import { gunzipSync } from 'node:zlib';
-import type { UnsequencedEvent } from '@agentdock/shared/protocol';
+import type { UnsequencedEvent } from '@nautelle/shared/protocol';
 import type { Server } from 'bun';
 import { errorMessage, type Logger } from '../log';
 import {

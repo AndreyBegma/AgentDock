@@ -1,4 +1,4 @@
-import type { RunnerCommands } from '@agentdock/shared/protocol';
+import type { RunnerCommands } from '@nautelle/shared/protocol';
 import type { WebSocket } from 'ws';
 import { LiveConnection, RunnerConnections } from './runner-connections';
 import type { RunnerOptions } from './runner-options';

@@ -1,4 +1,4 @@
-import { WEBHOOK_RETENTION_DAYS } from '@agentdock/shared';
+import { WEBHOOK_RETENTION_DAYS } from '@nautelle/shared';
 import {
   Injectable,
   Logger,

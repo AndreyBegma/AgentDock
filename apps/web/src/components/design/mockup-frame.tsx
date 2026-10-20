@@ -4,7 +4,7 @@ import type {
   DesignTheme,
   MockupMessage,
   MockupPinMarker,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useEffect, useRef, useState } from 'react';
 import {
   acceptPin,

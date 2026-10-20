@@ -1,5 +1,5 @@
 import { basename, dirname } from 'node:path';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import { NON_SLOT_WORKTREE } from '../fleet/session-name';
 import type { Correlation } from './types';
 

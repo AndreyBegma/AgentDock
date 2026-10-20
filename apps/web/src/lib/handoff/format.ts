@@ -3,7 +3,7 @@ import {
   type HandoffRejection,
   type HandoffUpdatedBy,
   validateHandoffNote,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 
 export const UPDATED_BY_LABEL: Record<HandoffUpdatedBy, string> = {

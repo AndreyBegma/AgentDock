@@ -3,11 +3,11 @@ import {
   TOKEN_SAVER_DEFAULT,
   type TokenSaverConfig,
   type TokenSaverSettingsView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   capabilitiesSchema,
   tokenSaverAvailable,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { TokenSaverSettings } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

@@ -1,15 +1,15 @@
 'use client';
 
-import type {
-  BoardCardView,
-  BoardPlanTaskView,
-  BoardView,
-} from '@agentdock/shared';
 import { Board, type BoardColumn } from '@andrewbehma/glass-ui/board';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { MenuItem, MenuSeparator } from '@andrewbehma/glass-ui/menu';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  BoardCardView,
+  BoardPlanTaskView,
+  BoardView,
+} from '@nautelle/shared';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import {

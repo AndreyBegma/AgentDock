@@ -1,12 +1,5 @@
 'use client';
 
-import {
-  RUN_KINDS,
-  RUN_STATUSES,
-  RUN_UPDATED_LIVE_EVENT,
-  type RunPage,
-  type RunStatus,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -21,6 +14,13 @@ import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Timeline } from '@andrewbehma/glass-ui/timeline';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
+import {
+  RUN_KINDS,
+  RUN_STATUSES,
+  RUN_UPDATED_LIVE_EVENT,
+  type RunPage,
+  type RunStatus,
+} from '@nautelle/shared';
 import NextLink from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

@@ -1,6 +1,5 @@
 'use client';
 
-import { LIVE_CLOSE_CODES, type PublicUser } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Breadcrumb } from '@andrewbehma/glass-ui/breadcrumb';
@@ -12,6 +11,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
 import { useCommandPaletteShortcut } from '@andrewbehma/glass-ui/use-command-palette-shortcut';
+import { LIVE_CLOSE_CODES, type PublicUser } from '@nautelle/shared';
 import { ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';

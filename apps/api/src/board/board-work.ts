@@ -31,11 +31,11 @@ import {
   RUN_UPDATED_LIVE_EVENT,
   type RunLiveChange,
   rebalancedPositions,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   API_EVENT_SOURCE,
   type CardPrOpenResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { type BoardCard, Prisma, type RunStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

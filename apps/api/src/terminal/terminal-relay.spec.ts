@@ -1,14 +1,14 @@
 import {
   TERMINAL_CLOSE_CODES,
   type TerminalServerFrame,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   TERMINAL_HISTORY_TIMEOUT_MS,
   TERMINAL_MAX_DATA_BYTES,
   type TerminalAttachArgs,
   type TerminalMode,
   type TerminalTarget,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import type { AuditEntry } from '../audit/audit.types';
 import type { AuthContext } from '../auth';

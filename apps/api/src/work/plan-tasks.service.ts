@@ -3,7 +3,7 @@ import {
   type BoardPlanTasksView,
   type BoardPlanTaskView,
   boardColumnOfPlanTask,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { AuthUser } from '../auth';
 import { PrismaService } from '../database/prisma.service';

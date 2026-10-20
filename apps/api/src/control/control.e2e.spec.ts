@@ -5,8 +5,8 @@ import {
   type ControlErrorBody,
   type OrchestratorSettingsView,
   SLOT_MESSAGE_SENT_LIVE_EVENT,
-} from '@agentdock/shared';
-import type { CommandErrorCode } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CommandErrorCode } from '@nautelle/shared/protocol';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';

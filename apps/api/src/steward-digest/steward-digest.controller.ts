@@ -1,4 +1,4 @@
-import type { StewardDigestView } from '@agentdock/shared';
+import type { StewardDigestView } from '@nautelle/shared';
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import {
   ProjectAccess,

@@ -6,7 +6,7 @@ import type {
   PlanTaskVersionsView,
   RunPage,
   TaskPage,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { capabilities } from '../runners/testing/runner-e2e';
 import { PlanDocsSink } from './plan-docs-sink';

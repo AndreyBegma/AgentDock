@@ -1,10 +1,10 @@
 'use client';
 
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import type {
   PlannerInstructionsUpdateRequest,
   PlannerInstructionsView,
-} from '@agentdock/shared';
-import { buttonClassName } from '@andrewbehma/glass-ui/button';
+} from '@nautelle/shared';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';

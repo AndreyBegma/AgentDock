@@ -1,10 +1,10 @@
-import { SKILLS_ERROR } from '@agentdock/shared';
+import { SKILLS_ERROR } from '@nautelle/shared';
 import {
   type CommandErrorCode,
   isCommandName,
   type SkillCommandName,
   skillCommands,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
 import {

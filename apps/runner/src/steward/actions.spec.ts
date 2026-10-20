@@ -4,14 +4,14 @@ import {
   STEWARD_NUDGE_TEXT,
   type StewardActedData,
   type StewardRunnerConfig,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardResumeArgs,
   type CardResumeResult,
   parseCommand,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CardRecord } from '../cards/record';
 import { CommandFailure } from '../commands/failure';
 import { FakeClock } from '../testing/fake-clock';

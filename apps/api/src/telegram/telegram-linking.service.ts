@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import type { TelegramLinkCode, TelegramLinkStatus } from '@agentdock/shared';
+import type { TelegramLinkCode, TelegramLinkStatus } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit';

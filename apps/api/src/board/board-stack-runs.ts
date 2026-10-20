@@ -7,7 +7,7 @@ import {
   type Role,
   type StackRunPause,
   stackLabel,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Injectable,
   Logger,

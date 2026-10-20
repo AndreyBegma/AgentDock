@@ -5,7 +5,7 @@ import {
   type BoardPlanTaskView,
   type BoardView,
   planTaskBoardLabel,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { api } from '../api';
 import { DESIGN_CHIP_LABEL } from '../design/format';
 import {

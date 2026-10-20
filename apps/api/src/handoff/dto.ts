@@ -1,7 +1,7 @@
 import {
   HANDOFF_NOTE_MAX_CHARS,
   type PutCardHandoffBody,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { IsString, MaxLength } from 'class-validator';
 
 /**

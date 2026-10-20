@@ -2,7 +2,7 @@ import {
   DEFAULT_VIEWPORTS,
   DESIGN_ERROR,
   type TaskDesignView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { PrismaService } from '../database/prisma.service';
 import { designError } from './design-error';
 import {

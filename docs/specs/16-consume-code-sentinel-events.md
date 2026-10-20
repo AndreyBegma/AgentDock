@@ -148,7 +148,7 @@ as merged: `skills/orchestrator/EVENTS.md` at claude-code-plugin@`bdce2e0`.
    `pr.checks_changed` and `pr.closed` carry `pr`/`rollup` with no `merged`.
    `pr.merged` and `slot.redispatched` are new types. Forwarded unchanged,
    almost every plugin event would have failed `parseFleetEvent`.
-   **`normalizeCodeSentinelLine(line, project)`** in `@agentdock/shared`
+   **`normalizeCodeSentinelLine(line, project)`** in `@nautelle/shared`
    (`src/fleet/code-sentinel.ts`) is now the one mapping. The runner's
    `events` collector calls it per line and only adds `seq`; the contract is in
    [event-schema.md → Code Sentinel](../architecture/event-schema.md#code-sentinel-eventsjsonl-spec-16).

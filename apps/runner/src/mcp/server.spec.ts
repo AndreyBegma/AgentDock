@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { HANDOFF_NOTE_TEMPLATE } from '@agentdock/shared';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { HANDOFF_NOTE_TEMPLATE } from '@nautelle/shared';
 import type { CardNote } from '../handoff/context';
 import type { LocalResult } from '../local/types';
 import { buildMcpServer, MCP_SERVER_NAME } from './server';

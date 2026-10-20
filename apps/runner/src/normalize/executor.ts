@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { TEXT_ERROR_MAX, TEXT_RESULT_MAX_BYTES } from '@agentdock/shared';
+import { TEXT_ERROR_MAX, TEXT_RESULT_MAX_BYTES } from '@nautelle/shared';
 import {
   AGENTDOCK_HOOKS_ENV,
   AGENTDOCK_HOOKS_OFF,
@@ -10,7 +10,7 @@ import {
   type TextNormalizeResult,
   textNormalizeFinishedDataSchema,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   bunSpawn,
   CAPTURE_CLAUDE_FLAGS,

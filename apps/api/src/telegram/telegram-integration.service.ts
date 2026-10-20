@@ -1,4 +1,4 @@
-import type { TelegramIntegrationStatus } from '@agentdock/shared';
+import type { TelegramIntegrationStatus } from '@nautelle/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit';
 import type { AuditContext } from '../audit/audit.types';

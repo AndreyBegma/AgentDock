@@ -1,7 +1,7 @@
 import {
   CARD_REVIEW_ACTIONS,
   type CardPullRequestView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { CALLBACK_DATA_MAX } from './callback-data';
 import {
   acceptConfirm,

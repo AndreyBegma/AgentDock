@@ -2,7 +2,7 @@ import {
   PLANNER_ERROR,
   type PlannerContractVersion,
   type PlanTurnAction,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Plan, PlanTask } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
 import { type DesignTurnPlan, designTurnPlanOf } from '../design/design-rules';

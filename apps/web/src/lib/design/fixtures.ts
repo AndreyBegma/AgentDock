@@ -2,8 +2,8 @@ import type {
   DesignCommentView,
   DesignRevisionView,
   TaskDesignView,
-} from '@agentdock/shared';
-import { DEFAULT_VIEWPORTS } from '@agentdock/shared';
+} from '@nautelle/shared';
+import { DEFAULT_VIEWPORTS } from '@nautelle/shared';
 
 /** Design fixtures for the tests: one task, two variants, under review. */
 

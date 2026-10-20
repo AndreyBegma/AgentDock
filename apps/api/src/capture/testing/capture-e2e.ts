@@ -1,5 +1,5 @@
-import { CAPTURE_FENCE_INFO } from '@agentdock/shared';
-import type { CardsExtractArgs } from '@agentdock/shared/protocol';
+import { CAPTURE_FENCE_INFO } from '@nautelle/shared';
+import type { CardsExtractArgs } from '@nautelle/shared/protocol';
 import { BoardWorld, ROOT_A } from '../../board/testing/board-e2e';
 import { CaptureService } from '../capture.service';
 import { CaptureCommands, type ExtractSendResult } from '../capture-commands';

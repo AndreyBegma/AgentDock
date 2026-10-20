@@ -1,14 +1,14 @@
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import {
   type CommandRunView,
   type ConversationEntry,
   FLEET_ERROR,
   type FleetNodePill,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CheckpointKind,
   WorktreeFileStatus,
-} from '@agentdock/shared/protocol';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared/protocol';
 import { ApiError, describeError } from '../api';
 import { describeOutcome } from '../control/format';
 import { CHECKPOINT_LABEL } from '../fleet/format';

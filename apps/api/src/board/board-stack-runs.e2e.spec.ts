@@ -4,7 +4,7 @@ import {
   type BoardStackDetail,
   type BoardView,
   type StackCardRunState,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { BoardStackRuns } from './board-stack-runs';
 import { BoardWorld } from './testing/board-e2e';

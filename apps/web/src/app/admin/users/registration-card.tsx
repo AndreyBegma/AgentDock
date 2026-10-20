@@ -1,10 +1,10 @@
 'use client';
 
-import type { RegistrationState } from '@agentdock/shared';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import type { RegistrationState } from '@nautelle/shared';
 import { api, describeError } from '../../../lib/api';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 import type { Section } from '../../../lib/section/use-section';

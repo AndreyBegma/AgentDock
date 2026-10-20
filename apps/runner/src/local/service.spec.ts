@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { ACTION_REQUEST_TOOL_INPUT_MAX } from '@agentdock/shared';
+import { ACTION_REQUEST_TOOL_INPUT_MAX } from '@nautelle/shared';
 import {
   HOOK_CONTENT_MAX_CHARS,
   parseHookEvent,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CardRecord } from '../cards/record';
 import { MASK } from '../pane/redact';
 import { memoryLogger } from '../testing/fixtures';

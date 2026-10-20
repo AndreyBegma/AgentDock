@@ -1,4 +1,4 @@
-import type { SessionErrorBody, SessionErrorCode } from '@agentdock/shared';
+import type { SessionErrorBody, SessionErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the sessions routes, shaped like every other API error. */

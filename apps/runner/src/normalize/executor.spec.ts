@@ -5,7 +5,7 @@ import type {
   TextNormalizeArgs,
   TextNormalizeFinishedData,
   UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CaptureProcess, CaptureSpawn } from '../capture/executor';
 import { CAPTURE_CLAUDE_FLAGS } from '../capture/executor';
 import { CommandFailure } from '../commands/failure';

@@ -1,4 +1,4 @@
-import { BOARD_ERROR } from '@agentdock/shared';
+import { BOARD_ERROR } from '@nautelle/shared';
 import { BoardWorld, failed } from './testing/board-e2e';
 
 /** #322 D2, D3, D9: the profile and model a card's Run starts with. */

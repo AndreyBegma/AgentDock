@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { HANDOFF_PERSON_MARK } from '@agentdock/shared';
+import { HANDOFF_PERSON_MARK } from '@nautelle/shared';
 import { type CardRecord, CardStore } from '../cards/record';
 import { isolatedGit } from '../skills/testing';
 import { tempDir } from '../testing/fixtures';

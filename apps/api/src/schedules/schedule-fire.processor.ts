@@ -1,7 +1,7 @@
 import {
   SCHEDULE_CATCH_UP_MAX_MS,
   SCHEDULE_FIRING_REASONS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma, ScheduleMissedPolicy } from '@prisma/client';
 import { DelayedError, type Job } from 'bullmq';

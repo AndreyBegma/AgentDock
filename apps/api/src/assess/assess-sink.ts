@@ -2,7 +2,7 @@ import {
   assessEventDataSchemas,
   isAssessEventType,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

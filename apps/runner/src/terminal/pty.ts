@@ -1,4 +1,4 @@
-import type { TerminalMode } from '@agentdock/shared/protocol';
+import type { TerminalMode } from '@nautelle/shared/protocol';
 import type { Env } from '../env';
 
 /** What the attach manager needs from a spawned `tmux attach` client. */

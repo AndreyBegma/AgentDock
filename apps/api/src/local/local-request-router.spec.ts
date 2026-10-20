@@ -1,9 +1,9 @@
-import type { Role } from '@agentdock/shared';
+import type { Role } from '@nautelle/shared';
 import type {
   LocalRequestMessage,
   LocalResponseMessage,
-} from '@agentdock/shared/protocol';
-import { localResponseMessageSchema } from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
+import { localResponseMessageSchema } from '@nautelle/shared/protocol';
 import { HttpException } from '@nestjs/common';
 import type { AuditService } from '../audit/audit.service';
 import type { AuditEntry } from '../audit/audit.types';

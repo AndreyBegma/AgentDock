@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
+import { resolveBoardMove } from '@andrewbehma/glass-ui/board';
 import {
   type BoardColumn,
   type BoardPlanTaskView,
   PLAN_TASK_MOVE_REFUSAL_TEXT,
-} from '@agentdock/shared';
-import { resolveBoardMove } from '@andrewbehma/glass-ui/board';
+} from '@nautelle/shared';
 import { decideDrop } from './board-state';
 import { boardView, card } from './fixtures';
 import { columnsOf } from './format';

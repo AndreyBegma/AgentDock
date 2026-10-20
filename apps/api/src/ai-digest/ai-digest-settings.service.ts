@@ -2,7 +2,7 @@ import {
   AI_DIGEST_DEFAULTS,
   type AiDigestSettingsView,
   type UpdateAiDigestSettings,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { AiDigestSettings } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

@@ -1,13 +1,13 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import type {
   ProjectRuleAcceptRequest,
   ProjectRuleImportResult,
   ProjectRuleScanResult,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+} from '@nautelle/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../../../lib/api';
 import {

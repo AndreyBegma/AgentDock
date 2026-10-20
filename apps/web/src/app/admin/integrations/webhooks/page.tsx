@@ -1,10 +1,5 @@
 'use client';
 
-import type {
-  ProjectSummary,
-  WebhookView,
-  WebhookWithSecret,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
@@ -16,6 +11,11 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  ProjectSummary,
+  WebhookView,
+  WebhookWithSecret,
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';

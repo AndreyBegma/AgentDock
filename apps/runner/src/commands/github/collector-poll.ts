@@ -2,7 +2,7 @@ import type {
   CollectorPollArgs,
   CollectorPollResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { watchedById } from '../queue/project';
 
 export interface CollectorPollDeps {

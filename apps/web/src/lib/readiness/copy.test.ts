@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ReadinessBlocker } from '@agentdock/shared';
+import type { ReadinessBlocker } from '@nautelle/shared';
 import { readinessCopy } from './copy';
 
 const suggestion = { id: 'prof-1', key: 'work', label: 'Work' };

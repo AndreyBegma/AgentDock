@@ -1,4 +1,4 @@
-import { hasClaudeTrailer } from '@agentdock/shared';
+import { hasClaudeTrailer } from '@nautelle/shared';
 import { CommandFailure } from '../commands/failure';
 import { gitOk, gitSucceeds } from '../skills/deps';
 import type { GitDeps } from './git';

@@ -1,8 +1,8 @@
 'use client';
 
-import type { CardTriageView, TriageHint } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { CardTriageView, TriageHint } from '@nautelle/shared';
 import { Sparkles } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';

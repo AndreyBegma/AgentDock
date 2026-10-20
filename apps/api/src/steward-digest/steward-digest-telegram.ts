@@ -1,4 +1,4 @@
-import type { StewardDigestView } from '@agentdock/shared';
+import type { StewardDigestView } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { BotTokenStore } from '../notifications';

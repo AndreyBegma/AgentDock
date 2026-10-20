@@ -1,4 +1,4 @@
-import type { RunDetail, RunPage } from '@agentdock/shared';
+import type { RunDetail, RunPage } from '@nautelle/shared';
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ProjectAccess,

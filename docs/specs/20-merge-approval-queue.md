@@ -232,7 +232,7 @@ i20-api, decided with the orchestrator on 2026-10-08:
     are the durable record #21 and #22 read. `ApprovalsService` is exported
     for #22's approve buttons.
 11. **D1 helper.** `mergeApprovalMismatch(project)` and
-    `configMergeApproval(config)` in `@agentdock/shared` are what the web
+    `configMergeApproval(config)` in `@nautelle/shared` are what the web
     settings page calls with the project detail it already has; an unread
     config is a mismatch only when Nautelle expects approval.
 

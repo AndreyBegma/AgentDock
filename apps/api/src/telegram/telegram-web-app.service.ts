@@ -2,7 +2,7 @@ import {
   AUTH_ERROR,
   type LoginDeniedReason,
   type TelegramSignInResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { type HttpException, Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit';
 import {

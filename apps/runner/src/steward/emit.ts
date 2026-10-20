@@ -7,8 +7,8 @@ import {
   type StewardObservedData,
   stewardActedDataSchema,
   stewardObservedDataSchema,
-} from '@agentdock/shared';
-import type { UnsequencedEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { UnsequencedEvent } from '@nautelle/shared/protocol';
 import { type Clock, isoNow } from '../clock';
 
 /** The envelope's `project`: what every runner event of a project carries. */

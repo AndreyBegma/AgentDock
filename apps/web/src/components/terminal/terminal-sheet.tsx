@@ -1,12 +1,12 @@
 'use client';
 
-import type { PendingQuestion } from '@agentdock/shared';
-import type { TerminalMode } from '@agentdock/shared/protocol';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import type { PendingQuestion } from '@nautelle/shared';
+import type { TerminalMode } from '@nautelle/shared/protocol';
 import { type ReactNode, useEffect, useState } from 'react';
 import type { SendSessionMessage } from '../../lib/session-message/actions';
 import {

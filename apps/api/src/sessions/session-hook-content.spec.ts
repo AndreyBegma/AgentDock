@@ -1,4 +1,4 @@
-import { type HookEvent, parseHookEvent } from '@agentdock/shared/protocol';
+import { type HookEvent, parseHookEvent } from '@nautelle/shared/protocol';
 import { contentDraftsOf, stripHookContent } from './session-hook-content';
 
 const wire = (type: string, data: unknown) => ({

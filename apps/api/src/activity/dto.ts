@@ -3,7 +3,7 @@ import {
   ACTIVITY_PAGE_MAX,
   type ActivityCategory,
   type ActivityQuery,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Type } from 'class-transformer';
 import {
   IsIn,

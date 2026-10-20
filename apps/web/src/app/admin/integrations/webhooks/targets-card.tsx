@@ -1,12 +1,12 @@
 'use client';
 
-import type { WebhookSettingsView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { WebhookSettingsView } from '@nautelle/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
 import { useErrorToast } from '../../../../lib/section/use-error-toast';

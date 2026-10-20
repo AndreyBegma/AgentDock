@@ -4,8 +4,8 @@ import {
   cardDesignPath,
   MOCKUP_PIN_HELPER_ATTRIBUTE,
   type TaskDesignView,
-} from '@agentdock/shared';
-import type { CardRunFile } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CardRunFile } from '@nautelle/shared/protocol';
 import { CardDesignHarness } from '../design/testing/card-design-e2e';
 import { designResult, MOCKUP } from '../design/testing/design-e2e';
 import { BoardFailure } from './board-error';
