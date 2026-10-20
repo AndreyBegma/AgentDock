@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  IgnoreTerminalSetupProfileRequest,
   SetupStep,
   TerminalSetupItem,
   TerminalSetupView,
@@ -13,11 +14,16 @@ import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import Link from 'next/link';
+import { useState } from 'react';
 import { api, describeError } from '../../lib/api';
+import { useErrorToast } from '../../lib/section/use-error-toast';
 import { useSection } from '../../lib/section/use-section';
 import {
   ASK_AN_ADMIN,
   BLOCKED_LABEL,
+  IGNORED_PROFILES_TITLE,
+  OTHER_PROFILES_DESCRIPTION,
+  OTHER_PROFILES_TITLE,
   SETUP_STATE_LABEL,
   SETUP_STATE_TONE,
   setupItemTitle,
@@ -57,14 +63,20 @@ function Step({ step, isAdmin }: { step: SetupStep; isAdmin: boolean }) {
   }
 }
 
+/** #719: hide a profile from AgentDock on the runner, or show it again. */
+type SetIgnored = (profileKey: string, ignored: boolean) => void;
+
 function Item({
   item,
   isAdmin,
+  onIgnore,
 }: {
   item: TerminalSetupItem;
   isAdmin: boolean;
+  onIgnore?: SetIgnored;
 }) {
   const open = item.state !== 'done';
+  const profileKey = item.id === 'plugin' ? item.profileKey : undefined;
   return (
     <li className="flex flex-col gap-2 py-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -82,6 +94,16 @@ function Item({
         {item.blockedBy ? (
           <span className="text-xs text-warn">{BLOCKED_LABEL[item.id]}</span>
         ) : null}
+        {onIgnore && profileKey ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => onIgnore(profileKey, true)}
+          >
+            Ignore
+          </Button>
+        ) : null}
       </div>
       {open ? (
         <div className="flex flex-col gap-2 pl-0 sm:pl-4">
@@ -96,13 +118,18 @@ function Item({
   );
 }
 
-/** The checklist itself, for a view already loaded. */
+/**
+ * The checklist itself, for a view already loaded. `onIgnore`, given to a
+ * project admin, offers to hide a profile from AgentDock on the runner (#719).
+ */
 export function TerminalSetupList({
   view,
   isAdmin,
+  onIgnore,
 }: {
   view: TerminalSetupView;
   isAdmin: boolean;
+  onIgnore?: SetIgnored;
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -121,9 +148,55 @@ export function TerminalSetupList({
             key={`${item.id}:${item.profileKey ?? ''}`}
             item={item}
             isAdmin={isAdmin}
+            onIgnore={onIgnore}
           />
         ))}
       </ul>
+      {view.otherProfiles.length > 0 ? (
+        <section
+          className="flex flex-col gap-1"
+          aria-label={OTHER_PROFILES_TITLE}
+        >
+          <h3 className="text-sm font-medium">{OTHER_PROFILES_TITLE}</h3>
+          <p className="text-xs text-ink-3">{OTHER_PROFILES_DESCRIPTION}</p>
+          <ul className="flex flex-col divide-y divide-line">
+            {view.otherProfiles.map((item) => (
+              <Item
+                key={`${item.id}:${item.profileKey ?? ''}`}
+                item={item}
+                isAdmin={isAdmin}
+                onIgnore={onIgnore}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {view.ignoredProfileKeys.length > 0 ? (
+        <section
+          className="flex flex-col gap-1"
+          aria-label={IGNORED_PROFILES_TITLE}
+        >
+          <h3 className="text-sm font-medium">{IGNORED_PROFILES_TITLE}</h3>
+          <ul className="flex flex-col gap-1">
+            {view.ignoredProfileKeys.map((key) => (
+              <li key={key} className="flex flex-wrap items-center gap-2">
+                <span className="min-w-0 break-words text-sm text-ink-2">
+                  {key}
+                </span>
+                {onIgnore ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onIgnore(key, false)}
+                  >
+                    Show again
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -144,6 +217,27 @@ export function TerminalSetupCard({
     () => api<TerminalSetupView>(`/projects/${projectId}/terminal-setup`),
     [projectId],
   );
+  const { setData } = section;
+  const [busy, setBusy] = useState(false);
+  const showError = useErrorToast();
+
+  const setIgnored: SetIgnored = async (profileKey, ignored) => {
+    setBusy(true);
+    try {
+      const body: IgnoreTerminalSetupProfileRequest = { profileKey, ignored };
+      setData(
+        await api<TerminalSetupView>(
+          `/projects/${projectId}/terminal-setup/ignored-profiles`,
+          { method: 'PUT', body },
+        ),
+      );
+    } catch (err) {
+      showError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Card pad="lg" className="flex flex-col gap-4">
       <SectionHeader
@@ -161,7 +255,11 @@ export function TerminalSetupCard({
         }
       />
       {section.data ? (
-        <TerminalSetupList view={section.data} isAdmin={isAdmin} />
+        <TerminalSetupList
+          view={section.data}
+          isAdmin={isAdmin}
+          onIgnore={isAdmin && !busy ? setIgnored : undefined}
+        />
       ) : section.error !== null ? (
         <Banner tone="danger" title="The checklist could not be loaded">
           {describeError(section.error)}

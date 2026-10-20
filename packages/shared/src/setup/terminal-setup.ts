@@ -53,13 +53,35 @@ export interface TerminalSetupItem {
 
 /** `GET /projects/:projectId/terminal-setup` (D5). */
 export interface TerminalSetupView {
+  /** The checklist: the profiles the project uses (#719). */
   items: TerminalSetupItem[];
+  /**
+   * #719: one optional `plugin` item per profile the runner reports that the
+   * project does not use — "Other profiles on this runner". Never counted in
+   * `complete` or `todo`.
+   */
+  otherProfiles: TerminalSetupItem[];
+  /** #719: the profiles hidden from AgentDock on the project's runner. */
+  ignoredProfileKeys: string[];
   /** Every required item is done. */
   complete: boolean;
   /** Required items in `todo` — the Overview's "N steps" (D6). */
   todo: number;
   /** What happens once the checklist is complete. */
   closing: string;
+}
+
+/** #719: the longest profile key a person may ignore. */
+export const TERMINAL_SETUP_PROFILE_KEY_MAX_LENGTH = 128;
+
+/**
+ * `PUT /projects/:projectId/terminal-setup/ignored-profiles` (#719): hide a
+ * profile from AgentDock on the project's runner, or show it again. Answers
+ * the project's new `TerminalSetupView`.
+ */
+export interface IgnoreTerminalSetupProfileRequest {
+  profileKey: string;
+  ignored: boolean;
 }
 
 /** D2: a profile's sessions in the project over the last 7 days. */
@@ -85,8 +107,12 @@ export interface TerminalSetupFacts {
   projectId: string;
   /** Whether the project's runner has an open socket. */
   runnerConnected: boolean;
-  /** D3's profiles, in `terminalSetupProfileKeys` order. */
+  /** D3's profiles the project uses, in `terminalSetupProfileKeys` order. */
   profiles: readonly TerminalSetupProfileFacts[];
+  /** #719: the other profiles the runner reports; optional, never a blocker. */
+  otherProfiles?: readonly TerminalSetupProfileFacts[];
+  /** #719: `runners.ignoredProfileKeys`, already left out of both lists. */
+  ignoredProfileKeys?: readonly string[];
   /** `projects.shipSessionContent`. */
   shipSessionContent: boolean;
   /** `projects.captureEnabled`. */
@@ -96,30 +122,59 @@ export interface TerminalSetupFacts {
 export const TERMINAL_SETUP_CLOSING =
   "Suggestions from your terminal sessions appear in the Board's Inbox; accept one to make it a card.";
 
+/** #719: how long a session or card run makes a profile one the project uses. */
+export const TERMINAL_SETUP_USE_WINDOW_DAYS = 30;
+
 /** D3 sources, in the order the checklist lists them. */
 export interface TerminalSetupProfileSources {
   defaultKey: string | null;
   orchestratorKey: string | null;
-  /** Profiles of the project's `manual` and `unknown` sessions, last 7 days (D2). */
+  /** Profiles of the project's `manual` and `unknown` sessions, last 30 days (#719). */
   sessionKeys: readonly (string | null)[];
-  /** Profiles of the project's `card` runs, last 7 days. */
+  /** Profiles of the project's `card` runs, last 30 days (#719). */
   cardRunKeys: readonly (string | null)[];
   /** Claude profiles the project's runner reports (`reportedClaudeProfileKeysOf`). */
   reportedKeys?: readonly string[];
+  /** #719: the runner's ignored profiles, left out of both lists. */
+  ignoredKeys?: readonly string[];
 }
 
-/** D3: the profile keys the checklist lists, deduplicated, in source order. */
+export interface TerminalSetupProfileKeys {
+  /** The profiles the project uses — the checklist's per-profile items. */
+  used: string[];
+  /** #719: reported by the runner, not used by the project — optional. */
+  other: string[];
+}
+
+/**
+ * D3, #719: the profile keys the checklist lists, deduplicated, in source
+ * order. A profile counts only when the project uses it — its default, the
+ * one chosen in its settings, or one that ran a session or card in it; the
+ * rest of what the runner reports is `other`.
+ */
 export const terminalSetupProfileKeys = (
   sources: TerminalSetupProfileSources,
-): string[] => {
-  const keys = [
+): TerminalSetupProfileKeys => {
+  const ignored = new Set(sources.ignoredKeys ?? []);
+  const keep = (keys: readonly (string | null)[]): string[] => [
+    ...new Set(
+      keys.filter(
+        (key): key is string =>
+          typeof key === 'string' && key.length > 0 && !ignored.has(key),
+      ),
+    ),
+  ];
+  const used = keep([
     sources.defaultKey,
     sources.orchestratorKey,
     ...sources.sessionKeys,
     ...sources.cardRunKeys,
-    ...(sources.reportedKeys ?? []),
-  ].filter((key): key is string => typeof key === 'string' && key.length > 0);
-  return [...new Set(keys)];
+  ]);
+  const inUse = new Set(used);
+  const other = keep(sources.reportedKeys ?? []).filter(
+    (key) => !inUse.has(key),
+  );
+  return { used, other };
 };
 
 const SAFE_SHELL_WORD = /^[A-Za-z0-9._-]+$/;
@@ -152,9 +207,9 @@ const pluginSteps = (key: string): SetupStep[] => [
 ];
 
 /**
- * No Claude profile is known — none configured, none seen on a session, none
- * reported by the runner (offline, or an older one): the person is told how to
- * list the keys and which command takes one.
+ * The project uses no known Claude profile — none configured, none seen on a
+ * session or card run (#719: the runner's other profiles do not count): the
+ * person is told how to list the keys and which command takes one.
  */
 const unknownProfilePlugin = (): TerminalSetupItem => ({
   id: 'plugin',
@@ -325,9 +380,19 @@ export const terminalSetup = (facts: TerminalSetupFacts): TerminalSetupView => {
     ...perProfile.flatMap((items) => items.telemetry),
   ];
 
+  // #719: listed so a person can see and ignore them, never a required step.
+  const otherProfiles = (facts.otherProfiles ?? []).map(
+    (profile): TerminalSetupItem => ({
+      ...profileItems(profile).plugin,
+      optional: true,
+    }),
+  );
+
   const required = items.filter((item) => !item.optional);
   return {
     items,
+    otherProfiles,
+    ignoredProfileKeys: [...(facts.ignoredProfileKeys ?? [])],
     complete: required.every((item) => item.state === 'done'),
     todo: required.filter((item) => item.state === 'todo').length,
     closing: TERMINAL_SETUP_CLOSING,

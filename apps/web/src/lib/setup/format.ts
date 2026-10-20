@@ -52,6 +52,14 @@ export const BLOCKED_LABEL: Record<TerminalSetupItemId, string> = {
   telemetry: 'Needs the plugin',
 };
 
+/** #719: the runner's profiles the project does not use — never required. */
+export const OTHER_PROFILES_TITLE = 'Other profiles on this runner';
+export const OTHER_PROFILES_DESCRIPTION =
+  'This project does not use these profiles, so their steps are optional.';
+
+/** #719: the profiles a project admin hid from AgentDock on the runner. */
+export const IGNORED_PROFILES_TITLE = 'Ignored profiles';
+
 export const settingsSessionsHref = (projectId: string): string =>
   `/projects/${projectId}/settings?tab=sessions`;
 
