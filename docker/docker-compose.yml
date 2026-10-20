@@ -44,6 +44,11 @@ services:
       timeout: 5s
       retries: 5
 
+# Pinned names: Docker would otherwise prefix them with the compose project
+# name, so renaming the project (`name:` above) would start with empty volumes.
+# These are the names the volumes have had since the project was `agentdock`.
 volumes:
   postgres_data:
+    name: agentdock_postgres_data
   redis_data:
+    name: agentdock_redis_data
