@@ -1,4 +1,4 @@
-import { STEWARD_REASON_MAX } from '@agentdock/shared';
+import { STEWARD_REASON_MAX } from '@nautelle/shared';
 
 /**
  * C0 and C1 controls, DEL, and the Unicode format characters that reorder or

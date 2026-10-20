@@ -4,7 +4,7 @@ import type {
   ProjectReadinessView,
   ReadinessAction,
   ReadinessBlocker,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 

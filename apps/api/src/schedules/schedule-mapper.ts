@@ -2,7 +2,7 @@ import type {
   ScheduleFiringView,
   ScheduleTarget,
   ScheduleView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Schedule, ScheduleFiring } from '@prisma/client';
 
 const iso = (date: Date | null): string | null => date?.toISOString() ?? null;

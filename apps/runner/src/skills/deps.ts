@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import type { Clock } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';

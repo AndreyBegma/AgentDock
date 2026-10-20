@@ -1,4 +1,4 @@
-import type { CardRestartMode, RestartEstimate } from '@agentdock/shared';
+import type { CardRestartMode, RestartEstimate } from '@nautelle/shared';
 import type { TranscriptStats } from './transcript';
 
 /**

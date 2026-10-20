@@ -1,4 +1,4 @@
-import type { TaskDesignView } from '@agentdock/shared';
+import type { TaskDesignView } from '@nautelle/shared';
 import { decomposed, ok, task } from '../planner/testing/planner-e2e';
 import { CardDesignHarness } from './testing/card-design-e2e';
 import { profileResult } from './testing/design-e2e';

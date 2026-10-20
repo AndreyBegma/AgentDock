@@ -2,7 +2,7 @@ import type {
   LlmErrorBody,
   LlmErrorCode,
   LlmProviderId,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 const STATUS: Record<LlmErrorCode, number> = {

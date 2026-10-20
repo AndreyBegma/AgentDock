@@ -6,7 +6,7 @@ import {
   RUN_LOG_MAX_FRAME_BYTES,
   type RunLogMessage,
   type SkillRunPhase,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { FakeClock } from '../../testing/fake-clock';
 import { memoryLogger, tempDir } from '../../testing/fixtures';
 import {

@@ -1,4 +1,4 @@
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   type RunnerEventSink,

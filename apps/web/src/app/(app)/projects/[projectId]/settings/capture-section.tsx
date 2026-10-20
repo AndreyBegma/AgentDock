@@ -1,11 +1,5 @@
 'use client';
 
-import {
-  CAPTURE_MODELS,
-  type CaptureModel,
-  type CardCaptureView,
-  isCaptureModel,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -14,6 +8,12 @@ import { Field, Select } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import {
+  CAPTURE_MODELS,
+  type CaptureModel,
+  type CardCaptureView,
+  isCaptureModel,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { ReadinessSlot } from '../../../../../components/readiness/readiness-notice';

@@ -1,4 +1,4 @@
-import type { ActivityPage } from '@agentdock/shared';
+import type { ActivityPage } from '@nautelle/shared';
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import type { AuthUser } from '../auth';
 import { CurrentUser } from '../auth/decorators';

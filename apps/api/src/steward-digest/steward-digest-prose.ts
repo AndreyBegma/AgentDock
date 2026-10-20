@@ -4,14 +4,14 @@ import {
   type RunLiveChange,
   type StewardDigestItem,
   type StewardDigestTrigger,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   DIGEST_COMPOSE_ITEMS_MAX,
   DIGEST_COMPOSE_MODEL,
   type DigestComposeArgs,
   type DigestComposeSection,
   type StewardCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { RunStatus } from '@prisma/client';
 import { SYSTEM_ACTOR } from '../audit/audit.types';

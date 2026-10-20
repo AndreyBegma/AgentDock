@@ -1,6 +1,5 @@
 'use client';
 
-import type { BoardCardView, UiProfileView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -12,6 +11,7 @@ import {
 } from '@andrewbehma/glass-ui/menu';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import type { BoardCardView, UiProfileView } from '@nautelle/shared';
 import { Ellipsis } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';

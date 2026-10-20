@@ -4,7 +4,7 @@ import {
   type CardTriageView,
   cardLabel,
   type TriageHint,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   type BoardCardKind,

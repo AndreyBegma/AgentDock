@@ -7,13 +7,13 @@ import {
   type Role,
   SLOT_MESSAGE_SENT_LIVE_EVENT,
   type SlotMessageSentEvent,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CommandArgs,
   type CommandResult,
   commands,
   slotNameSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service';

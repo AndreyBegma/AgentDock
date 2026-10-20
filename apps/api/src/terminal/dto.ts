@@ -1,10 +1,10 @@
-import type { TerminalTicketRequest } from '@agentdock/shared';
+import type { TerminalTicketRequest } from '@nautelle/shared';
 import {
   SLOT_NAME_MAX_LENGTH,
   type TerminalMode,
   type TerminalTargetKind,
   terminalModeSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   IsIn,
   IsNotEmpty,

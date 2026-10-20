@@ -1,4 +1,4 @@
-import type { AuditRecordView } from '@agentdock/shared';
+import type { AuditRecordView } from '@nautelle/shared';
 
 /** Names the audit page can resolve, keyed by the record's `targetType`. */
 export interface NameSources {

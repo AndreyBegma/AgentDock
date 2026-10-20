@@ -4,7 +4,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   type RegisterRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,

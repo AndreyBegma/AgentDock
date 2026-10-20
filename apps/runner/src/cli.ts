@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { TERSE_REGISTER } from '@agentdock/shared';
-import type { Host } from '@agentdock/shared/protocol';
+import { TERSE_REGISTER } from '@nautelle/shared';
+import type { Host } from '@nautelle/shared/protocol';
 import { accessHeaders, accessOf } from './access';
 import { runClaude } from './claude';
 import type { Clock } from './clock';

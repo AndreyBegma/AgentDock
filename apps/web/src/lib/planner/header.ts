@@ -1,4 +1,4 @@
-import type { PlanDetail, PlanTaskView } from '@agentdock/shared';
+import type { PlanDetail, PlanTaskView } from '@nautelle/shared';
 import { canApprove, isClosed } from './format';
 
 /**

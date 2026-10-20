@@ -4,7 +4,7 @@ import type {
   FleetOrchestratorNode,
   FleetPlannedNode,
   FleetSlotNode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { slotHue } from '../hue';
 import { ORCHESTRATOR_STATUS_LABEL } from './format';
 import {

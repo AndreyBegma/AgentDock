@@ -1,7 +1,7 @@
 import {
   type IgnoreTerminalSetupProfileRequest,
   TERMINAL_SETUP_PROFILE_KEY_MAX_LENGTH,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { IsBoolean, IsString, Matches, MaxLength } from 'class-validator';
 
 /** `PUT /projects/:projectId/terminal-setup/ignored-profiles` (#719). */

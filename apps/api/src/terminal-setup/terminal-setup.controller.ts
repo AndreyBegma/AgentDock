@@ -1,4 +1,4 @@
-import type { TerminalSetupView } from '@agentdock/shared';
+import type { TerminalSetupView } from '@nautelle/shared';
 import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import { AuditCtx } from '../audit/audit-context';

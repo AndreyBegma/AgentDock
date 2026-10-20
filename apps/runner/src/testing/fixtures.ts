@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { UnsequencedEvent } from '@agentdock/shared/protocol';
+import type { UnsequencedEvent } from '@nautelle/shared/protocol';
 import type { Exec, ExecResult } from '../detect/exec';
 import { createLogger, type Logger } from '../log';
 

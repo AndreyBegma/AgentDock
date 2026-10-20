@@ -2,7 +2,7 @@ import type {
   GitHubAppHealth,
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type Clock, systemClock } from '../clock';
 import type { Exec } from '../detect/exec';
 import { errorMessage, type Logger } from '../log';

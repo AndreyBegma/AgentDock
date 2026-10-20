@@ -4,12 +4,12 @@ import {
   type TerminalErrorBody,
   type TerminalErrorCode,
   type TerminalTicketResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   capabilitiesSchema,
   type TerminalTarget,
   terminalAvailable,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import type { AuthContext } from '../auth';
 import { PrismaService } from '../database/prisma.service';

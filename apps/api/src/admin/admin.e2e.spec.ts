@@ -1,4 +1,4 @@
-import { AUTH_ERROR, REGISTRATION_SETTING_KEY } from '@agentdock/shared';
+import { AUTH_ERROR, REGISTRATION_SETTING_KEY } from '@nautelle/shared';
 import {
   createE2eApp,
   createUser,

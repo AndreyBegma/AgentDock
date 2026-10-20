@@ -1,11 +1,5 @@
 'use client';
 
-import type {
-  AcceptBoardCardRequest,
-  BoardCardView,
-  CardPullRequestView,
-} from '@agentdock/shared';
-import type { RunnerCommands } from '@agentdock/shared/protocol';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
@@ -13,6 +7,12 @@ import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Radio, RadioGroup } from '@andrewbehma/glass-ui/radio-group';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type {
+  AcceptBoardCardRequest,
+  BoardCardView,
+  CardPullRequestView,
+} from '@nautelle/shared';
+import type { RunnerCommands } from '@nautelle/shared/protocol';
 import { useEffect, useState } from 'react';
 import {
   type AcceptChoice,

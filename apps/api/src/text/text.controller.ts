@@ -1,7 +1,7 @@
 import type {
   TextNormalizationsResponse,
   TextSettingsView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   BadRequestException,
   Body,

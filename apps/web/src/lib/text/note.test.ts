@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { TextFieldView } from '@agentdock/shared';
+import type { TextFieldView } from '@nautelle/shared';
 import { findFieldView, noteModel } from './note';
 
 const view = (over: Partial<TextFieldView>): TextFieldView => ({

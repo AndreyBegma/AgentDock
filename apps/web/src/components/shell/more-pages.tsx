@@ -1,11 +1,11 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
 import {
   ActionList,
   type ActionListProps,
 } from '@andrewbehma/glass-ui/action-list';
 import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
+import type { ProjectSummary } from '@nautelle/shared';
 import Link from 'next/link';
 import { approvalsBadge } from '../../lib/approvals/format';
 import { attentionBadge } from '../../lib/fleet/format';

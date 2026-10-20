@@ -3,7 +3,7 @@ import {
   type AttachmentErrorBody,
   type AttachmentErrorCode,
   type AttachmentRefusal,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /**

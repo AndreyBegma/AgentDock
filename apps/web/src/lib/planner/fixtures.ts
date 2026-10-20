@@ -3,7 +3,7 @@ import type {
   PlanQuestion,
   PlanTaskView,
   PlanTurnView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** Planner fixtures for the tests: a batch plan of three tasks, mid-review. */
 

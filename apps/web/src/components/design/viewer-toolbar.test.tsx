@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_VIEWPORTS } from '@agentdock/shared';
+import { DEFAULT_VIEWPORTS } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { design, revision } from '../../lib/design/fixtures';
 import { resolveViewerState } from '../../lib/design/viewer-state';

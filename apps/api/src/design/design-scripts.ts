@@ -3,7 +3,7 @@ import type {
   DesignFrameDraft,
   PlannerParseResult,
   PlanTurnAction,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * #690, spec 223 D6: every inline script of a drawn frame must run in the

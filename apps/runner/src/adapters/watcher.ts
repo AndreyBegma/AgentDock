@@ -9,7 +9,7 @@ import {
   sessionEventDataSchemas,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Cancel, Clock } from '../clock';
 import type { ConfigProfile } from '../config';
 import { errorMessage, type Logger } from '../log';

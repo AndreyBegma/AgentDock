@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { CARD_RUN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
+import { CARD_RUN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 import { acceptanceChecklist, freshSeed, type SeedInput } from './seed';
 import { cardNumberOfPrompt } from './state';
 import { validNote } from './testing';

@@ -6,7 +6,7 @@ import {
   readSync,
 } from 'node:fs';
 import { basename, join } from 'node:path';
-import { type FilterStatRow, filterStatRowSchema } from '@agentdock/shared';
+import { type FilterStatRow, filterStatRowSchema } from '@nautelle/shared';
 import { FILTER_STATS_FILE } from './env';
 
 /**

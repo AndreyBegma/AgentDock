@@ -1,11 +1,11 @@
 'use client';
 
-import type { CardHandoffView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { CardHandoffView } from '@nautelle/shared';
 import { useState } from 'react';
 import { Time } from '../../../lib/format/time';
 import {

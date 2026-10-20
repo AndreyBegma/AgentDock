@@ -1,6 +1,5 @@
 'use client';
 
-import type { TextFieldView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import {
@@ -11,6 +10,7 @@ import {
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { TextFieldView } from '@nautelle/shared';
 import { useState } from 'react';
 import { describeBoardError } from '../../lib/board/format';
 import { noteModel } from '../../lib/text/note';

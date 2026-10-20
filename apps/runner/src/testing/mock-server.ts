@@ -4,7 +4,7 @@ import {
   type RunnerMessage,
   runnerMessageSchema,
   type ServerMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Server, ServerWebSocket } from 'bun';
 
 interface SocketData {

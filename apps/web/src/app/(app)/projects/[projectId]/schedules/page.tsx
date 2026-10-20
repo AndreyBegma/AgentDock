@@ -1,17 +1,17 @@
 'use client';
 
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import type {
   AdminRunnerDetail,
   InstalledSkillsView,
   ScheduleView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   SCHEDULE_FIRING_UPDATED_LIVE_EVENT,
   SCHEDULE_UPDATED_LIVE_EVENT,
-} from '@agentdock/shared';
-import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
 import { CalendarPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';

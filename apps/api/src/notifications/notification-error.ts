@@ -1,7 +1,7 @@
 import type {
   NotificationErrorBody,
   NotificationErrorCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the notification routes, shaped like every other API error. */

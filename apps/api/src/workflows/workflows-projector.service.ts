@@ -1,4 +1,4 @@
-import type { Runtime } from '@agentdock/shared/protocol';
+import type { Runtime } from '@nautelle/shared/protocol';
 import {
   Inject,
   Injectable,

@@ -10,7 +10,7 @@ import {
   type TokenSaverRunKind,
   type TokenSaverSessionKind,
   type TokenSaverUnmeasuredKind,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import { formatCost, formatNumber, formatTokens } from '../format';
 

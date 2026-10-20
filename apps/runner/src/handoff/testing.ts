@@ -1,4 +1,4 @@
-import { HANDOFF_NOTE_TEMPLATE } from '@agentdock/shared';
+import { HANDOFF_NOTE_TEMPLATE } from '@nautelle/shared';
 
 /** A valid note (#449 D5) with `goal`, and `next` under "## Next". */
 export const validNote = (goal = 'Ship the login page.', next = ''): string =>

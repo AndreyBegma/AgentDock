@@ -1,4 +1,4 @@
-import { AI_LANGUAGE_PATTERN, type AiSummaryRequest } from '@agentdock/shared';
+import { AI_LANGUAGE_PATTERN, type AiSummaryRequest } from '@nautelle/shared';
 import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 
 /** `POST …/summary` (#658): the reader's language, and whether to make it again. */

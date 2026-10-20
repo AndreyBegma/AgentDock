@@ -5,7 +5,7 @@ import {
   type TerminalSetupProfileFacts,
   type TerminalSetupView,
   terminalSetup,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   setupItemTitle,
   stepNeedsAdmin,

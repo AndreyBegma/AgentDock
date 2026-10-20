@@ -4,7 +4,7 @@ import type {
   SessionToolNode,
   SessionTotals,
   SessionTreeNode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   buildTrace,
   describeSessionHint,

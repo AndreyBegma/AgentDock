@@ -1,4 +1,4 @@
-import type { PaneDialog } from '@agentdock/shared/protocol';
+import type { PaneDialog } from '@nautelle/shared/protocol';
 
 /**
  * The Claude Code launch dialogs `watch.sh` recognises (spec 11 D2), in

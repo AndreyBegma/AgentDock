@@ -1,10 +1,5 @@
 'use client';
 
-import type {
-  ProjectSummary,
-  SessionListResponse,
-  SessionSummary,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DataTable } from '@andrewbehma/glass-ui/data-table';
@@ -12,6 +7,11 @@ import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Section } from '@andrewbehma/glass-ui/section';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type {
+  ProjectSummary,
+  SessionListResponse,
+  SessionSummary,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';

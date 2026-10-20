@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { SESSION_COOKIE } from '@agentdock/shared';
+import { SESSION_COOKIE } from '@nautelle/shared';
 import { NextRequest } from 'next/server';
 import nextConfig from '../next.config';
 import { config, PUBLIC_FILES, proxy } from './proxy';

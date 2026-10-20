@@ -1,4 +1,4 @@
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../../database/prisma.service';
 

@@ -1,5 +1,5 @@
-import type { PlanDetail, PlanTaskView } from '@agentdock/shared';
 import type { FlowEdge, FlowNode } from '@andrewbehma/glass-ui/flow-graph';
+import type { PlanDetail, PlanTaskView } from '@nautelle/shared';
 import { KIND_HUE, KIND_LABEL, taskStatusView } from './format';
 
 /** What a plan graph node carries: the task, and what its card says. */

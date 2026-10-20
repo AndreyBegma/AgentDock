@@ -13,7 +13,7 @@ import {
   type OrchestratorTargetArgs,
   orchestratorSessionName,
   type StoppedResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { isoNow } from '../clock';
 import { ORCHESTRATOR_SKILL } from '../collectors/orchestrator/orchestrator';
 import { classifyPane } from '../collectors/tmux/classify';

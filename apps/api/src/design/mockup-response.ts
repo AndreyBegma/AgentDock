@@ -2,7 +2,7 @@ import {
   injectPinHelper,
   MOCKUP_RESPONSE_HEADERS,
   type UiProfileSnippet,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Response } from 'express';
 
 /**

@@ -1,7 +1,7 @@
 import {
   SESSION_MESSAGE_MAX_CHARS,
   type SessionMessageInput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   IsIn,
   IsInt,

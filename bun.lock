@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "agentdock",
+      "name": "nautelle",
       "devDependencies": {
         "@biomejs/biome": "2.4.10",
         "turbo": "2.9.5",
@@ -11,10 +11,10 @@
       },
     },
     "apps/api": {
-      "name": "@agentdock/api",
+      "name": "@nautelle/api",
       "version": "0.0.1",
       "dependencies": {
-        "@agentdock/shared": "workspace:*",
+        "@nautelle/shared": "workspace:*",
         "@anthropic-ai/sdk": "0.135.0",
         "@nestjs/bullmq": "11.0.5",
         "@nestjs/common": "^11.1.0",
@@ -63,13 +63,13 @@
       },
     },
     "apps/runner": {
-      "name": "@agentdock/runner",
+      "name": "@nautelle/runner",
       "version": "0.13.0",
       "bin": {
         "agentdock-runner": "./dist/agentdock-runner",
       },
       "dependencies": {
-        "@agentdock/shared": "workspace:*",
+        "@nautelle/shared": "workspace:*",
         "@modelcontextprotocol/sdk": "1.31.0",
         "protobufjs": "8.8.0",
         "zod": "4.6.5",
@@ -80,10 +80,10 @@
       },
     },
     "apps/web": {
-      "name": "@agentdock/web",
+      "name": "@nautelle/web",
       "version": "0.0.1",
       "dependencies": {
-        "@agentdock/shared": "workspace:*",
+        "@nautelle/shared": "workspace:*",
         "@andrewbehma/glass-ui": "0.37.0",
         "@dagrejs/dagre": "3.1.1",
         "@radix-ui/react-context-menu": "2.3.8",
@@ -116,7 +116,7 @@
       },
     },
     "packages/shared": {
-      "name": "@agentdock/shared",
+      "name": "@nautelle/shared",
       "version": "0.0.1",
       "dependencies": {
         "zod": "4.6.5",
@@ -128,13 +128,13 @@
     },
   },
   "packages": {
-    "@agentdock/api": ["@agentdock/api@workspace:apps/api"],
+    "@nautelle/api": ["@nautelle/api@workspace:apps/api"],
 
-    "@agentdock/runner": ["@agentdock/runner@workspace:apps/runner"],
+    "@nautelle/runner": ["@nautelle/runner@workspace:apps/runner"],
 
-    "@agentdock/shared": ["@agentdock/shared@workspace:packages/shared"],
+    "@nautelle/shared": ["@nautelle/shared@workspace:packages/shared"],
 
-    "@agentdock/web": ["@agentdock/web@workspace:apps/web"],
+    "@nautelle/web": ["@nautelle/web@workspace:apps/web"],
 
     "@alloc/quick-lru": ["@alloc/quick-lru@5.3.0", "", {}, "sha512-U4+70Pc5ZS9osnCBCE5Jha/ciHM+Yp+CNMNC/7HvYbNRk1Ldd+f7qO65W5qfhu/TCv+/ozljlXXe9Nj8419DMA=="],
 

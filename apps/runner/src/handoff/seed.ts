@@ -1,5 +1,5 @@
-import { estimateHandoffTokens } from '@agentdock/shared';
-import { CARD_RUN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
+import { estimateHandoffTokens } from '@nautelle/shared';
+import { CARD_RUN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 import type { Exec } from '../detect/exec';
 import { GIT_TIMEOUT_MS } from '../skills/deps';
 

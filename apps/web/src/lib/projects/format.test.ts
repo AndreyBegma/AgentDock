@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { PROJECT_ERROR } from '@agentdock/shared';
-import type { ProjectInspection } from '@agentdock/shared/protocol';
+import { PROJECT_ERROR } from '@nautelle/shared';
+import type { ProjectInspection } from '@nautelle/shared/protocol';
 import { ApiError } from '../api';
 import {
   connectBlocker,

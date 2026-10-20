@@ -1,4 +1,4 @@
-import type { TaskDesignStatus } from '@agentdock/shared';
+import type { TaskDesignStatus } from '@nautelle/shared';
 import type { TaskDesign } from '@prisma/client';
 import type { PlanActor } from '../planner/plan.service';
 import type { PlanCaller } from '../planner/plan-turn.service';

@@ -1,4 +1,4 @@
-import type { PlannedTask, PlanQuestion } from '@agentdock/shared';
+import type { PlannedTask, PlanQuestion } from '@nautelle/shared';
 import {
   afterGrill,
   type CurrentTask,

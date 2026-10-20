@@ -1,17 +1,17 @@
 'use client';
 
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Section } from '@andrewbehma/glass-ui/section';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import type {
   ActivityPage,
   ApprovalsView,
   FleetView,
   RunPage,
   RunSummary,
-} from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
-import { buttonClassName } from '@andrewbehma/glass-ui/button';
-import { Section } from '@andrewbehma/glass-ui/section';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
-import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import NextLink from 'next/link';
 import type { ReactNode } from 'react';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';

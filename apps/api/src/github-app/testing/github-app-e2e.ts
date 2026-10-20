@@ -1,5 +1,5 @@
 import { generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
-import type { CollectorPollArgs } from '@agentdock/shared/protocol';
+import type { CollectorPollArgs } from '@nautelle/shared/protocol';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';

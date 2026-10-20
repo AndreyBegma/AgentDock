@@ -4,7 +4,7 @@ import {
   type TerminalAttachView,
   type TerminalRefusalCode,
   type TerminalServerFrame,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CommandErrorCode,
   TERMINAL_HISTORY_TIMEOUT_MS,
@@ -12,7 +12,7 @@ import {
   type TerminalCloseReason,
   type TerminalMode,
   type TerminalTarget,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Inject,
   Injectable,

@@ -5,7 +5,7 @@ import {
   PENDING_QUESTION_TEXT_MAX_CHARS,
   type PendingQuestion,
   pendingQuestionSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * #473: Claude Code's question selector — the `AskUserQuestion` tool waiting

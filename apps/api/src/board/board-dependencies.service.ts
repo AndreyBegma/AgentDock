@@ -7,8 +7,8 @@ import {
   isActiveRoundPhase,
   openDependencies,
   type Role,
-} from '@agentdock/shared';
-import { roleAtLeast } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { roleAtLeast } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { BoardColumn, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

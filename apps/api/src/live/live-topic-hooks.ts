@@ -3,7 +3,7 @@ import {
   type LiveTopic,
   type LiveTopicPrefix,
   parseLiveTopic,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { LiveClient } from './live-connections';
 

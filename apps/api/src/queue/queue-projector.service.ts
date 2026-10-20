@@ -1,4 +1,4 @@
-import { QUEUE_LIVE_EVENT, type QueueLiveChange } from '@agentdock/shared';
+import { QUEUE_LIVE_EVENT, type QueueLiveChange } from '@nautelle/shared';
 import {
   type IssueClosedData,
   type IssuesSnapshotData,
@@ -8,7 +8,7 @@ import {
   parseQueueEvent,
   type QueueEvent,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

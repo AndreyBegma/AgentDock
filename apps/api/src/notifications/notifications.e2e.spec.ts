@@ -1,7 +1,4 @@
-import type {
-  NotificationPage,
-  NotificationRulesView,
-} from '@agentdock/shared';
+import type { NotificationPage, NotificationRulesView } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { SYSTEM_ACTOR, userActor } from '../audit/audit.types';

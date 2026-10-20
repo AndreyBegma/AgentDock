@@ -1,4 +1,4 @@
-import { WORK_ERROR, type WorkErrorCode } from '@agentdock/shared';
+import { WORK_ERROR, type WorkErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the work routes, shaped like every other API error. */

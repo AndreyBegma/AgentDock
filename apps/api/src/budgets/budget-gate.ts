@@ -1,4 +1,4 @@
-import type { BudgetScope } from '@agentdock/shared';
+import type { BudgetScope } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { BudgetExceededError } from './budget-error';

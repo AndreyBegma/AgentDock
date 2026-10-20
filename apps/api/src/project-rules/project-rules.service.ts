@@ -8,7 +8,7 @@ import {
   parseRulesMarkdown,
   ruleTitleKey,
   textFieldsSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { ProjectRule } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

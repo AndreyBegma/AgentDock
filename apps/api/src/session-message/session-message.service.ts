@@ -6,7 +6,7 @@ import {
   type SessionMessageInput,
   type SessionMessageOutcome,
   type SessionMessageVia,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   capabilitiesSchema,
   type Role,
@@ -14,7 +14,7 @@ import {
   type SessionMessageTarget,
   sessionMessageArgsSchema,
   sessionMessageAvailable,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { HttpException, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';

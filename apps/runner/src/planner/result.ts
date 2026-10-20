@@ -4,7 +4,7 @@ import {
   PLAN_TURN_RESULT_MAX_BYTES,
   type PlanTurnTerminalPhase,
   planSessionIdSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { redact } from '../pane/redact';
 import type { ExitRecord } from '../skills/run/record';
 import { finalResult } from '../skills/run/stream';

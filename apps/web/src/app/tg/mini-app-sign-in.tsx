@@ -1,11 +1,11 @@
 'use client';
 
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Spinner } from '@andrewbehma/glass-ui/spinner';
 import type {
   TelegramSignInRequest,
   TelegramSignInResponse,
-} from '@agentdock/shared';
-import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import { Spinner } from '@andrewbehma/glass-ui/spinner';
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';

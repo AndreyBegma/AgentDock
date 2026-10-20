@@ -1,4 +1,4 @@
-import { PAIRING_PATH, RUNNER_SOCKET_PATH } from '@agentdock/shared/protocol';
+import { PAIRING_PATH, RUNNER_SOCKET_PATH } from '@nautelle/shared/protocol';
 
 export class ServerUrlError extends Error {}
 

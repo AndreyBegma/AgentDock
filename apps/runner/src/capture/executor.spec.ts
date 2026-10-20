@@ -5,7 +5,7 @@ import type {
   CardsExtractArgs,
   CardsExtractFinishedData,
   UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { expectTextCallWired } from '../launch/testing';

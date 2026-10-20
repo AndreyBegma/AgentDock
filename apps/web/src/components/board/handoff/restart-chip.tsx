@@ -1,6 +1,6 @@
-import { type BoardCardView, restartChipLabel } from '@agentdock/shared';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import { type BoardCardView, restartChipLabel } from '@nautelle/shared';
 
 /**
  * #449 D9: how the latest round's session started — `resumed from handoff ·

@@ -1,4 +1,4 @@
-import type { WorkflowsSummaryResponse } from '@agentdock/shared';
+import type { WorkflowsSummaryResponse } from '@nautelle/shared';
 import { adminSession } from '../runners/testing/runner-e2e';
 import {
   createE2eApp,

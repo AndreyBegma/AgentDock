@@ -1,4 +1,4 @@
-import type { BoardCardDetail } from '@agentdock/shared';
+import type { BoardCardDetail } from '@nautelle/shared';
 import {
   BOARD_CALLBACK_PREFIXES,
   boardFailureText,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { WorkItem } from '@agentdock/shared';
+import type { WorkItem } from '@nautelle/shared';
 import {
   EMPTY_WORK_FILTERS,
   filtersFromSearch,

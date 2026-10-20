@@ -1,14 +1,14 @@
 'use client';
 
+import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Field, Input } from '@andrewbehma/glass-ui/field';
 import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   type RegisterRequest,
   type RegisterResponse,
   type RegistrationState,
-} from '@agentdock/shared';
-import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import { Field, Input } from '@andrewbehma/glass-ui/field';
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';

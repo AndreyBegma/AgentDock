@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import {
   issueCreateArgsSchema,
   issueCreateCommand,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { IssuesRefreshers } from '../../collectors/issues/refresh';
 import type { Exec, ExecResult } from '../../detect/exec';
 import { tempDir } from '../../testing/fixtures';

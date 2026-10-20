@@ -3,7 +3,7 @@ import {
   type DesignProgressView,
   STALL_AFTER_MS,
   type TaskDesignView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** What a queued run says, build or turn alike. */
 export const WAITING_FOR_SLOT = 'Waiting for a free runner slot…';

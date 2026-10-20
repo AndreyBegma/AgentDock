@@ -2,13 +2,13 @@
 
 ## What to do
 Codemod the internal names:
-- `@agentdock/shared` → `@nautelle/shared` (about 1,700 imports), `@agentdock/web`, `@agentdock/api`, `@agentdock/runner` workspace names, turbo filters, tsconfig paths;
+- the `@agentdock` package scope → `@nautelle`: `shared` (about 1,700 imports), `web`, `api` and `runner` workspace names, turbo filters, tsconfig paths;
 - type, class, constant and test names that carry the product name, where renaming is safe;
 - `.woodpecker/**` and scripts that name the workspaces.
 Leave env vars, runner paths, the npm runner package, the plugin name, tmux prefixes and the database name to the next card.
 
 ## Acceptance criteria
-- [ ] `git grep -i '@agentdock/'` is empty.
+- [ ] `git grep -i` for the old package scope (`@agentdock` followed by a slash) is empty.
 - [ ] Build, typecheck, tests and `bun run check` pass; CI is green.
 
 ## Context

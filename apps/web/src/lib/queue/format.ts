@@ -10,7 +10,7 @@ import {
   SPEC_GAP_TEXT,
   type SpecGap,
   specGap,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import { updateRunnerText } from '../control/format';
 import type { FilterCodec } from '../filters/url-filters';

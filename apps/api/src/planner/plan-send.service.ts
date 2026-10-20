@@ -1,11 +1,11 @@
-import { PLANNER_ERROR, type PlannerSpecOutput } from '@agentdock/shared';
+import { PLANNER_ERROR, type PlannerSpecOutput } from '@nautelle/shared';
 import {
   docsPublishSpecsArgsSchema,
   issueCreateArgsSchema,
   PLAN_QUEUE_ISSUES_MAX,
   planDocsBranch,
   planPublishSpecsArgsSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { Plan, PlanTask } from '@prisma/client';
 import { z } from 'zod';

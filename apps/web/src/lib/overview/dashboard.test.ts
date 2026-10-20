@@ -7,7 +7,7 @@ import type {
   ProjectSummary,
   RunSummary,
   SlotSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   approvalsHref,
   costByProject,

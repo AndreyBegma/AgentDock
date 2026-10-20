@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { UnsequencedEvent } from '@agentdock/shared/protocol';
+import type { UnsequencedEvent } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../../config';
 import { tempDir } from '../../testing/fixtures';
 import { adapters } from '../index';

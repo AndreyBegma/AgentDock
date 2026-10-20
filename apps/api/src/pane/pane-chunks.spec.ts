@@ -1,4 +1,4 @@
-import type { PaneFrame } from '@agentdock/shared/protocol';
+import type { PaneFrame } from '@nautelle/shared/protocol';
 import { chunkPaneFrame } from './pane-chunks';
 
 const size = (frame: PaneFrame) => Buffer.byteLength(JSON.stringify(frame));

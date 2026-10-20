@@ -7,7 +7,7 @@ import {
   type CardCiState,
   type CardNeedsPersonReason,
   type CardPullRequestRef,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { PR_STATE_LABEL } from './pull-request';
 
 /** #359 D5: the CI dot beside the PR chip. `null` while the PR has no checks to show. */

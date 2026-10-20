@@ -7,7 +7,7 @@ import {
   type GitHubAppCredentialsRequest,
   type GitHubAppView,
   type GitHubHealthReason,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 import {
   ENCRYPTION_KEY_REMEDY,

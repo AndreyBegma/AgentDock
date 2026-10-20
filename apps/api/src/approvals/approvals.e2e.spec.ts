@@ -3,8 +3,8 @@ import {
   APPROVALS_LIVE_EVENT,
   type ApprovalDetail,
   type ApprovalsView,
-} from '@agentdock/shared';
-import type { PrInspection, RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { PrInspection, RunnerEvent } from '@nautelle/shared/protocol';
 import { EventStream, ROOT, seedProject } from '../fleet/testing/fleet-e2e';
 import { allowedLiveOrigin } from '../live/live-options';
 import {

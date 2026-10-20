@@ -7,7 +7,7 @@ import {
   type SkillRunPhase,
   skillPhaseToRunStatus,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../../commands/failure';
 import type { ConfigProfile } from '../../config';
 import type { Exec } from '../../detect/exec';

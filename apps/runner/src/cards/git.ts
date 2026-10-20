@@ -17,13 +17,13 @@ import {
   CARD_PR_MARKER,
   cardWipCommitMessage,
   divergedBranchMessage,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CardCollectArgs,
   CardCollectPrState,
   CardCollectResult,
   CardRunFile,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { CommandFailure } from '../commands/failure';
 import {

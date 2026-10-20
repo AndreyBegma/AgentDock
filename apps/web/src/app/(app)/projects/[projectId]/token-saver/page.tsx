@@ -1,13 +1,13 @@
 'use client';
 
-import {
-  isUnfilteredId,
-  LAST_RUNNER_WITHOUT_FILTER_REASONS,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Section } from '@andrewbehma/glass-ui/section';
 import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
+import {
+  isUnfilteredId,
+  LAST_RUNNER_WITHOUT_FILTER_REASONS,
+} from '@nautelle/shared';
 import { Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';

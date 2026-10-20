@@ -5,7 +5,7 @@ import type {
   ProjectSummary,
   SessionDetail,
   SkillRunDetail,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { type CrumbNames, planLabel, sessionLabel } from './crumbs';

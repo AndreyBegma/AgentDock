@@ -1,7 +1,7 @@
 import {
   PAIRING_CODE_ALPHABET,
   PAIRING_CODE_PATTERN,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { advanceCursor } from './ack-cursor';
 import {
   bearerToken,

@@ -1,13 +1,5 @@
 'use client';
 
-import type {
-  AcceptCandidatesRequest,
-  AcceptCandidatesResponse,
-  PlanCandidateView,
-  PlanDetail,
-  PlanListView,
-  PlanSummary,
-} from '@agentdock/shared';
 // glass-ui 0.34.0 exports `SelectionBar` from the barrel only (see bulk-action-bar.tsx).
 import { SelectionBar } from '@andrewbehma/glass-ui';
 import { Button } from '@andrewbehma/glass-ui/button';
@@ -15,6 +7,14 @@ import { Card } from '@andrewbehma/glass-ui/card';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  AcceptCandidatesRequest,
+  AcceptCandidatesResponse,
+  PlanCandidateView,
+  PlanDetail,
+  PlanListView,
+  PlanSummary,
+} from '@nautelle/shared';
 import { Layers, MessagesSquare } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';

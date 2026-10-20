@@ -3,7 +3,7 @@ import {
   WEBHOOK_CIRCUIT_STATES,
   WEBHOOK_EVENT_TYPES,
   WEBHOOKS_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import { EVENT_DESCRIPTION, triggerUrl } from './events';
 import { actionSummary, CIRCUIT_LABEL, describeWebhooksError } from './format';

@@ -6,7 +6,7 @@ import {
   type LiveEventMessage,
   type LiveTopic,
   liveServerMessageSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { type Reachability, reachability } from './reachability';
 
 /** What the status dot shows: connected, trying again, or given up. */

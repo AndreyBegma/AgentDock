@@ -1,4 +1,4 @@
-import type { AuditResult, Role } from '@agentdock/shared';
+import type { AuditResult, Role } from '@nautelle/shared';
 import {
   LOCAL_ROLE_CAP,
   type LocalErrorCode,
@@ -10,7 +10,7 @@ import {
   localMethods,
   parseLocalRequest,
   roleAtLeast,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   HttpException,
   Injectable,

@@ -2,7 +2,7 @@ import {
   effectiveProjectRole,
   type ProjectMemberView,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

@@ -1,5 +1,5 @@
 import type { KeyObject } from 'node:crypto';
-import { GITHUB_APP_ERROR } from '@agentdock/shared';
+import { GITHUB_APP_ERROR } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { GitHubApp } from '@prisma/client';
 import { SecretCipher } from '../common/crypto';

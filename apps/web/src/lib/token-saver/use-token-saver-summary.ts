@@ -1,6 +1,6 @@
 'use client';
 
-import type { TokenSaverSummary } from '@agentdock/shared';
+import type { TokenSaverSummary } from '@nautelle/shared';
 import { useSection } from '../section/use-section';
 import { fetchTokenSaverSummary } from './actions';
 import { emptySummary, mergeSummaries } from './summary';

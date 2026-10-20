@@ -4,7 +4,7 @@ import {
   CAPTURE_TITLE_MAX,
   captureFingerprint,
   type DismissAllResult,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';

@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import type { AdminRunnerDetail } from '@agentdock/shared';
+import type { AdminRunnerDetail } from '@nautelle/shared';
 import { resetDatabase, type Session } from '../test/e2e-app';
 import { API_ROOT } from '../test/test-database';
 import {

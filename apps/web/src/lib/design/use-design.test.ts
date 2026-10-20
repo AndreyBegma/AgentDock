@@ -3,7 +3,7 @@ import {
   BOARD_CHANGED_EVENT,
   DESIGN_LIVE_EVENT,
   PLANNER_LIVE_EVENT,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { isCardDesignChange, isDesignChange } from './use-design';
 
 describe('isCardDesignChange (#243)', () => {

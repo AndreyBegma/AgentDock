@@ -4,8 +4,8 @@ import {
   type RoundView,
   type SlotDetail,
   type SlotPage,
-} from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { allowedLiveOrigin } from '../live/live-options';
 import {
   createLiveE2eApp,

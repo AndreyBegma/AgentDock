@@ -3,7 +3,7 @@ import {
   policyRuleSchema,
   type RunnerPolicy,
   runnerPolicyOf,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 
 /**
  * ADR-0047: a runner's local security policy refusal, as the runner words it:

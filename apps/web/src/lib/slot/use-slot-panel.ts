@@ -7,7 +7,7 @@ import {
   type SlotConversation,
   type SlotDetail,
   type SlotWorktreeView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { useLive } from '../live/use-live';

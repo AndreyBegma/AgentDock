@@ -1,4 +1,4 @@
-import { GITHUB_POLL_DEBOUNCE_MS } from '@agentdock/shared';
+import { GITHUB_POLL_DEBOUNCE_MS } from '@nautelle/shared';
 import { type DebouncedPoll, PollDebouncer } from './poll-debouncer';
 
 describe('PollDebouncer (spec 27 D8)', () => {

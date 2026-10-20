@@ -1,9 +1,9 @@
 'use client';
 
-import { DESIGN_SKILLS_MAX, type DesignOwnerKind } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Combobox } from '@andrewbehma/glass-ui/combobox';
+import { DESIGN_SKILLS_MAX, type DesignOwnerKind } from '@nautelle/shared';
 import { Info, Save, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import {

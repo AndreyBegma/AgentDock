@@ -4,12 +4,12 @@ import {
   normalizeCodeSentinelLine,
   type SlotDetail,
   type SlotPage,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   EVENTS_DUPLICATE_EVENT,
   type EventSource,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   adminSession,
   createRunnerE2eApp,

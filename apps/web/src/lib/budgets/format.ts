@@ -15,7 +15,7 @@ import {
   type BudgetView,
   isValidTimeZone,
   normalizeThresholds,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';

@@ -1,4 +1,4 @@
-import type { IssuesRefreshResult } from '@agentdock/shared/protocol';
+import type { IssuesRefreshResult } from '@nautelle/shared/protocol';
 
 /** Polls one project's issues now, ignoring the ETag. */
 export type IssuesRefresher = () => Promise<IssuesRefreshResult>;

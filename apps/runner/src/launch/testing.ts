@@ -1,6 +1,6 @@
 import { expect } from 'bun:test';
 import { join } from 'node:path';
-import type { TokenSaverRunKind } from '@agentdock/shared';
+import type { TokenSaverRunKind } from '@nautelle/shared';
 import { FILTER_RUN_KIND_ENV, LAUNCH_SETTINGS_ENV } from '../filter/env';
 import {
   AUTOCOMPACT_PCT_ENV,

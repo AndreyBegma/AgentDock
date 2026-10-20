@@ -1,4 +1,4 @@
-import type { WebhookEventType } from '@agentdock/shared';
+import type { WebhookEventType } from '@nautelle/shared';
 
 /** What each outbound event means, in one line, beside its checkbox (spec 26 D9). */
 export const EVENT_DESCRIPTION: Record<WebhookEventType, string> = {

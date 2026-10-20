@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import {
   SLOT_MESSAGE_SEEN_MAX_BYTES,
   type SlotMessageSeenData,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { MESSAGE_FILE } from '../../control/slot';
 import type { FleetEmitter } from '../../fleet/project';
 import type { SlotBook } from '../../fleet/slots';

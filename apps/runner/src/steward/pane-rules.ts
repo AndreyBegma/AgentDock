@@ -3,7 +3,7 @@ import {
   STEWARD_PANE_TAIL_MAX_BYTES,
   type StewardDialogId,
   type StewardIncidentKind,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { matchKnownDialog } from '../cards/dialogs';
 import { matchQuestion } from '../cards/question';
 import { DIALOG_PATTERNS, QUOTA_MARKER } from '../collectors/tmux/classify';

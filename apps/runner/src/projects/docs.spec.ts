@@ -4,7 +4,7 @@ import { basename, dirname, join, relative, sep } from 'node:path';
 import {
   type DocsCandidate,
   docsSourceSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Exec } from '../detect/exec';
 import {
   type FsAccess,

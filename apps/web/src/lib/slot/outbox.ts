@@ -1,4 +1,4 @@
-import type { ConversationEntry } from '@agentdock/shared';
+import type { ConversationEntry } from '@nautelle/shared';
 
 /**
  * The chat's optimistic messages: what this tab sent to the worker and has

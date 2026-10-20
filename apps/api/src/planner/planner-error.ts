@@ -3,7 +3,7 @@ import type {
   NoProfileDetails,
   PlannerErrorBody,
   PlannerErrorCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** A refusal's details: `no_profile`'s (#272 D2), `candidate_decided`'s (#592). */

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AssistantConversationView } from '@agentdock/shared';
+import type { AssistantConversationView } from '@nautelle/shared';
 import { groupConversations } from './group-conversations';
 
 const conversation = (id: string, updatedAt: string) =>

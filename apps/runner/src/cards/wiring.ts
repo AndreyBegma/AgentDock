@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import type {
   CardRunWiring,
   CardRunWiringReason,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { readProfileAgentdock } from '../detect/capabilities';
 import { claudeConfigDir } from '../detect/profiles';

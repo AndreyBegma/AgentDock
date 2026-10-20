@@ -3,11 +3,11 @@ import {
   type CommandRunLiveEvent,
   type CommandRunView,
   type ControlErrorCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   OrchestratorMode,
   OrchestratorPermissionMode,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError, type ErrorHint } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';

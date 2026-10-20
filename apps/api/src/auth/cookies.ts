@@ -1,4 +1,4 @@
-import { CSRF_COOKIE, SESSION_COOKIE } from '@agentdock/shared';
+import { CSRF_COOKIE, SESSION_COOKIE } from '@nautelle/shared';
 import type { CookieOptions, Response } from 'express';
 import type { IssuedSession } from './session.service';
 import { SESSION_ABSOLUTE_MS } from './session.service';

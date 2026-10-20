@@ -5,12 +5,12 @@ import {
   type SkillInspectView,
   type SkillRunDetail,
   type SkillRunView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   InstalledSkill,
   RunnerEvent,
   SkillCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { seedProject } from '../fleet/testing/fleet-e2e';
 import { allowedLiveOrigin } from '../live/live-options';
 import {

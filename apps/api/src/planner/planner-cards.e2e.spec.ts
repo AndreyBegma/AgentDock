@@ -1,4 +1,4 @@
-import type { CreatePlanCardsResponse, PlanDetail } from '@agentdock/shared';
+import type { CreatePlanCardsResponse, PlanDetail } from '@nautelle/shared';
 import { decomposed, PlannerHarness, task } from './testing/planner-e2e';
 
 /** #337 D7, D11, D12: Create cards, and plans from before the Board planner. */

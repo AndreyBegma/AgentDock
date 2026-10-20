@@ -3,7 +3,7 @@ import {
   GITHUB_APP_PERMISSIONS,
   type GitHubAppView,
   type GitHubManifestResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Logger } from '@nestjs/common';
 import { ModulesContainer } from '@nestjs/core';
 import { SecretCipher } from '../common/crypto';

@@ -1,11 +1,11 @@
 'use client';
 
-import type { PlanDetail } from '@agentdock/shared';
 import {
   FlowGraph,
   FlowLegend,
   FlowNodeCard,
 } from '@andrewbehma/glass-ui/flow-graph';
+import type { PlanDetail } from '@nautelle/shared';
 import { useMemo } from 'react';
 import { KIND_LABEL } from '../../lib/planner/format';
 import { nodeLabel, planGraph } from '../../lib/planner/graph';

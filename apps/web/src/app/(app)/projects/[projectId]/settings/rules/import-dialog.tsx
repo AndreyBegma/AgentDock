@@ -1,9 +1,5 @@
 'use client';
 
-import {
-  PROJECT_RULE_IMPORT_MAX,
-  type ProjectRuleImportResult,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
@@ -15,6 +11,10 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
+import {
+  PROJECT_RULE_IMPORT_MAX,
+  type ProjectRuleImportResult,
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { api } from '../../../../../../lib/api';
 import {

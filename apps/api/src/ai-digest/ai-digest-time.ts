@@ -1,4 +1,4 @@
-import { AI_DIGEST_DEFAULTS, AI_DIGEST_TIME_PATTERN } from '@agentdock/shared';
+import { AI_DIGEST_DEFAULTS, AI_DIGEST_TIME_PATTERN } from '@nautelle/shared';
 
 interface Parts {
   year: number;

@@ -1,14 +1,14 @@
 'use client';
 
+import { Chip } from '@andrewbehma/glass-ui/chip';
+import type { TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import {
   ACTIVITY_ITEM_LIVE_EVENT,
   type ActivityCategory,
   type ActivityItem,
   type ActivitySeverity,
   type LiveTopic,
-} from '@agentdock/shared';
-import { Chip } from '@andrewbehma/glass-ui/chip';
-import type { TimelineItem } from '@andrewbehma/glass-ui/timeline';
+} from '@nautelle/shared';
 import { Bot, GitPullRequest, Server, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {

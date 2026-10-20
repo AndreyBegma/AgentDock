@@ -1,9 +1,9 @@
-import type { AdminRunnerDetail } from '@agentdock/shared';
+import type { AdminRunnerDetail } from '@nautelle/shared';
 import {
   RUNNER_CLOSE_CODES,
   type RunnerEvent,
   SPOOL_TRUNCATED_EVENT,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { resetDatabase, type Session } from '../test/e2e-app';
 import { generateRunnerToken } from './credentials';
 import { RunnerConnectHooks } from './runner-connect-hooks';

@@ -21,7 +21,7 @@ import {
   repoSearchArgsSchema,
   repoSearchResultSchema,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CaptureSpawn } from '../capture/executor';
 import { createDispatcher } from '../commands/dispatcher';
 import { CommandFailure } from '../commands/failure';

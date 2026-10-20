@@ -1,4 +1,4 @@
-import { TERMINAL_HISTORY_LINES } from '@agentdock/shared/protocol';
+import { TERMINAL_HISTORY_LINES } from '@nautelle/shared/protocol';
 
 /**
  * Inline scrollback of an attach (#522). tmux redraws the whole screen of an

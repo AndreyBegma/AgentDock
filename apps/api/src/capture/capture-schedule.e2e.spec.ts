@@ -2,7 +2,7 @@ import {
   CAPTURE_IDLE_DELAY_MS,
   CAPTURE_SESSION_END_DELAY_MS,
   captureJobId,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { CaptureWorker } from './capture-worker';
 import { CaptureWorld, LONG_PROMPT } from './testing/capture-e2e';
 

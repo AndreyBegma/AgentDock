@@ -2,7 +2,7 @@ import {
   BOARD_CARD_KINDS,
   type BoardCardKind,
   TRIAGE_PRIORITIES,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { z } from 'zod';
 
 /** Duplicates one card shows, at most. */

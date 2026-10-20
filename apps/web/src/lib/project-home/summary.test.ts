@@ -4,7 +4,7 @@ import type {
   FleetView,
   RunSummary,
   SlotSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { isTask, needsYou, recentResult, summarySentence } from './summary';
 
 const run = (over: Partial<RunSummary>): RunSummary =>

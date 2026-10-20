@@ -1,9 +1,9 @@
 'use client';
 
-import type { ProjectSummary, Role } from '@agentdock/shared';
 import { ActionList } from '@andrewbehma/glass-ui/action-list';
 import { BottomCapsule } from '@andrewbehma/glass-ui/bottom-capsule';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import type { ProjectSummary, Role } from '@nautelle/shared';
 import { Plus, SquarePen } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';

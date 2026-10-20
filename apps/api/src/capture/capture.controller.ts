@@ -2,7 +2,7 @@ import {
   CAPTURE_PAGE_SIZE,
   type CardCapturePage,
   type CardCaptureView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { IsOptional, Matches } from 'class-validator';
 import { PrismaService } from '../database/prisma.service';

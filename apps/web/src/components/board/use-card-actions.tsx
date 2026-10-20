@@ -1,14 +1,14 @@
 'use client';
 
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import type {
   AcceptBoardCardRequest,
   AcceptSuggestionRequest,
   BoardCardView,
   RunBoardCardRequest,
-} from '@agentdock/shared';
-import type { RunnerCommands } from '@agentdock/shared/protocol';
-import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
+import type { RunnerCommands } from '@nautelle/shared/protocol';
 import { type ReactNode, useCallback, useState } from 'react';
 import {
   acceptedMessage,

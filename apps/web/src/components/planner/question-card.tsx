@@ -1,12 +1,12 @@
 'use client';
 
-import type { PlanQuestion } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { Radio, RadioGroup } from '@andrewbehma/glass-ui/radio-group';
+import type { PlanQuestion } from '@nautelle/shared';
 import { Sparkles } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { type CardAnswer, isRecommended } from '../../lib/planner/answers';

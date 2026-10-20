@@ -1,3 +1,4 @@
+import type { ChartSeries } from '@andrewbehma/glass-ui/chart';
 import {
   FILTER_ID_NONE,
   FILTER_ID_NONE_COMPOUND,
@@ -16,8 +17,7 @@ import {
   type TokenSaverSessionKind,
   type TokenSaverSummary,
   type TokenSaverUnfilteredProgram,
-} from '@agentdock/shared';
-import type { ChartSeries } from '@andrewbehma/glass-ui/chart';
+} from '@nautelle/shared';
 import { passThroughShare } from './format';
 
 const sum = (a: TokenSavedView, b: TokenSavedView): TokenSavedView => ({

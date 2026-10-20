@@ -1,4 +1,4 @@
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import type { Clock } from '../clock';
 import type { ConfigProfile } from '../config';
 import type { Exec } from '../detect/exec';

@@ -3,7 +3,7 @@
 import {
   TOKEN_SAVER_UNMEASURED_KINDS,
   type TokenSaverCostPerRound,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { ReactNode } from 'react';
 import { formatCost, formatNumber, formatTokens } from '../../lib/format';
 import {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import type { BoardCardView, TaskDesignStatus } from '@agentdock/shared';
-import type { CardRunWiringReason } from '@agentdock/shared/protocol';
+import type { BoardCardView, TaskDesignStatus } from '@nautelle/shared';
+import type { CardRunWiringReason } from '@nautelle/shared/protocol';
 import { ApiError } from '../api';
 import { boardView, card, round } from './fixtures';
 import {

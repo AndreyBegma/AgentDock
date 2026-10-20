@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { TokenSaverRunKind } from '@agentdock/shared';
+import type { TokenSaverRunKind } from '@nautelle/shared';
 
 /**
  * The environment a launch gives its Claude session so the command-output
@@ -30,7 +30,7 @@ export const LAUNCH_SETTINGS_ENV = 'AGENTDOCK_LAUNCH_SETTINGS';
 
 /**
  * The bypass (D4c): `AGENTDOCK_RAW=1 <cmd>`. Mirrors `TOKEN_SAVER_RAW_ENV`
- * from `@agentdock/shared`, which this hot path does not load; a test pins
+ * from `@nautelle/shared`, which this hot path does not load; a test pins
  * the two together.
  */
 export const RAW_ENV = 'AGENTDOCK_RAW';

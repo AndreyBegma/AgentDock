@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type {
   PlanTaskVersionsView,
   PlanTaskVersionView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { shownVersion, versionTurnText } from './versions';
 
 const version = (n: number): PlanTaskVersionView => ({

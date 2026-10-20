@@ -1,4 +1,4 @@
-import type { AssistantConversationView } from '@agentdock/shared';
+import type { AssistantConversationView } from '@nautelle/shared';
 
 export type ConversationGroupKey = 'today' | 'yesterday' | 'week' | 'earlier';
 

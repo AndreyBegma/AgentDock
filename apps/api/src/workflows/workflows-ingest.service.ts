@@ -2,7 +2,7 @@ import {
   parseSessionEvent,
   type RunnerEvent,
   type SessionEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

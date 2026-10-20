@@ -3,7 +3,7 @@ import {
   type BoardStackView,
   type PlanIntakeSplitView,
   STACK_GATE_REASON,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { boardView, card } from './fixtures';
 import {
   addStage,

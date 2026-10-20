@@ -1,4 +1,4 @@
-import { PLANNER_BLOCK_TAG } from '@agentdock/shared';
+import { PLANNER_BLOCK_TAG } from '@nautelle/shared';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BotTokenStore } from '../notifications';
 import {

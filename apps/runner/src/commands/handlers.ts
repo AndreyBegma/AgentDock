@@ -4,7 +4,7 @@ import type {
   TerminalAttachArgs,
   TerminalAttachResult,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { AssessHandlers } from '../assess';
 import type { CaptureHandlers } from '../capture';
 import {

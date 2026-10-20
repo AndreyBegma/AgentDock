@@ -1,9 +1,5 @@
-import type {
-  BoardCardView,
-  BoardView,
-  FleetCardEdit,
-} from '@agentdock/shared';
-import type { LocalMethodArgs } from '@agentdock/shared/protocol';
+import type { BoardCardView, BoardView, FleetCardEdit } from '@nautelle/shared';
+import type { LocalMethodArgs } from '@nautelle/shared/protocol';
 import type { LocalCall } from '../local/local-call';
 import { LocalError } from '../local/local-error';
 import { LocalHandlers } from '../local/local-handlers';

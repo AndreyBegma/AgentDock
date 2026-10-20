@@ -8,7 +8,7 @@ import {
   type PolicyGatedCommand,
   policyCodeDenySchema,
   type RunnerPolicy,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 
 const gatedCommandsShape = Object.fromEntries(

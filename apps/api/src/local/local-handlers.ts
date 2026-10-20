@@ -3,7 +3,7 @@ import {
   ACTION_REQUEST_ISSUE_TITLE_MAX,
   ACTION_REQUEST_SUMMARY_MAX,
   issueFromBranch,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   API_EVENT_SOURCE,
   type LocalMethodArgs,
@@ -11,7 +11,7 @@ import {
   MANUAL_HANDOFF_EVENT,
   MANUAL_NOTE_EVENT,
   SESSION_START_CONTEXT_MAX_CHARS,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { BoardService } from '../board/board.service';

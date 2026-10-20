@@ -1,8 +1,8 @@
 'use client';
 
-import type { FleetGraph } from '@agentdock/shared';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { FlowGraph, FlowLegend } from '@andrewbehma/glass-ui/flow-graph';
+import type { FleetGraph } from '@nautelle/shared';
 import { useMemo } from 'react';
 import {
   EDGE_LEGEND_LABELS,

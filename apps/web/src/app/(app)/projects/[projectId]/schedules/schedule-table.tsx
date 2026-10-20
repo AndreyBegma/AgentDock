@@ -1,6 +1,5 @@
 'use client';
 
-import type { AdminScheduleView, ScheduleView } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { type Column } from '@andrewbehma/glass-ui/data-table';
@@ -11,6 +10,7 @@ import {
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import type { AdminScheduleView, ScheduleView } from '@nautelle/shared';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { ResponsiveRows } from '../../../../../components/responsive-rows/responsive-rows';

@@ -6,7 +6,7 @@ import {
   type AttachmentView,
   type BoardCardDetail,
   type BoardView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BoardWorld } from '../board/testing/board-e2e';
 import {
   generateRunnerToken,

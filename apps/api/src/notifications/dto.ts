@@ -4,7 +4,7 @@ import {
   type NotificationKind,
   type NotificationMuteUpdate,
   type NotificationRulesUpdate,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,

@@ -1,4 +1,4 @@
-import { RUNNER_ERROR } from '@agentdock/shared';
+import { RUNNER_ERROR } from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { Runner } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

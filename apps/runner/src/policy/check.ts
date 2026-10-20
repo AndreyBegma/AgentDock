@@ -5,7 +5,7 @@ import {
   permissionModeAllowed,
   policyAllowsCommand,
   policyFixHint,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
 import { notMainCheckout, type Realpath, rootOutsideAllowed } from './roots';

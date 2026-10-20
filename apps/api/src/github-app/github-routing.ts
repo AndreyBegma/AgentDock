@@ -1,4 +1,4 @@
-import type { PollableCollector } from '@agentdock/shared/protocol';
+import type { PollableCollector } from '@nautelle/shared/protocol';
 
 /**
  * D8: what a verified GitHub delivery asks Nautelle to do. Pure — the hook

@@ -1,4 +1,4 @@
-import type { WebhookDeliveryPage, WebhookWithSecret } from '@agentdock/shared';
+import type { WebhookDeliveryPage, WebhookWithSecret } from '@nautelle/shared';
 import { SecretCipher } from '../../common/crypto';
 import { createUser, login, type Session } from '../../test/e2e-app';
 import {

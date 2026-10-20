@@ -40,7 +40,7 @@ import {
   STACK_TITLE_MAX,
   type TasksQuery,
   type UpdatePlanCandidateRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,

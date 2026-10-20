@@ -2,7 +2,7 @@ import type {
   SessionOrigin,
   TerminalSetupItem,
   TerminalSetupView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { PlannerHarness } from '../planner/testing/planner-e2e';
 
 /** #281 D2, D3, D5: `GET /projects/:projectId/terminal-setup`. */

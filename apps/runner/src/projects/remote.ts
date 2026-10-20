@@ -1,4 +1,4 @@
-import type { Forge } from '@agentdock/shared/protocol';
+import type { Forge } from '@nautelle/shared/protocol';
 
 /** `git@github.com:owner/name(.git)`, `ssh://git@github.com/owner/name`, `https://github.com/owner/name(.git)`. */
 const GITHUB_REMOTE =

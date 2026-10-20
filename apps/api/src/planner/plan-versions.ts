@@ -2,7 +2,7 @@ import type {
   PlanTaskVersionView,
   PlanUserRef,
   PlanVersionTurnView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { PlanTask } from '@prisma/client';
 
 /** A succeeded decompose or revise turn, as the version mapping reads it. */

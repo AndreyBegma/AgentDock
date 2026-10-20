@@ -3,7 +3,7 @@ import type {
   BoardStackDetail,
   StackCardView,
   StackRunView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { autoRunFailureText } from './format';
 import {
   canStopStack,

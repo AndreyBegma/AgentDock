@@ -1,4 +1,4 @@
-import { CARD_ASSESS_QUEUE } from '@agentdock/shared';
+import { CARD_ASSESS_QUEUE } from '@nautelle/shared';
 import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { ConditionalModule } from '@nestjs/config';

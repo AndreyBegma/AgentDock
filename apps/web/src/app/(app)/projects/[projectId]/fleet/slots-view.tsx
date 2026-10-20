@@ -1,17 +1,17 @@
 'use client';
 
-import {
-  SLOT_STATUSES,
-  type SlotPage,
-  type SlotStatus,
-  type SlotSummary,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { Section } from '@andrewbehma/glass-ui/section';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import {
+  SLOT_STATUSES,
+  type SlotPage,
+  type SlotStatus,
+  type SlotSummary,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { type ReactNode, useState } from 'react';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';

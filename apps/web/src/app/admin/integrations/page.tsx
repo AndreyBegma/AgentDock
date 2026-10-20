@@ -1,15 +1,15 @@
 'use client';
 
+import { Badge } from '@andrewbehma/glass-ui/badge';
+import { buttonClassName } from '@andrewbehma/glass-ui/button';
+import { Card } from '@andrewbehma/glass-ui/card';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import type {
   GitHubAppView,
   InboundTriggerView,
   TelegramIntegrationStatus,
   WebhookView,
-} from '@agentdock/shared';
-import { Badge } from '@andrewbehma/glass-ui/badge';
-import { buttonClassName } from '@andrewbehma/glass-ui/button';
-import { Card } from '@andrewbehma/glass-ui/card';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+} from '@nautelle/shared';
 import { GitBranch, type LucideIcon, Send, Webhook, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '../../../components/page-header/page-header';

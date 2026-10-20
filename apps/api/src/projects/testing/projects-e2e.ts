@@ -2,7 +2,7 @@ import type {
   CommandErrorCode,
   ProjectInspection,
   ProjectScanRulesResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { TestRunnerSocket } from '../../runners/testing/runner-e2e';
 
 export const ROOT = '/srv/dev/widget';

@@ -2,7 +2,7 @@ import {
   injectPinHelper,
   type PlannerParseResult,
   parsePlannerOutput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { checkMockupScripts, withMockupScriptCheck } from './design-scripts';
 
 const page = (body: string) =>

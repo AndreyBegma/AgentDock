@@ -27,7 +27,7 @@ import {
   projectRulesBlock,
   stackDesignPath,
   stackLabel,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardRunArgs,
   type CardRunFile,
@@ -38,7 +38,7 @@ import {
   ISSUE_TITLE_MAX,
   ORCHESTRATOR_DEFAULTS,
   type OrchestratorPermissionMode,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   BadRequestException,
   ForbiddenException,

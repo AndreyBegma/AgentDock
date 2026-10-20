@@ -1,9 +1,3 @@
-import type {
-  WorkflowOutcome,
-  WorkflowSankeyNode,
-  WorkflowsOrchestrationResponse,
-  WorkflowToolTransition,
-} from '@agentdock/shared';
 import { type Hue, hueFor } from '@andrewbehma/glass-ui/hue';
 import type {
   SankeyColumn,
@@ -11,6 +5,12 @@ import type {
   SankeyNode,
   SankeyTone,
 } from '@andrewbehma/glass-ui/sankey';
+import type {
+  WorkflowOutcome,
+  WorkflowSankeyNode,
+  WorkflowsOrchestrationResponse,
+  WorkflowToolTransition,
+} from '@nautelle/shared';
 
 /* ── Sankeys: the two graphs of /workflows ──────────────────────────── */
 

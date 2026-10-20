@@ -3,8 +3,8 @@ import type {
   ProjectRuleImportResult,
   ProjectRuleScanResult,
   ProjectRuleView,
-} from '@agentdock/shared';
-import type { ProjectScanRulesResult } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { ProjectScanRulesResult } from '@nautelle/shared/protocol';
 import { FakeRunner, inspection, ROOT } from '../projects/testing/projects-e2e';
 import {
   adminSession,

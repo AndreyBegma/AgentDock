@@ -6,14 +6,14 @@ import {
   SLOT_CONVERSATION_MAX_ENTRIES,
   type SlotConversation,
   type SlotWorktreeView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   gitRefSchema,
   type Role,
   RUNNER_FEATURE_COMMANDS,
   slotMessageSeenDataSchema,
   slotNameSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import type { Slot, SlotCheckpoint } from '@prisma/client';
 import type { AuditContext } from '../audit/audit.types';

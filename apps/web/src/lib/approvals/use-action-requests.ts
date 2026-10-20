@@ -1,6 +1,6 @@
 'use client';
 
-import type { ActionRequestSummary } from '@agentdock/shared';
+import type { ActionRequestSummary } from '@nautelle/shared';
 import { useEffect, useRef } from 'react';
 import { api } from '../api';
 import { useLive } from '../live/use-live';

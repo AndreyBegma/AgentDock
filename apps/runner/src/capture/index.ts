@@ -2,7 +2,7 @@ import type {
   CaptureCommandName,
   CommandArgs,
   CommandResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CaptureExecutor } from './executor';
 
 export {

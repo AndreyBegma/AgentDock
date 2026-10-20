@@ -10,7 +10,7 @@ import {
   type PlanIntakeSplitView,
   type PlanQuestion,
   type SplitCardDraft,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { inputOf } from './plan-mapper';
 
@@ -29,7 +29,7 @@ type Db = Pick<Prisma.TransactionClient, 'planTurn'>;
  * and the API image read the same file.
  */
 export const CARD_INSTRUCTIONS_PATH = resolve(
-  dirname(require.resolve('@agentdock/shared')),
+  dirname(require.resolve('@nautelle/shared')),
   '../src/planner/card-instructions.md',
 );
 

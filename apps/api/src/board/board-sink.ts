@@ -5,7 +5,7 @@ import {
   type CardWaitingEventData,
   type CardWaitingReason,
   isActiveRoundPhase,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardRunDialogData,
   type CardRunFinishRefusedData,
@@ -33,7 +33,7 @@ import {
   type PaneDialog,
   parseHookEvent,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

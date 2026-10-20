@@ -1,10 +1,5 @@
 'use client';
 
-import type {
-  InboundTriggerView,
-  InboundTriggerWithSecret,
-  ProjectSummary,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -17,6 +12,11 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  InboundTriggerView,
+  InboundTriggerWithSecret,
+  ProjectSummary,
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../components/prerequisites/async-section';

@@ -1,10 +1,5 @@
 'use client';
 
-import type {
-  ActionRequestSummary,
-  ApprovalItemView,
-  ApprovalsView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
@@ -19,6 +14,11 @@ import {
 } from '@andrewbehma/glass-ui/table';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
+import type {
+  ActionRequestSummary,
+  ApprovalItemView,
+  ApprovalsView,
+} from '@nautelle/shared';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';

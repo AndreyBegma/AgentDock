@@ -1,5 +1,5 @@
-import { captureFingerprint, cardLabel } from '@agentdock/shared';
-import type { LocalMethodArgs } from '@agentdock/shared/protocol';
+import { captureFingerprint, cardLabel } from '@nautelle/shared';
+import type { LocalMethodArgs } from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';

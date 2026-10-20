@@ -1,7 +1,7 @@
 import type {
   TerminalAttachView,
   TerminalTicketResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { type AuthenticatedRequest, Roles } from '../auth';
 import { TerminalActiveQueryDto, TerminalTicketDto } from './dto';

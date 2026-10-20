@@ -1,9 +1,5 @@
 'use client';
 
-import {
-  ATTACHMENT_MAX_BYTES,
-  ATTACHMENTS_PER_CARD_MAX,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import {
   FileDropzone,
@@ -11,6 +7,10 @@ import {
 } from '@andrewbehma/glass-ui/file-dropzone';
 import { FileItem } from '@andrewbehma/glass-ui/file-item';
 import type { UploadItem } from '@andrewbehma/glass-ui/use-file-upload';
+import {
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENTS_PER_CARD_MAX,
+} from '@nautelle/shared';
 import { useState } from 'react';
 import {
   ATTACHMENT_ACCEPT,

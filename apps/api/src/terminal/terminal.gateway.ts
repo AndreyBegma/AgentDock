@@ -5,14 +5,14 @@ import {
   TERMINAL_DEFAULT_SIZE,
   TERMINAL_WS_QUERY,
   type TerminalServerFrame,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   TERMINAL_MAX_DATA_BYTES,
   TERMINAL_WS_PATH,
   terminalClientFrameSchema,
   terminalColsSchema,
   terminalRowsSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import { type RawData, WebSocket } from 'ws';

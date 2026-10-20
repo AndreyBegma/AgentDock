@@ -5,8 +5,8 @@ import {
   type TextOwnerType,
   textFieldsSchema,
   textFieldView,
-} from '@agentdock/shared';
-import { roleAtLeast } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { roleAtLeast } from '@nautelle/shared/protocol';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

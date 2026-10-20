@@ -1,4 +1,4 @@
-import type { EventSource } from '@agentdock/shared/protocol';
+import type { EventSource } from '@nautelle/shared/protocol';
 import type { Prisma } from '@prisma/client';
 
 /**

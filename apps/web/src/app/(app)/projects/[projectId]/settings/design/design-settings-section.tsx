@@ -1,5 +1,12 @@
 'use client';
 
+import { Banner } from '@andrewbehma/glass-ui/banner';
+import { Button } from '@andrewbehma/glass-ui/button';
+import { Combobox } from '@andrewbehma/glass-ui/combobox';
+import { Input, Select } from '@andrewbehma/glass-ui/field';
+import { NumberInput } from '@andrewbehma/glass-ui/number-input';
+import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
+import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   DEFAULT_VIEWPORTS,
   DESIGN_SKILLS_MAX,
@@ -8,14 +15,7 @@ import {
   type DesignSettingsView,
   type DesignTheme,
   type InstalledSkillsView,
-} from '@agentdock/shared';
-import { Banner } from '@andrewbehma/glass-ui/banner';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { Combobox } from '@andrewbehma/glass-ui/combobox';
-import { Input, Select } from '@andrewbehma/glass-ui/field';
-import { NumberInput } from '@andrewbehma/glass-ui/number-input';
-import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
-import { toast } from '@andrewbehma/glass-ui/toast';
+} from '@nautelle/shared';
 import { ArrowDown, ArrowUp, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AsyncSection } from '../../../../../../components/prerequisites/async-section';

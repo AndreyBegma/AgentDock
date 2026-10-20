@@ -7,12 +7,12 @@ import {
   type PlannerSettingsUpdateRequest,
   type PlannerSettingsView,
   type PlannerSpecOutput,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardMergeMethod,
   cardMergeMethodSchema,
   repoRelativeDirSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

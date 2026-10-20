@@ -1,7 +1,7 @@
 'use client';
 
-import type { TaskDesignView } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
+import type { TaskDesignView } from '@nautelle/shared';
 
 /**
  * What the person must not mistake the mockup for (spec 223 D5, "UI"), and

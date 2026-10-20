@@ -12,7 +12,7 @@ import {
   skillRunPhaseChangedDataSchema,
   skillRunSessionName,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type Cancel, isoNow } from '../../clock';
 import { CommandFailure } from '../../commands/failure';
 import { watchedProject } from '../../control/target';

@@ -1,4 +1,4 @@
-import { miniAppTargetOfLink } from '@agentdock/shared';
+import { miniAppTargetOfLink } from '@nautelle/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BotTokenStore, TelegramDeliveryLedger } from '../notifications';
 import { formatDigest, formatMessage } from './markdown-v2';

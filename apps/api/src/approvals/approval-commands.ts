@@ -1,4 +1,4 @@
-import { APPROVALS_ERROR } from '@agentdock/shared';
+import { APPROVALS_ERROR } from '@nautelle/shared';
 import type {
   ApprovalSignalResult,
   CommandErrorCode,
@@ -8,7 +8,7 @@ import type {
   PrRequestChangesArgs,
   PrVoidApprovalArgs,
   Role,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { AuditContext } from '../audit/audit.types';
 import { RunnerCommandService } from '../runners/runner-command.service';

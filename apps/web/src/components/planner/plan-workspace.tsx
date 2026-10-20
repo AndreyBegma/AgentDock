@@ -1,13 +1,13 @@
 'use client';
 
+import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
+import { Section } from '@andrewbehma/glass-ui/section';
 import type {
   CreatePlanCardsResponse,
   PlanDetail,
   PlannerSettingsView,
   PlanTaskView,
-} from '@agentdock/shared';
-import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
-import { Section } from '@andrewbehma/glass-ui/section';
+} from '@nautelle/shared';
 import { useEffect, useRef, useState } from 'react';
 import {
   activeTurn,

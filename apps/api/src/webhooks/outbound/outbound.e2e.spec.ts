@@ -6,7 +6,7 @@ import {
   type WebhookEnvelope,
   type WebhookView,
   type WebhookWithSecret,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { REPO, ROOT, seedProject } from '../../fleet/testing/fleet-e2e';
 import type { Session } from '../../test/e2e-app';
 import { verifyOutboundSignature } from '../common';

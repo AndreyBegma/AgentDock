@@ -1,4 +1,4 @@
-import type { ProjectErrorBody, ProjectErrorCode } from '@agentdock/shared';
+import type { ProjectErrorBody, ProjectErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the projects routes, shaped like every other API error. */

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ActionRequestSummary } from '@agentdock/shared';
+import type { ActionRequestSummary } from '@nautelle/shared';
 import { CardStore } from '../cards/record';
 import { HandoffStateStore } from '../handoff/state';
 import { validNote } from '../handoff/testing';

@@ -12,7 +12,7 @@ import {
   ATTACHMENTS_WORKTREE_DIR,
   type AttachmentRef,
   attachmentFileName,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { CommandFailure } from '../commands/failure';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import { type AttachmentSource, syncAttachments } from './attachments';

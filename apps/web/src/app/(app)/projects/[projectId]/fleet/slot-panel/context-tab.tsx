@@ -1,6 +1,6 @@
 'use client';
 
-import type { SlotDetail } from '@agentdock/shared';
+import type { SlotDetail } from '@nautelle/shared';
 import type { ReactNode } from 'react';
 import {
   formatAheadBehind,

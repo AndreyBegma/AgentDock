@@ -11,7 +11,7 @@ import {
   type ToolCallData,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../../config';
 import { freshState, type TranscriptSource } from '../types';
 import { claudeAdapter } from './adapter';

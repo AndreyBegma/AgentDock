@@ -7,7 +7,7 @@ import {
   type DesignRevisionView,
   type DesignTheme,
   type ViewportPreset,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { clampZoom, type Zoom } from './zoom';
 
 /**

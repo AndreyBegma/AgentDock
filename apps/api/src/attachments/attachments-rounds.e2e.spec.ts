@@ -3,7 +3,7 @@ import {
   attachmentWorktreePath,
   type BoardCardDetail,
   CARD_WORKER_PROMPT_VERSION,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BoardWorld } from '../board/testing/board-e2e';
 import {
   FILES,

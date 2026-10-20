@@ -6,7 +6,7 @@ import {
   REPO_READ_LINES_MAX,
   type RepoReadArgs,
   type RepoReadResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { readRegularFileInside } from '../fs/safe-read';
 import { checkoutPath } from './paths';

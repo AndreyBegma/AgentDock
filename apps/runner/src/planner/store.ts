@@ -6,12 +6,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { planTurnPhaseSchema } from '@agentdock/shared';
+import { planTurnPhaseSchema } from '@nautelle/shared';
 import {
   planIdSchema,
   planTurnArgsSchema,
   skillRunShortIdSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import {
   type ExitRecord,

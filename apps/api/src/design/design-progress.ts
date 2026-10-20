@@ -4,7 +4,7 @@ import {
   type DesignProgressView,
   designFailureReasonOf,
   type TaskDesignStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { PlanTurnPhase, Prisma, RunStatus } from '@prisma/client';
 import { designTurnPlanOf } from './design-rules';
 import type { Db, DesignKey } from './design-store';

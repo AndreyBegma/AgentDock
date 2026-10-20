@@ -5,7 +5,7 @@ import {
   PLANNER_ERROR,
   type PlanCandidateView,
   type PlanDetail,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import { pluralize } from '../format';
 import { draftTitle, splitRowProblem } from './intake';

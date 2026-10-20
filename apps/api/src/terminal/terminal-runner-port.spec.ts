@@ -1,4 +1,4 @@
-import type { TerminalAttachArgs } from '@agentdock/shared/protocol';
+import type { TerminalAttachArgs } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import type { RunnerCommandService } from '../runners/runner-command.service';
 import type { RunnerStreams } from '../runners/runner-streams';

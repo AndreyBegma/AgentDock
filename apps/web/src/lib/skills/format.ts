@@ -3,7 +3,7 @@ import {
   type ProjectRuntimeProfile,
   SKILLS_ERROR,
   type SkillRunRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   isTerminalSkillRunPhase,
   type OrchestratorPermissionMode,
@@ -14,7 +14,7 @@ import {
   type SkillFrontmatter,
   type SkillRunPhase,
   type SkillScope,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';

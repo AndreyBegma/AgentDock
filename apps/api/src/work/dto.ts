@@ -7,7 +7,7 @@ import {
   type WorkQuery,
   type WorkSource,
   type WorkStatus,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 const ID_MAX_LENGTH = 64;

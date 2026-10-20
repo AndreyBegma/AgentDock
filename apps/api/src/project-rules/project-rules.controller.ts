@@ -2,7 +2,7 @@ import type {
   ProjectRuleImportResult,
   ProjectRuleScanResult,
   ProjectRuleView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

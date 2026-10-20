@@ -1,4 +1,4 @@
-import type { ApprovalsErrorBody, ApprovalsErrorCode } from '@agentdock/shared';
+import type { ApprovalsErrorBody, ApprovalsErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the approvals routes, shaped like every other API error. */

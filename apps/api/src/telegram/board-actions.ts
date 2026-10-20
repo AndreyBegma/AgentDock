@@ -13,7 +13,7 @@ import {
   canStop,
   MOVE_REFUSAL_TEXT,
   ROUND_PHASE_LABEL,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { callbackCodec } from './callback-data';
 import { appLink } from './markdown-v2';
 import { OPEN_IN_APP_TEXT, openInAppButton } from './mini-app-buttons';

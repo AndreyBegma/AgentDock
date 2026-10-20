@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { BoardCardView } from '@agentdock/shared';
+import type { BoardCardView } from '@nautelle/shared';
 import {
   boardFilterCodec,
   boardMeta,

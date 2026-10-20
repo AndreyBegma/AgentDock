@@ -1,4 +1,4 @@
-import { TEXT_NORMALIZE_QUEUE } from '@agentdock/shared';
+import { TEXT_NORMALIZE_QUEUE } from '@nautelle/shared';
 import {
   Injectable,
   Logger,

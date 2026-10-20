@@ -20,7 +20,7 @@ import {
   stageLinks,
   type TaskDesignSummary,
   type UpdateBoardStackRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { type BoardStack, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

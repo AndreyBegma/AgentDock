@@ -7,7 +7,7 @@ import {
   cardLabel,
   PLANNER_ERROR,
   type PlanQuestion,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { Plan, PlanTask } from '@prisma/client';
 import { BoardPlanCards } from '../board/board-plan-cards';

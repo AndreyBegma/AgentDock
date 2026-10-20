@@ -1,9 +1,9 @@
-import { TERMINAL_CLOSE_CODES } from '@agentdock/shared';
+import { TERMINAL_CLOSE_CODES } from '@nautelle/shared';
 import {
   type CommandErrorCode,
   TERMINAL_WS_PATH,
   type TerminalMode,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { allowedLiveOrigin } from '../live/live-options';
 import {
   adminSession,

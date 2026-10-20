@@ -4,7 +4,7 @@ import {
   type AttachmentView,
   CSRF_COOKIE,
   CSRF_HEADER,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   ATTACHMENT_NOTE,
   attachmentCountLabel,

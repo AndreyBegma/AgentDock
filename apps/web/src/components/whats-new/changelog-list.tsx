@@ -1,6 +1,6 @@
-import type { ChangelogEntry } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Card } from '@andrewbehma/glass-ui/card';
+import type { ChangelogEntry } from '@nautelle/shared';
 import {
   CHANGE_KIND_LABEL,
   CHANGE_KIND_TONE,

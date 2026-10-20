@@ -4,7 +4,7 @@ import {
   runTopic,
   SKILL_RUN_PHASE_LIVE_EVENT,
   type SkillRunPhaseLiveChange,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   isSkillRunEventType,
   isTerminalSkillRunPhase,
@@ -14,7 +14,7 @@ import {
   type SkillRunPhaseChangedData,
   skillPhaseToRunStatus,
   skillRunEventDataSchemas,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';

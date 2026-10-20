@@ -4,7 +4,7 @@ import {
   type WebhookCircuitState,
   type WebhookDeliveryStatus,
   webhookRetryDelayMs,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * The decisions of the delivery worker (docs/specs/26-webhooks.md D12, D14),

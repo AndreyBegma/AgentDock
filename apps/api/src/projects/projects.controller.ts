@@ -3,8 +3,8 @@ import type {
   ProjectMemberView,
   ProjectRuntimeProfile,
   ProjectSummary,
-} from '@agentdock/shared';
-import type { ProjectInspection } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { ProjectInspection } from '@nautelle/shared/protocol';
 import {
   Body,
   Controller,

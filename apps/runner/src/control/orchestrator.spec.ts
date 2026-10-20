@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { OrchestratorState } from '@agentdock/shared/protocol';
+import type { OrchestratorState } from '@nautelle/shared/protocol';
 import { createDispatcher } from '../commands/dispatcher';
 import { createHandlers } from '../commands/handlers';
 import type { ConfigProfile } from '../config';

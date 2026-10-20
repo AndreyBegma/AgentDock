@@ -8,11 +8,11 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { HANDOFF_PERSON_MARK } from '@agentdock/shared';
+import { HANDOFF_PERSON_MARK } from '@nautelle/shared';
 import type {
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CaptureSpawn } from '../capture/executor';
 import type { ConfigProfile } from '../config';
 import { isolatedGit } from '../skills/testing';

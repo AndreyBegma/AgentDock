@@ -9,7 +9,7 @@ import {
   type UsageInterval,
   type UsageRangeQuery,
   type UsageTimeseriesQuery,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Transform, Type } from 'class-transformer';
 import {
   IsIn,

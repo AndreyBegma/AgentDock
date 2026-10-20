@@ -3,8 +3,8 @@ import {
   TEXT_FENCE_INFO,
   type TextField,
   type TextFieldView,
-} from '@agentdock/shared';
-import type { TextNormalizeArgs } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { TextNormalizeArgs } from '@nautelle/shared/protocol';
 import type { TextNormalization } from '@prisma/client';
 import { BoardWorld } from '../../board/testing/board-e2e';
 import {

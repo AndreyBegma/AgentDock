@@ -2,7 +2,7 @@ import type {
   PendingQuestion,
   SessionMessageErrorCode,
   SessionMessageOutcome,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { escapeMarkdownV2 } from './markdown-v2';
 import type { InlineKeyboardButton } from './telegram-client';
 

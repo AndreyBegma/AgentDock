@@ -1,7 +1,7 @@
 import {
   BLOCKED_CHECKPOINT_DELAY_MS,
   RUNNER_OFFLINE_AFTER_MS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** Timings of the notification loops; e2e tests override the provider. */
 export interface NotificationOptions {

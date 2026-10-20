@@ -1,11 +1,5 @@
 'use client';
 
-import type {
-  IgnoreTerminalSetupProfileRequest,
-  SetupStep,
-  TerminalSetupItem,
-  TerminalSetupView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
@@ -13,6 +7,12 @@ import { Card } from '@andrewbehma/glass-ui/card';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type {
+  IgnoreTerminalSetupProfileRequest,
+  SetupStep,
+  TerminalSetupItem,
+  TerminalSetupView,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { useState } from 'react';
 import { api, describeError } from '../../lib/api';

@@ -1,4 +1,4 @@
-import type { BoardColumn } from '@agentdock/shared';
+import type { BoardColumn } from '@nautelle/shared';
 
 /**
  * #500: the typed `callback_data` of the bot's inline buttons. A codec is a

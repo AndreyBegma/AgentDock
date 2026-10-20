@@ -9,7 +9,7 @@ import {
   type SchedulePreviewView,
   type ScheduleTarget,
   type ScheduleView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Schedule } from '@prisma/client';
 import cronstrue from 'cronstrue';

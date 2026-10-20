@@ -1,4 +1,4 @@
-import { CSRF_COOKIE, type Role, SESSION_COOKIE } from '@agentdock/shared';
+import { CSRF_COOKIE, type Role, SESSION_COOKIE } from '@nautelle/shared';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { UserStatus } from '@prisma/client';

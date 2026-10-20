@@ -2,7 +2,7 @@ import { basename, dirname, join } from 'node:path';
 import type {
   OrchestratorPermissionMode,
   SkillRunArgs,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../../config';
 import {
   type TokenSaverLaunch,

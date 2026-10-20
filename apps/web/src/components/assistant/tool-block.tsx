@@ -1,8 +1,8 @@
 'use client';
 
-import type { AssistantToolStep } from '@agentdock/shared';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import type { AssistantToolStep } from '@nautelle/shared';
 import { Check, X } from 'lucide-react';
 import Link from 'next/link';
 import { cardLabelOf } from '../../lib/assistant/tools';

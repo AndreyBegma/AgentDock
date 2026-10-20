@@ -4,7 +4,7 @@ import {
   RUNNER_CLOSE_CODES,
   type RunnerEvent,
   type ServerMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Backoff } from './backoff';
 import { createDispatcher } from './commands/dispatcher';
 import { createHandlers } from './commands/handlers';

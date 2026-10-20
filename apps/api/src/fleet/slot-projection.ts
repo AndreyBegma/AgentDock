@@ -2,7 +2,7 @@ import {
   type CheckpointKind,
   isHttpsGithubUrl,
   slotNameSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Prisma, type Slot } from '@prisma/client';
 import {
   guardGroups,

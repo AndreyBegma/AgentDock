@@ -1,7 +1,7 @@
 'use client';
 
-import type { BudgetView, ProjectSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
+import type { BudgetView, ProjectSummary } from '@nautelle/shared';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';

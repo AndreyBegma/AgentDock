@@ -5,7 +5,7 @@ import {
   BOARD_CARD_BODY_MAX,
   BOARD_CARD_KINDS,
   BOARD_CARD_TITLE_MAX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { z } from 'zod';
 import { ActivityQueryService } from '../../activity/activity-query.service';

@@ -2,11 +2,11 @@ import type {
   LiveErrorCode,
   LiveEventMessage,
   LiveTopic,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   RUN_LOG_LIVE_EVENTS,
   runLogFrameSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { LiveClient } from '../live/client';
 import {
   applyRunLogFrame,

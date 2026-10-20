@@ -6,7 +6,7 @@ import type {
   PriceVersionSummary,
   RecomputeProgress,
   UsageSummaryResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Logger } from '@nestjs/common';
 import {
   adminSession,

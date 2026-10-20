@@ -1,17 +1,17 @@
 'use client';
 
-import {
-  type BoardCardDetail,
-  STEWARD_KIND_LABEL,
-  type StewardIncidentView,
-  suggestIssueLink,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Timeline, type TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  type BoardCardDetail,
+  STEWARD_KIND_LABEL,
+  type StewardIncidentView,
+  suggestIssueLink,
+} from '@nautelle/shared';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';

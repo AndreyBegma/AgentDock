@@ -1,4 +1,4 @@
-import type { CardTriageView } from '@agentdock/shared';
+import type { CardTriageView } from '@nautelle/shared';
 
 /** How many hints a triage shows: duplicates count once. */
 export const triageHintCount = (view: CardTriageView): number =>

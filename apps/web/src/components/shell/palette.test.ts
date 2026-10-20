@@ -4,7 +4,7 @@ import type {
   ProjectSummary,
   RunSummary,
   SessionSummary,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { visibleNav } from './nav';
 import { askItem, type PaletteInput, paletteGroups } from './palette';
 

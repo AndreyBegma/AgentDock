@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { PaneFrame } from '@agentdock/shared/protocol';
+import type { PaneFrame } from '@nautelle/shared/protocol';
 import { applyFrame, EMPTY_PANE, type PaneState } from './reducer';
 
 const full = (lines: string[], y = 0): PaneFrame => ({

@@ -21,8 +21,8 @@ import {
   isActiveRoundPhase,
   profileAgentdockOf,
   type Role,
-} from '@agentdock/shared';
-import { roleAtLeast } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { roleAtLeast } from '@nautelle/shared/protocol';
 import {
   BadRequestException,
   Injectable,

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import type { PlanTurnPhase } from '@agentdock/shared';
-import { planTurnPhaseSchema } from '@agentdock/shared';
+import type { PlanTurnPhase } from '@nautelle/shared';
+import { planTurnPhaseSchema } from '@nautelle/shared';
 import {
   skillRunIdSchema,
   skillRunShortIdSchema,
@@ -13,7 +13,7 @@ import {
   uiProfileBuildArgsSchema,
   uiProfileBuildFinishedDataSchema,
   uiProfileBuildPhaseChangedDataSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';

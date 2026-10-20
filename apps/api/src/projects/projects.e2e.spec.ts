@@ -4,8 +4,8 @@ import type {
   ProjectMemberView,
   ProjectSummary,
   Role,
-} from '@agentdock/shared';
-import { WATCH_REFUSED_EVENT } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { WATCH_REFUSED_EVENT } from '@nautelle/shared/protocol';
 import { allowedLiveOrigin } from '../live/live-options';
 import { TestLiveSocket } from '../live/testing/live-e2e';
 import {

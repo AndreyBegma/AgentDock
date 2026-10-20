@@ -1,9 +1,9 @@
-import { FLEET_LIVE_EVENT, type FleetLiveChange } from '@agentdock/shared';
+import { FLEET_LIVE_EVENT, type FleetLiveChange } from '@nautelle/shared';
 import {
   type FleetEvent,
   parseFleetEvent,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';

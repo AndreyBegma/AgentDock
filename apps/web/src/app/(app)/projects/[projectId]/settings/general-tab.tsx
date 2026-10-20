@@ -1,13 +1,5 @@
 'use client';
 
-import {
-  type AdminRunnerDetail,
-  type AdminRuntimeProfile,
-  configMergeApproval,
-  mergeApprovalMismatch,
-  type ProjectDetail,
-  type UpdateProjectRequest,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -15,6 +7,14 @@ import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import {
+  type AdminRunnerDetail,
+  type AdminRuntimeProfile,
+  configMergeApproval,
+  mergeApprovalMismatch,
+  type ProjectDetail,
+  type UpdateProjectRequest,
+} from '@nautelle/shared';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
 import { TextSettingsCard } from '../../../../../components/text/text-settings-card';

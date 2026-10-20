@@ -1,8 +1,8 @@
-import { boardVerdicts, DEFAULT_READY_LABEL } from '@agentdock/shared';
+import { boardVerdicts, DEFAULT_READY_LABEL } from '@nautelle/shared';
 import {
   type RoundDecisions,
   roundDecisionsSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { CachedIssue, QueueInputs } from './queue-state';
 

@@ -1,4 +1,4 @@
-import type { Role } from '@agentdock/shared';
+import type { Role } from '@nautelle/shared';
 import {
   createParamDecorator,
   ExecutionContext,

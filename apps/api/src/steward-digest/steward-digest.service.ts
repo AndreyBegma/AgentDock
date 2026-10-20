@@ -2,7 +2,7 @@ import {
   STEWARD_DEFAULTS,
   type StewardDigestTrigger,
   type StewardDigestView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

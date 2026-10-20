@@ -3,7 +3,7 @@ import {
   type IssuesSnapshotData,
   type SnapshotIssue,
   type SnapshotPullRequest,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type Listing, truncateUtf8 } from './listing';
 
 const sizeOf = (value: unknown): number =>

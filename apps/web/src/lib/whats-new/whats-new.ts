@@ -1,4 +1,4 @@
-import type { ChangeKind, WhatsNewView } from '@agentdock/shared';
+import type { ChangeKind, WhatsNewView } from '@nautelle/shared';
 import { api } from '../api';
 
 /** C-294: the version and the unread dot, per person and stored server-side. */

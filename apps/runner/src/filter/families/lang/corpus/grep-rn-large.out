@@ -25,7 +25,7 @@ apps/runner/src/filter/hook.ts:262:export const runFilterHook = (stdin: string, 
 apps/runner/src/filter/types.ts:11:export interface Filter {
 apps/runner/src/filter/types.ts:26:  apply(input: FilterInput): string | null;
 apps/runner/src/filter/types.ts:37:export interface FilterInput {
-apps/runner/src/filter/launch-e2e.spec.ts:4:import type { FilterStatRow } from '@agentdock/shared';
+apps/runner/src/filter/launch-e2e.spec.ts:4:import type { FilterStatRow } from '@nautelle/shared';
 apps/runner/src/filter/launch-e2e.spec.ts:9:import { runFilter } from './engine';
 apps/runner/src/filter/launch-e2e.spec.ts:10:import { type HookOutput, runFilterHook } from './hook';
 apps/runner/src/filter/launch-e2e.spec.ts:11:import { FilterStatsReader } from './stats-reader';
@@ -42,7 +42,7 @@ apps/runner/src/filter/launch-e2e.spec.ts:163:    const code = await runFilter([
 apps/runner/src/filter/launch-e2e.spec.ts:165:      filters: [demoFilter],
 apps/runner/src/filter/launch-e2e.spec.ts:174:    const reader = new FilterStatsReader({
 apps/runner/src/filter/launch-e2e.spec.ts:187:    const rows = (events[0]?.data as { rows: FilterStatRow[] }).rows;
-apps/runner/src/filter/stats.ts:2:import type { FilterStatRow, TokenSaverRunKind } from '@agentdock/shared';
+apps/runner/src/filter/stats.ts:2:import type { FilterStatRow, TokenSaverRunKind } from '@nautelle/shared';
 apps/runner/src/filter/stats.ts:8:  type FilterLaunch,
 apps/runner/src/filter/stats.ts:17:  row: FilterStatRow;
 apps/runner/src/filter/stats.ts:33:export interface StatsTarget extends Omit<FilterLaunch, 'runDir'> {
@@ -103,7 +103,7 @@ apps/runner/src/filter/hook.spec.ts:531:    const out = runFilterHook(JSON.strin
 apps/runner/src/filter/hook.spec.ts:542:      runFilterHook(JSON.stringify(preToolUse('bun run test')), {
 apps/runner/src/filter/hook.spec.ts:552:      expect(runFilterHook(stdin, deps)).toBe('');
 apps/runner/src/filter/hook.spec.ts:555:      runFilterHook(JSON.stringify(preToolUse('bun test')), {
-apps/runner/src/filter/eco.ts:9:import { type FilterStatRow, filterStatRowSchema } from '@agentdock/shared';
+apps/runner/src/filter/eco.ts:9:import { type FilterStatRow, filterStatRowSchema } from '@nautelle/shared';
 apps/runner/src/filter/eco.ts:97:): { rows: FilterStatRow[]; rejected: number } => {
 apps/runner/src/filter/eco.ts:99:  const rows: FilterStatRow[] = [];
 apps/runner/src/filter/stats-reader.ts:15:  type FilterStatRow,
@@ -122,7 +122,7 @@ apps/runner/src/filter/families/index.ts:11:  js: jsFilters,
 apps/runner/src/filter/families/index.ts:12:  ops: opsFilters,
 apps/runner/src/filter/families/index.ts:13:  lang: langFilters,
 apps/runner/src/filter/families/index.ts:17:export const ALL_FILTERS: readonly Filter[] = Object.values(FAMILIES).flat();
-apps/runner/src/filter/eco.spec.ts:12:import { type FilterStatRow, filterStatsDataSchema } from '@agentdock/shared';
+apps/runner/src/filter/eco.spec.ts:12:import { type FilterStatRow, filterStatsDataSchema } from '@nautelle/shared';
 apps/runner/src/filter/eco.spec.ts:26:import { FILTER_STATS_OFFSET_FILE, FilterStatsReader } from './stats-reader';
 apps/runner/src/filter/eco.spec.ts:148:  let reader: FilterStatsReader;
 apps/runner/src/filter/eco.spec.ts:163:    reader = new FilterStatsReader({

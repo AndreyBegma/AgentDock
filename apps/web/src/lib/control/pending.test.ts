@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { CommandRunLiveEvent } from '@agentdock/shared';
+import type { CommandRunLiveEvent } from '@nautelle/shared';
 import {
   applyRunEvent,
   isPending,

@@ -4,14 +4,14 @@ import {
   TERMINAL_WS_QUERY,
   type TerminalErrorBody,
   type TerminalRefusalCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   TERMINAL_COLS,
   TERMINAL_MAX_DATA_BYTES,
   TERMINAL_ROWS,
   TERMINAL_WS_PATH,
   type TerminalCloseReason,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError } from '../api';
 

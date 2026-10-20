@@ -1,12 +1,12 @@
 'use client';
 
-import type { ApprovalDetail } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { ApprovalDetail } from '@nautelle/shared';
 import { Check } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { DisabledReason } from '../../../../../components/prerequisites/disabled-reason';

@@ -1,16 +1,16 @@
 'use client';
 
+import { Button } from '@andrewbehma/glass-ui/button';
+import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
+import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import {
   BUDGET_ACTIONS,
   BUDGET_PERIODS,
   type BudgetPeriod,
   type BudgetScope,
   type BudgetView,
-} from '@agentdock/shared';
-import { Button } from '@andrewbehma/glass-ui/button';
-import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import { Field, Input, Select } from '@andrewbehma/glass-ui/field';
-import { Toggle } from '@andrewbehma/glass-ui/toggle';
+} from '@nautelle/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import {

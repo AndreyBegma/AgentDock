@@ -13,11 +13,11 @@ import {
   FILTER_STATS_MAX_ROWS,
   type FilterStatRow,
   filterStatsDataSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   eventsMessageSchema,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { createLogger } from '../log';
 import { FILTER_RUN_FILE, FILTER_STATS_FILE } from './env';
 import {

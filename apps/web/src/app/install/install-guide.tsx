@@ -1,6 +1,5 @@
 'use client';
 
-import { PAIRING_CODE_TTL_MS, type PublicUser } from '@agentdock/shared';
 import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import {
@@ -11,6 +10,7 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
+import { PAIRING_CODE_TTL_MS, type PublicUser } from '@nautelle/shared';
 import {
   FolderLock,
   GitBranch,

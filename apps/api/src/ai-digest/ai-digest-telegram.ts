@@ -1,4 +1,4 @@
-import type { AiDigestView } from '@agentdock/shared';
+import type { AiDigestView } from '@nautelle/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { BotTokenStore } from '../notifications';

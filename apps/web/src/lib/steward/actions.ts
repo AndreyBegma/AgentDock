@@ -3,7 +3,7 @@ import type {
   StewardIncidentView,
   StewardSettingsView,
   UpdateStewardSettingsBody,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, api } from '../api';
 
 const base = (projectId: string) =>

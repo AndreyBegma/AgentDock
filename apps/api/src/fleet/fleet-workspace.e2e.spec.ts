@@ -3,12 +3,12 @@ import type {
   FleetSlotNode,
   SlotConversation,
   SlotWorktreeView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CommandErrorCode,
   RunnerEvent,
   WorktreeStatusResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';

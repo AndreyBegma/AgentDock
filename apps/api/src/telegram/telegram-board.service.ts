@@ -8,7 +8,7 @@ import {
   canStop,
   cardReviewActions,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit';
 import { ANONYMOUS_ACTOR, userActor } from '../audit/audit.types';

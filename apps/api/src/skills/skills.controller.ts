@@ -6,7 +6,7 @@ import type {
   SkillProfileInstallView,
   SkillRunDetail,
   SkillRunView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

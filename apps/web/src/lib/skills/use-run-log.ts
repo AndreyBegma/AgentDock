@@ -1,6 +1,6 @@
 'use client';
 
-import { type LiveTopic, runTopic } from '@agentdock/shared';
+import { type LiveTopic, runTopic } from '@nautelle/shared';
 import { useCallback, useSyncExternalStore } from 'react';
 import { getLiveClient } from '../live/client';
 import {

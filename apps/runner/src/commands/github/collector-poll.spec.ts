@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { commandResultMessageSchema } from '@agentdock/shared/protocol';
+import { commandResultMessageSchema } from '@nautelle/shared/protocol';
 import { CollectorRegistry } from '../../collectors';
 import { permissivePolicy, sameRealpath } from '../../policy/testing';
 import { FakeClock } from '../../testing/fake-clock';

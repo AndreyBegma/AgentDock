@@ -1,4 +1,4 @@
-import type { CardAssessArgs } from '@agentdock/shared/protocol';
+import type { CardAssessArgs } from '@nautelle/shared/protocol';
 import type { Run } from '@prisma/client';
 import { TextWorld } from '../../text/testing/text-e2e';
 import {

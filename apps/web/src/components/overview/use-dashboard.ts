@@ -10,7 +10,7 @@ import type {
   RunSummary,
   TerminalSetupView,
   UsageSummaryResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useEffect } from 'react';
 import { api } from '../../lib/api';
 import { nextHour, startOfToday } from '../../lib/overview/dashboard';

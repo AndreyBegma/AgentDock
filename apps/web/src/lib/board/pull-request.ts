@@ -3,7 +3,7 @@ import type {
   CardCollectOutcome,
   CardPrState,
   CardPrTarget,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** #329 D6: the PR's state as the card shows it, next to `PR #n`. */
 export const PR_STATE_LABEL: Record<CardPrState, string> = {
@@ -58,7 +58,7 @@ export function prTargetNotice(
 }
 
 /** #329 D5: shared with the bot (#578). */
-export { canCreatePr } from '@agentdock/shared';
+export { canCreatePr } from '@nautelle/shared';
 
 /** The sheet's line above Create pull request. */
 export function noPrText(

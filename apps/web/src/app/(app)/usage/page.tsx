@@ -1,15 +1,15 @@
 'use client';
 
+import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
+import { Section } from '@andrewbehma/glass-ui/section';
+import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
+import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import type {
   ProjectSummary,
   UsageBreakdownResponse,
   UsageSummaryResponse,
   UsageTimeseriesResponse,
-} from '@agentdock/shared';
-import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
-import { Section } from '@andrewbehma/glass-ui/section';
-import { SegmentedControl } from '@andrewbehma/glass-ui/segmented-control';
-import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { BudgetStrip } from '../../../components/budgets/budget-chip';

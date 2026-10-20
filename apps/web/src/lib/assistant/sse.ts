@@ -1,4 +1,4 @@
-import type { AssistantStreamEvent } from '@agentdock/shared';
+import type { AssistantStreamEvent } from '@nautelle/shared';
 
 /**
  * Splits a growing text into the complete `data:` events it holds and the

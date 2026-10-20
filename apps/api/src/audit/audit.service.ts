@@ -1,4 +1,4 @@
-import type { AuditAction, AuditResult } from '@agentdock/shared';
+import type { AuditAction, AuditResult } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

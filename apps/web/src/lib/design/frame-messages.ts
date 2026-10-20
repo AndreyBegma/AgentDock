@@ -5,10 +5,10 @@ import {
   mockupMessageSchema,
   VIEWER_MESSAGE_SOURCE,
   type ViewerMessage,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
- * The viewer's side of the pin protocol (`@agentdock/shared` `pin.ts`). The
+ * The viewer's side of the pin protocol (`@nautelle/shared` `pin.ts`). The
  * mockup has an opaque origin, so a message is trusted by the window it came
  * from, never by its origin: only the frame's own window counts, and only a
  * message that parses.

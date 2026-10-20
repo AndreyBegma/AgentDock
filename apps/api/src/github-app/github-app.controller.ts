@@ -4,8 +4,8 @@ import type {
   GitHubManifestResponse,
   GitHubProjectAppStatus,
   GitHubResyncResult,
-} from '@agentdock/shared';
-import { GITHUB_HEADERS } from '@agentdock/shared';
+} from '@nautelle/shared';
+import { GITHUB_HEADERS } from '@nautelle/shared';
 import {
   Body,
   Controller,

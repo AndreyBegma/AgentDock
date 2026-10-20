@@ -4,7 +4,7 @@ import {
   TEXT_CHANGED_EVENT,
   type TextFieldView,
   type TextOwnerType,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLive } from '../live/use-live';
 import { fetchTextNotes, retryTextNormalization } from './actions';

@@ -1,8 +1,8 @@
 'use client';
 
-import { GITHUB_APP_ADMIN_PAGE } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { GITHUB_APP_ADMIN_PAGE } from '@nautelle/shared';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { apiCallbackUrl } from '../../../../../lib/github-app/format';

@@ -1,10 +1,10 @@
 'use client';
 
-import type { BoardCardView } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import type { BoardCardView } from '@nautelle/shared';
 import { type ReactNode, useState } from 'react';
 import { updateCard } from '../../lib/board/actions';
 import { autoRunNote } from '../../lib/board/dependencies';

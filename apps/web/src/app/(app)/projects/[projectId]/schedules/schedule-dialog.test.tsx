@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ScheduleView } from '@agentdock/shared';
+import type { ScheduleView } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { OwnerNotice } from './schedule-dialog';
 

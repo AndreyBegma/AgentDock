@@ -1,4 +1,4 @@
-import type { RunLogFrame, RunLogLine } from '@agentdock/shared/protocol';
+import type { RunLogFrame, RunLogLine } from '@nautelle/shared/protocol';
 
 /** Lines kept in memory; a long run drops its oldest rendered lines. */
 export const RUN_LOG_KEEP_LINES = 5000;

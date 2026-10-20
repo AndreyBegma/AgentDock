@@ -1,14 +1,5 @@
 'use client';
 
-import {
-  APPROVALS_LIVE_EVENT,
-  type ApprovalsView,
-  QUEUE_LIVE_EVENT,
-  QUEUE_STATES,
-  type QueueItemView,
-  type QueueRefreshResult,
-  type QueueView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ChipButton } from '@andrewbehma/glass-ui/chip';
@@ -22,6 +13,15 @@ import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import {
+  APPROVALS_LIVE_EVENT,
+  type ApprovalsView,
+  QUEUE_LIVE_EVENT,
+  QUEUE_STATES,
+  type QueueItemView,
+  type QueueRefreshResult,
+  type QueueView,
+} from '@nautelle/shared';
 import { CirclePlus, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';

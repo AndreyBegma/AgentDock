@@ -6,7 +6,7 @@ import type {
   TokenSaverPromptCache,
   TokenSaverSummary,
   TokenSaverUnfilteredProgram,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { ReactNode } from 'react';
 import { formatCost, formatNumber, formatTokens } from '../../lib/format';
 import {

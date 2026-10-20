@@ -4,7 +4,7 @@ import {
   type CardChecksArgs,
   cardChecksResultSchema,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ExecResult } from '../detect/exec';
 import { cardChecks } from './checks';

@@ -2,7 +2,7 @@ import {
   type ApiErrorBody,
   AUTH_ERROR,
   type AuthErrorCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type ArgumentsHost,
   Catch,

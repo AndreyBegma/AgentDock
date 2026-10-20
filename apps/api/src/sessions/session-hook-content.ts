@@ -1,4 +1,4 @@
-import type { SessionContentKind } from '@agentdock/shared';
+import type { SessionContentKind } from '@nautelle/shared';
 import {
   HOOK_PROMPT_SUBMITTED_EVENT,
   HOOK_STOPPED_EVENT,
@@ -6,7 +6,7 @@ import {
   type HookEvent,
   isHookEventType,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 
 /** The `data` keys of a hook event that carry content (ADR-0021). */
 const CONTENT_KEYS = [

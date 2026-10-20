@@ -3,8 +3,8 @@ import {
   INBOUND_DELIVERY_REASONS,
   type InboundDeliveryReason,
   SKILLS_ERROR,
-} from '@agentdock/shared';
-import { ORCHESTRATOR_DEFAULTS } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { ORCHESTRATOR_DEFAULTS } from '@nautelle/shared/protocol';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { InboundDelivery, InboundDeliveryStatus } from '@prisma/client';
 import { systemActorFor } from '../../audit/audit.types';

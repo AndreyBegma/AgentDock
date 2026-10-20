@@ -9,7 +9,7 @@ import {
   terminalCloseMessageSchema,
   terminalDataMessageSchema,
   terminalHistoryMessageSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { fakeTmux } from '../control/testing';
 import { FakeClock } from '../testing/fake-clock';

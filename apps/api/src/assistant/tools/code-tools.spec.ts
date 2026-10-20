@@ -1,4 +1,4 @@
-import type { CommandName } from '@agentdock/shared/protocol';
+import type { CommandName } from '@nautelle/shared/protocol';
 import type { BudgetGate } from '../../budgets/budget-gate';
 import type { PrismaService } from '../../database/prisma.service';
 import type { RuntimeProfileResolver } from '../../readiness';

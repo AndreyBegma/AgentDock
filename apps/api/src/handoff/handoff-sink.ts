@@ -8,8 +8,8 @@ import {
   ROUND_WARMUP_EVENT,
   type RoundRestartData,
   type RoundWarmupData,
-} from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { BoardWork } from '../board/board-work';

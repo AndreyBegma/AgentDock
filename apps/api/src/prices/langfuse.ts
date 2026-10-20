@@ -4,7 +4,7 @@ import type {
   PriceTier,
   TierCondition,
   TierPrices,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Prisma } from '@prisma/client';
 
 /**

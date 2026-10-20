@@ -1,4 +1,4 @@
-import type { ApprovalItemView, ApprovalUserRef } from '@agentdock/shared';
+import type { ApprovalItemView, ApprovalUserRef } from '@nautelle/shared';
 import type { MergeApproval, Slot, User } from '@prisma/client';
 
 /** A row with the user who decided it. */

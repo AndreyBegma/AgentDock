@@ -1,9 +1,9 @@
-import type { PaneState, PrState } from '@agentdock/shared';
+import type { PaneState, PrState } from '@nautelle/shared';
 import type {
   CheckpointKind,
   PrChecks,
   SlotRuntime,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Applied } from './projection';
 
 /** The columns a slot event may set; `status` and `endedAt` follow from them. */

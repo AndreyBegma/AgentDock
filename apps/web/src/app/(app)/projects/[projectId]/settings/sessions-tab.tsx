@@ -1,10 +1,5 @@
 'use client';
 
-import {
-  type ProjectDetail,
-  SESSION_CONTENT_RETENTION_DAYS,
-  type UpdateProjectRequest,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -13,6 +8,11 @@ import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import {
+  type ProjectDetail,
+  SESSION_CONTENT_RETENTION_DAYS,
+  type UpdateProjectRequest,
+} from '@nautelle/shared';
 import { type FormEvent, useEffect, useState } from 'react';
 import { TerminalSetupCard } from '../../../../../components/setup/terminal-setup-card';
 import { api } from '../../../../../lib/api';

@@ -4,7 +4,7 @@ import type {
   FleetEventType,
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type Clock, isoNow } from '../clock';
 import type { Exec } from '../detect/exec';
 import { parseRemote } from '../projects/remote';

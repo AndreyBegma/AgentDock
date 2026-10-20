@@ -5,11 +5,11 @@ import {
   STEWARD_OBSERVED_EVENT,
   type StewardObservedData,
   type StewardRunnerConfig,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { CardRecord } from '../cards/record';
 import type { ConfigProfile } from '../config';
 import { FakeClock } from '../testing/fake-clock';

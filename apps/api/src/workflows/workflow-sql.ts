@@ -1,4 +1,4 @@
-import { WORKFLOW_IDLE_MS } from '@agentdock/shared';
+import { WORKFLOW_IDLE_MS } from '@nautelle/shared';
 import { Prisma } from '@prisma/client';
 
 /**

@@ -10,11 +10,11 @@ import {
   CURRENT_APPROVAL_STATUSES,
   PR_INSPECTION_CACHE_MS,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   APPROVAL_NOTE_MAX_BYTES,
   type PrInspection,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

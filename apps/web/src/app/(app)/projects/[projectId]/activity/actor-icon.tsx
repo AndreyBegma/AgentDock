@@ -1,4 +1,4 @@
-import type { ActivityActorType } from '@agentdock/shared';
+import type { ActivityActorType } from '@nautelle/shared';
 import { Bot, Cog, Server, User } from 'lucide-react';
 import { ACTOR_LABEL } from '../../../../../lib/history/format';
 

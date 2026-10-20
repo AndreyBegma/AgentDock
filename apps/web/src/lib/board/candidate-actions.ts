@@ -3,7 +3,7 @@ import type {
   AcceptCandidatesResponse,
   PlanCandidateView,
   UpdatePlanCandidateRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { api } from '../api';
 import { planApi } from '../planner/href';
 

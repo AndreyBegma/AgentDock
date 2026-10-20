@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { AUTHOR_CONTACTS, type AuthorContact } from '@agentdock/shared';
+import { AUTHOR_CONTACTS, type AuthorContact } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ContactList, contactName } from './contact-links';
 

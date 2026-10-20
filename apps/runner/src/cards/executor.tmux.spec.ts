@@ -15,13 +15,13 @@ import {
   STEWARD_OBSERVED_EVENT,
   STEWARD_RESUME_TEXT,
   type StewardRunnerConfig,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CardRunArgs,
   CardRunPhaseChangedData,
   CardRunPushedData,
   UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import type { Exec } from '../detect/exec';

@@ -2,7 +2,7 @@ import type {
   PlanTaskVersionsView,
   PlanTaskVersionView,
   PlanVersionTurnView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { TURN_ACTION_LABEL } from './format';
 
 /** "Revise the plan · Ada": what produced a version, and who asked for it. */

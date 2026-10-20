@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import {
   type HelloMessage,
   runtimeProfileSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type CliDeps, runCli } from './cli';
 import { type ConfigProfile, saveConfig } from './config';
 import type { RunnerConnection } from './connection';

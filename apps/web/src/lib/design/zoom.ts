@@ -1,7 +1,7 @@
 import {
   DESIGN_VIEWPORT_MAX_PX,
   DESIGN_VIEWPORT_MIN_PX,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * The viewer's zoom (spec 335): the mockup keeps its layout width and is

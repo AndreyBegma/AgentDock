@@ -4,7 +4,7 @@ import {
   cardLabel,
   type HandoffNoteView,
   type ResumeContextResult,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { type CardRecord, CardStore } from '../cards/record';
 import type { Exec } from '../detect/exec';
 import { type Env, resolvePaths } from '../env';

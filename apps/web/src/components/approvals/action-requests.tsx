@@ -1,9 +1,5 @@
 'use client';
 
-import {
-  ACTION_REQUEST_NOTE_MAX,
-  type ActionRequestSummary,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
@@ -17,6 +13,10 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  ACTION_REQUEST_NOTE_MAX,
+  type ActionRequestSummary,
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {

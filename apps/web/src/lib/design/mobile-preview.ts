@@ -1,4 +1,4 @@
-import { DEFAULT_VIEWPORTS, type ViewportPreset } from '@agentdock/shared';
+import { DEFAULT_VIEWPORTS, type ViewportPreset } from '@nautelle/shared';
 import { fitZoom } from './zoom';
 
 /** The cropped preview's height on a phone, in px. */

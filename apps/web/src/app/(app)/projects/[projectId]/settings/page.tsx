@@ -1,10 +1,10 @@
 'use client';
 
-import type { ProjectDetail } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
+import type { ProjectDetail } from '@nautelle/shared';
 import { useParams, useSearchParams } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '../../../../../components/page-header/page-header';

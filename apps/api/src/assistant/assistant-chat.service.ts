@@ -6,7 +6,7 @@ import {
   type LlmProviderId,
   llmModelSeesImages,
   projectRoleAtLeast,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { AuditContext } from '../audit/audit.types';

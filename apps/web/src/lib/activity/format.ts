@@ -1,3 +1,4 @@
+import type { TimelineItem } from '@andrewbehma/glass-ui/timeline';
 import {
   ACTIVITY_AUDIT_ACTIONS,
   ACTIVITY_CATEGORIES,
@@ -8,8 +9,7 @@ import {
   type ActivitySeverity,
   MAX_LIVE_SUBSCRIPTIONS,
   STEWARD_ACTIVITY_TYPES,
-} from '@agentdock/shared';
-import type { TimelineItem } from '@andrewbehma/glass-ui/timeline';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
 import { isSlotName } from '../fleet/workspace-url';

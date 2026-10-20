@@ -1,4 +1,4 @@
-import type { RunnerErrorBody, RunnerErrorCode } from '@agentdock/shared';
+import type { RunnerErrorBody, RunnerErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the runners routes, shaped like every other API error. */

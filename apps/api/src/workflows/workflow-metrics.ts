@@ -14,8 +14,8 @@ import {
   type WorkflowsSummaryResponse,
   type WorkflowToolFlow,
   type WorkflowToolTransition,
-} from '@agentdock/shared';
-import type { Runtime } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { Runtime } from '@nautelle/shared/protocol';
 
 /**
  * The metric definitions of #161 that are not SQL: rows in, numbers out. The

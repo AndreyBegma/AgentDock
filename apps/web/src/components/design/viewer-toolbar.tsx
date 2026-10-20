@@ -1,13 +1,5 @@
 'use client';
 
-import {
-  DESIGN_THEMES,
-  DESIGN_VIEWPORT_MAX_PX,
-  DESIGN_VIEWPORT_MIN_PX,
-  type DesignRevisionView,
-  type DesignTheme,
-  type ViewportPreset,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Select } from '@andrewbehma/glass-ui/field';
 import { NumberInput } from '@andrewbehma/glass-ui/number-input';
@@ -15,6 +7,14 @@ import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
+import {
+  DESIGN_THEMES,
+  DESIGN_VIEWPORT_MAX_PX,
+  DESIGN_VIEWPORT_MIN_PX,
+  type DesignRevisionView,
+  type DesignTheme,
+  type ViewportPreset,
+} from '@nautelle/shared';
 import { Crosshair, Minus, Monitor, Plus, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { revisionLabel } from '../../lib/design/format';

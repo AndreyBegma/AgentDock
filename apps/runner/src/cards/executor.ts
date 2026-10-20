@@ -5,7 +5,7 @@ import {
   CARD_PUSH_MIN_INTERVAL_MS,
   CARD_SESSION_POLL_MS,
   STEWARD_RESUME_TEXT,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardCloseArgs,
   type CardCloseResult,
@@ -27,7 +27,7 @@ import {
   cardSessionName,
   type PaneDialog,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type Cancel, isoNow } from '../clock';
 import { DIALOG_PATTERNS } from '../collectors/tmux/classify';
 import { CommandFailure } from '../commands/failure';

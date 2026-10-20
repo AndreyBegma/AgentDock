@@ -2,13 +2,13 @@ import {
   type DocsSourceOverrideRequest,
   type DocsSourceView,
   PROJECT_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   BaseSource,
   DocsRule,
   DocsSourceKind,
   ProjectInspection,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { type PrerequisiteCopy, RUNNERS_PAGE } from '../prerequisites/copy';

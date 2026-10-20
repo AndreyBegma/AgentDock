@@ -4,7 +4,7 @@ import type {
   FleetGraphEdge,
   FleetGraphNode,
   FleetNodePill,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { nodeOf, relationsOf, slotNodeId } from './relations';
 
 const AT = '2026-10-14T10:00:00.000Z';

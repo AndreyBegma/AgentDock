@@ -1,9 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type {
-  Capabilities,
-  ProfileAgentdock,
-} from '@agentdock/shared/protocol';
+import type { Capabilities, ProfileAgentdock } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import type { ConfigProfile, RunnerConfig } from '../config';
 import { profileMcpServerNames } from '../launch/profile-mcp';

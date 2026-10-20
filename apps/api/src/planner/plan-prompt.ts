@@ -13,8 +13,8 @@ import {
   type PlanTurnAction,
   type PlanTurnInput,
   plannerOutputContract,
-} from '@agentdock/shared';
-import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 import {
   type ApprovedDesignContext,
   approvedDesignSections,

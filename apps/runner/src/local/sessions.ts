@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import type { WatchedProject } from '@agentdock/shared/protocol';
+import type { WatchedProject } from '@nautelle/shared/protocol';
 import { correlateCwd } from '../adapters/correlate';
 import type { Ancestor } from './types';
 

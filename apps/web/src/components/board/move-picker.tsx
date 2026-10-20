@@ -1,9 +1,9 @@
 'use client';
 
-import type { BoardCardView, BoardColumn } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
+import type { BoardCardView, BoardColumn } from '@nautelle/shared';
 import { Check } from 'lucide-react';
 import { moveTargets } from '../../lib/board/board-state';
 import { COLUMN_TITLE } from '../../lib/board/format';

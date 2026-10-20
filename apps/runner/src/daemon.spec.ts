@@ -5,7 +5,7 @@ import type {
   CommandResultMessage,
   HelloMessage,
   RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CardStore } from './cards/record';
 import type { PairedConfig } from './config';
 import type { RunnerConnection } from './connection';

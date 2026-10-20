@@ -1,9 +1,9 @@
-import { QUEUE_STATES, type QueueState } from '@agentdock/shared';
+import { QUEUE_STATES, type QueueState } from '@nautelle/shared';
 import {
   ISSUE_BODY_MAX_BYTES,
   ISSUE_LABELS_MAX,
   ISSUE_TITLE_MAX,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   ArrayMaxSize,
   IsArray,

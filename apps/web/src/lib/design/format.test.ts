@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import { STATUSES } from '@andrewbehma/glass-ui/status-pill';
 import {
   DESIGN_ERROR,
   TASK_DESIGN_STATUSES,
   type TaskDesignSummary,
   UI_PROFILE_STATUSES,
-} from '@agentdock/shared';
-import { STATUSES } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import { card, round } from '../board/fixtures';
 import { task } from '../planner/fixtures';

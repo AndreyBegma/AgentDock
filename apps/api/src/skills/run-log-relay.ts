@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { LiveErrorCode, LiveTopic } from '@agentdock/shared';
+import type { LiveErrorCode, LiveTopic } from '@nautelle/shared';
 import {
   isTerminalSkillRunPhase,
   RUN_LOG_LIVE_EVENTS,
   type RunLogFrame,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';

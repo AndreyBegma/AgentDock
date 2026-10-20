@@ -2,7 +2,7 @@ import {
   SESSION_COOKIE,
   type TerminalServerFrame,
   terminalServerFrameSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { WebSocket } from 'ws';
 
 export interface Closed {

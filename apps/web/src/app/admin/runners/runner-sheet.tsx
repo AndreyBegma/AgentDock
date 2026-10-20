@@ -1,11 +1,5 @@
 'use client';
 
-import type {
-  AdminRunner,
-  AdminRunnerDetail,
-  PairingCodeResponse,
-  PingResult,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
@@ -23,6 +17,12 @@ import {
   TableRow,
 } from '@andrewbehma/glass-ui/table';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  AdminRunner,
+  AdminRunnerDetail,
+  PairingCodeResponse,
+  PingResult,
+} from '@nautelle/shared';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { policyRows } from '@/lib/runners/policy';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';

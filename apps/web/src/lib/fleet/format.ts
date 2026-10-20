@@ -1,11 +1,11 @@
+import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
 import {
   FLEET_ERROR,
   type FleetChannel,
   type OrchestratorStatus,
   type SlotStatus,
-} from '@agentdock/shared';
-import type { CheckpointKind, PrChecks } from '@agentdock/shared/protocol';
-import type { RailBadge } from '@andrewbehma/glass-ui/nav-rail';
+} from '@nautelle/shared';
+import type { CheckpointKind, PrChecks } from '@nautelle/shared/protocol';
 import { ApiError, describeError, type ErrorHint } from '../api';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';

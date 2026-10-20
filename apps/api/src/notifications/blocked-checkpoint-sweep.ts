@@ -1,4 +1,4 @@
-import { NOTIFICATION_KIND_SPECS } from '@agentdock/shared';
+import { NOTIFICATION_KIND_SPECS } from '@nautelle/shared';
 import {
   Inject,
   Injectable,

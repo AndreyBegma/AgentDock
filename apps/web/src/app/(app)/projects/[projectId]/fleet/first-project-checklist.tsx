@@ -1,16 +1,16 @@
 'use client';
 
-import type {
-  AdminRunnerDetail,
-  AdminRuntimeProfile,
-  OrchestratorSettingsView,
-  UpdateProjectRequest,
-} from '@agentdock/shared';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Field, Select } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  AdminRunnerDetail,
+  AdminRuntimeProfile,
+  OrchestratorSettingsView,
+  UpdateProjectRequest,
+} from '@nautelle/shared';
 import { Check, Circle } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';

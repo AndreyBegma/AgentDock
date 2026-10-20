@@ -1,7 +1,7 @@
 import {
   type SkillFrontmatter,
   skillFrontmatterSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { YAML } from 'bun';
 
 /** The frontmatter block is read from at most this much of `SKILL.md`. */

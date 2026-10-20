@@ -1,4 +1,4 @@
-import type { RunnerEvent, TokenBuckets } from '@agentdock/shared/protocol';
+import type { RunnerEvent, TokenBuckets } from '@nautelle/shared/protocol';
 import type { PrismaService } from '../../database/prisma.service';
 import { SessionsIngestService } from '../../sessions/sessions-ingest.service';
 import type { E2eContext } from '../../test/e2e-app';

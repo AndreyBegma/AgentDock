@@ -1,4 +1,4 @@
-import { MINI_APP_PATH, SESSION_COOKIE } from '@agentdock/shared';
+import { MINI_APP_PATH, SESSION_COOKIE } from '@nautelle/shared';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { HOME_PATH, safeNext } from './app/login/safe-next';

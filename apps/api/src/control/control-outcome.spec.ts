@@ -1,4 +1,4 @@
-import type { CommandErrorCode } from '@agentdock/shared/protocol';
+import type { CommandErrorCode } from '@nautelle/shared/protocol';
 import { controlOutcome } from './control-outcome';
 
 const error = (code: CommandErrorCode, message?: string) =>

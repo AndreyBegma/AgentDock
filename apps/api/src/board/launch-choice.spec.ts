@@ -1,4 +1,4 @@
-import { ORCHESTRATOR_DEFAULTS } from '@agentdock/shared/protocol';
+import { ORCHESTRATOR_DEFAULTS } from '@nautelle/shared/protocol';
 import {
   defaultCardLaunch,
   defaultCardModel,

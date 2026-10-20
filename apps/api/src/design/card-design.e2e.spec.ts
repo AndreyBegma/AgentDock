@@ -1,4 +1,4 @@
-import { BOARD_ERROR } from '@agentdock/shared';
+import { BOARD_ERROR } from '@nautelle/shared';
 import { BoardFailure } from '../board/board-error';
 import { BudgetGate } from '../budgets/budget-gate';
 import { capabilities } from '../runners/testing/runner-e2e';

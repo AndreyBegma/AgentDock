@@ -3,7 +3,7 @@ import {
   type AttachmentView,
   BOARD_CHANGED_EVENT,
   type BoardChangedData,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Controller,
   Delete,

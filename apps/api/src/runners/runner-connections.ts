@@ -1,10 +1,10 @@
-import type { RunnerHeartbeat } from '@agentdock/shared';
+import type { RunnerHeartbeat } from '@nautelle/shared';
 import {
   type CommandResultMessage,
   RUNNER_CLOSE_CODES,
   type RunnerCommands,
   type ServerMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import { WebSocket } from 'ws';
 

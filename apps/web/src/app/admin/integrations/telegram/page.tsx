@@ -1,9 +1,5 @@
 'use client';
 
-import type {
-  TelegramBotTokenUpdate,
-  TelegramIntegrationStatus,
-} from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -12,6 +8,10 @@ import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  TelegramBotTokenUpdate,
+  TelegramIntegrationStatus,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
 import { PageHeader } from '../../../../components/page-header/page-header';

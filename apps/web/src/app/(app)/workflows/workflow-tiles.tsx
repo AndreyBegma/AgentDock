@@ -1,12 +1,12 @@
 'use client';
 
-import type { WorkflowsSummaryResponse } from '@agentdock/shared';
 import {
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
 } from '@andrewbehma/glass-ui/popover';
 import { StatTile } from '@andrewbehma/glass-ui/stat-tile';
+import type { WorkflowsSummaryResponse } from '@nautelle/shared';
 import { Info } from 'lucide-react';
 import { formatNumber, pluralize } from '../../../lib/format';
 import {

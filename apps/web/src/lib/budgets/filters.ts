@@ -3,7 +3,7 @@ import {
   BUDGET_STATES,
   type BudgetScope,
   type BudgetState,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
 import { SCOPE_LABEL, STATE_LABEL } from './format';
 

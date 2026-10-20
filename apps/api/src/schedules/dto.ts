@@ -7,7 +7,7 @@ import {
   type SchedulePreviewRequest,
   type ScheduleTarget,
   type ScheduleUpdateRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,

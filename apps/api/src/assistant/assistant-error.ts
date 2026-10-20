@@ -1,4 +1,4 @@
-import type { AssistantErrorCode } from '@agentdock/shared';
+import type { AssistantErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An assistant refusal, shaped like every other API error. */

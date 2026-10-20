@@ -7,8 +7,8 @@ import {
   plannerOutputContract,
   stackLabel,
   type UiProfileSnippet,
-} from '@agentdock/shared';
-import { PLAN_TURN_PROMPT_MAX_BYTES } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 
 /**
  * The design sections of a plan turn's prompt (docs/specs/223-design-stage.md

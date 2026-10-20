@@ -14,7 +14,7 @@ import {
   type TerminalMode,
   type TerminalResizeMessage,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Cancel, Clock } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';

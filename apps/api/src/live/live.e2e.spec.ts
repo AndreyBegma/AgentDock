@@ -3,7 +3,7 @@ import {
   MAX_LIVE_CONNECTIONS_PER_SESSION,
   MAX_LIVE_MESSAGE_BYTES,
   MAX_LIVE_SUBSCRIPTIONS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   createUser,
   login,

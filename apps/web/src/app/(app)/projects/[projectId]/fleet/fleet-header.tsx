@@ -1,6 +1,5 @@
 'use client';
 
-import type { OrchestratorStatus } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { MetaBar } from '@andrewbehma/glass-ui/meta-bar';
 import type { PageHeaderOverflowItem } from '@andrewbehma/glass-ui/page-header';
@@ -9,6 +8,7 @@ import {
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { OrchestratorStatus } from '@nautelle/shared';
 import { Maximize, Settings } from 'lucide-react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';

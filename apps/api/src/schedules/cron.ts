@@ -4,7 +4,7 @@ import {
   SCHEDULE_MIN_INTERVAL_MS,
   SCHEDULES_ERROR,
   type SchedulesErrorCode,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { type CronExpression, CronExpressionParser } from 'cron-parser';
 
 /** D2: the macros a schedule may use; any other `@…` is refused. */

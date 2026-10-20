@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_VIEWPORTS, DESIGN_VIEWPORTS_MAX } from '@agentdock/shared';
+import { DEFAULT_VIEWPORTS, DESIGN_VIEWPORTS_MAX } from '@nautelle/shared';
 import {
   blankRow,
   canAddRow,

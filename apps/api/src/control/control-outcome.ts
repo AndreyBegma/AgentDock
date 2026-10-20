@@ -1,5 +1,5 @@
-import type { CommandRunStatus } from '@agentdock/shared';
-import type { CommandErrorCode } from '@agentdock/shared/protocol';
+import type { CommandRunStatus } from '@nautelle/shared';
+import type { CommandErrorCode } from '@nautelle/shared/protocol';
 import { ControlFailure } from './control-error';
 
 /** `RunnerCommandService.send`'s result, read structurally. */

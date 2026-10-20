@@ -2,7 +2,7 @@ import {
   TOKEN_SAVER_SESSION_KINDS,
   type TokenSaverCostPerRound,
   type TokenSaverSessionKind,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
 import {

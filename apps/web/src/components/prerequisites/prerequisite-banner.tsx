@@ -1,9 +1,9 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import type { ProjectSummary } from '@nautelle/shared';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import {

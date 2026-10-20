@@ -1,15 +1,15 @@
 'use client';
 
-import type {
-  FleetView,
-  OrchestratorSettingsView,
-  OrchestratorStatus,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { StatusDot } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type {
+  FleetView,
+  OrchestratorSettingsView,
+  OrchestratorStatus,
+} from '@nautelle/shared';
 import type { ReactNode } from 'react';
 import { PrerequisiteBanner } from '../../../../../components/prerequisites/prerequisite-banner';
 import { orchestratorSettingsHref } from '../../../../../lib/control/reasons';

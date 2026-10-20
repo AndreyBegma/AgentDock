@@ -1,6 +1,6 @@
-import { BOARD_CARD_BODY_MAX } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Textarea } from '@andrewbehma/glass-ui/field';
+import { BOARD_CARD_BODY_MAX } from '@nautelle/shared';
 import { Markdown } from '../markdown/markdown';
 
 /**

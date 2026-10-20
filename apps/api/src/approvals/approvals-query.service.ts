@@ -8,8 +8,8 @@ import {
   CURRENT_APPROVAL_STATUSES,
   configMergeApproval,
   mergeApprovalMismatch,
-} from '@agentdock/shared';
-import type { PrInspection } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { PrInspection } from '@nautelle/shared/protocol';
 import { HttpException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { projectNotFound } from '../projects';

@@ -1,6 +1,5 @@
 'use client';
 
-import { APP_VERSION, type PublicUser } from '@agentdock/shared';
 import { Avatar } from '@andrewbehma/glass-ui/avatar';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import {
@@ -13,6 +12,7 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
+import { APP_VERSION, type PublicUser } from '@nautelle/shared';
 import { LogOut, Shield, Sparkles, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {

@@ -6,8 +6,8 @@ import {
   type PingResult,
   pairCommand,
   RUNNER_ERROR,
-} from '@agentdock/shared';
-import { RUNNER_CLOSE_CODES } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { RUNNER_CLOSE_CODES } from '@nautelle/shared/protocol';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma, type Runner } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

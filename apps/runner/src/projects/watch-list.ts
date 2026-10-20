@@ -1,4 +1,4 @@
-import type { WatchedProject, WatchRefusal } from '@agentdock/shared/protocol';
+import type { WatchedProject, WatchRefusal } from '@nautelle/shared/protocol';
 import type { CollectorRegistry } from '../collectors';
 import { errorMessage, type Logger } from '../log';
 

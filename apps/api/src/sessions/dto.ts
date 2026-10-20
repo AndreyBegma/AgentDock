@@ -4,13 +4,13 @@ import {
   SESSION_ORIGINS,
   type SessionListQuery,
   type SessionOrigin,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type Runtime,
   runtimeSchema,
   SESSION_ID_MAX_LENGTH,
   SESSION_NAME_MAX_LENGTH,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,

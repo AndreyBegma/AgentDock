@@ -13,8 +13,8 @@ import {
   cardLabel,
   failedCardChecks,
   isActiveRoundPhase,
-} from '@agentdock/shared';
-import type { CardChecksResult } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CardChecksResult } from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

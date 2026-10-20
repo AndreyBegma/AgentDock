@@ -1,9 +1,9 @@
-import type { ApprovalSource, ApprovalStatus } from '@agentdock/shared';
+import type { ApprovalSource, ApprovalStatus } from '@nautelle/shared';
 import {
   type PrChecks,
   parseFleetEvent,
   type RunnerEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 
 /**
  * The approval rules of spec 20 as pure functions: which events of a batch

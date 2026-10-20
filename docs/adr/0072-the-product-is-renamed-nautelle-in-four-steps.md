@@ -9,8 +9,8 @@ Spec: [`docs/specs/card-295-rename-to-nautelle-brand-ui-text-and-doc.md`](../spe
 The person decided on 2026-10-20 to rename the product from **AgentDock** to
 **Nautelle**. The old name appears about 5,000 times in 1,800 files: in text
 people read (the web app, Telegram and GitHub messages, the docs), in code
-identifiers and package names (`@agentdock/*`, `AgentDock` classes), in the
-runner and its protocol (`agentdock-runner`, `X-AgentDock-*` webhook headers,
+identifiers and package names (the `@agentdock` package scope, `AgentDock`
+classes), in the runner and its protocol (`agentdock-runner`, `X-AgentDock-*` webhook headers,
 the `AgentDock-Card` pull request marker, `AGENTDOCK_*` variables) and in the
 infrastructure (the GitHub repository, images, hosts, databases).
 

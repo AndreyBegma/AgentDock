@@ -1,6 +1,5 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
@@ -12,6 +11,7 @@ import {
   PopoverTrigger,
 } from '@andrewbehma/glass-ui/popover';
 import { Toolbar } from '@andrewbehma/glass-ui/toolbar';
+import type { ProjectSummary } from '@nautelle/shared';
 import { ListFilter } from 'lucide-react';
 import { useMemo } from 'react';
 import {

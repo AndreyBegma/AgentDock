@@ -3,7 +3,7 @@ import {
   CSRF_COOKIE,
   REGISTRATION_SETTING_KEY,
   SESSION_COOKIE,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AuditService } from '../audit/audit.service';
 import {

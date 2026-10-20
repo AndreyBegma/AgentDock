@@ -6,7 +6,7 @@ import {
   type SessionOrigin,
   type SessionsChangedLiveData,
   sessionOriginOf,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   HOOK_SESSION_ENDED_EVENT,
   HOOK_SESSION_STARTED_EVENT,
@@ -21,7 +21,7 @@ import {
   type SessionEvent,
   type SessionObservedData,
   type ToolCallData,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

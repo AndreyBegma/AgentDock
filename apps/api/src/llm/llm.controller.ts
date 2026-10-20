@@ -1,4 +1,4 @@
-import type { LlmKeyTestResult, LlmSettingsView } from '@agentdock/shared';
+import type { LlmKeyTestResult, LlmSettingsView } from '@nautelle/shared';
 import {
   Body,
   Controller,

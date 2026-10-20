@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import type {
   CardPrCloseArgs,
   WatchedProject,
-} from '@agentdock/shared/protocol';
-import { cardPrCloseResultSchema } from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
+import { cardPrCloseResultSchema } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ExecResult } from '../detect/exec';
 import { closeCardPr } from './pr-close';

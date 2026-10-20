@@ -2,7 +2,7 @@ import type {
   TextNormalizationsResponse,
   TextSettingsView,
   UpdateTextSettingsBody,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { api } from '../api';
 
 const base = (projectId: string) =>

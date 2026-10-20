@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { CardCommandName } from '@agentdock/shared/protocol';
+import type { CardCommandName } from '@nautelle/shared/protocol';
 import type { CardHandlers } from '../cards';
 import { permissivePolicy } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';

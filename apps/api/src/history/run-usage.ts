@@ -1,4 +1,4 @@
-import type { RunUsage } from '@agentdock/shared';
+import type { RunUsage } from '@nautelle/shared';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
 

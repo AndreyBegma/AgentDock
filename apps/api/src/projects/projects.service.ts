@@ -5,11 +5,11 @@ import {
   type ProjectRuntimeProfile,
   type ProjectSummary,
   type Role,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type ProjectInspection,
   repoRelativeDirSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

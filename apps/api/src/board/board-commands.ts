@@ -1,4 +1,4 @@
-import { BOARD_ERROR } from '@agentdock/shared';
+import { BOARD_ERROR } from '@nautelle/shared';
 import {
   type CardChecksArgs,
   type CardChecksResult,
@@ -30,7 +30,7 @@ import {
   type PrInspection,
   planCloseResultSchema,
   prInspectionSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
 import {

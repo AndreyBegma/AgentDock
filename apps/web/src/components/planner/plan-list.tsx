@@ -1,9 +1,9 @@
 'use client';
 
-import type { PlanSummary } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import type { Column } from '@andrewbehma/glass-ui/data-table';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { PlanSummary } from '@nautelle/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Time } from '../../lib/format/time';

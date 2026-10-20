@@ -1,8 +1,8 @@
 'use client';
 
-import { projectRoleAtLeast } from '@agentdock/shared';
 import { buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import { projectRoleAtLeast } from '@nautelle/shared';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';

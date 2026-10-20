@@ -1,11 +1,11 @@
 'use client';
 
-import type { DesignProgressView } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Spinner } from '@andrewbehma/glass-ui/spinner';
+import type { DesignProgressView } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import {
   elapsedSince,

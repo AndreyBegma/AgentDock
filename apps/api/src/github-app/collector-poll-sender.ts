@@ -1,4 +1,4 @@
-import type { CollectorPollArgs } from '@agentdock/shared/protocol';
+import type { CollectorPollArgs } from '@nautelle/shared/protocol';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { RunnerCommandService } from '../runners/runner-command.service';

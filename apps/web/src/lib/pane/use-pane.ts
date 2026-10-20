@@ -1,12 +1,12 @@
 'use client';
 
-import type { LiveTopic } from '@agentdock/shared';
+import type { LiveTopic } from '@nautelle/shared';
 import {
   PANE_LIVE_EVENTS,
   type PaneFrame,
   paneFrameSchema,
   paneTopic,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { useLive, useLiveStatus } from '../live/use-live';
 import { describePaneError, type PaneConnection } from './format';

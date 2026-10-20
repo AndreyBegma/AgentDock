@@ -5,7 +5,7 @@ import type {
   SchedulePreviewView,
   ScheduleView,
   SystemJobView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Body,
   Controller,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { TERMINAL_HISTORY_LINES } from '@agentdock/shared/protocol';
+import { TERMINAL_HISTORY_LINES } from '@nautelle/shared/protocol';
 import {
   HISTORY_SWIPE_PX,
   HistoryController,

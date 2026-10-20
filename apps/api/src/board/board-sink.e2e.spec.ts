@@ -1,4 +1,4 @@
-import type { BoardCardDetail, BoardView } from '@agentdock/shared';
+import type { BoardCardDetail, BoardView } from '@nautelle/shared';
 import type { LocalCall } from '../local/local-call';
 import { LocalError } from '../local/local-error';
 import { LocalHandlers } from '../local/local-handlers';

@@ -1,4 +1,4 @@
-import type { TaskDesignPatchRequest, TaskDesignView } from '@agentdock/shared';
+import type { TaskDesignPatchRequest, TaskDesignView } from '@nautelle/shared';
 
 /**
  * #604: the panel's skills — a design follows the project default until its

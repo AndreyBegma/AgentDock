@@ -1,7 +1,7 @@
 'use client';
 
-import type { PlanAnswer, PlanQuestion } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
+import type { PlanAnswer, PlanQuestion } from '@nautelle/shared';
 import { useState } from 'react';
 import {
   acceptRecommendation,

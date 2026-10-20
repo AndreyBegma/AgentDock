@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import type { TerminalMode, TerminalTarget } from '@agentdock/shared/protocol';
+import type { TerminalMode, TerminalTarget } from '@nautelle/shared/protocol';
 import { Inject, Injectable } from '@nestjs/common';
 import { TERMINAL_OPTIONS, type TerminalOptions } from './terminal-options';
 

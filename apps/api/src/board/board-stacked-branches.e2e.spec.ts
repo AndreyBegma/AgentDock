@@ -2,7 +2,7 @@ import {
   BOARD_ERROR,
   type BoardCardDetail,
   type BoardStackDetail,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { BoardShipping } from './board-shipping';
 import {
   BoardWorld,

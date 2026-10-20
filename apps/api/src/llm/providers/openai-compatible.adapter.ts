@@ -1,5 +1,5 @@
-import type { LlmProviderId } from '@agentdock/shared';
-import type { TokenBuckets } from '@agentdock/shared/protocol';
+import type { LlmProviderId } from '@nautelle/shared';
+import type { TokenBuckets } from '@nautelle/shared/protocol';
 import { LlmError } from '../llm-error';
 import {
   DEFAULT_MAX_TOKENS,

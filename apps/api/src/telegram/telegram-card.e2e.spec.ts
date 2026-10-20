@@ -1,5 +1,5 @@
-import { CARD_FINISHED_EVENT, CARDS_SUGGESTED_EVENT } from '@agentdock/shared';
-import type { SessionMessageArgs } from '@agentdock/shared/protocol';
+import { CARD_FINISHED_EVENT, CARDS_SUGGESTED_EVENT } from '@nautelle/shared';
+import type { SessionMessageArgs } from '@nautelle/shared/protocol';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import {
   BoardWorld,

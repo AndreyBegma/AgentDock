@@ -1,7 +1,7 @@
 import type {
   ProjectRuleImportResult,
   ProjectRuleView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { seedProject } from '../fleet/testing/fleet-e2e';
 import {
   createE2eApp,

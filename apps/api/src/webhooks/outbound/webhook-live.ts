@@ -2,7 +2,7 @@ import {
   WEBHOOK_LIVE_EVENTS,
   type WebhookCircuitState,
   type WebhookDeliveryUpdatedData,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { WebhookDelivery } from '@prisma/client';
 import { LiveService } from '../../live/live.service';

@@ -1,7 +1,7 @@
 'use client';
 
-import type { AdminRunnerDetail } from '@agentdock/shared';
-import { terminalAvailable } from '@agentdock/shared/protocol';
+import type { AdminRunnerDetail } from '@nautelle/shared';
+import { terminalAvailable } from '@nautelle/shared/protocol';
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 

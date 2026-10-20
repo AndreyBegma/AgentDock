@@ -1,6 +1,5 @@
 'use client';
 
-import { projectRoleAtLeast } from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
@@ -9,6 +8,7 @@ import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
+import { projectRoleAtLeast } from '@nautelle/shared';
 import { X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type ReactNode, useState } from 'react';

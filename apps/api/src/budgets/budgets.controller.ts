@@ -1,4 +1,4 @@
-import type { BudgetRecomputeResult, BudgetView } from '@agentdock/shared';
+import type { BudgetRecomputeResult, BudgetView } from '@nautelle/shared';
 import {
   Body,
   Controller,

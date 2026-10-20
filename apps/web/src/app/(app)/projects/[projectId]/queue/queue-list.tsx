@@ -1,10 +1,10 @@
-import type { QueueItemView } from '@agentdock/shared';
 import {
   Table,
   TableCell,
   TableHead,
   TableRow,
 } from '@andrewbehma/glass-ui/table';
+import type { QueueItemView } from '@nautelle/shared';
 import { ScrollX } from '../../../../../components/scroll-x/scroll-x';
 import { blockerLabel, priorityLabel } from '../../../../../lib/queue/format';
 import { ComputedNote, IssueLink, SourceDot, StateBadge } from './state-cells';

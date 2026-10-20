@@ -6,7 +6,7 @@ import type {
   DocsPrStateResult,
   DocsPublishSpecsArgs,
   DocsPublishSpecsResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { openSpecsPr } from '../planner/publish-specs';
 import { GH_TIMEOUT_MS, type SkillsDeps, stderrLine } from '../skills/deps';
 import { docsBaseOf, docsRepoOf } from './repo';

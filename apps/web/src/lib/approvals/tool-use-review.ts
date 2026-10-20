@@ -1,4 +1,4 @@
-import type { ActionRequestSummary } from '@agentdock/shared';
+import type { ActionRequestSummary } from '@nautelle/shared';
 import { toolUseArgs } from './action-requests';
 
 /** What the runner puts where it masked a secret (`pane/redact.ts`). */

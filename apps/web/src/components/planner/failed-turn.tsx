@@ -1,9 +1,9 @@
 'use client';
 
-import type { PlanTurnView } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
+import type { PlanTurnView } from '@nautelle/shared';
 import Link from 'next/link';
 import { useState } from 'react';
 import { isContractViolation } from '../../lib/planner/format';

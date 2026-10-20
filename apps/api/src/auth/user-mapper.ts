@@ -1,4 +1,4 @@
-import type { AdminUser, PublicUser } from '@agentdock/shared';
+import type { AdminUser, PublicUser } from '@nautelle/shared';
 import type { User } from '@prisma/client';
 
 // Explicit field lists: a new column (or passwordHash) never leaks by default.

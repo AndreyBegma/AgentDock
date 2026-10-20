@@ -1,13 +1,5 @@
 'use client';
 
-import type {
-  CreatePlanRequest,
-  DiscussProposal,
-  InstalledSkillsView,
-  PlanSummary,
-  ProjectDetail,
-} from '@agentdock/shared';
-import { DISCUSS_SKILLS_MAX } from '@agentdock/shared';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
@@ -17,6 +9,14 @@ import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type {
+  CreatePlanRequest,
+  DiscussProposal,
+  InstalledSkillsView,
+  PlanSummary,
+  ProjectDetail,
+} from '@nautelle/shared';
+import { DISCUSS_SKILLS_MAX } from '@nautelle/shared';
 import { SendHorizontal, Trash2 } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { api } from '../../lib/api';

@@ -2,7 +2,7 @@ import {
   TERMINAL_IDLE_TIMEOUT_SEC_DEFAULT,
   TERMINAL_MAX_DURATION_SEC_DEFAULT,
   TERMINAL_TICKET_TTL_MS,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigService } from '@nestjs/config';
 
 /** Limits of the terminal attach (spec 29 D5, D7); tests override the provider to run fast. */

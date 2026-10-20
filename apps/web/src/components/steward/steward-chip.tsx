@@ -1,10 +1,10 @@
+import { Chip } from '@andrewbehma/glass-ui/chip';
+import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import {
   STEWARD_KIND_LABEL,
   type StewardCardChip,
   stewardChipLabel,
-} from '@agentdock/shared';
-import { Chip } from '@andrewbehma/glass-ui/chip';
-import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+} from '@nautelle/shared';
 import { TriangleAlert } from 'lucide-react';
 
 /**

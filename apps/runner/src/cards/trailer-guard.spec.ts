@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
-import { cardDraftPullRequest, cardPullRequestBody } from '@agentdock/shared';
-import type { CardCollectArgs } from '@agentdock/shared/protocol';
+import { cardDraftPullRequest, cardPullRequestBody } from '@nautelle/shared';
+import type { CardCollectArgs } from '@nautelle/shared/protocol';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import { collectCard, ensureWorktree } from './git';
 import { cardWorktreePath } from './launch';

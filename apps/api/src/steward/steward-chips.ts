@@ -1,4 +1,4 @@
-import type { StewardCardChip } from '@agentdock/shared';
+import type { StewardCardChip } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { actionsOf } from './steward-incidents.service';

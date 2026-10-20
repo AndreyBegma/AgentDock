@@ -10,11 +10,11 @@ import {
   isActiveRoundPhase,
   RUN_UPDATED_LIVE_EVENT,
   type RunLiveChange,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CardAssessArgs,
   CardAssessFinishedData,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Prisma, RunStatus } from '@prisma/client';
 import { z } from 'zod';

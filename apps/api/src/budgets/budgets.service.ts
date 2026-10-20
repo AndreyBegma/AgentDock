@@ -10,7 +10,7 @@ import {
   isValidTimeZone,
   normalizeThresholds,
   periodAt,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { type Budget, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';

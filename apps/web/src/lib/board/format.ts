@@ -1,3 +1,4 @@
+import type { Status } from '@andrewbehma/glass-ui/status-pill';
 import {
   BOARD_ACTION_ERROR_TEXT,
   BOARD_COLUMNS,
@@ -32,12 +33,11 @@ import {
   isWorktreeGoneError,
   MOVE_REFUSAL_TEXT,
   ownsWorker,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   CardRunWiringReason,
   LocalErrorCode,
-} from '@agentdock/shared/protocol';
-import type { Status } from '@andrewbehma/glass-ui/status-pill';
+} from '@nautelle/shared/protocol';
 import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { STAGE_LABEL } from '../fleet/graph';
@@ -59,7 +59,7 @@ export {
   canMarkFinished,
   isSuggestion,
   isWorktreeGoneError,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 // The rules the Telegram bot offers its buttons by too live in shared.
 export {
   COLUMN_TITLE,

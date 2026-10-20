@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CARD_PR_DESCRIPTION_FILE } from '@agentdock/shared';
-import type { CardRunArgs } from '@agentdock/shared/protocol';
+import { CARD_PR_DESCRIPTION_FILE } from '@nautelle/shared';
+import type { CardRunArgs } from '@nautelle/shared/protocol';
 
 /**
  * #445 D8: the artifact guard on `finish_card`. A card launched with Token

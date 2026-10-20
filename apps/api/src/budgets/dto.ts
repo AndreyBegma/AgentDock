@@ -16,7 +16,7 @@ import {
   type BudgetScope,
   type BudgetState,
   type BudgetUpdateRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   ArrayMaxSize,
   IsArray,

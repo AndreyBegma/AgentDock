@@ -6,7 +6,7 @@ import {
   type CommandResultMessage,
   commandResultMessageSchema,
   commands,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type CommandHandlers, createDispatcher } from '../commands/dispatcher';
 import { CommandFailure } from '../commands/failure';
 import { createHandlers } from '../commands/handlers';

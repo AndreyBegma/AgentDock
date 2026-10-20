@@ -1,4 +1,4 @@
-import type { GitHubAppErrorBody, GitHubAppErrorCode } from '@agentdock/shared';
+import type { GitHubAppErrorBody, GitHubAppErrorCode } from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the GitHub App routes, shaped like every other API error. */

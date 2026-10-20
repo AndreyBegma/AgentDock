@@ -3,7 +3,7 @@ import {
   type DesignTheme,
   type ViewportPreset,
   viewportPresetSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /**
  * The viewport presets editor (spec 223 D11, Settings → Design). Rows are

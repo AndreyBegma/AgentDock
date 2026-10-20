@@ -14,8 +14,8 @@ import {
   CARD_PR_DESCRIPTION_FILE,
   cardPullRequestBody,
   isDivergedBranchError,
-} from '@agentdock/shared';
-import type { CardCollectArgs } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import type { CardCollectArgs } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec, ExecOptions } from '../detect/exec';
 import { GITHUB_GIT_CONFIG, GitAuth, HARDENED_GIT_CONFIG } from '../git-auth';

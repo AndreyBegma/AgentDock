@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { gzipSync } from 'node:zlib';
-import type { UnsequencedEvent } from '@agentdock/shared/protocol';
+import type { UnsequencedEvent } from '@nautelle/shared/protocol';
 import { createLogger } from '../log';
 import {
   handleOtlpRequest,

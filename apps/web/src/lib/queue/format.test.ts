@@ -4,7 +4,7 @@ import {
   type QueueItemView,
   type QueueState,
   type QueueView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
   allowedLabels,

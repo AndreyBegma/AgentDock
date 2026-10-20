@@ -1,4 +1,4 @@
-import type { SessionMessageOutcome } from '@agentdock/shared';
+import type { SessionMessageOutcome } from '@nautelle/shared';
 import { answerSteps, readQuestion } from '../cards/question';
 import type { TmuxControl } from '../control/tmux';
 import { readPane } from '../steward/pane-rules';

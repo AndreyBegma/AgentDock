@@ -4,12 +4,12 @@ import { join } from 'node:path';
 import {
   HANDOFF_UPDATED_EVENT,
   handoffUpdatedDataSchema,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   PLAN_TURN_PROMPT_MAX_BYTES,
   type UnsequencedEvent,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type Clock, isoNow } from '../clock';
 import type { ConfigProfile } from '../config';
 import { errorMessage, type Logger } from '../log';

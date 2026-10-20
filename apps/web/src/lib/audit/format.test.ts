@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AuditRecordView } from '@agentdock/shared';
+import type { AuditRecordView } from '@nautelle/shared';
 import { actorLabel } from './format';
 
 const record = (overrides: Partial<AuditRecordView>): AuditRecordView => ({

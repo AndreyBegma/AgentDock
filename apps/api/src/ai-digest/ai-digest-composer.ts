@@ -4,7 +4,7 @@ import {
   DIGEST_REASON_MAX,
   DIGEST_TITLE_MAX,
   oneLine,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {

@@ -1,11 +1,11 @@
 'use client';
 
-import type { BudgetView } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { BudgetView } from '@nautelle/shared';
 import { useState } from 'react';
 import { BudgetCard } from '../../../../../../components/budgets/budget-card';
 import { BudgetFormDialog } from '../../../../../../components/budgets/budget-form-dialog';

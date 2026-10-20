@@ -7,7 +7,7 @@ import {
   type Runtime,
   type TokenBuckets,
   type UnsequencedEvent,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { AttributeValue, OtlpLogRecord } from './decode';
 
 /** The envelope's `project` (event-schema.md). */

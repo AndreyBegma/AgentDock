@@ -1,8 +1,8 @@
 'use client';
 
-import type { FleetView } from '@agentdock/shared';
 import { Section } from '@andrewbehma/glass-ui/section';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
+import type { FleetView } from '@nautelle/shared';
 import { Network } from 'lucide-react';
 import {
   formatAge,

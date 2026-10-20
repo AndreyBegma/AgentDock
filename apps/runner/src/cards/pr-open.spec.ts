@@ -4,7 +4,7 @@ import {
   cardPrOpenArgsSchema,
   cardPrOpenResultSchema,
   type WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ExecResult } from '../detect/exec';
 import { openCardPr } from './pr-open';
 

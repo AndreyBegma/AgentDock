@@ -1,8 +1,8 @@
 'use client';
 
-import type { PendingQuestion, SessionMessageRequest } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Input } from '@andrewbehma/glass-ui/field';
+import type { PendingQuestion, SessionMessageRequest } from '@nautelle/shared';
 import { type FormEvent, useId, useState } from 'react';
 import type { SendSessionMessage } from '../../lib/session-message/actions';
 import {

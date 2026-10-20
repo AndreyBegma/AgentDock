@@ -1,9 +1,9 @@
-import type { RunnerStatus } from '@agentdock/shared';
+import type { RunnerStatus } from '@nautelle/shared';
 import {
   type CommandName,
   type CommandSupport,
   commandSupport,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Inject, Injectable } from '@nestjs/common';
 import type { Runner } from '@prisma/client';
 import { RunnerConnections } from './runner-connections';

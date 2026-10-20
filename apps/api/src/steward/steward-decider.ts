@@ -8,7 +8,7 @@ import {
   type StewardActionResult,
   type StewardDialogId,
   stewardActionCount,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardResumeArgs,
   cardResumeArgsSchema,
@@ -17,7 +17,7 @@ import {
   type Role,
   roleAtLeast,
   type StewardCommandName,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   Injectable,
   Logger,

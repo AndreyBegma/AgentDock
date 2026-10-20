@@ -1,15 +1,15 @@
 'use client';
 
-import {
-  PROJECT_RULE_DESCRIPTION_MAX,
-  PROJECT_RULE_TITLE_MAX,
-  type ProjectRuleView,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
+import {
+  PROJECT_RULE_DESCRIPTION_MAX,
+  PROJECT_RULE_TITLE_MAX,
+  type ProjectRuleView,
+} from '@nautelle/shared';
 import { useEffect, useState } from 'react';
 import { SOURCE_LABEL } from '../../../../../../lib/project-rules/format';
 

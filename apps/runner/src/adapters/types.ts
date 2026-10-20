@@ -3,7 +3,7 @@ import type {
   SessionObservedData,
   UnsequencedEvent,
   WatchedProject,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 
 /** One transcript file of one runtime session (D2). */

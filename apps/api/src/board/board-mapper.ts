@@ -36,7 +36,7 @@ import {
   type StewardCardChip,
   type TaskDesignSummary,
   type TokenSavedView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type CardRunWiring,
   type CardRunWiringReason,
@@ -47,7 +47,7 @@ import {
   type PaneDialog,
   type ProfileAgentdock,
   paneDialogSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import {
   type BoardCard,
   type BoardCardPullRequest,

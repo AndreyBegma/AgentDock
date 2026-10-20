@@ -4,7 +4,7 @@ import {
   type BudgetErrorCode,
   type BudgetExceededBody,
   type BudgetScope,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { HttpException } from '@nestjs/common';
 
 /** An HTTP error of the budget routes, shaped like every other API error. */

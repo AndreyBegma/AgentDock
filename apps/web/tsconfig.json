@@ -14,7 +14,7 @@
     "incremental": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@agentdock/shared": ["../../packages/shared/src/index.ts"]
+      "@nautelle/shared": ["../../packages/shared/src/index.ts"]
     },
     "plugins": [{ "name": "next" }],
     "ignoreDeprecations": "6.0"

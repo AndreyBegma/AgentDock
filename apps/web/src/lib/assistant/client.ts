@@ -8,7 +8,7 @@ import {
   ATTACHMENT_UPLOAD_FIELD,
   type CreateAssistantConversationRequest,
   type UpdateAssistantConversationRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, api, csrfHeaders } from '../api';
 import { parseSse } from './sse';
 

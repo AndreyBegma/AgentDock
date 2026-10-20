@@ -3,7 +3,7 @@ import {
   type AuthorContact,
   type AuthorContactKind,
   presentContacts,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Briefcase,
   GitBranch,

@@ -1,5 +1,5 @@
-import type { ModelPriceInput, PriceTier } from '@agentdock/shared';
-import type { TokenBuckets } from '@agentdock/shared/protocol';
+import type { ModelPriceInput, PriceTier } from '@nautelle/shared';
+import type { TokenBuckets } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { CostSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';

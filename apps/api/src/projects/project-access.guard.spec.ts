@@ -1,4 +1,4 @@
-import type { Role } from '@agentdock/shared';
+import type { Role } from '@nautelle/shared';
 import type { ExecutionContext, HttpException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { AuthUser } from '../auth';

@@ -1,4 +1,4 @@
-import type { TextOwnerType } from '@agentdock/shared';
+import type { TextOwnerType } from '@nautelle/shared';
 import { CardDesignHarness } from '../design/testing/card-design-e2e';
 import { designResult } from '../design/testing/design-e2e';
 import { decomposed, task } from '../planner/testing/planner-e2e';

@@ -3,7 +3,7 @@ import {
   type InboundTriggerAction,
   type InboundTriggerView,
   inboundHookPath,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type { InboundDelivery, InboundTrigger } from '@prisma/client';
 
 export const toDeliveryView = (row: InboundDelivery): InboundDeliveryView => ({

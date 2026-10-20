@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // F-27: do not advertise the framework.
   poweredByHeader: false,
-  transpilePackages: ['@agentdock/shared'],
+  transpilePackages: ['@nautelle/shared'],
   // Same-origin API access (spec D12): cookies stay first-party.
   async rewrites() {
     return [{ source: '/api/:path*', destination: `${apiUrl}/:path*` }];

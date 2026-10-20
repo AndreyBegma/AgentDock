@@ -34,11 +34,11 @@ import {
   type UpdateBoardCardRequest,
   type UpdateBoardSettingsRequest,
   type UpdateBoardStackRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   type OrchestratorPermissionMode,
   orchestratorPermissionModeSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,

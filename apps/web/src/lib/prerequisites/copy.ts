@@ -1,4 +1,4 @@
-import type { ProjectSummary } from '@agentdock/shared';
+import type { ProjectSummary } from '@nautelle/shared';
 import { parsePolicyRefusal } from '../runners/policy';
 import { isRunnerOnline } from './facts';
 

@@ -18,7 +18,7 @@ import {
   skillContentHashInput,
   skillFilePathSchema,
   skillNameSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { parseFrontmatter } from './frontmatter';
 
 export const SKILL_FILE = 'SKILL.md';

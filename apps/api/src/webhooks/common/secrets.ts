@@ -3,7 +3,7 @@ import {
   TRIGGER_PUBLIC_ID_LENGTH,
   WEBHOOK_SECRET_BYTES,
   WEBHOOKS_ERROR,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { SecretCipher } from '../../common/crypto';
 import { webhooksError } from './webhooks-error';

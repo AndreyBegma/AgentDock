@@ -1,12 +1,12 @@
 'use client';
 
+import { FlowGraph } from '@andrewbehma/glass-ui/flow-graph';
 import {
   type FleetGraph,
   type FleetGraphNode,
   ORCHESTRATOR_NODE_ID,
   slotNodeId,
-} from '@agentdock/shared';
-import { FlowGraph } from '@andrewbehma/glass-ui/flow-graph';
+} from '@nautelle/shared';
 import { useMemo } from 'react';
 import type { useControl } from '../../../../../lib/control/use-control';
 import {

@@ -1,5 +1,5 @@
-import { FLEET_LIVE_EVENT, type FleetView } from '@agentdock/shared';
-import type { RunnerEvent } from '@agentdock/shared/protocol';
+import { FLEET_LIVE_EVENT, type FleetView } from '@nautelle/shared';
+import type { RunnerEvent } from '@nautelle/shared/protocol';
 import { Logger } from '@nestjs/common';
 import { allowedLiveOrigin } from '../live/live-options';
 import { TestLiveSocket } from '../live/testing/live-e2e';

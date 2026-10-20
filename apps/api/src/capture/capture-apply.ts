@@ -9,7 +9,7 @@ import {
   captureFingerprint,
   type FingerprintedSuggestion,
   selectCaptureCards,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

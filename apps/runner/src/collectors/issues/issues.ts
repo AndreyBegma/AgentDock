@@ -1,10 +1,10 @@
-import { parseDependsOn } from '@agentdock/shared';
+import { parseDependsOn } from '@nautelle/shared';
 import type {
   GitHubAppHealth,
   IssueClosedData,
   IssuesRefreshResult,
   QueueEventType,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type Cancel, isoNow } from '../../clock';
 import { type FleetProject, resolveFleetProject } from '../../fleet/project';
 import { errorMessage } from '../../log';

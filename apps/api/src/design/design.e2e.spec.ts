@@ -5,8 +5,8 @@ import {
   SESSION_COOKIE,
   type TaskDesignView,
   type UiProfileView,
-} from '@agentdock/shared';
-import { PLAN_TURN_RESULT_MAX_BYTES } from '@agentdock/shared/protocol';
+} from '@nautelle/shared';
+import { PLAN_TURN_RESULT_MAX_BYTES } from '@nautelle/shared/protocol';
 import { BudgetGate } from '../budgets';
 import { BudgetExceededError } from '../budgets/budget-error';
 import { block, decomposed, task } from '../planner/testing/planner-e2e';

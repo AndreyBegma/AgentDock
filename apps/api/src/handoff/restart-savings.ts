@@ -1,5 +1,5 @@
-import { type RestartEstimate, restartEstimateSchema } from '@agentdock/shared';
-import type { TokenBuckets } from '@agentdock/shared/protocol';
+import { type RestartEstimate, restartEstimateSchema } from '@nautelle/shared';
+import type { TokenBuckets } from '@nautelle/shared/protocol';
 import type { BoardCardRound } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
 import { sessionModelByRun } from '../history/run-usage';

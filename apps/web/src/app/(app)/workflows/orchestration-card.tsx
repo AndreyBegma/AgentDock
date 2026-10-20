@@ -1,9 +1,9 @@
 'use client';
 
-import type { WorkflowsOrchestrationResponse } from '@agentdock/shared';
 import { Sankey, type SankeyNodeInfo } from '@andrewbehma/glass-ui/sankey';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type { WorkflowsOrchestrationResponse } from '@nautelle/shared';
 import { type ReactNode, useMemo } from 'react';
 import { formatNumber } from '../../../lib/format';
 import {

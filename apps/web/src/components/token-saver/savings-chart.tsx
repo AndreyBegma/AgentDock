@@ -1,7 +1,7 @@
 'use client';
 
-import type { TokenSaverSummary } from '@agentdock/shared';
 import { Chart } from '@andrewbehma/glass-ui/chart';
+import type { TokenSaverSummary } from '@nautelle/shared';
 import { useMemo } from 'react';
 import { formatDate } from '../../lib/format';
 import { formatSavedUsd } from '../../lib/token-saver/format';

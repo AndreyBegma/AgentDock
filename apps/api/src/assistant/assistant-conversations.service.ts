@@ -1,7 +1,7 @@
 import type {
   AssistantConversationView,
   AssistantMessageView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth-request';
 import { PrismaService } from '../database/prisma.service';

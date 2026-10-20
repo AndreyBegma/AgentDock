@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { CardRunArgs } from '@agentdock/shared/protocol';
+import type { CardRunArgs } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import {
   CARD_PORT_BASE,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { ROLES } from '@agentdock/shared';
+import { ROLES } from '@nautelle/shared';
 import {
   defaultUsersTab,
   deleteUserCopy,

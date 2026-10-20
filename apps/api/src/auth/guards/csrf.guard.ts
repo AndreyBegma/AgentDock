@@ -1,4 +1,4 @@
-import { AUTH_ERROR, CSRF_HEADER, SESSION_COOKIE } from '@agentdock/shared';
+import { AUTH_ERROR, CSRF_HEADER, SESSION_COOKIE } from '@nautelle/shared';
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';

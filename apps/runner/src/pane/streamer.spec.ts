@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { SubscribeMessage } from '@agentdock/shared/protocol';
+import type { SubscribeMessage } from '@nautelle/shared/protocol';
 import { fakeTmux } from '../control/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { memoryLogger } from '../testing/fixtures';

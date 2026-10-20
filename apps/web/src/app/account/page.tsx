@@ -1,12 +1,5 @@
 'use client';
 
-import {
-  type ChangePasswordRequest,
-  PASSWORD_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
-  type PublicUser,
-  type SessionInfo,
-} from '@agentdock/shared';
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
@@ -16,6 +9,13 @@ import { Field, Input } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import {
+  type ChangePasswordRequest,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  type PublicUser,
+  type SessionInfo,
+} from '@nautelle/shared';
 import { Monitor, Smartphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';

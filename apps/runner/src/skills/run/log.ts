@@ -9,7 +9,7 @@ import {
   type RunLogSubscribeMessage,
   type SkillRunPhase,
   type SubscribeErrorMessage,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import type { Cancel, Clock } from '../../clock';
 import { errorMessage, type Logger } from '../../log';
 import { renderStreamLine } from './stream';

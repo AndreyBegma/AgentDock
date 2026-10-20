@@ -2,7 +2,7 @@ import {
   type PlanQuestion,
   type PlanTurnAction,
   plannerOutputContract,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { systemPrompt } from './assistant/prompts';
 import { readDefaultPlannerInstructions } from './database/seed-planner-instructions';
 import {

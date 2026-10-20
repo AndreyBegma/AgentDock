@@ -1,4 +1,4 @@
-import type { AiDigestSettingsView, AiDigestView } from '@agentdock/shared';
+import type { AiDigestSettingsView, AiDigestView } from '@nautelle/shared';
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';

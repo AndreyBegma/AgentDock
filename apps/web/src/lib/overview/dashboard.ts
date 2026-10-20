@@ -8,7 +8,7 @@ import type {
   SlotStatus,
   SlotSummary,
   UsageTimeseriesResponse,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { orchestratorSettingsHref } from '../control/reasons';
 import { ORCHESTRATOR_STATUS_LABEL } from '../fleet/format';
 import { slotHref } from '../fleet/workspace-url';

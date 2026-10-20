@@ -5,7 +5,7 @@ import {
   type CardPullRequestView,
   type CardReviewAction,
   cardLabel,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { callbackCodec } from './callback-data';
 import type { InlineKeyboardButton } from './telegram-client';
 import type { GuardRefusal } from './telegram-guard.service';

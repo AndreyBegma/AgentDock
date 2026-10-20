@@ -1,13 +1,13 @@
 'use client';
 
-import type {
-  UsageSummaryResponse,
-  UsageTimeseriesResponse,
-} from '@agentdock/shared';
 import { Chart } from '@andrewbehma/glass-ui/chart';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Sparkline } from '@andrewbehma/glass-ui/sparkline';
 import { StatTile } from '@andrewbehma/glass-ui/stat-tile';
+import type {
+  UsageSummaryResponse,
+  UsageTimeseriesResponse,
+} from '@nautelle/shared';
 import Link from 'next/link';
 import { type ComponentProps, useMemo } from 'react';
 import {

@@ -1,11 +1,11 @@
 'use client';
 
+import { Select } from '@andrewbehma/glass-ui/field';
 import {
   type AssistantModelOption,
   LLM_PROVIDER_INFO,
   type ProjectSummary,
-} from '@agentdock/shared';
-import { Select } from '@andrewbehma/glass-ui/field';
+} from '@nautelle/shared';
 import {
   AUTO_PROJECT,
   modelKey,

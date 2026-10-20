@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { CardMergeArgs, WatchedProject } from '@agentdock/shared/protocol';
+import type { CardMergeArgs, WatchedProject } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ExecResult } from '../detect/exec';
 import { mergeCard } from './merge';

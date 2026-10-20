@@ -1,7 +1,7 @@
 import {
   ATTACHMENTS_PER_CARD_MAX,
   type ClaimAttachmentsRequest,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { applyDecorators } from '@nestjs/common';
 import {
   ArrayMaxSize,

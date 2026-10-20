@@ -5,7 +5,7 @@ import type {
   TerminalSetupItem,
   TerminalSetupItemId,
   TerminalSetupView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 
 /** Issue #281 D6: the web side of the "Terminal → Board" checklist. */
 

@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto';
 import {
   UIPROFILE_FINGERPRINT_MAX_FILES,
   UIPROFILE_FINGERPRINT_MAX_GLOBS,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import type {
   UiProfileFingerprintArgs,
   UiProfileFingerprintResult,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
 import {

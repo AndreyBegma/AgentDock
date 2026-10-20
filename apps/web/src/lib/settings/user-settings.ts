@@ -4,7 +4,7 @@ import {
   PLANNING_MODEL_DEFAULT,
   type UpdateUserSettingsRequest,
   type UserSettingsView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { api } from '../api';
 import { useSection } from '../section/use-section';
 

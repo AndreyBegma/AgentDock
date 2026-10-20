@@ -1,6 +1,5 @@
 'use client';
 
-import type { ProjectSummary } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import {
   NavRail,
@@ -10,6 +9,7 @@ import {
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import { useBreakpoint } from '@andrewbehma/glass-ui/use-breakpoint';
+import type { ProjectSummary } from '@nautelle/shared';
 import { Ellipsis, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';

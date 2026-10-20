@@ -1,15 +1,15 @@
 'use client';
 
-import type {
-  ProjectSummary,
-  StewardDigestItem,
-  StewardDigestView,
-} from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SectionUnavailable } from '@andrewbehma/glass-ui/section-unavailable';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
+import type {
+  ProjectSummary,
+  StewardDigestItem,
+  StewardDigestView,
+} from '@nautelle/shared';
 import { useEffect } from 'react';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';

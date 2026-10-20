@@ -10,7 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { filterStatRowSchema } from '@agentdock/shared';
+import { filterStatRowSchema } from '@nautelle/shared';
 import { type FilterDeps, judge, runFilter } from './engine';
 import { filterEnv, RAW_ENV } from './env';
 import { searchFilter } from './families/lang/files';

@@ -1,10 +1,10 @@
 'use client';
 
-import type { PlanDetail } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
+import type { PlanDetail } from '@nautelle/shared';
 import { Globe, Lock } from 'lucide-react';
 import NextLink from 'next/link';
 import { boardHref } from '../../lib/board/href';

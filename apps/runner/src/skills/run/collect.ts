@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import type {
   SkillRunChangedFile,
   SkillRunTerminalPhase,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { resolveFleetProject } from '../../fleet/project';
 import { redact, redactText } from '../../pane/redact';
 import {

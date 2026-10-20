@@ -1,4 +1,4 @@
-import { AUTH_ERROR, type Role } from '@agentdock/shared';
+import { AUTH_ERROR, type Role } from '@nautelle/shared';
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';

@@ -1,8 +1,8 @@
 'use client';
 
-import type { ReadinessAction, ReadinessBlockerCode } from '@agentdock/shared';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import type { ReadinessAction, ReadinessBlockerCode } from '@nautelle/shared';
 import { useState } from 'react';
 import { api, describeError } from '../../lib/api';
 import { readinessCopy } from '../../lib/readiness/copy';

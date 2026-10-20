@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { PlanIntakeSplitView, PlanSummary } from '@agentdock/shared';
+import type { PlanIntakeSplitView, PlanSummary } from '@nautelle/shared';
 import { plan, question, turn } from '../planner/fixtures';
 import { boardView, card } from './fixtures';
 import {

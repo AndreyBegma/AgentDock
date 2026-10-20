@@ -4,7 +4,7 @@ import {
   type ProjectRuleCandidateView,
   type ProjectRuleSource,
   type ProjectRuleView,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError } from '../api';
 import { describeProjectError } from '../projects/format';
 

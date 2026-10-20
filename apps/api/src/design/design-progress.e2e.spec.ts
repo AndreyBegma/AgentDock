@@ -1,4 +1,4 @@
-import type { PlanDetail, TaskDesignView } from '@agentdock/shared';
+import type { PlanDetail, TaskDesignView } from '@nautelle/shared';
 import { decomposed, task } from '../planner/testing/planner-e2e';
 import {
   DesignHarness,

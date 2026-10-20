@@ -1,4 +1,4 @@
-import type { LlmProviderId, Role } from '@agentdock/shared';
+import type { LlmProviderId, Role } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import type { AuditContext } from '../../audit/audit.types';

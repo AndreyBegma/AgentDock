@@ -8,13 +8,13 @@ import {
   type PrApproveBoundArgs,
   prDiffUrl,
   shortHeadSha,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import { ApiError, describeError } from '../api';
 
 /**
  * The live event on `project:<id>` when an action request changes. The API
  * names it (`ACTION_REQUESTS_LIVE_EVENT`, apps/api/src/local); it is not in
- * `@agentdock/shared`, so the name is repeated here.
+ * `@nautelle/shared`, so the name is repeated here.
  */
 export const ACTION_REQUESTS_LIVE_EVENT = 'action_requests';
 

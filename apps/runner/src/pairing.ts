@@ -5,7 +5,7 @@ import {
   pairingCodeSchema,
   pairingErrorSchema,
   pairingResponseSchema,
-} from '@agentdock/shared/protocol';
+} from '@nautelle/shared/protocol';
 import { type AccessCredentials, accessHeaders } from './access';
 import { errorMessage } from './log';
 import { pairingUrl } from './server-url';

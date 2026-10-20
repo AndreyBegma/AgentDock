@@ -6,7 +6,7 @@ import {
   activityFromAudit,
   activityFromEvent,
   SCRAPED_SHADOWED_EVENT_TYPES,
-} from '@agentdock/shared';
+} from '@nautelle/shared';
 import {
   Inject,
   Injectable,
