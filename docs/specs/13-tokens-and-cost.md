@@ -1,6 +1,6 @@
 # Tokens and API-equivalent cost
 
-Issue: [#13](https://github.com/AndreyBegma/AgentDock/issues/13) · Roadmap: M1.7 ·
+Issue: [#13](https://github.com/AndreyBegma/Nautelle/issues/13) · Roadmap: M1.7 ·
 Decisions: [ADR-0003](../adr/0003-usage-from-opentelemetry-transcripts-as-backfill.md),
 [ADR-0009](../adr/0009-api-equivalent-cost-from-a-versioned-price-table.md),
 [cost-model.md](../architecture/cost-model.md), [event-schema.md](../architecture/event-schema.md)

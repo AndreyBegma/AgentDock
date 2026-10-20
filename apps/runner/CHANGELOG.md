@@ -35,7 +35,7 @@ Releases before this one are listed under their old name, `agentdock-runner`.
   `mcp__plugin_nautelle_nautelle__*`. `nautelle-runner setup claude` replaces
   `agentdock@agentdock` with it; by hand: `claude plugin uninstall
   agentdock@agentdock`, `claude plugin marketplace remove agentdock`,
-  `claude plugin marketplace add AndreyBegma/AgentDock` and
+  `claude plugin marketplace add AndreyBegma/Nautelle` and
   `claude plugin install nautelle@nautelle`.
 - Hooks already written into a running card's settings call the old binary
   path; the `agentdock-runner` link (npm shim or Homebrew) keeps them working

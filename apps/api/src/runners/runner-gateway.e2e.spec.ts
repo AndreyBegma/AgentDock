@@ -34,7 +34,7 @@ const event = (
   ts: '2026-10-07T18:36:02.335Z',
   type: 'slot.checkpoint',
   source: 'code-sentinel',
-  project: { repo: 'AndreyBegma/AgentDock', root: '/home/archi/dev/AgentDock' },
+  project: { repo: 'AndreyBegma/Nautelle', root: '/home/archi/dev/AgentDock' },
   slot: 'i6-api',
   issue: 6,
   session: { runtime: 'claude', id: '8f0c2a', name: 'cs-i6-api' },
@@ -531,7 +531,7 @@ describe('/runner gateway (e2e)', () => {
       expect(stored[0]).toMatchObject({
         type: 'slot.checkpoint',
         source: 'code-sentinel',
-        projectRepo: 'AndreyBegma/AgentDock',
+        projectRepo: 'AndreyBegma/Nautelle',
         projectRoot: '/home/archi/dev/AgentDock',
         slot: 'i6-api',
         issue: 6,

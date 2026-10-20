@@ -37,7 +37,7 @@ describe('render-formula.sh', () => {
       'linux-arm64': '4'.repeat(64),
     };
     for (const [target, sha] of Object.entries(expected)) {
-      const url = `https://github.com/AndreyBegma/AgentDock/releases/download/runner-v9.8.7/nautelle-runner-9.8.7-${target}.tar.gz`;
+      const url = `https://github.com/AndreyBegma/Nautelle/releases/download/runner-v9.8.7/nautelle-runner-9.8.7-${target}.tar.gz`;
       expect(formula).toContain(`url "${url}"\n      sha256 "${sha}"`);
     }
     expect(formula).toContain('version "9.8.7"');
@@ -46,7 +46,7 @@ describe('render-formula.sh', () => {
 
   it('pins SHA256SUMS and its signature as resources of the release', () => {
     const base =
-      'https://github.com/AndreyBegma/AgentDock/releases/download/runner-v9.8.7';
+      'https://github.com/AndreyBegma/Nautelle/releases/download/runner-v9.8.7';
     expect(formula).toContain(
       `url "${base}/SHA256SUMS"\n    sha256 "${sha256(readFileSync(fixture))}"`,
     );

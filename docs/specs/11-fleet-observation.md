@@ -1,6 +1,6 @@
 # Fleet observation — slots, rounds, worker checkpoints
 
-Issue: [#11](https://github.com/AndreyBegma/AgentDock/issues/11) · Roadmap: M1.5 ·
+Issue: [#11](https://github.com/AndreyBegma/Nautelle/issues/11) · Roadmap: M1.5 ·
 Decisions: [ADR-0002](../adr/0002-structured-orchestrator-events-markdown-as-fallback.md),
 [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
 [event-schema.md](../architecture/event-schema.md), [runner-protocol.md](../architecture/runner-protocol.md)

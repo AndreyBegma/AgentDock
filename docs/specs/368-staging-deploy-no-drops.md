@@ -1,6 +1,6 @@
 # A staging deploy does not drop requests
 
-Issue: [#368](https://github.com/AndreyBegma/AgentDock/issues/368)
+Issue: [#368](https://github.com/AndreyBegma/Nautelle/issues/368)
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # Context handoff — a new round or session starts in context, at the cheapest cost
 
-Issue: [#449](https://github.com/AndreyBegma/AgentDock/issues/449) · Decision: [ADR-0042](../adr/0042-context-handoff.md)
+Issue: [#449](https://github.com/AndreyBegma/Nautelle/issues/449) · Decision: [ADR-0042](../adr/0042-context-handoff.md)
 
 ## Summary
 

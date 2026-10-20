@@ -33,7 +33,7 @@ macOS, then prints the command that starts it.
 **From source** (needs Bun):
 
 ```sh
-git clone https://github.com/AndreyBegma/AgentDock && cd AgentDock
+git clone https://github.com/AndreyBegma/Nautelle && cd AgentDock
 bun install && bun run build
 apps/runner/dist/nautelle-runner version
 ```

@@ -1,6 +1,6 @@
 # nautelle-runner
 
-The per-machine daemon of [Nautelle](https://agentdock.luna-realm.com/),
+The per-machine daemon of [Nautelle](https://nautelle.luna-realm.com/),
 a self-hosted control plane for Claude Code and Codex agent fleets. It pairs
 with a Nautelle server, reports the machine's runtimes and answers typed
 commands.
@@ -23,14 +23,14 @@ pnpm. Installing with optional dependencies turned off leaves no binary to run.
 Before it runs the binary, the shim checks that the binary's SHA-256 is listed
 in the release's `SHA256SUMS`, shipped in this package, and that the file is
 signed by the Nautelle release key
-([`release-key.pub`](https://github.com/AndreyBegma/AgentDock/blob/main/apps/runner/release-key.pub)).
+([`release-key.pub`](https://github.com/AndreyBegma/Nautelle/blob/main/apps/runner/release-key.pub)).
 It refuses a binary that fails either check.
 
 **Upgrading from 0.12 or earlier:** 0.13 watches only projects under a
 folder you allow on the machine, and allows none by default. Run
 `nautelle-runner policy allow-root --watched` (the folders it watched
 before, after asking) or `nautelle-runner policy allow-root <dir>`. See the
-[release notes](https://github.com/AndreyBegma/AgentDock/blob/main/apps/runner/CHANGELOG.md).
+[release notes](https://github.com/AndreyBegma/Nautelle/blob/main/apps/runner/CHANGELOG.md).
 
 On macOS, Homebrew is the other way in:
 
@@ -39,6 +39,6 @@ brew install andreybegma/tap/nautelle-runner
 brew services start nautelle-runner
 ```
 
-- Website: [agentdock.luna-realm.com](https://agentdock.luna-realm.com/).
-- Source: [github.com/AndreyBegma/AgentDock](https://github.com/AndreyBegma/AgentDock).
-- Documentation: [apps/runner](https://github.com/AndreyBegma/AgentDock/tree/main/apps/runner).
+- Website: [nautelle.luna-realm.com](https://nautelle.luna-realm.com/).
+- Source: [github.com/AndreyBegma/Nautelle](https://github.com/AndreyBegma/Nautelle).
+- Documentation: [apps/runner](https://github.com/AndreyBegma/Nautelle/tree/main/apps/runner).

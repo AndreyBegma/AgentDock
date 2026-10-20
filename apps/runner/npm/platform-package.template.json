@@ -3,10 +3,10 @@
   "version": "{{version}}",
   "description": "The nautelle-runner binary for {{os}}-{{arch}}. Install nautelle-runner instead.",
   "license": "MIT",
-  "homepage": "https://agentdock.luna-realm.com/",
+  "homepage": "https://nautelle.luna-realm.com/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AndreyBegma/AgentDock.git",
+    "url": "git+https://github.com/AndreyBegma/Nautelle.git",
     "directory": "apps/runner"
   },
   "os": ["{{os}}"],

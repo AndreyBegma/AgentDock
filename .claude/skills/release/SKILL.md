@@ -30,7 +30,7 @@ who build it.
 | The promotion | `develop` → `main` | opened by this skill, merged by a person |
 | The tag | `vX.Y.Z` on `main`'s merge commit | this skill, after the person merged the promotion |
 
-Repository: `AndreyBegma/AgentDock`. Run every command from the repository
+Repository: `AndreyBegma/Nautelle`. Run every command from the repository
 root.
 
 **The runner is not part of a product release.** It has its own version in
@@ -54,9 +54,9 @@ Run this first, always, and show the result before you touch anything.
 git fetch origin --tags --quiet
 LAST=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)
 echo "last release tag: ${LAST:-none}"
-gh api repos/AndreyBegma/AgentDock/compare/main...develop --jq '"develop is \(.ahead_by) commits ahead of main"'
-gh pr list --repo AndreyBegma/AgentDock --state open --base main --json number,title
-gh pr list --repo AndreyBegma/AgentDock --state open --head 'release/' --json number,title,headRefName
+gh api repos/AndreyBegma/Nautelle/compare/main...develop --jq '"develop is \(.ahead_by) commits ahead of main"'
+gh pr list --repo AndreyBegma/Nautelle --state open --base main --json number,title
+gh pr list --repo AndreyBegma/Nautelle --state open --head 'release/' --json number,title,headRefName
 ```
 
 Report, in this order:
@@ -71,12 +71,12 @@ Report, in this order:
    release is in flight: stop and name it.
 4. **Migrations in the window.** A deploy of `main` applies them:
    ```bash
-   gh api repos/AndreyBegma/AgentDock/compare/main...develop \
+   gh api repos/AndreyBegma/Nautelle/compare/main...develop \
      --jq '[.files[].filename | select(startswith("apps/api/prisma/migrations/"))] | unique'
    ```
 5. **New environment variables in the window**, from the committed examples:
    ```bash
-   gh api repos/AndreyBegma/AgentDock/compare/main...develop \
+   gh api repos/AndreyBegma/Nautelle/compare/main...develop \
      --jq '.files[] | select(.filename | test("\\.env\\.example$")) | .patch' \
      | grep -oE '^\+[A-Z][A-Z0-9_]*=' | tr -d '+=' | sort -u
    ```
@@ -96,7 +96,7 @@ commit landed on `develop`. Take its date from the tagged commit:
 
 ```bash
 SINCE=$(git log -1 --format=%cI "$LAST")
-gh pr list --repo AndreyBegma/AgentDock --state merged --base develop \
+gh pr list --repo AndreyBegma/Nautelle --state merged --base develop \
   --search "merged:>$SINCE" --limit 200 \
   --json number,title,mergedAt,url,body,files \
   --jq 'sort_by(.mergedAt)[] | "#\(.number)\t\(.title)\t\(.url)"'
@@ -228,7 +228,7 @@ must do (an upgrade, a new setting).>
 
 | PR | Title | Classified as |
 |---|---|---|
-| [#N](https://github.com/AndreyBegma/AgentDock/pull/N) | <title> | new / improved / fixed / excluded (<why>) / held for the next runner release |
+| [#N](https://github.com/AndreyBegma/Nautelle/pull/N) | <title> | new / improved / fixed / excluded (<why>) / held for the next runner release |
 
 ## Runner
 
@@ -269,7 +269,7 @@ git commit -m "Release vX.Y.Z
 
 <One line naming the release's theme.>"
 git push -u origin release/vX.Y.Z
-gh pr create --repo AndreyBegma/AgentDock --base develop --head release/vX.Y.Z \
+gh pr create --repo AndreyBegma/Nautelle --base develop --head release/vX.Y.Z \
   --title "Release vX.Y.Z" --body-file <body>
 ```
 
@@ -281,7 +281,7 @@ Claude attribution trailer or footer, in the commit or the body.
 Wait for its checks:
 
 ```bash
-gh pr checks <N> --repo AndreyBegma/AgentDock --watch
+gh pr checks <N> --repo AndreyBegma/Nautelle --watch
 ```
 
 Green: merge it (`gh pr merge <N> --merge`). Red: **stop**, report the
@@ -293,7 +293,7 @@ entry that has not landed on `develop` cannot be in it.
 ## Step 8 — Promote `develop` to `main`
 
 ```bash
-gh pr create --repo AndreyBegma/AgentDock --base main --head develop \
+gh pr create --repo AndreyBegma/Nautelle --base main --head develop \
   --title "Release vX.Y.Z" --body-file <body>
 ```
 
@@ -312,7 +312,7 @@ commit, as every promotion so far, giving the pull request's link and the
 check that it is before Step 9:
 
 ```bash
-gh pr view <N> --repo AndreyBegma/AgentDock --json state,mergeCommit \
+gh pr view <N> --repo AndreyBegma/Nautelle --json state,mergeCommit \
   --jq '"\(.state) \(.mergeCommit.oid)"'
 ```
 
@@ -329,10 +329,10 @@ After the person confirmed the promotion is merged (Step 8), tag `main`'s merge 
 
 ```bash
 git fetch origin main --quiet
-SHA=$(gh pr view <N> --repo AndreyBegma/AgentDock --json mergeCommit --jq .mergeCommit.oid)
+SHA=$(gh pr view <N> --repo AndreyBegma/Nautelle --json mergeCommit --jq .mergeCommit.oid)
 git tag -a vX.Y.Z "$SHA" -m "Nautelle vX.Y.Z"
 git push origin vX.Y.Z
-gh release create vX.Y.Z --repo AndreyBegma/AgentDock --verify-tag \
+gh release create vX.Y.Z --repo AndreyBegma/Nautelle --verify-tag \
   --title "Nautelle vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md --latest=false
 ```
 

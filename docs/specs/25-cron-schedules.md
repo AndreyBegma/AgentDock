@@ -6,7 +6,7 @@
 > (targets, cron/DST rules, missed runs, overlap, authorization) is unchanged
 > and stays defined here.
 
-Issue: [#25](https://github.com/AndreyBegma/AgentDock/issues/25) · Roadmap: M3.2 ·
+Issue: [#25](https://github.com/AndreyBegma/Nautelle/issues/25) · Roadmap: M3.2 ·
 Decisions: [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
 [ADR-0007](../adr/0007-postgresql-only.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),

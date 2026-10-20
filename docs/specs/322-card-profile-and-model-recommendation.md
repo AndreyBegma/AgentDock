@@ -1,6 +1,6 @@
 # Pick the Claude profile and the model when a card runs or designs
 
-Issue: [#322](https://github.com/AndreyBegma/AgentDock/issues/322) ·
+Issue: [#322](https://github.com/AndreyBegma/Nautelle/issues/322) ·
 Decision: [ADR-0032](../adr/0032-a-cards-model-is-recommended-by-a-runner-side-assessment.md)
 
 ## Summary

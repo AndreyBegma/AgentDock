@@ -55,8 +55,8 @@ describe('ownerLabel', () => {
 
 describe('issueUrl', () => {
   test('only for an owner/name repo', () => {
-    expect(issueUrl('AndreyBegma/AgentDock', 201)).toBe(
-      'https://github.com/AndreyBegma/AgentDock/issues/201',
+    expect(issueUrl('AndreyBegma/Nautelle', 201)).toBe(
+      'https://github.com/AndreyBegma/Nautelle/issues/201',
     );
     expect(issueUrl('javascript:alert(1)', 1)).toBeNull();
     expect(issueUrl(undefined, 1)).toBeNull();

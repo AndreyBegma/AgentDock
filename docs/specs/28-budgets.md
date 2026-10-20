@@ -1,6 +1,6 @@
 # Budgets — per project and per user, alert or hard stop
 
-Issue: [#28](https://github.com/AndreyBegma/AgentDock/issues/28) · Roadmap: M3.5 ·
+Issue: [#28](https://github.com/AndreyBegma/Nautelle/issues/28) · Roadmap: M3.5 ·
 Decisions: [ADR-0009](../adr/0009-api-equivalent-cost-from-a-versioned-price-table.md),
 [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
 [cost-model.md](../architecture/cost-model.md), [data-model.md](../architecture/data-model.md),

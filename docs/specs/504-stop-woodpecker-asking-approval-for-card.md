@@ -7,7 +7,7 @@ Pipelines for pull requests that Nautelle opens for board cards (for example PR 
 
 Find out why the approval is requested and remove the cause:
 - Check the repository's Woodpecker settings (via the Woodpecker API or UI): the *Require approval* value. It is most likely `pull_requests` or `all_events` instead of `forks`.
-- Check where the card branch is pushed: it must be a branch of `AndreyBegma/AgentDock` itself, not a fork and not another account. Look at how the runner and the API create the card branch and PR (search `apps/runner` and `apps/api` for the PR creation and push code, and ADR-0043 for the close/reopen retrigger) and confirm the PR head repository equals the base repository.
+- Check where the card branch is pushed: it must be a branch of `AndreyBegma/Nautelle` itself, not a fork and not another account. Look at how the runner and the API create the card branch and PR (search `apps/runner` and `apps/api` for the PR creation and push code, and ADR-0043 for the close/reopen retrigger) and confirm the PR head repository equals the base repository.
 - Check that the close/reopen retrigger from ADR-0043 does not itself cause the approval gate (a reopened PR from a bot or another actor).
 - Fix the cause: set the setting to `forks` if that is the cause, or fix the push/PR code if the head is not the base repository.
 - Update `deploy/README.md` with the verified setting and a troubleshooting entry: "A pipeline waits for approval on an own-branch PR".

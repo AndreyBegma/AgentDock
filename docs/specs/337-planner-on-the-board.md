@@ -1,6 +1,6 @@
 # The Planner moves onto the Board: New Card interviews, New Plan makes cards
 
-Issue: [#337](https://github.com/AndreyBegma/AgentDock/issues/337) ·
+Issue: [#337](https://github.com/AndreyBegma/Nautelle/issues/337) ·
 Decision: [ADR-0034](../adr/0034-the-planner-lives-on-the-board-and-makes-cards.md) (amends ADR-0028)
 
 ## Summary

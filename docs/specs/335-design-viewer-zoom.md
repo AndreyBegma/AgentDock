@@ -1,6 +1,6 @@
 # Zoom in the design viewer
 
-Issue: [#335](https://github.com/AndreyBegma/AgentDock/issues/335) · Extends [spec 223](223-design-stage.md) D11
+Issue: [#335](https://github.com/AndreyBegma/Nautelle/issues/335) · Extends [spec 223](223-design-stage.md) D11
 
 ## Summary
 

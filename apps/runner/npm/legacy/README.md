@@ -18,5 +18,5 @@ On its first start, `nautelle-runner` moves `~/.config/agentdock` and
 behind, so the pairing, the policy, the watched projects and the running
 sessions carry over. `AGENTDOCK_*` environment variables are still read until
 0.16.0. See the
-[release notes](https://github.com/AndreyBegma/AgentDock/blob/main/apps/runner/CHANGELOG.md)
+[release notes](https://github.com/AndreyBegma/Nautelle/blob/main/apps/runner/CHANGELOG.md)
 and ADR-0073.

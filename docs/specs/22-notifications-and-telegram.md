@@ -1,6 +1,6 @@
 # In-app notifications and Telegram bot
 
-Issue: [#22](https://github.com/AndreyBegma/AgentDock/issues/22) · Roadmap: M2.7 ·
+Issue: [#22](https://github.com/AndreyBegma/Nautelle/issues/22) · Roadmap: M2.7 ·
 Decisions: [ADR-0005](../adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md),
 [ADR-0007](../adr/0007-postgresql-only.md), [ADR-0046](../adr/0046-the-telegram-bot-acts-on-the-board-through-a-command-router.md), [security.md](../architecture/security.md),
 [PRD — notifications](../product/prd.md)

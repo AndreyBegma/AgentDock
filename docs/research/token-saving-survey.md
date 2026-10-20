@@ -1,6 +1,6 @@
 # Survey: open-source token-saving tools and what Nautelle adopts
 
-Issue: [#650](https://github.com/AndreyBegma/AgentDock/issues/650) ·
+Issue: [#650](https://github.com/AndreyBegma/Nautelle/issues/650) ·
 Spec: [`docs/specs/650-survey-open-source-token-saving-tools-an.md`](../specs/650-survey-open-source-token-saving-tools-an.md) ·
 Date: 2026-10-19
 

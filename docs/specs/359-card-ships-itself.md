@@ -1,6 +1,6 @@
 # A card ships itself: draft PR while working, CI watched and fixed, auto-merge at Finished
 
-Issue: [#359](https://github.com/AndreyBegma/AgentDock/issues/359) ·
+Issue: [#359](https://github.com/AndreyBegma/Nautelle/issues/359) ·
 Decision: [ADR-0035](../adr/0035-a-card-ships-itself.md) (amends ADR-0024 §6 and ADR-0029)
 
 ## Summary

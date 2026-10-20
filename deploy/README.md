@@ -80,12 +80,12 @@ Nothing is published on the host. The stack runs on its own compose network
    the public hostname `staging-agentdock.luna-realm.com` → `HTTP` `proxy:80`.
    Save the token as `~/.agentdock/cloudflared-staging.env`, mode 600, with one
    line: `TUNNEL_TOKEN=...`.
-2. **Woodpecker.** Activate `AndreyBegma/AgentDock` and apply these settings:
+2. **Woodpecker.** Activate `AndreyBegma/Nautelle` and apply these settings:
    - *Trusted → volumes*: on. The trusted steps mount the Docker socket and
      the stack directory, and the postgres service mounts a tmpfs.
    - *Require approval*: forks (`require_approval: "forks"` in the API). The
      repository is public, so a pull request from a fork must wait for a
-     maintainer. A pull request from a branch of `AndreyBegma/AgentDock`
+     maintainer. A pull request from a branch of `AndreyBegma/Nautelle`
      itself — every board card's — must not: *Pull requests* or *All events*
      gates those too (#504). Check the live value with
      `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`.
@@ -207,7 +207,7 @@ docker run --rm -v "$PWD/deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro" \
   close/reopen by itself for a board card's PR after 5 minutes (ADR-0043).
 - **A pipeline waits for approval on an own-branch PR** (#504): Woodpecker
   shows "This pipeline is awaiting approval from a maintainer!" for a pull
-  request whose head is a branch of `AndreyBegma/AgentDock`, such as a board
+  request whose head is a branch of `AndreyBegma/Nautelle`, such as a board
   card's. Run `gh pr view <number> --json isCrossRepository`: `false` means
   the PR is not from a fork, so the gate comes from the repository setting.
   `curl -s https://ci.luna-realm.com/api/repos/9 | jq .require_approval`
@@ -250,7 +250,7 @@ that, and both must be in place before the first release.
    `release-key.pub` and in the copies the npm shim and the formula template
    embed, which the runner's tests keep equal. The change lands in a pull
    request before the next tag.
-3. **Woodpecker secrets (P-02).** Add three secrets to `AndreyBegma/AgentDock`,
+3. **Woodpecker secrets (P-02).** Add three secrets to `AndreyBegma/Nautelle`,
    each restricted to the **tag** event only. Do not tick **manual** or any
    other event; a manual run is a dry run and gets no secret.
    - `github_release_token`: a GitHub token with *contents: write* on
@@ -260,7 +260,7 @@ that, and both must be in place before the first release.
    - `runner_signing_key`: the PEM private key whose public half is
      `apps/runner/release-key.pub`. A tag run without it fails in
      `build-release`, and a different key is refused.
-4. **GitHub tag ruleset (P-03).** In `AndreyBegma/AgentDock` → Settings →
+4. **GitHub tag ruleset (P-03).** In `AndreyBegma/Nautelle` → Settings →
    Rules → Rulesets, add a tag ruleset, *Active*, that targets the tag pattern
    `runner-v*`. Turn on *Restrict creations*, *Restrict updates* and *Restrict
    deletions*, and give the bypass list only the repository administrators.

@@ -1,6 +1,6 @@
 # Audit log with hash chain
 
-Issue: [#8](https://github.com/AndreyBegma/AgentDock/issues/8) · Roadmap: M1.2 ·
+Issue: [#8](https://github.com/AndreyBegma/Nautelle/issues/8) · Roadmap: M1.2 ·
 Decisions: [ADR-0008](../adr/0008-local-accounts-with-admin-approved-registration.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
 [security.md](../architecture/security.md), [data-model.md](../architecture/data-model.md)

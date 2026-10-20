@@ -56,7 +56,7 @@ export const PAIRING_CODE_PLACEHOLDER = 'XXXX-XXXX';
 
 /** Building from source, for a machine with neither. */
 export const RUNNER_README_URL =
-  'https://github.com/AndreyBegma/AgentDock/blob/main/apps/runner/README.md';
+  'https://github.com/AndreyBegma/Nautelle/blob/main/apps/runner/README.md';
 
 /** The foreground daemon. */
 export const RUN_COMMAND = 'nautelle-runner run';

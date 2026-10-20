@@ -15,7 +15,7 @@ import { type Env, expandHome } from '../env';
 import { OTLP_HOST } from '../otlp/receiver';
 
 /** The repository marketplace and the plugin in it (spec 201 D21). */
-export const MARKETPLACE_SOURCE = 'AndreyBegma/AgentDock';
+export const MARKETPLACE_SOURCE = 'AndreyBegma/Nautelle';
 export const MARKETPLACE_NAME = 'nautelle';
 export const PLUGIN_REF = `nautelle@${MARKETPLACE_NAME}`;
 

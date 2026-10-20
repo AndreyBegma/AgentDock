@@ -1,6 +1,6 @@
 # Webhooks — inbound triggers and outbound deliveries
 
-Issue: [#26](https://github.com/AndreyBegma/AgentDock/issues/26) · Roadmap: M3.3 ·
+Issue: [#26](https://github.com/AndreyBegma/Nautelle/issues/26) · Roadmap: M3.3 ·
 Decisions: [ADR-0007](../adr/0007-postgresql-only.md),
 [ADR-0010](../adr/0010-typed-command-allowlist-on-the-runner.md),
 [security.md](../architecture/security.md), [data-model.md](../architecture/data-model.md),

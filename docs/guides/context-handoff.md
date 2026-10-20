@@ -1,6 +1,6 @@
 # Context handoff
 
-Context handoff ([#449](https://github.com/AndreyBegma/AgentDock/issues/449),
+Context handoff ([#449](https://github.com/AndreyBegma/Nautelle/issues/449),
 [ADR-0042](../adr/0042-context-handoff.md), [spec](../specs/449-context-handoff.md))
 keeps a short note for every card, so the next round or session starts in
 context at the lowest cost. It is on with Token saver; there is no separate

@@ -1,6 +1,6 @@
 # Token saver — compress what agents read, keep what people read
 
-Issue: [#445](https://github.com/AndreyBegma/AgentDock/issues/445) · Decision: [ADR-0039](../adr/0039-token-saver.md)
+Issue: [#445](https://github.com/AndreyBegma/Nautelle/issues/445) · Decision: [ADR-0039](../adr/0039-token-saver.md)
 
 ## Summary
 

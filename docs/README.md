@@ -4,7 +4,7 @@ Nautelle is a self-hosted control plane for AI coding-agent fleets. It connects
 projects, watches and steers the Code Sentinel orchestrator and its workers, runs
 skills on projects, and records what every agent did, on which model, at what
 cost. It works with Claude Code and Codex. The product site is
-[agentdock.luna-realm.com](https://agentdock.luna-realm.com/).
+[nautelle.luna-realm.com](https://nautelle.luna-realm.com/).
 
 This folder is the authority for what Nautelle is and how it is built. Code
 that disagrees with it is either a bug or an undocumented decision — record the
@@ -24,7 +24,7 @@ decision (`adr/`) in the same pull request that makes it.
 ## Workflow
 
 1. A feature starts as `/code-sentinel:spec` → a spec in `specs/` and a GitHub
-   issue in `AndreyBegma/AgentDock` with acceptance criteria and a
+   issue in `AndreyBegma/Nautelle` with acceptance criteria and a
    `## Parallel plan`.
 2. The spec PR merges first; then the issue gets `cs:ready`.
 3. `/code-sentinel:orchestrator` builds it.

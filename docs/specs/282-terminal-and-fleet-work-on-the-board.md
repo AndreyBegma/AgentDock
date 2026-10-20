@@ -1,6 +1,6 @@
 # 282 — Terminal work and fleet work on the Board
 
-Issue: [#282](https://github.com/AndreyBegma/AgentDock/issues/282) · ADR: [0030](../adr/0030-terminal-work-and-fleet-work-appear-on-the-board.md)
+Issue: [#282](https://github.com/AndreyBegma/Nautelle/issues/282) · ADR: [0030](../adr/0030-terminal-work-and-fleet-work-appear-on-the-board.md)
 
 ## Summary
 
