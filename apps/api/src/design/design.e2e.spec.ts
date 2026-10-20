@@ -303,6 +303,8 @@ describe('design stage (e2e)', () => {
     ],
     ['<script>fetch("/api/me")</script>', 'design_forbidden_feature'],
     [`<p>${'x'.repeat(161 * 1024)}</p>`, 'design_too_large'],
+    ['<script>const top = 1;</script>', 'design_script_invalid'],
+    ['<script>render(;</script>', 'design_script_invalid'],
   ])('fails a mockup that breaks a rule and stores no revision (%#)', async (body, reason) => {
     await h.seedProfile();
     const plan = await uiPlan();

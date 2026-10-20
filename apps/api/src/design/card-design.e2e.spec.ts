@@ -137,6 +137,13 @@ describe('card design (e2e, #243)', () => {
       ),
       'design_too_large',
     ],
+    [
+      designResult(
+        { taskKey: KEY, variant: 1 },
+        '<!doctype html><html><body><script>const top = document.body;</script></body></html>',
+      ),
+      'design_script_invalid',
+    ],
   ])('fails a card turn that breaks the contract and stores no revision (%#)', async (result, reason) => {
     await h.seedProfile();
     const card = await h.designedCard(1);
