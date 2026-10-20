@@ -407,6 +407,10 @@ model Project {
   hasClaudeMd                 Boolean
   hasAgentsMd                 Boolean
   lastInspectedAt             DateTime
+  /// #691: why the runner's local policy refuses to watch this project, as the
+  /// runner worded it in its latest `runner.watch_refused` (ADR-0047). Null
+  /// while the runner watches it.
+  watchRefusal                String?
   /// Nullable so deleting the admin who connected it keeps the project.
   createdById                 String?
   createdAt                   DateTime   @default(now())

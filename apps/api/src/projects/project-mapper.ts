@@ -102,6 +102,7 @@ export const toProjectSummary = (
   base: project.baseOverride ?? project.baseBranch,
   docsKind: project.docsSource?.kind ?? null,
   role,
+  watchRefusal: project.watchRefusal,
 });
 
 export const toProjectDetail = (
