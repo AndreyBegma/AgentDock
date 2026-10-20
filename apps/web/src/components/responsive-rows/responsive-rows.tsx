@@ -27,10 +27,21 @@ function StackedColumns<Row>({
 }
 
 /**
+ * Where the table gives way to stacked rows. Static class names, so Tailwind
+ * sees them in the source.
+ */
+const SWITCH = {
+  tablet: { table: 'max-tablet:hidden', rows: 'tablet:hidden' },
+  desktop: { table: 'max-desktop:hidden', rows: 'desktop:hidden' },
+} as const;
+
+/**
  * A list of the same record that is a table from tablet up and stacked rows
  * on a phone (stack S-7), so nothing scrolls sideways at 375 px. The switch is
  * CSS only (`max-tablet:` / `tablet:`), so the server HTML is right at every
  * width. `stacked` draws one row for the phone; the table keeps its columns.
+ * A table too wide for a tablet's content column passes `stackBelow="desktop"`
+ * and is stacked on a tablet too (C-301).
  */
 export function ResponsiveRows<Row>({
   label,
@@ -39,6 +50,7 @@ export function ResponsiveRows<Row>({
   columns,
   stacked,
   onRowActivate,
+  stackBelow = 'tablet',
 }: {
   label: string;
   rows: Row[];
@@ -47,10 +59,13 @@ export function ResponsiveRows<Row>({
   /** The phone row; by default the first column on top, the rest as label: value. */
   stacked?: (row: Row) => ReactNode;
   onRowActivate?: (row: Row) => void;
+  /** The narrowest width that still gets the table. */
+  stackBelow?: keyof typeof SWITCH;
 }) {
+  const at = SWITCH[stackBelow];
   return (
     <>
-      <div className="max-tablet:hidden">
+      <div className={at.table}>
         <DataTable
           rows={rows}
           getRowId={getRowId}
@@ -61,7 +76,7 @@ export function ResponsiveRows<Row>({
       </div>
       <ul
         aria-label={label}
-        className="surface-content tablet:hidden divide-y divide-line overflow-hidden rounded-xl"
+        className={`surface-content ${at.rows} divide-y divide-line overflow-hidden rounded-xl`}
       >
         {rows.map((row) => (
           <li key={getRowId(row)} className="min-w-0 px-4 py-3">

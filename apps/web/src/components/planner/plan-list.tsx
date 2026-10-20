@@ -31,14 +31,18 @@ export function planColumns(retry?: PlanRetry): Column<PlanSummary>[] {
     {
       id: 'plan',
       header: 'Plan',
+      // The plan takes what is left; the other columns keep to their content.
+      width: '100%',
       cell: (plan) => {
         const reason = planAttentionReason(plan);
+        // The table cell is `nowrap`; the title and the reason wrap here so a
+        // long one cannot push the other columns off the table (C-301).
         return (
-          <span className="flex min-w-0 flex-col tablet:min-w-64 gap-0.5 py-1">
-            <span className="flex min-w-0 items-center gap-2">
+          <span className="flex min-w-0 flex-col gap-0.5 py-1 whitespace-normal desktop:min-w-64">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <Link
                 href={planHref(plan.projectId, plan.id)}
-                className="min-w-0 truncate font-medium text-ink underline-offset-2 hover:underline"
+                className="line-clamp-2 min-w-0 font-medium text-ink wrap-anywhere underline-offset-2 hover:underline"
                 title={plan.title}
               >
                 {plan.title}
@@ -105,11 +109,11 @@ export function planColumns(retry?: PlanRetry): Column<PlanSummary>[] {
 }
 
 /**
- * The plans the person may read (spec 172 UI): a table from tablet up, with
+ * The plans the person may read (spec 172 UI): a table on a desktop, with
  * the title and its visibility (a lock for a private one), author, mode and
  * version under it and, when the newest turn failed, the reason; status; task
- * counts; when it last moved. On a phone each plan is a stacked row (stack
- * S-7), so nothing scrolls sideways.
+ * counts; when it last moved. On a tablet and a phone each plan is a stacked
+ * row (stack S-7, C-301), so nothing scrolls sideways.
  */
 export function PlanList({
   plans,
@@ -126,6 +130,7 @@ export function PlanList({
       rows={[...plans]}
       getRowId={(plan) => plan.id}
       columns={columns}
+      stackBelow="desktop"
       onRowActivate={(plan) => router.push(planHref(plan.projectId, plan.id))}
       stacked={(plan) => {
         const pill = planPill(plan);

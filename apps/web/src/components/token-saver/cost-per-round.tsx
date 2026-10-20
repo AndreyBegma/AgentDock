@@ -28,7 +28,11 @@ const weekLabel = (week: string): string =>
     timeZone: 'UTC',
   })}`;
 
-/** The measured columns every cost-per-round table shares. */
+/**
+ * The measured columns every cost-per-round table shares. Seven or eight
+ * columns do not fit a tablet's content column, so these tables are stacked
+ * rows below desktop (C-301).
+ */
 const measured = <T,>(of: (row: T) => TokenSaverCostPerRound) => [
   {
     id: 'rounds',
@@ -104,6 +108,7 @@ export function CostPerRoundTable({
   return (
     <ResponsiveRows
       label="Cost per round by session kind"
+      stackBelow="desktop"
       rows={trends}
       getRowId={(t) => t.sessionKind}
       columns={columns}
@@ -134,6 +139,7 @@ export function CostPerRoundWeeksTable({
   return (
     <ResponsiveRows
       label="Cost per round by week"
+      stackBelow="desktop"
       rows={[...rows]}
       getRowId={(r) => `${r.sessionKind}:${r.week}`}
       columns={columns}

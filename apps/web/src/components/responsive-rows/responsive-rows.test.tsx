@@ -41,4 +41,19 @@ describe('ResponsiveRows', () => {
     );
     expect(html).toContain('<b>custom Alpha</b>');
   });
+
+  test('stacks on a tablet too when asked to switch at desktop', () => {
+    const html = renderToStaticMarkup(
+      <ResponsiveRows
+        label="Things"
+        rows={rows}
+        getRowId={(r) => r.id}
+        columns={columns}
+        stackBelow="desktop"
+      />,
+    );
+    expect(html).toContain('class="max-desktop:hidden"');
+    expect(html).toContain('desktop:hidden divide-y');
+    expect(html).not.toContain('tablet:hidden');
+  });
 });
