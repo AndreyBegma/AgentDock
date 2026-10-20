@@ -4,6 +4,7 @@ import {
   PUBLIC_URL_REMEDY,
   runnerOfflineCopy,
   serverEnvRemedy,
+  watchRefusalCopy,
 } from './copy';
 
 describe('serverEnvRemedy', () => {
@@ -69,5 +70,73 @@ describe('runnerOfflineCopy', () => {
         true,
       ),
     ).toMatchObject({ tone: 'danger', title: 'Runner laptop was revoked.' });
+  });
+});
+
+describe('watchRefusalCopy (#691)', () => {
+  const REFUSED =
+    "refused by this runner's policy (allowedRoots): this runner allows no project root yet. On the runner's machine: `agentdock-runner policy allow-root /srv/dev/widget`";
+
+  test('no banner while the runner watches the project', () => {
+    expect(
+      watchRefusalCopy({
+        runnerName: 'laptop',
+        runnerStatus: 'online',
+        watchRefusal: null,
+      }),
+    ).toBeNull();
+    expect(
+      watchRefusalCopy({ runnerName: 'laptop', runnerStatus: 'online' }),
+    ).toBeNull();
+  });
+
+  test('an offline runner has its own banner', () => {
+    expect(
+      watchRefusalCopy({
+        runnerName: 'laptop',
+        runnerStatus: 'offline',
+        watchRefusal: REFUSED,
+      }),
+    ).toBeNull();
+  });
+
+  test('says the runner refuses the project, why, and the exact command', () => {
+    expect(
+      watchRefusalCopy({
+        runnerName: 'laptop',
+        runnerStatus: 'online',
+        watchRefusal: REFUSED,
+      }),
+    ).toEqual({
+      tone: 'danger',
+      title: 'Runner laptop refuses to watch this project.',
+      body: "This runner allows no project root yet. The Board, card collect and the Planner stop for this project until its folder is allowed. Only the person on the runner's machine can allow it: run this there.",
+      commands: [
+        'agentdock-runner policy allow-root /srv/dev/widget',
+        'agentdock-runner policy allow-root --watched',
+      ],
+    });
+  });
+
+  test('a refusal no allow-root lifts offers no --watched', () => {
+    const copy = watchRefusalCopy({
+      runnerName: 'laptop',
+      runnerStatus: 'online',
+      watchRefusal:
+        "refused by this runner's policy (allowedRoots): /srv/dev/widget is not a git main checkout. On the runner's machine: `agentdock-runner policy allow-root <dir>`",
+    });
+    expect(copy?.commands).toEqual([
+      'agentdock-runner policy allow-root <dir>',
+    ]);
+  });
+
+  test('text the runner did not word as a refusal is shown as it is', () => {
+    expect(
+      watchRefusalCopy({
+        runnerName: 'laptop',
+        runnerStatus: 'online',
+        watchRefusal: 'something else',
+      })?.body,
+    ).toStartWith('something else.');
   });
 });
