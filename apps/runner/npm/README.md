@@ -26,6 +26,12 @@ signed by the AgentDock release key
 ([`release-key.pub`](https://github.com/AndreyBegma/AgentDock/blob/main/apps/runner/release-key.pub)).
 It refuses a binary that fails either check.
 
+**Upgrading from 0.12 or earlier:** 0.13 watches only projects under a
+folder you allow on the machine, and allows none by default. Run
+`agentdock-runner policy allow-root --watched` (the folders it watched
+before, after asking) or `agentdock-runner policy allow-root <dir>`. See the
+[release notes](https://github.com/AndreyBegma/AgentDock/blob/main/apps/runner/CHANGELOG.md).
+
 On macOS, Homebrew is the other way in:
 
 ```sh
