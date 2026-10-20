@@ -23,3 +23,24 @@ export function useWide(): boolean | undefined {
     () => undefined,
   );
 }
+
+/** Tailwind's `sm`, glass-ui's tablet edge: from here the Fleet's panel is a column. */
+export const TABLET_COLUMN_QUERY = '(min-width: 640px)';
+
+const subscribeTablet = (listener: () => void) => {
+  const query = window.matchMedia(TABLET_COLUMN_QUERY);
+  query.addEventListener('change', listener);
+  return () => query.removeEventListener('change', listener);
+};
+
+/**
+ * Like `useWide`, but the column starts at the tablet edge: the Fleet's agent
+ * panel is a side panel from tablet up and a bottom sheet on a phone.
+ */
+export function useTabletUp(): boolean | undefined {
+  return useSyncExternalStore<boolean | undefined>(
+    subscribeTablet,
+    () => window.matchMedia(TABLET_COLUMN_QUERY).matches,
+    () => undefined,
+  );
+}
