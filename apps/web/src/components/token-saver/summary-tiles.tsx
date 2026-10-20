@@ -36,7 +36,7 @@ export function SummaryTiles({ summary }: { summary: TokenSaverSummary }) {
         hue={7}
         label="Bypass rate"
         value={none ? '—' : formatRate(summary.bypassRate)}
-        hint="Commands run with AGENTDOCK_RAW=1"
+        hint="Commands run with NAUTELLE_RAW=1"
       />
       <StatTile
         hue={5}

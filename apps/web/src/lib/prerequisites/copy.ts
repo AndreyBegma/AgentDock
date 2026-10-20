@@ -77,7 +77,7 @@ export function runnerOfflineCopy(
 
 /** The runner's own command that allows every root it watched (#691). */
 export const ALLOW_WATCHED_COMMAND =
-  'agentdock-runner policy allow-root --watched';
+  'nautelle-runner policy allow-root --watched';
 
 /** A watch refusal's banner: the copy, and the commands to run on the runner's machine. */
 export interface WatchRefusalCopy extends PrerequisiteCopy {

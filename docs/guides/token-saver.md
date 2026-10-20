@@ -17,7 +17,7 @@ For every Claude launch the runner makes, with the project's setting on:
 - **Command output is shortened.** When an agent runs a covered command (a test
   run, `git log`, a build…), the runner's filter keeps the lines that matter
   and hides the rest. The agent sees a footer such as
-  `[agentdock filter: 412 lines hidden · full output: <path> · AGENTDOCK_RAW=1 to bypass]`.
+  `[agentdock filter: 412 lines hidden · full output: <path> · NAUTELLE_RAW=1 to bypass]`.
 - **Only the MCP servers you allow are loaded.** Every other server's tool
   schemas cost no tokens (see [the allowlist](#the-mcp-allowlist)).
 - **The history is compacted at about 150k tokens**, on every model. On a 1M
@@ -121,16 +121,16 @@ run's directory: `<run dir>/raw/<n>.log`. The path is in the footer the agent
 sees, and an agent can read it when it needs a hidden line. The file is on the
 runner's machine; the control plane never reads it (ADR-0001).
 
-## Bypass: `AGENTDOCK_RAW=1`
+## Bypass: `NAUTELLE_RAW=1`
 
 To run one command with no filtering, put the variable in front of it:
 
 ```sh
-AGENTDOCK_RAW=1 bun run test
+NAUTELLE_RAW=1 bun run test
 ```
 
 The worker prompt tells agents about it. You can use it too when you drive a
-session by hand, or tell an agent: *"re-run that with `AGENTDOCK_RAW=1`"*. A
+session by hand, or tell an agent: *"re-run that with `NAUTELLE_RAW=1`"*. A
 bypassed command is counted, so a high **bypass rate** on the dashboard means
 the filter is getting in the way.
 

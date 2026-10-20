@@ -84,7 +84,7 @@ describe('describeControlErrorHint', () => {
     const hint = describeControlErrorHint(apiError(409, 'runner_offline'), {
       isAdmin: true,
     });
-    expect(hint.text).toContain('agentdock-runner run');
+    expect(hint.text).toContain('nautelle-runner run');
     expect(hint.href).toBe('/admin/runners');
     expect(hint.cta).toBe('Open Runners');
   });

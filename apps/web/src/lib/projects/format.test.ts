@@ -98,7 +98,7 @@ describe('noOnlineRunnerCopy', () => {
     ).toMatchObject({
       title: 'laptop is offline.',
       body: 'Start it on that machine:',
-      command: 'agentdock-runner run',
+      command: 'nautelle-runner run',
     });
     expect(
       noOnlineRunnerCopy({
@@ -129,7 +129,7 @@ describe('errors', () => {
 
   test('runner offline says how to start it', () => {
     expect(describeProjectError(error(PROJECT_ERROR.runnerOffline))).toContain(
-      'agentdock-runner run',
+      'nautelle-runner run',
     );
   });
 

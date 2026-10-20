@@ -12,14 +12,14 @@ schemas fails the build.
 
 1. An admin creates a runner in the UI → the API returns a one-time pairing code
    (10 minutes, single use) and an install command.
-2. `agentdock-runner pair --server https://dock.example --code XXXX-XXXX [--allow-root <dir>]…`
+2. `nautelle-runner pair --server https://dock.example --code XXXX-XXXX [--allow-root <dir>]…`
    — each `--allow-root` is added to the runner-local policy's `allowedRoots`
    ([Runner-local policy](#runner-local-policy)).
 3. The runner posts `{ code, hostname, version, protocolVersion }` to
    `POST <server>/runners/pair` (`PAIRING_PATH`). The API exchanges the code
    for a long-lived runner token and the runner id: `{ runnerId, token }`. An
    invalid, expired or used code is a `400 { "error": "invalid_code" }`. The
-   runner writes both to `~/.config/agentdock/runner.json` (mode 0600).
+   runner writes both to `~/.config/nautelle/runner.json` (mode 0600).
 4. Revoking the runner in the UI invalidates the token and closes its socket.
 
 **Pairing code.** Eight characters from `PAIRING_CODE_ALPHABET`
@@ -52,7 +52,7 @@ both sit at the root of that origin.
 
 Every close above is terminal: the runner exits 78 and its service unit does not
 restart it. Before exiting it logs why and writes
-`~/.local/state/agentdock/stopped.json`, which `agentdock-runner status` prints
+`~/.local/state/nautelle/stopped.json`, which `nautelle-runner status` prints
 (`replaced by another connection at <time>, re-pair if this was not you` for
 `4409`); the next `run` clears it. A `4409` that takes over a socket that was
 still open is audited as `runner.connection_replaced` with both peers' IP and
@@ -347,7 +347,7 @@ watch-list project the runner-local policy refuses: `data` is
 `{ projects: [{ projectId, message }] }`, where `message` has the shape of a
 `policy_refused` message (below) with the exact command for that project's
 root — e.g. ``refused by this runner's policy (allowedRoots): this runner
-allows no project root yet. On the runner's machine: `agentdock-runner policy
+allows no project root yet. On the runner's machine: `nautelle-runner policy
 allow-root /home/archi/dev/widget` ``. The runner sends it once per start and
 whenever the refused set changes, so `projects: []` clears an earlier one; the
 API keeps the latest message on each project (`watchRefusal` in
@@ -623,7 +623,7 @@ runners that send it.
 (amends ADR-0010). The allowlist says *which* commands exist; it is not a
 boundary against a server that sends a dangerous instance of one. The runner
 therefore keeps a `policy` block in its own `runner.json`. Only the CLI on the
-machine writes it — `agentdock-runner policy show|set|allow-root|deny-root|deny-path|allow-path` and
+machine writes it — `nautelle-runner policy show|set|allow-root|deny-root|deny-path|allow-path` and
 `pair --allow-root <dir>` — and no message from the server (`welcome`,
 `config`, any command) can change it. A running daemon re-reads it within 5 s.
 
@@ -653,7 +653,7 @@ The dispatcher checks the policy after the args parse and before any handler;
 ```json
 { "type": "command.result", "id": "cmd_9", "ok": false,
   "error": { "code": "policy_refused",
-    "message": "refused by this runner's policy (maxPermissionMode): card.run asks for bypassPermissions, this runner allows at most auto. On the runner's machine: `agentdock-runner policy set maxPermissionMode bypassPermissions`" } }
+    "message": "refused by this runner's policy (maxPermissionMode): card.run asks for bypassPermissions, this runner allows at most auto. On the runner's machine: `nautelle-runner policy set maxPermissionMode bypassPermissions`" } }
 ```
 
 The message always has that shape — `refused by this runner's policy
@@ -1193,7 +1193,7 @@ or a git ref, so every field is patterned and bounded. Nothing starts with
   run of another project.
 - `isRunnableSkill` refuses `code-sentinel:orchestrator`, `code-sentinel:worker`
   (and their `cs-` names) with `not_runnable`.
-- A run's tmux session is `agentdock-run-<shortid>` (`skillRunSessionName`),
+- A run's tmux session is `nautelle-run-<shortid>` (`skillRunSessionName`),
   never `cs-`. Its branch is `run/<shortid>-<skill>`, with a plugin's `:`
   written as `-` (`skillRunBranch`).
 
@@ -1260,7 +1260,7 @@ its runner handlers (`apps/runner/src/cards/`).
 
 A card's worker is an interactive Claude Code session in its own worktree
 `<parent>/.wt-<repo>-card-<shortId>` and tmux session
-`agentdock-card-<shortId>` (`cardSessionName`), outside the orchestrator.
+`nautelle-card-<shortId>` (`cardSessionName`), outside the orchestrator.
 Every command needs an operator.
 
 | Command | Args | Result |
@@ -1273,7 +1273,7 @@ Every command needs an operator.
 - **Run.** Round 1 (`session.resume: false`) creates the worktree from
   `origin/<base>` on `branch`, or checks out `origin/<branch>` when it exists,
   commits `files` as the branch's first commit, writes `launch.json` with
-  `interactive: true` and starts tmux running `agentdock-runner exec-run`.
+  `interactive: true` and starts tmux running `nautelle-runner exec-run`.
   `exec-run` launches `claude --session-id <id>` (later rounds
   `claude --resume <id>`) with `--model` and `--permission-mode`; the prompt is
   one argv element, never a shell string. An interactive `exec-run` inherits
@@ -1309,10 +1309,10 @@ D1–D7 and D10. It is exported as `terminalCommands` and spread into the
   - `slot { projectId, root, slot }` → `cs-<slot>` (or
     `cs-<prefix>--<slot>`), when the slot's worktree belongs to `root`;
   - `orchestrator { projectId, root }` → the project's orchestrator session;
-  - `skill_run { projectId, root, runId }` → `agentdock-run-<shortid>` of a
+  - `skill_run { projectId, root, runId }` → `nautelle-run-<shortid>` of a
     live run of that project. Until #24's runner lands this answers
     `unsupported`.
-  - `card { projectId, root, cardId }` → `agentdock-card-<shortid>` of that
+  - `card { projectId, root, cardId }` → `nautelle-card-<shortid>` of that
     project's board card (issue #242). Until the card executor lands this
     answers `unsupported`.
 - A target that does not resolve, or resolves into another project, is
@@ -1477,7 +1477,7 @@ command of a covered family. These pass through unchanged and are counted
 listed so the slots agree:
 
 - The `filter` subprocess appends one JSONL row per command to the file named
-  by `$AGENTDOCK_FILTER_STATS`, in the run dir. The launch sets the variable.
+  by `$NAUTELLE_FILTER_STATS`, in the run dir. The launch sets the variable.
   The daemon reads the file in batches and sends `filter.stats`.
 - `/cs-eco` sessions (#475) keep their rows in the plugin's state dir,
   `${XDG_STATE_HOME:-~/.local/state}/cs-eco/sessions/<session id>/filter-stats.jsonl`.
@@ -1501,7 +1501,7 @@ carry no `projectId`: the API resolves the project.
 | `filter` | `<family>/<command>` (e.g. `js/jest`), or why no filter matched: `none:compound`, `none:uncovered`, `none:mode` (amendment 12); runners up to 0.12.2 write a plain `none` |
 | `program` | optional (#648): the program the command ran — `argv[0]`'s bare name plus the subcommand of a tool that has them (`git log`, `bun run`), never another argument; at most 64 characters. Absent on reads and on rows of runners up to 0.12.2 |
 | `rawBytes`, `keptBytes` | the output before and after the filter; `keptBytes ≤ rawBytes` |
-| `bypassed` | ran with `AGENTDOCK_RAW=1`; `keptBytes = rawBytes` |
+| `bypassed` | ran with `NAUTELLE_RAW=1`; `keptBytes = rawBytes` |
 | `passedThrough` | the filter returned the original output; `keptBytes = rawBytes` |
 | `at` | when the command finished (ISO); stored as `createdAt` |
 
@@ -1654,7 +1654,7 @@ with its runner handler.
   answered: it escalates at once with "open the terminal".
 - **Digest prose (#491, D3, D14).** haiku writes the digest's one-paragraph
   summary as one headless `claude -p --tools "" --permission-mode plan` on
-  `profileKey`, in a directory of its own with `AGENTDOCK_HOOKS=off`; the
+  `profileKey`, in a directory of its own with `NAUTELLE_HOOKS=off`; the
   call's telemetry carries `runId`, so its spend counts against the project
   budget (D16). The args are the digest's stored content only: every string
   is one line within the digest bounds (`isOneLine`), the schema is strict,
@@ -1836,7 +1836,7 @@ question selector it shows. It is sent only to a runner whose capabilities say
 ## Delivery guarantees
 
 - Events: at-least-once; dedupe on `(runnerId, seq)`. A runner keeps unacked
-  events in a local append-only spool (`~/.local/state/agentdock/spool/`), capped
+  events in a local append-only spool (`~/.local/state/nautelle/spool/`), capped
   at 100 MB, oldest dropped with a `runner.spool_truncated` event.
   Those events are gone and will never be resent, so a server that persists a
   `runner.spool_truncated` event treats its `[fromSeq, toSeq]` range as filled

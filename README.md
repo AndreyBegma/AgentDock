@@ -7,7 +7,7 @@
 [![Website](https://img.shields.io/badge/website-agentdock.luna--realm.com-black)](https://agentdock.luna-realm.com/)
 [![Docs: Wiki](https://img.shields.io/badge/docs-wiki-6d5dfc)](https://github.com/AndreyBegma/AgentDock/wiki)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![agentdock-runner on npm](https://img.shields.io/npm/v/agentdock-runner?label=agentdock-runner)](https://www.npmjs.com/package/agentdock-runner)
+[![nautelle-runner on npm](https://img.shields.io/npm/v/nautelle-runner?label=nautelle-runner)](https://www.npmjs.com/package/nautelle-runner)
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/mkQARkBs4C)
 
 [**Wiki**](https://github.com/AndreyBegma/AgentDock/wiki) ·
@@ -84,7 +84,7 @@ flowchart LR
   api --> pg[("PostgreSQL")]
   api --> redis[("Redis")]
   subgraph machine["Each of your machines"]
-    runner["agentdock-runner"] --> agents["tmux · worktrees<br/>Claude Code · gh"]
+    runner["nautelle-runner"] --> agents["tmux · worktrees<br/>Claude Code · gh"]
   end
   runner -- "outbound WebSocket<br/>events up · typed commands down" --> api
 ```
@@ -120,9 +120,9 @@ Then pair a runner on the machine that holds your repositories. Get a code at
 **Admin › Runners › Add runner**:
 
 ```sh
-brew install andreybegma/tap/agentdock-runner      # or: npm i -g agentdock-runner
-agentdock-runner pair --server http://localhost:8180 --code XXXX-XXXX --allow-root ~/dev
-agentdock-runner install-service
+brew install andreybegma/tap/nautelle-runner      # or: npm i -g nautelle-runner
+nautelle-runner pair --server http://localhost:8180 --code XXXX-XXXX --allow-root ~/dev
+nautelle-runner install-service
 ```
 
 Step-by-step guides:

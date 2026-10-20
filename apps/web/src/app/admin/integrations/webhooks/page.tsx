@@ -48,7 +48,7 @@ const revealWebhook = (
   secret: webhook.secret,
   children: (
     <p className="text-sm text-ink-2">
-      Receivers verify <code className="font-mono">X-AgentDock-Signature</code>{' '}
+      Receivers verify <code className="font-mono">X-Nautelle-Signature</code>{' '}
       with this secret; the recipe is on the webhook’s detail sheet.
     </p>
   ),

@@ -64,7 +64,8 @@ projects, keep its live sessions and keep its policy.
    - **npm**: `agentdock-runner` is published one last time per release as a
      deprecated package that depends on the same version of
      `nautelle-runner`; its `agentdock-runner` command runs the new runner and
-     prints a notice on a terminal. **Homebrew**: the tap renames the formula
+     prints a notice on a terminal, and each such version is marked
+     deprecated (`npm deprecate`). **Homebrew**: the tap renames the formula
      (`formula_renames.json`), and `nautelle-runner` also installs an
      `agentdock-runner` link, so a unit or a hook that still names the old
      binary keeps working.
@@ -73,8 +74,9 @@ projects, keep its live sessions and keep its policy.
      file still exists.
    - **Plugin**: the plugin moves to `plugins/nautelle`. Claude Code keys a
      plugin by its name and its marketplace, so the old id cannot keep
-     working; `nautelle-runner setup claude` installs the new one, and the
-     upgrade notes say to uninstall `agentdock@agentdock`. The runner counts
+     working; `nautelle-runner setup claude` uninstalls `agentdock@agentdock`
+     and its marketplace when it finds them and installs the new one, and the
+     upgrade notes give the same steps by hand. The runner counts
      either plugin as installed and allows MCP tools of either server name.
    - **Protocol**: the API sends both header sets on every webhook and reads
      the new header first, the old one second, on inbound hooks. The runner
@@ -89,8 +91,13 @@ projects, keep its live sessions and keep its policy.
 4. **What stays.** The database is still named `agentdock`, as are the
    Redis queue prefix, the advisory lock names, the fenced block tags
    (`agentdock-plan`, `agentdock-design`, `agentdock-cards`), the `.agentdock/`
-   directory inside a card's worktree and the HTML data attributes. They are
-   internal, no person types them, and renaming them needs a data migration;
+   directory inside a card's worktree, the HTML data attributes, the
+   `agentdock.*` OpenTelemetry attributes, the `source` of the orchestrator's
+   `events.jsonl`, the orchestrator's tmux session and message directory, the
+   `agentdock` field of the runner's capabilities, the plugin marketplace's
+   source repository (`AndreyBegma/AgentDock`), the homepage domain and the CI
+   image. They are internal or owned by another step, no person types them,
+   and renaming them needs a data migration or breaks a stored reference;
    the infrastructure step (ADR-0072 step 4) owns the database and the
    repository.
 

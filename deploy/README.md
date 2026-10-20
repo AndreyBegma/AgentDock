@@ -147,12 +147,12 @@ side.
    `CF-Access-Client-Secret` on the pairing request and on every WebSocket
    connect, and keeps them in `runner.json` (mode 600):
    ```sh
-   agentdock-runner pair --server https://staging-agentdock.luna-realm.com/api \
+   nautelle-runner pair --server https://staging-agentdock.luna-realm.com/api \
      --code XXXX-XXXX --access-client-id <id>.access --access-client-secret-stdin
    ```
    Give the secret on stdin (`--access-client-secret-stdin`) or in
-   `AGENTDOCK_ACCESS_CLIENT_SECRET` so that it stays out of the shell history;
-   `--access-client-secret <secret>` also works. `agentdock-runner status`
+   `NAUTELLE_ACCESS_CLIENT_SECRET` so that it stays out of the shell history;
+   `--access-client-secret <secret>` also works. `nautelle-runner status`
    shows `access token: set` and never the secret. A re-pair without the flags
    clears the stored token. Rotate the token by pairing again.
 
@@ -194,7 +194,7 @@ docker run --rm -v "$PWD/deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro" \
   reconnect, and the reconnect succeeds on the first try. It is not
   blue/green: one request may be slow by up to the API's boot time.
 - **A runner** pairs against the API through the proxy:
-  `agentdock-runner pair --server https://staging-agentdock.luna-realm.com/api --code XXXX-XXXX`.
+  `nautelle-runner pair --server https://staging-agentdock.luna-realm.com/api --code XXXX-XXXX`.
 - **A pull request with no pipeline** (#484): open the repository's
   *Settings → Webhooks → Recent Deliveries* and look for the PR's delivery.
   A 500, 502, 530 or a timeout there is a delivery Woodpecker never
@@ -225,7 +225,7 @@ A tag `runner-v<version>` runs `.woodpecker/release-runner.yml`. The workflow
 tests the runner, builds the four binaries, signs `SHA256SUMS` and creates the
 GitHub Release with the tarballs, `SHA256SUMS` and `SHA256SUMS.sig`. It then
 publishes the npm packages, the four platform packages before
-`agentdock-runner`. Last, it pushes `Formula/agentdock-runner.rb` to
+`nautelle-runner`. Last, it pushes `Formula/nautelle-runner.rb` to
 `AndreyBegma/homebrew-tap`. The npm shim and the formula refuse a binary whose
 checksum is not in a `SHA256SUMS` signed by `apps/runner/release-key.pub`.
 
@@ -251,7 +251,7 @@ that, and both must be in place before the first release.
    - `github_release_token`: a GitHub token with *contents: write* on
      `AgentDock` and on `homebrew-tap`;
    - `npm_token`: an npm automation token for the account that owns
-     `agentdock-runner` and `agentdock-runner-{darwin,linux}-{arm64,x64}`;
+     `nautelle-runner` and `nautelle-runner-{darwin,linux}-{arm64,x64}`;
    - `runner_signing_key`: the PEM private key whose public half is
      `apps/runner/release-key.pub`. A tag run without it fails in
      `build-release`, and a different key is refused.
@@ -291,10 +291,10 @@ that, and both must be in place before the first release.
        -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig
      sha256sum -c --ignore-missing SHA256SUMS
      ```
-   - `npm view agentdock-runner@<version> optionalDependencies` names the four
+   - `npm view nautelle-runner@<version> optionalDependencies` names the four
      platform packages at that version;
-   - `brew update && brew install andreybegma/tap/agentdock-runner` then
-     `agentdock-runner version` prints `<version> <os>-<arch>`. Check it on
+   - `brew update && brew install andreybegma/tap/nautelle-runner` then
+     `nautelle-runner version` prints `<version> <os>-<arch>`. Check it on
      Apple Silicon for the first release. If Gatekeeper refuses the binary,
      ad-hoc signing (`codesign --sign -`) goes into `build-release.sh`.
 
