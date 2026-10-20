@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  AGENTDOCK_HOOKS_ENV,
-  AGENTDOCK_HOOKS_OFF,
-} from '@nautelle/shared/protocol';
+import { HOOKS_OFF_ENV } from '@nautelle/shared/protocol';
 import {
   bunSpawn,
   CAPTURE_CLAUDE_FLAGS,
@@ -44,7 +41,7 @@ export interface StewardClassification {
 }
 
 export interface StewardClassifierOptions {
-  /** `$XDG_STATE_HOME/agentdock/steward`: one directory per call, deleted at its end. */
+  /** `$XDG_STATE_HOME/nautelle/steward`: one directory per call, deleted at its end. */
   dir: string;
   env: Env;
   clock: Clock;
@@ -57,7 +54,7 @@ export interface StewardClassifierOptions {
 /**
  * D3: an unknown stall classified by haiku, run locally on the subject's own
  * profile — one headless `claude -p --tools "" --permission-mode plan` with
- * the prompt on stdin, in a directory of its own, with `AGENTDOCK_HOOKS=off`
+ * the prompt on stdin, in a directory of its own, with `NAUTELLE_HOOKS=off`
  * so the call never becomes a captured session. The prompt carries pane
  * text, so its file is deleted when the call ends and neither is logged.
  * Resolves `null` on any failure: the caller falls back to its rule.
@@ -98,7 +95,7 @@ export class StewardClassifier {
         /[^A-Za-z0-9_.-]/g,
         (c) => encodeURIComponent(c),
       )}`;
-      env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
+      Object.assign(env, HOOKS_OFF_ENV);
       const proc = (this.options.spawn ?? bunSpawn)({
         command: [
           profile.binary ?? profile.runtime,

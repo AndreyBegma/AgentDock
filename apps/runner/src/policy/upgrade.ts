@@ -12,7 +12,7 @@ export const shellWord = (path: string): string =>
 
 /** The `allow-root` line for `roots`; the placeholder when there is none. */
 export const allowRootCommand = (roots: readonly string[]): string =>
-  `agentdock-runner policy allow-root ${
+  `nautelle-runner policy allow-root ${
     roots.length > 0 ? roots.map(shellWord).join(' ') : '<dir>'
   }`;
 
@@ -40,7 +40,7 @@ export const upgradeNotice = (projects: readonly CachedProject[]): string => {
       'It watched these before the upgrade:',
       ...projects.map((p) => `  ${p.root} (${p.id})`),
       'To watch them again, run on this machine:',
-      '  agentdock-runner policy allow-root --watched',
+      '  nautelle-runner policy allow-root --watched',
       'or allow the directories yourself:',
       `  ${allowRootCommand(roots)}`,
     );
@@ -65,7 +65,7 @@ export const reportUpgrade = (
 ): void => {
   const roots = cachedRoots(projects);
   log.warn(
-    'runner 0.13 upgrade: runner.json has no policy block, so no project is watched. Run `agentdock-runner policy allow-root --watched` on this machine',
+    'runner 0.13 upgrade: runner.json has no policy block, so no project is watched. Run `nautelle-runner policy allow-root --watched` on this machine',
     { roots, command: allowRootCommand(roots) },
   );
   stderr(upgradeNotice(projects));

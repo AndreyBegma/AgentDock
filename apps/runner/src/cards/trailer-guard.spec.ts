@@ -46,7 +46,7 @@ const setup = async () => {
     worktree: cardWorktreePath(f.root, 'ab12cd34'),
     branch: BRANCH,
     base: 'main',
-    tmuxSession: 'agentdock-card-ab12cd34',
+    tmuxSession: 'nautelle-card-ab12cd34',
     runId: 'run_1',
     phase: 'running',
     startedAt: '2026-10-16T12:00:00.000Z',

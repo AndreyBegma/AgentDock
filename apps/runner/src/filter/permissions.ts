@@ -8,7 +8,7 @@ import type { HookCommand } from './shell';
  * decision on the hook's permissions, narrowed by amendment 9, widened to
  * auto mode by amendment 10 and plan mode by amendment 14). Claude Code matches its permission rules
  * against the command a PreToolUse hook returns, so a rewritten
- * `agentdock-runner filter -- git push` would slip past `Bash(git push:*)`.
+ * `nautelle-runner filter -- git push` would slip past `Bash(git push:*)`.
  * The hook therefore rewrites only when:
  *
  * - the session is in `bypassPermissions`, or in `auto` or `plan`, where the

@@ -86,7 +86,7 @@ const S2 = '22222222-2222-4222-8222-222222222222';
 
 const setup = async (options: { cap?: number } = {}) => {
   const f = await skillsWorkspace();
-  const server = `agentdock-plan-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const server = `nautelle-plan-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   const tmuxServer = ['-L', server];
   teardown.push(async () => {
     await releaseTmuxServer(tmuxServer);
@@ -586,7 +586,7 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     const t = await setup();
     await t.executor.run(t.args({ profileKey: 'claude-slow' }));
     for (let i = 0; i < 200 && t.calls() === 0; i++) await Bun.sleep(25);
-    expect(await t.sessions()).toEqual(['agentdock-plan-pln00001']);
+    expect(await t.sessions()).toEqual(['nautelle-plan-pln00001']);
 
     expect(
       await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' }),

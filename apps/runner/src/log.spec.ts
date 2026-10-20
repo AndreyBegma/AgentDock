@@ -40,9 +40,9 @@ describe('logger', () => {
     expect(lines[0].split(REDACTED).length - 1).toBe(4);
   });
 
-  it('reads AGENTDOCK_LOG, defaulting to info', () => {
-    expect(parseLogLevel({ AGENTDOCK_LOG: 'DEBUG' })).toBe('debug');
-    expect(parseLogLevel({ AGENTDOCK_LOG: 'nonsense' })).toBe('info');
+  it('reads NAUTELLE_LOG, defaulting to info', () => {
+    expect(parseLogLevel({ NAUTELLE_LOG: 'DEBUG' })).toBe('debug');
+    expect(parseLogLevel({ NAUTELLE_LOG: 'nonsense' })).toBe('info');
     expect(parseLogLevel({})).toBe('info');
   });
 

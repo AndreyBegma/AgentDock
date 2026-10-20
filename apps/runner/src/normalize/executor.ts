@@ -2,8 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TEXT_ERROR_MAX, TEXT_RESULT_MAX_BYTES } from '@nautelle/shared';
 import {
-  AGENTDOCK_HOOKS_ENV,
-  AGENTDOCK_HOOKS_OFF,
+  HOOKS_OFF_ENV,
   skillRunIdSchema,
   type TextNormalizeArgs,
   type TextNormalizeFinishedData,
@@ -37,7 +36,7 @@ const PROMPT_FILE = 'prompt.md';
 
 export interface NormalizeExecutorOptions extends TextCallLaunchOptions {
   deps: Pick<SkillsDeps, 'exec' | 'clock' | 'profiles' | 'watchedProjects'>;
-  /** `$XDG_STATE_HOME/agentdock/normalize`: one directory per run, deleted at its end. */
+  /** `$XDG_STATE_HOME/nautelle/normalize`: one directory per run, deleted at its end. */
   normalizeDir: string;
   /** The runner's own environment; the profile's overlays it. */
   env: Env;
@@ -66,7 +65,7 @@ interface Outcome {
  * `text.normalize` (issue #271 D4, ADR-0027): one headless
  * `claude -p --tools "" --permission-mode plan` with the prompt on stdin, run
  * in a directory of its own outside every watched root and with
- * `AGENTDOCK_HOOKS=off`, so a translation never becomes a captured session.
+ * `NAUTELLE_HOOKS=off`, so a translation never becomes a captured session.
  * The runner reports the final `result` text and never parses it. The prompt
  * carries what a person typed, so the file is deleted when the run ends and
  * neither the prompt nor the result is ever logged.
@@ -140,7 +139,7 @@ export class NormalizeExecutor {
       env,
       runEnv(profile, args, this.options.otlpPort?.() ?? null),
     );
-    env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
+    Object.assign(env, HOOKS_OFF_ENV);
     // #445: off or absent launches exactly as before.
     const tokenSaver = textCallTokenSaver(
       this.options,

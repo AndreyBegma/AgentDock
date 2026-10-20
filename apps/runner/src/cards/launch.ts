@@ -1,5 +1,5 @@
 import { basename, dirname, join } from 'node:path';
-import { CARD_ENV_ID, CARD_ENV_PORT } from '@nautelle/shared';
+import { bothEnvNames, CARD_ENV_ID, CARD_ENV_PORT } from '@nautelle/shared';
 import type {
   CardRunArgs,
   CardSession,
@@ -53,12 +53,13 @@ export const cardPort = (shortId: string): number => {
 /**
  * #389: what the card's session is told about itself, so its tests and
  * servers keep to a database and a port of their own. The project's own test
- * setup reads `AGENTDOCK_CARD` (AgentDock's: `apps/api/src/test`); the prompt
- * names both.
+ * setup reads `NAUTELLE_CARD` (Nautelle's: `apps/api/src/test`); the prompt
+ * names both. ADR-0073: the `AGENTDOCK_` names are set too, for a project
+ * whose setup predates the rename.
  */
 export const cardEnv = (shortId: string): Record<string, string> => ({
-  [CARD_ENV_ID]: shortId,
-  [CARD_ENV_PORT]: String(cardPort(shortId)),
+  ...bothEnvNames(CARD_ENV_ID, shortId),
+  ...bothEnvNames(CARD_ENV_PORT, String(cardPort(shortId))),
 });
 
 /** D5: round 1 fixes the session id the API chose; a later round resumes it. */
@@ -142,7 +143,7 @@ export const cardLaunchSpec = (
 
 /**
  * #445: the card round's Token saver — the filter hook over the injected
- * hooks (a plugin profile keeps its own), `agentdock` with the artifact
+ * hooks (a plugin profile keeps its own), `nautelle` with the artifact
  * guard (D8), the scout, and the round dir for the filter's files. `null`
  * when it is off: the round launches as before.
  */
@@ -166,7 +167,7 @@ export const cardTokenSaver = (
     runKind: 'card',
     projectId: args.projectId,
     runId: args.runId,
-    agentdock: finishGuardArgs(cardIssueNumber(args)),
+    runnerMcp: finishGuardArgs(cardIssueNumber(args)),
     scout: true,
     baseSettings:
       wiring.wiring === 'injected' ? cardHooksSettings(selfCommand) : undefined,

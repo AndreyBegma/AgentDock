@@ -28,7 +28,7 @@ const connect = async (
 const text = (result: unknown): string =>
   (result as { content: { text: string }[] }).content[0]?.text ?? '';
 
-describe('agentdock MCP server (spec 201 D20)', () => {
+describe('nautelle MCP server (spec 201 D20)', () => {
   it('answers tools/list with the fifteen tools, named agentdock', async () => {
     const { client } = await connect(() => ({ ok: true, data: {} }));
     expect(client.getServerVersion()?.name).toBe(MCP_SERVER_NAME);
@@ -265,7 +265,7 @@ describe('the card note over MCP (#449 D6)', () => {
       worktree: '/srv/.wt-app-card-ab12cd34',
       branch: 'card/c12-login',
       base: 'develop',
-      tmuxSession: 'agentdock-card-ab12cd34',
+      tmuxSession: 'nautelle-card-ab12cd34',
       runId: 'run_1',
       phase: 'ended',
       startedAt: '2026-10-16T10:00:00.000Z',
@@ -334,7 +334,7 @@ describe('the card note over MCP (#449 D6)', () => {
     expect(calls).toEqual(['card.track']);
     const parts = (result as { content: { text: string }[] }).content;
     expect(parts).toHaveLength(2);
-    expect(parts[1]?.text).toContain('AgentDock card C-12');
+    expect(parts[1]?.text).toContain('Nautelle card C-12');
     expect(parts[1]?.text).toContain('Ship the login page.');
   });
 });

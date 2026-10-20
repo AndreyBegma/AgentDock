@@ -36,7 +36,7 @@ export const LOCAL_RETRY_MAX_DELAY_MS = 10_000;
 
 /** Said to the worker when the window ran out: the tool call is safe to repeat. */
 export const LOCAL_RETRY_EXHAUSTED_MESSAGE =
-  'the runner could not reach AgentDock within 2 minutes; nothing was lost — call this tool again in a minute';
+  'the runner could not reach Nautelle within 2 minutes; nothing was lost — call this tool again in a minute';
 
 export const localOpSchema = z.enum(['event', 'request', 'ping']);
 export type LocalOp = z.infer<typeof localOpSchema>;

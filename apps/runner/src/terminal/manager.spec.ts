@@ -40,11 +40,11 @@ interface RunningRun {
 
 /** `run_a` runs in prj_1; `run_b` runs in another project on this runner. */
 const RUNS: Record<string, RunningRun> = {
-  run_a: { projectId: 'prj_1', root, session: 'agentdock-run-abc123' },
+  run_a: { projectId: 'prj_1', root, session: 'nautelle-run-abc123' },
   run_b: {
     projectId: 'prj_2',
     root: '/srv/other',
-    session: 'agentdock-run-def456',
+    session: 'nautelle-run-def456',
   },
 };
 
@@ -84,9 +84,9 @@ const setup = (
     sessions: overrides.sessions ?? {
       'cs-i42': '',
       'cs-i7': '',
-      'agentdock-orch-acme-widget': '',
-      'agentdock-run-abc123': '',
-      'agentdock-run-def456': '',
+      'nautelle-orch-acme-widget': '',
+      'nautelle-run-abc123': '',
+      'nautelle-run-def456': '',
     },
   });
   const runs = overrides.runs === undefined ? RUNS : overrides.runs;
@@ -194,15 +194,15 @@ describe('terminal.attach — spawn', () => {
       await manager.attach(
         args('t1', { kind: 'orchestrator', projectId: 'prj_1', root }),
       ),
-    ).toEqual({ attached: true, session: 'agentdock-orch-acme-widget' });
-    expect(ptys[0]?.options.argv.at(-1)).toBe('=agentdock-orch-acme-widget');
+    ).toEqual({ attached: true, session: 'nautelle-orch-acme-widget' });
+    expect(ptys[0]?.options.argv.at(-1)).toBe('=nautelle-orch-acme-widget');
   });
 
   it('attaches read-only to the session of a running skill run of the project', async () => {
     const { manager, ptys } = setup();
     expect(await manager.attach(args('t1', skillRun('run_a')))).toEqual({
       attached: true,
-      session: 'agentdock-run-abc123',
+      session: 'nautelle-run-abc123',
     });
     expect(ptys[0]?.options.argv).toEqual([
       'tmux',
@@ -211,7 +211,7 @@ describe('terminal.attach — spawn', () => {
       '-f',
       'ignore-size',
       '-t',
-      '=agentdock-run-abc123',
+      '=nautelle-run-abc123',
     ]);
   });
 
@@ -222,7 +222,7 @@ describe('terminal.attach — spawn', () => {
       'tmux',
       'attach-session',
       '-t',
-      '=agentdock-run-abc123',
+      '=nautelle-run-abc123',
     ]);
   });
 

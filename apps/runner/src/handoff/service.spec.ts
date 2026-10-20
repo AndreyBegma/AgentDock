@@ -90,7 +90,7 @@ const setup = async (
     sessionId: OLD_SESSION,
     profileKey: 'claude',
     startedAt: new Date(Date.now() - 60_000).toISOString(),
-    tmuxSession: 'agentdock-card-ab12cd34',
+    tmuxSession: 'nautelle-card-ab12cd34',
   };
   const cardsDir = join(ws, 'cards');
   const state = new HandoffStateStore((id) => join(cardsDir, id));

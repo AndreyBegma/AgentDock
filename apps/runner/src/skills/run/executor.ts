@@ -41,7 +41,7 @@ export const RUN_CLEANUP_MS = 10 * 60_000;
 
 export interface ExecutorOptions {
   deps: SkillsDeps;
-  /** `$XDG_STATE_HOME/agentdock/runs` (D7). */
+  /** `$XDG_STATE_HOME/nautelle/runs` (D7). */
   runsDir: string;
   /** The argv that starts this runner: `exec-run <runDir>` is appended (D7). */
   selfCommand: readonly string[];

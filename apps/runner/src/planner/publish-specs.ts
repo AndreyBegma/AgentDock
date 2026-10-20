@@ -164,7 +164,7 @@ export const openSpecsPr = async (
     worktree,
     base,
   ]);
-  const temp = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
+  const temp = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'nautelle-pr-'));
   try {
     writeSpecFiles(worktree, content.specDir, content.files);
     await gitOk(exec, [

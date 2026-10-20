@@ -2,13 +2,12 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { CAPTURE_RESULT_MAX_BYTES } from '@nautelle/shared';
 import {
-  AGENTDOCK_HOOKS_ENV,
-  AGENTDOCK_HOOKS_OFF,
   CAPTURE_EXTRACT_ERROR_MAX,
   type CardsExtractArgs,
   type CardsExtractFinishedData,
   type CardsExtractResult,
   cardsExtractFinishedDataSchema,
+  HOOKS_OFF_ENV,
   skillRunIdSchema,
   type UnsequencedEvent,
 } from '@nautelle/shared/protocol';
@@ -81,7 +80,7 @@ export const bunSpawn: CaptureSpawn = ({ command, cwd, env, stdinFile }) => {
 
 export interface CaptureExecutorOptions extends TextCallLaunchOptions {
   deps: Pick<SkillsDeps, 'exec' | 'clock' | 'profiles' | 'watchedProjects'>;
-  /** `$XDG_STATE_HOME/agentdock/capture`: one directory per extraction, deleted at its end. */
+  /** `$XDG_STATE_HOME/nautelle/capture`: one directory per extraction, deleted at its end. */
   capturesDir: string;
   /** The runner's own environment; the profile's overlays it. */
   env: Env;
@@ -116,7 +115,7 @@ export const inside = (root: string, path: string): boolean => {
  * `cards.extract` (issue #244 D4, ADR-0026): one headless
  * `claude -p --tools "" --permission-mode plan` with the prompt on stdin, run
  * in a directory of its own outside every watched root and with
- * `AGENTDOCK_HOOKS=off`, so the extraction never becomes a session that is
+ * `NAUTELLE_HOOKS=off`, so the extraction never becomes a session that is
  * itself captured. The runner reports the final `result` text and never
  * parses it. The prompt carries session content, so the file is deleted when
  * the run ends and neither the prompt nor the result is ever logged.
@@ -198,7 +197,7 @@ export class CaptureExecutor {
       env,
       runEnv(profile, args, this.options.otlpPort?.() ?? null),
     );
-    env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
+    Object.assign(env, HOOKS_OFF_ENV);
     // #445: off or absent launches exactly as before.
     const tokenSaver = textCallTokenSaver(
       this.options,

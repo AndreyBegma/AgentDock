@@ -15,7 +15,7 @@ export interface ExecRunIo {
 }
 
 /**
- * `agentdock-runner exec-run <runDir>` (D7) — what a run's tmux session
+ * `nautelle-runner exec-run <runDir>` (D7) — what a run's tmux session
  * executes. Reads `run.json`, spawns the profile binary as an argv (never a
  * shell string) in the run worktree, feeds it the spec's `stdin` file when
  * there is one (a plan turn's prompt, spec 172 D16), sends its stdout to `stream.jsonl` and
@@ -30,7 +30,7 @@ export const execRun = async (
 ): Promise<number> => {
   const [runDir, ...rest] = argv;
   if (!runDir || rest.length > 0 || !isAbsolute(runDir)) {
-    io.stderr('Usage: agentdock-runner exec-run <absolute run directory>\n');
+    io.stderr('Usage: nautelle-runner exec-run <absolute run directory>\n');
     return 2;
   }
   const spec = readJson(join(runDir, RUN_FILES.launch), launchSpecSchema);
@@ -62,7 +62,7 @@ export const execRun = async (
   }
 
   const label =
-    spec.label ?? (spec.interactive ? 'agentdock card' : 'agentdock skill run');
+    spec.label ?? (spec.interactive ? 'nautelle card' : 'nautelle skill run');
   io.stdout(`${label} · ${spec.binary} in ${spec.cwd}\n`);
   const command = [binary, ...spec.args];
   const child = spec.interactive

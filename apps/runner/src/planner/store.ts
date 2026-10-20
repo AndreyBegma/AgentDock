@@ -22,7 +22,7 @@ import {
 } from '../skills/run/record';
 
 /**
- * A plan's state on the runner, `$XDG_STATE_HOME/agentdock/plans/<planId>/`:
+ * A plan's state on the runner, `$XDG_STATE_HOME/nautelle/plans/<planId>/`:
  * `plan.json` (its worktree, D15) and one directory per turn under `turns/`.
  * A turn directory is what `exec-run` reads and writes (`run.json`,
  * `stream.jsonl`, `stderr.log`, `exit.json`), plus `prompt.md` (D16) and the

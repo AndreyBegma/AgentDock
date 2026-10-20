@@ -74,7 +74,7 @@ export class TmuxServerGuard {
       const running = await exec('tmux', [...server, 'list-sessions']);
       if (running?.code === 0) return exec(binary, args, execOptions);
 
-      const unit = `agentdock-tmux-${this.uid ?? 'user'}-${this.suffix()}`;
+      const unit = `nautelle-tmux-${this.uid ?? 'user'}-${this.suffix()}`;
       const scoped = await exec(
         'systemd-run',
         [

@@ -5,12 +5,11 @@ import {
   CARD_ASSESS_RESULT_MAX_BYTES,
 } from '@nautelle/shared';
 import {
-  AGENTDOCK_HOOKS_ENV,
-  AGENTDOCK_HOOKS_OFF,
   type CardAssessArgs,
   type CardAssessFinishedData,
   type CardAssessResult,
   cardAssessFinishedDataSchema,
+  HOOKS_OFF_ENV,
   skillRunIdSchema,
   type UnsequencedEvent,
 } from '@nautelle/shared/protocol';
@@ -40,7 +39,7 @@ const PROMPT_FILE = 'prompt.md';
 
 export interface AssessExecutorOptions extends TextCallLaunchOptions {
   deps: Pick<SkillsDeps, 'exec' | 'clock' | 'profiles' | 'watchedProjects'>;
-  /** `$XDG_STATE_HOME/agentdock/assess`: one directory per run, deleted at its end. */
+  /** `$XDG_STATE_HOME/nautelle/assess`: one directory per run, deleted at its end. */
   assessDir: string;
   /** The runner's own environment; the profile's overlays it. */
   env: Env;
@@ -69,7 +68,7 @@ interface Outcome {
  * `card.assess` (issue #322 D5, ADR-0032): one headless
  * `claude -p --tools "" --permission-mode plan` with the prompt on stdin, run
  * in a directory of its own outside every watched root and with
- * `AGENTDOCK_HOOKS=off`, so an assessment never becomes a captured session.
+ * `NAUTELLE_HOOKS=off`, so an assessment never becomes a captured session.
  * The runner reports the final `result` text and never parses it. The prompt
  * carries a card's text, so the file is deleted when the run ends and neither
  * the prompt nor the result is ever logged.
@@ -143,7 +142,7 @@ export class AssessExecutor {
       env,
       runEnv(profile, args, this.options.otlpPort?.() ?? null),
     );
-    env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
+    Object.assign(env, HOOKS_OFF_ENV);
     // #445: off or absent launches exactly as before.
     const tokenSaver = textCallTokenSaver(
       this.options,

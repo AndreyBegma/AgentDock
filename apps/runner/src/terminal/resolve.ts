@@ -1,12 +1,12 @@
 import {
   cardTmuxSessionSchema,
   manualTmuxSessionSchema,
-  orchestratorSessionName,
   type TerminalTarget,
   type WatchedProject,
 } from '@nautelle/shared/protocol';
 import { correlateCwd } from '../adapters/correlate';
 import { CommandFailure } from '../commands/failure';
+import { findOrchestratorSession } from '../control/orchestrator';
 import { resolveSlot, watchedProject } from '../control/target';
 import { TmuxControl } from '../control/tmux';
 import type { Exec } from '../detect/exec';
@@ -36,7 +36,7 @@ export interface ResolveDeps {
     sessionId: string,
   ) => { tmuxSession: string; cwd: string } | undefined;
   /**
-   * The `agentdock-card-*` session of a card of this project, or null
+   * The `nautelle-card-*` session of a card of this project, or null
    * (`CardExecutor.cardSession`). Absent: `card` targets are `unsupported`.
    */
   cardSession?: (
@@ -91,8 +91,8 @@ const resolve = async (
     }
     case 'orchestrator': {
       const fleet = await resolveFleetProject(deps.exec, project);
-      const session = orchestratorSessionName(fleet.repo);
-      if (!(await tmux.find(session))) {
+      const session = await findOrchestratorSession(tmux, fleet.repo);
+      if (!session) {
         throw notFound(`the orchestrator of ${project.id} is not running`);
       }
       return session;
@@ -120,7 +120,7 @@ const resolve = async (
         );
       }
       // Only what a hook of this machine reported (D23), only an
-      // `agentdock-manual-<hex>` name, and only one working inside this project.
+      // `nautelle-manual-<hex>` name, and only one working inside this project.
       const known = deps.manualSession(target.sessionId);
       const name = manualTmuxSessionSchema.safeParse(known?.tmuxSession);
       if (!known || !name.success) {

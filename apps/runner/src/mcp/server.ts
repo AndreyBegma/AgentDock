@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   RESUME_CONTEXT_TOOL,
+  RUNNER_MCP_SERVER,
   resumeContextResultSchema,
 } from '@nautelle/shared';
 import type { LocalMethodName } from '@nautelle/shared/protocol';
@@ -22,8 +23,8 @@ export type McpRequest = (
   args: Record<string, unknown>,
 ) => Promise<LocalResult<unknown>>;
 
-/** The server name; with the plugin name it makes `mcp__plugin_agentdock_agentdock__*`. */
-export const MCP_SERVER_NAME = 'agentdock';
+/** The server name; with the plugin name it makes `mcp__plugin_nautelle_nautelle__*`. */
+export const MCP_SERVER_NAME = RUNNER_MCP_SERVER;
 
 const errorResult = (code: string, message?: string): CallToolResult => ({
   isError: true,
@@ -116,7 +117,7 @@ export const buildMcpServer = (
     RESUME_CONTEXT_TOOL,
     {
       description:
-        'The handoff note of the AgentDock card this session works on (its worktree or its branch): goal, what is done, what is next, decisions, dead ends, files, how to verify, checklist, open questions. Answers found: false outside a card session or when the card has no note yet.',
+        'The handoff note of the Nautelle card this session works on (its worktree or its branch): goal, what is done, what is next, decisions, dead ends, files, how to verify, checklist, open questions. Answers found: false outside a card session or when the card has no note yet.',
       inputSchema: {},
     },
     () => resumeContext(options.cardNote),

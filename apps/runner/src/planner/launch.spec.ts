@@ -95,6 +95,6 @@ describe('plan turn launch (D3, D15, D16)', () => {
     expect(planWorktreePath('/ws/widget/', 'abc12345')).toBe(
       '/ws/.wt-widget-plan-abc12345',
     );
-    expect(planTurnSessionName('abc12345')).toBe('agentdock-plan-abc12345');
+    expect(planTurnSessionName('abc12345')).toBe('nautelle-plan-abc12345');
   });
 });

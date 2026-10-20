@@ -202,7 +202,7 @@ export const createPullRequest = async (
   deps: Pick<SkillsDeps, 'exec' | 'tempRoot'>,
   pr: PullRequestInput,
 ): Promise<{ number: number; url: string }> => {
-  const dir = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'agentdock-pr-'));
+  const dir = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'nautelle-pr-'));
   try {
     const bodyFile = join(dir, 'body.md');
     await writeFile(bodyFile, pr.body, { mode: 0o600 });

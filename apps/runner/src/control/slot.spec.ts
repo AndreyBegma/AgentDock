@@ -31,7 +31,7 @@ describe('slot.stop', () => {
   it('kills cs-i42 only, with an exact target', async () => {
     const fake = fakeTmux({
       worktrees: ['/srv/.wt-widget-i42', '/srv/.wt-widget-i7'],
-      sessions: { 'cs-i42': '', 'cs-i7': '', 'agentdock-orch-acme-widget': '' },
+      sessions: { 'cs-i42': '', 'cs-i7': '', 'nautelle-orch-acme-widget': '' },
     });
     expect(await stopSlot({ ...target, slot: 'i42' }, fake.deps)).toEqual({
       stopped: true,
@@ -41,7 +41,7 @@ describe('slot.stop', () => {
     ]);
     expect([...fake.sessions.keys()]).toEqual([
       'cs-i7',
-      'agentdock-orch-acme-widget',
+      'nautelle-orch-acme-widget',
     ]);
     // git is only read: no worktree removal, prune or branch deletion.
     for (const call of fake.calls.filter((c) => c[0] === 'git')) {
@@ -132,7 +132,7 @@ describe('slot.message', () => {
       delivered: true,
     });
     expect(readFileSync(join(wt, MESSAGE_FILE), 'utf8')).toBe(
-      'From: dev@example.com via AgentDock\n' +
+      'From: dev@example.com via Nautelle\n' +
         'Date: 2026-10-08T10:00:00.000Z\n' +
         '\n' +
         'Rebase on develop, then rerun the checks.\n',

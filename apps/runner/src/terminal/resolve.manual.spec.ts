@@ -3,7 +3,7 @@ import type { TerminalTarget } from '@nautelle/shared/protocol';
 import type { Exec } from '../detect/exec';
 import { type ResolveDeps, resolveTerminalTarget } from './resolve';
 
-const SESSION = 'agentdock-manual-0a1b2c3d';
+const SESSION = 'nautelle-manual-0a1b2c3d';
 const project = { id: 'prj_1', root: '/home/u/dev/app' };
 const other = { id: 'prj_2', root: '/home/u/dev/other' };
 
@@ -53,7 +53,7 @@ describe('resolving a manual terminal target (spec 201 D23)', () => {
     );
   });
 
-  it('refuses a recorded name that is not agentdock-manual-<hex>', async () => {
+  it('refuses a recorded name that is not nautelle-manual-<hex>', async () => {
     const bad = deps({
       manualSession: () => ({ tmuxSession: 'cs-main', cwd: project.root }),
       exec: tmuxWith('cs-main'),

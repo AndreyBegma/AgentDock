@@ -29,7 +29,7 @@ import {
 /** What the hook process adds beside its stdin (D10, D11, D23). */
 export interface HookExtras {
   gitBranch?: string;
-  /** `AGENTDOCK_TMUX_SESSION`, set by `agentdock-runner claude`. */
+  /** `NAUTELLE_TMUX_SESSION`, set by `nautelle-runner claude`. */
   tmuxSession?: string;
   ancestors?: Ancestor[];
   /** `stop` (#390): what still runs in the background, from the transcript. */

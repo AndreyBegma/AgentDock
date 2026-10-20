@@ -19,7 +19,7 @@ setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS * 2);
  */
 const tmuxInstalled = Bun.which('tmux') !== null;
 const FIXTURES = join(import.meta.dir, '..', 'cards', '__fixtures__');
-const SESSION = 'agentdock-card-ab12cd34';
+const SESSION = 'nautelle-card-ab12cd34';
 
 // Shows the screen, then records raw input until the session is killed.
 const SCREEN = `#!/bin/sh

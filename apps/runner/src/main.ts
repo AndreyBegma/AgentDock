@@ -6,6 +6,11 @@ const compiled = Bun.main.startsWith('/$bunfs/');
 
 const argv = process.argv.slice(2);
 
+// ADR-0073: the `AGENTDOCK_*` variables count as their `NAUTELLE_*` names,
+// the filter's hot path included. Lightweight: no daemon imports.
+const { adoptLegacyEnv, migrateLegacyDirs } = await import('./legacy');
+const legacyEnv = adoptLegacyEnv(process.env);
+
 // `filter` and `filter-hook` run on every Bash call of every agent (#445 D3),
 // `read-hook` on every Read (#616): they load only their own modules. Everything else is imported lazily below,
 // and the build splits chunks, so the daemon's graph is never parsed here.
@@ -17,6 +22,17 @@ if (
   const { runFilterCommand } = await import('./filter/main');
   process.exit(await runFilterCommand(argv));
 }
+
+/** Commands that read no runner directory, so they migrate none (ADR-0073). */
+const PATHLESS_COMMANDS = new Set([
+  'version',
+  '--version',
+  '-v',
+  'help',
+  '--help',
+  '-h',
+  'register',
+]);
 
 const controller = new AbortController();
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
@@ -49,6 +65,14 @@ const code =
             ? [process.execPath, 'run']
             : [process.execPath, Bun.main, 'run'],
           signal: controller.signal,
+          // ADR-0073: the `agentdock` directories move before any command
+          // reads them; the commands that read none leave them alone.
+          legacy: {
+            env: legacyEnv,
+            ...(PATHLESS_COMMANDS.has(argv[0] ?? '')
+              ? { moved: [], both: [], failed: [] }
+              : migrateLegacyDirs(process.env, platform())),
+          },
         });
       })();
 process.exit(code);

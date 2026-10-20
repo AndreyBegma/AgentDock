@@ -95,7 +95,7 @@ describe('card command handlers (#242)', () => {
     const cards: CardHandlers = {
       'card.run': async () => {
         seen.push('card.run');
-        return { phase: 'running', tmuxSession: 'agentdock-card-ab12cd34' };
+        return { phase: 'running', tmuxSession: 'nautelle-card-ab12cd34' };
       },
       'card.stop': async () => {
         seen.push('card.stop');

@@ -107,7 +107,7 @@ describe('session.message to a card round', () => {
       cards: {
         record: () =>
           ({ cardId: 'card_1', projectId: 'prj_1', runId: 'run_2' }) as never,
-        liveSession: () => 'agentdock-card-ab12cd34',
+        liveSession: () => 'nautelle-card-ab12cd34',
       },
       ...fakeTmux().deps,
       log: memoryLogger().log,

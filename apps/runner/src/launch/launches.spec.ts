@@ -37,7 +37,7 @@ import {
  * The three headless text calls are covered in their executors' specs.
  */
 
-const SELF = ['/opt/agentdock-runner'];
+const SELF = ['/opt/nautelle-runner'];
 const S1 = '11111111-1111-4111-8111-111111111111';
 const ON: TokenSaverConfig = { enabled: true, mcpAllow: ['playwright'] };
 const OFF: TokenSaverConfig = { enabled: false, mcpAllow: ['playwright'] };
@@ -129,8 +129,8 @@ describe('card worker launch (#445)', () => {
   const injected: CardWiring = {
     wiring: 'injected',
     files: {
-      settings: '/r/agentdock-settings.json',
-      mcp: '/r/agentdock-mcp.json',
+      settings: '/r/nautelle-settings.json',
+      mcp: '/r/nautelle-mcp.json',
     },
   };
 
@@ -160,7 +160,7 @@ describe('card worker launch (#445)', () => {
     }
   });
 
-  it('carries the injected hooks, the filter hook, agentdock with the guard, and the scout', () => {
+  it('carries the injected hooks, the filter hook, nautelle with the guard, and the scout', () => {
     const ts = cardTokenSaver(
       profile,
       { ...args, tokenSaver: ON },
@@ -179,7 +179,7 @@ describe('card worker launch (#445)', () => {
     expect(Object.keys(settings.hooks)).toContain('SessionStart');
     expect(settings.hooks.PreToolUse[0].matcher).toBe('Bash');
     expect(serversOf(ts)).toEqual({
-      agentdock: {
+      nautelle: {
         command: SELF[0],
         args: ['mcp', '--finish-guard', '--issue', '12'],
       },
@@ -188,7 +188,7 @@ describe('card worker launch (#445)', () => {
     expectEcoEnv(spec.env);
     expectLeanPrefix(spec.args, spec.env, ts, true);
     expect(spec.env[FILTER_RUN_ENV]).toBe('run_1');
-    expect(spec.env.AGENTDOCK_CARD).toBe('abcd1234');
+    expect(spec.env.NAUTELLE_CARD).toBe('abcd1234');
   });
 
   it('wires a CI-fix round — the card’s resumed session — the same way (#663)', () => {
@@ -286,7 +286,7 @@ describe('skill run launch (#445)', () => {
     }
   });
 
-  it('wires it before `-p` when on, with agentdock and the scout', () => {
+  it('wires it before `-p` when on, with nautelle and the scout', () => {
     const ts = skillTokenSaver(
       profile,
       { ...args, tokenSaver: ON },
@@ -300,7 +300,7 @@ describe('skill run launch (#445)', () => {
     expect(spec.args.indexOf('-p')).toBe(1 + ts.args.length);
     expect(ts.args).toContain('--agents');
     expect(Object.keys(serversOf(ts)).sort()).toEqual([
-      'agentdock',
+      'nautelle',
       'playwright',
     ]);
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('skill');
@@ -342,7 +342,7 @@ describe('plan turn launch (#445)', () => {
     }
   });
 
-  it('wires it when on, with agentdock and the scout', () => {
+  it('wires it when on, with nautelle and the scout', () => {
     const ts = planTurnTokenSaver(
       profile,
       { ...args, tokenSaver: ON },
@@ -353,7 +353,7 @@ describe('plan turn launch (#445)', () => {
     if (!ts) throw new Error('expected a launch');
     const spec = planTurnLaunchSpec(profile, args, '/w', '/r/p.md', null, ts);
     expectWired(spec.args, ts);
-    expect(Object.keys(serversOf(ts))).toContain('agentdock');
+    expect(Object.keys(serversOf(ts))).toContain('nautelle');
     expect(spec.env[FILTER_RUN_KIND_ENV]).toBe('plan');
     expectEcoEnv(spec.env);
     expectLeanPrefix(spec.args, spec.env, ts, false);
@@ -443,7 +443,7 @@ describe('design build launch (#445)', () => {
     }
   });
 
-  it('wires it when on, without agentdock', () => {
+  it('wires it when on, without nautelle', () => {
     const ts = uiProfileTokenSaver(
       profile,
       { ...build, tokenSaver: ON },
@@ -508,7 +508,7 @@ describe('orchestrator session launch (#445)', () => {
     expectWired(argv.slice(1), ts);
     expect(argv.at(-1)).toBe('/code-sentinel:orchestrator start');
     expect(Object.keys(serversOf(ts)).sort()).toEqual([
-      'agentdock',
+      'nautelle',
       'playwright',
     ]);
     expect(ts.env[FILTER_RUN_KIND_ENV]).toBe('orchestrator');

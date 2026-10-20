@@ -32,7 +32,7 @@ describe('Bash read refusal (#663 D8)', () => {
         runKind: 'card',
       }),
       filters: [demoFilter],
-      selfCommand: ['/opt/agentdock/agentdock-runner'],
+      selfCommand: ['/opt/agentdock/nautelle-runner'],
       home: '/home/u',
       os: 'linux',
       now: () => Date.parse('2026-10-19T12:00:00.000Z'),
@@ -176,7 +176,7 @@ describe('filter family switch (#663 D9)', () => {
   });
 });
 
-describe('agentdock-runner register (#663 D3)', () => {
+describe('nautelle-runner register (#663 D3)', () => {
   it('prints the shared register', async () => {
     const stdout: string[] = [];
     const deps = {

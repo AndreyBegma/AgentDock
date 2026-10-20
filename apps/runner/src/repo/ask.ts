@@ -1,12 +1,11 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import {
-  AGENTDOCK_HOOKS_ENV,
-  AGENTDOCK_HOOKS_OFF,
   CODE_ASK_ANSWER_MAX,
   CODE_ASK_TIMEOUT_SEC,
   type CodeAskArgs,
   type CodeAskResult,
+  HOOKS_OFF_ENV,
   type WatchedProject,
 } from '@nautelle/shared/protocol';
 import { bunSpawn, type CaptureSpawn } from '../capture/executor';
@@ -156,7 +155,7 @@ export const codeAskArgv = (
 /** What the session is asked. The question is the person's text: data. */
 export const codeAskPrompt = (question: string): string =>
   [
-    'A person asks a question about the code in this repository, through the AgentDock assistant.',
+    'A person asks a question about the code in this repository, through the Nautelle assistant.',
     'Answer it from the code: read what you need with Read, Grep and Glob, and change nothing.',
     'Cite every claim with the file path relative to the repository and line numbers, as `path/to/file.ts:42`. Never invent a path; when the code does not answer the question, say so.',
     'Never quote secrets, keys or credentials, even when you find them.',
@@ -169,7 +168,7 @@ export const codeAskPrompt = (question: string): string =>
   ].join('\n');
 
 export interface CodeAskOptions {
-  /** `$XDG_STATE_HOME/agentdock/code-ask`: one directory per call, deleted at its end. */
+  /** `$XDG_STATE_HOME/nautelle/code-ask`: one directory per call, deleted at its end. */
   dir: string;
   env: Env;
   clock: Clock;
@@ -218,7 +217,7 @@ export class CodeAsker {
         env,
         runEnv(profile, args, this.options.otlpPort?.() ?? null),
       );
-      env[AGENTDOCK_HOOKS_ENV] = AGENTDOCK_HOOKS_OFF;
+      Object.assign(env, HOOKS_OFF_ENV);
       const proc = (this.options.spawn ?? bunSpawn)({
         command: codeAskArgv(profile, args, policy, root),
         cwd: root,

@@ -24,7 +24,7 @@ export const permissionOutput = (decision: PermissionDecision): string =>
   });
 
 /** The deny message when the approver left no note. */
-export const DEFAULT_DENY_MESSAGE = 'Denied remotely in AgentDock.';
+export const DEFAULT_DENY_MESSAGE = 'Denied remotely in Nautelle.';
 
 /** Polling errors in a row after which the hook gives up and the dialog shows. */
 export const MAX_POLL_FAILURES = 3;

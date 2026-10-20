@@ -56,7 +56,7 @@ export const PLAN_IDLE_MS = 14 * 24 * 60 * 60_000;
 
 export interface PlanExecutorOptions {
   deps: SkillsDeps;
-  /** `$XDG_STATE_HOME/agentdock/plans`, beside the skill runs. */
+  /** `$XDG_STATE_HOME/nautelle/plans`, beside the skill runs. */
   plansDir: string;
   /** The argv that starts this runner: `exec-run <turnDir>` is appended. */
   selfCommand: readonly string[];

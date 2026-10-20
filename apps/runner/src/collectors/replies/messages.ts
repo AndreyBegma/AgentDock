@@ -15,7 +15,7 @@ import {
 import { redactText } from '../../pane/redact';
 import { truncateBytes } from './replies';
 
-/** `From: <sender>` — the header AgentDock's `slot.message` writes (spec 17 D7). */
+/** `From: <sender>` — the header Nautelle's `slot.message` writes (spec 17 D7). */
 const FROM_HEADER = /^From:\s*(.+?)\s*$/im;
 /** `Date: <iso>` of the same header block. */
 const DATE_HEADER = /^Date:\s*(\S+)\s*$/im;
@@ -28,7 +28,8 @@ export const messageHeader = (
 ): Pick<SlotMessageSeenData, 'sender' | 'sentAt'> => {
   const head = body.split(/\n\s*\n/, 1)[0] ?? '';
   const sender = (FROM_HEADER.exec(head)?.[1] ?? FROM_HEADING.exec(head)?.[1])
-    ?.replace(/\s+via AgentDock$/i, '')
+    // ADR-0073: a message written before the rename says `via AgentDock`.
+    ?.replace(/\s+via (?:Nautelle|AgentDock)$/i, '')
     .slice(0, 320);
   const date = DATE_HEADER.exec(head)?.[1];
   const sentAt =

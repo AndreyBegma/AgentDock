@@ -63,9 +63,7 @@ export const issueCreate = async (
   const queued = args.queue && reason === null;
   if (queued) labels.push(readyLabel);
 
-  const dir = await mkdtemp(
-    join(deps.tempRoot ?? tmpdir(), 'agentdock-issue-'),
-  );
+  const dir = await mkdtemp(join(deps.tempRoot ?? tmpdir(), 'nautelle-issue-'));
   try {
     const bodyFile = join(dir, 'body.md');
     await writeFile(bodyFile, args.body, { mode: 0o600 });

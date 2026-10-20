@@ -222,7 +222,7 @@ describe.skipIf(!tmuxInstalled)('skill runs (real tmux)', () => {
 
     // The worktree and the branch are gone; the main checkout never moved.
     const record = t.executor.record('run_1');
-    expect(record?.session).toBe('agentdock-run-run00000');
+    expect(record?.session).toBe('nautelle-run-run00000');
     expect(existsSync(record?.worktree ?? '')).toBe(false);
     expect(await t.f.run(t.f.root, 'branch', '--list', 'run/*')).toBe('');
     expect(await t.f.run(t.f.root, 'rev-parse', 'HEAD')).toBe(headBefore);
@@ -232,11 +232,11 @@ describe.skipIf(!tmuxInstalled)('skill runs (real tmux)', () => {
       readFileSync(join(t.executor.store.dir('run_1'), 'patch.diff'), 'utf8'),
     ).toBe(data?.patch ?? '<no patch>');
 
-    // The session was agentdock-run-*, and launched `exec-run` as an argv, not `sh -c`.
+    // The session was nautelle-run-*, and launched `exec-run` as an argv, not `sh -c`.
     const created = t.tmuxCalls.find((c) => c.includes('new-session'));
     expect(created).toBeDefined();
     const at = created!.indexOf('-s');
-    expect(created![at + 1]).toMatch(/^agentdock-run-[a-z0-9]{6,16}$/);
+    expect(created![at + 1]).toMatch(/^nautelle-run-[a-z0-9]{6,16}$/);
     const argv = created!.slice(created!.indexOf(record!.worktree) + 1);
     expect(argv).toEqual([
       process.execPath,
@@ -329,7 +329,7 @@ describe.skipIf(!tmuxInstalled)('skill runs (real tmux)', () => {
     const t = await setup();
     await t.executor.run(t.args({ profileKey: 'claude-slow' }));
     await t.until('run_1', ['running']);
-    expect(await t.sessions()).toEqual(['agentdock-run-run00000']);
+    expect(await t.sessions()).toEqual(['nautelle-run-run00000']);
     expect(
       await t.executor.cancel({ runId: 'run_1', projectId: t.f.project.id }),
     ).toEqual({

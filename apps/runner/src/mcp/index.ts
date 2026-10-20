@@ -29,7 +29,7 @@ export const mcpSessionToken = (
     undefined);
 
 /**
- * `agentdock-runner mcp` (spec 201 D20): the `agentdock` MCP server over
+ * `nautelle-runner mcp` (spec 201 D20): the `nautelle` MCP server over
  * stdio. Every tool call is one request to the daemon's local socket (D5),
  * carrying the session's token (#113): from the env of a session the runner
  * launched, else the one its `SessionStart` hook kept for this process's

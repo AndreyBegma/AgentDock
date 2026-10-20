@@ -97,7 +97,7 @@ describe('commands capability (#233)', () => {
   });
 });
 
-describe('agentdock plugin and telemetry per profile (#281 D1)', () => {
+describe('nautelle plugin and telemetry per profile (#281 D1)', () => {
   let dir = '';
   let cleanup = () => {};
   beforeEach(() => {
@@ -130,7 +130,7 @@ describe('agentdock plugin and telemetry per profile (#281 D1)', () => {
       'code-sentinel@code-sentinel': [
         { version: '1.24.0', installPath: '/c', scope: 'user' },
       ],
-      'agentdock@agentdock': [
+      'nautelle@nautelle': [
         { version: '0.3.0', installPath: '/p/0.3.0', scope: 'project' },
         { version: '0.2.0', installPath: '/p/0.2.0', scope: 'user' },
       ],
@@ -178,7 +178,7 @@ describe('agentdock plugin and telemetry per profile (#281 D1)', () => {
       'claude-a': { plugin: null, telemetry: false },
     });
     writePlugins({
-      'agentdock@agentdock': [
+      'nautelle@nautelle': [
         { version: '0.2.0', installPath: '/p', scope: 'user' },
       ],
     });
@@ -193,7 +193,7 @@ describe('agentdock plugin and telemetry per profile (#281 D1)', () => {
 
   it('is reported for claude profiles only', async () => {
     writePlugins({
-      'agentdock@agentdock': [
+      'nautelle@nautelle': [
         { version: '0.2.0', installPath: '/p', scope: 'user' },
       ],
     });
