@@ -51,8 +51,8 @@ describe('boardColumnWidth', () => {
 });
 
 describe('PHONE_MAX_WIDTH_PX (#497)', () => {
-  test('is the shell breakpoint the capsule shows below, `lg`', () => {
+  test('is the shell breakpoint the capsule shows below, `sm` (C-282)', () => {
     expect(PHONE_MAX_WIDTH_PX).toBe(NARROW_MAX_WIDTH_PX);
-    expect(PHONE_MAX_WIDTH_PX).toBe(1024);
+    expect(PHONE_MAX_WIDTH_PX).toBe(640);
   });
 });
