@@ -13,7 +13,7 @@ import { profileKeySchema, skillRunIdSchema } from './skills';
  * A card's model assessment on the runner (issue #322 D5, ADR-0032). The API
  * has no model key, so the recommendation is headless `claude -p` with
  * `haiku`, no tools, `--permission-mode plan`, the prompt on stdin, in a run
- * directory outside every watched root and with `AGENTDOCK_HOOKS=off` —
+ * directory outside every watched root and with `NAUTELLE_HOOKS=off` —
  * exactly as `text.normalize` does (ADR-0027).
  *
  * `assessCommands` is defined and exported here, but entered in the

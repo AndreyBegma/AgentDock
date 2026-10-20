@@ -14,15 +14,20 @@ describe('findOldBrand', () => {
     expect(findOldBrand('Open in Nautelle')).toEqual([]);
   });
 
-  test('allows the names later cards rename', () => {
+  test('allows the legacy names and the ones a later card renames', () => {
     const text = [
       "signature: 'X-AgentDock-Signature',",
-      "export const CARD_PR_MARKER = 'AgentDock-Card';",
-      "const USER_AGENT = 'AgentDock-Webhooks/1';",
+      "export const LEGACY_CARD_PR_MARKER = 'AgentDock-Card';",
       "'https://github.com/AndreyBegma/AgentDock/blob/main/apps/runner/README.md'",
       "root: '/home/dev/AgentDock', cwd: '/home/dev/.wt-AgentDock-i42'",
     ].join('\n');
     expect(findOldBrand(text)).toEqual([]);
+  });
+
+  test('finds the old webhook User-Agent (ADR-0073)', () => {
+    expect(
+      findOldBrand("const USER_AGENT = 'AgentDock-Webhooks/1';"),
+    ).toHaveLength(1);
   });
 
   test('still finds the brand next to an allowed name', () => {

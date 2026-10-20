@@ -45,7 +45,7 @@ describe('board rounds (e2e)', () => {
         round: 1,
         trigger: 'run',
         phase: 'starting',
-        tmuxSession: `agentdock-card-${card.shortId}`,
+        tmuxSession: `nautelle-card-${card.shortId}`,
       });
       const run = await w.ctx.prisma.run.findUniqueOrThrow({
         where: { id: card.rounds[0].runId },

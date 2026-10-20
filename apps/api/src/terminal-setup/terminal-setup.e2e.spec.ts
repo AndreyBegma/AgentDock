@@ -182,7 +182,7 @@ describe('terminal setup (e2e)', () => {
     const alpha = view.otherProfiles[0];
     expect(
       alpha.steps.flatMap((s) => (s.kind === 'command' ? [s.code] : [])),
-    ).toContain('agentdock-runner setup claude --profile claude-alpha');
+    ).toContain('nautelle-runner setup claude --profile claude-alpha');
     // The project uses none of them: the checklist asks for the key instead.
     expect(plugins(view)).toHaveLength(1);
     expect(plugins(view)[0].profileKey).toBeUndefined();
@@ -339,8 +339,8 @@ describe('terminal setup (e2e)', () => {
         s.kind === 'command' ? [s.code] : [],
       ),
     ).toEqual([
-      'agentdock-runner profiles',
-      'agentdock-runner setup claude --profile <key>',
+      'nautelle-runner profiles',
+      'nautelle-runner setup claude --profile <key>',
     ]);
   });
 

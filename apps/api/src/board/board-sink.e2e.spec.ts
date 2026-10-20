@@ -619,7 +619,7 @@ describe('board sink (e2e)', () => {
         title: 'C-1: Add login',
       });
       expect(collect.body).toBe(
-        'Added the login form; tests pass.\n\nAgentDock-Card: C-1',
+        'Added the login form; tests pass.\n\nNautelle-Card: C-1',
       );
       expect(after).toMatchObject({
         prNumber: 77,
@@ -649,7 +649,7 @@ describe('board sink (e2e)', () => {
       await finishCard(sessionId, 'Done.');
       await w.work.settled();
       expect(w.sent('card.collect')[0].body).toBe(
-        'Done.\n\nCloses #41\n\nAgentDock-Card: C-1',
+        'Done.\n\nCloses #41\n\nNautelle-Card: C-1',
       );
     });
 

@@ -4,7 +4,7 @@ import { boardFailureOf } from './board-commands';
 describe('boardFailureOf', () => {
   it('maps a runner policy refusal to 403 policy_refused with its reason (ADR-0047)', () => {
     const message =
-      "refused by this runner's policy (maxPermissionMode): card.run asks for bypassPermissions, this runner allows at most auto. On the runner's machine: `agentdock-runner policy set maxPermissionMode bypassPermissions`";
+      "refused by this runner's policy (maxPermissionMode): card.run asks for bypassPermissions, this runner allows at most auto. On the runner's machine: `nautelle-runner policy set maxPermissionMode bypassPermissions`";
     const failure = boardFailureOf('card.run', {
       code: 'policy_refused',
       message,

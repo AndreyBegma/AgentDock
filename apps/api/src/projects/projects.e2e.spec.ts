@@ -888,7 +888,7 @@ describe('projects (e2e)', () => {
 
   describe('watch refusal (#691)', () => {
     const refusal = (root: string) =>
-      `refused by this runner's policy (allowedRoots): ${root} is not under an allowed root. On the runner's machine: \`agentdock-runner policy allow-root ${root}\``;
+      `refused by this runner's policy (allowedRoots): ${root} is not under an allowed root. On the runner's machine: \`nautelle-runner policy allow-root ${root}\``;
 
     let seq = 0;
     const report = async (socket: TestRunnerSocket, data: unknown) => {

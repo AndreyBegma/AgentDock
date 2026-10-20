@@ -39,7 +39,7 @@ describe('skill run events', () => {
         projectId: 'p',
         phase: 'running',
         at: '2026-10-08T12:00:00.000Z',
-        tmuxSession: 'agentdock-run-a1b2c3',
+        tmuxSession: 'nautelle-run-a1b2c3',
         worktree: '/home/dev/.wt-repo-run-a1b2c3',
         branch: 'run/a1b2c3-estimate',
       }).success,

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import { commands } from '../commands';
 import {
-  AGENTDOCK_HOOKS_ENV,
-  AGENTDOCK_HOOKS_OFF,
   CAPTURE_PROMPT_MAX_BYTES,
   captureCommands,
   cardsExtractArgsSchema,
   cardsExtractResultSchema,
+  HOOKS_ENV,
+  HOOKS_OFF,
+  HOOKS_OFF_ENV,
   hooksDisabled,
 } from './capture';
 
@@ -89,13 +90,22 @@ describe('captureCommands', () => {
 });
 
 describe('hook suppression', () => {
-  it('turns hooks off only for AGENTDOCK_HOOKS=off', () => {
-    expect(AGENTDOCK_HOOKS_ENV).toBe('AGENTDOCK_HOOKS');
-    expect(hooksDisabled({ [AGENTDOCK_HOOKS_ENV]: AGENTDOCK_HOOKS_OFF })).toBe(
-      true,
-    );
-    expect(hooksDisabled({ AGENTDOCK_HOOKS: 'OFF' })).toBe(false);
-    expect(hooksDisabled({ AGENTDOCK_HOOKS: '0' })).toBe(false);
+  it('turns hooks off under either name during the rename window (ADR-0073)', () => {
+    expect(hooksDisabled({ AGENTDOCK_HOOKS: 'off' })).toBe(true);
+    expect(
+      hooksDisabled({ NAUTELLE_HOOKS: 'on', AGENTDOCK_HOOKS: 'off' }),
+    ).toBe(false);
+    expect(HOOKS_OFF_ENV).toEqual({
+      NAUTELLE_HOOKS: 'off',
+      AGENTDOCK_HOOKS: 'off',
+    });
+  });
+
+  it('turns hooks off only for NAUTELLE_HOOKS=off', () => {
+    expect(HOOKS_ENV).toBe('NAUTELLE_HOOKS');
+    expect(hooksDisabled({ [HOOKS_ENV]: HOOKS_OFF })).toBe(true);
+    expect(hooksDisabled({ NAUTELLE_HOOKS: 'OFF' })).toBe(false);
+    expect(hooksDisabled({ NAUTELLE_HOOKS: '0' })).toBe(false);
     expect(hooksDisabled({})).toBe(false);
   });
 });

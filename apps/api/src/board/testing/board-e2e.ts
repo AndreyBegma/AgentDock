@@ -249,7 +249,7 @@ export class BoardWorld {
       },
       'card.run': {
         phase: 'starting',
-        tmuxSession: `agentdock-card-${String(args.shortId)}`,
+        tmuxSession: `nautelle-card-${String(args.shortId)}`,
       },
       'card.stop': { stopped: true },
       'card.collect': {

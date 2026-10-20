@@ -29,7 +29,7 @@ export type CardRunPhase = z.infer<typeof cardRunPhaseSchema>;
 
 /**
  * #367 D1–D3: how a round's session reaches the Board — hooks and
- * `finish_card`. `plugin`: the profile's own agentdock plugin; `injected`:
+ * `finish_card`. `plugin`: the profile's own nautelle plugin; `injected`:
  * the runner's `--settings` / `--mcp-config` of the round; `none`: neither.
  */
 export const cardRunWiringSchema = z.enum(['plugin', 'injected', 'none']);

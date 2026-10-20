@@ -2,6 +2,7 @@ import {
   INBOUND_PAYLOAD_NOTICE,
   INBOUND_RATE_PER_HOUR,
   type InboundTriggerWithSecret,
+  LEGACY_WEBHOOK_HEADERS,
   WEBHOOK_HEADERS,
 } from '@nautelle/shared';
 import { systemActorFor } from '../../audit/audit.types';
@@ -69,6 +70,8 @@ describe('POST /hooks/:publicId (e2e, spec 26 D1–D7)', () => {
     /** Signs this body but sends `body`. */
     signedBody?: string;
     omit?: (keyof typeof WEBHOOK_HEADERS)[];
+    /** Sends the `X-AgentDock-*` names a caller set up before the rename. */
+    legacy?: boolean;
   }
 
   const deliver = (trigger: InboundTriggerWithSecret, d: Delivery = {}) => {
@@ -82,12 +85,13 @@ describe('POST /hooks/:publicId (e2e, spec 26 D1–D7)', () => {
       deliveryId,
       d.signedBody ?? body,
     );
+    const names = d.legacy ? LEGACY_WEBHOOK_HEADERS : WEBHOOK_HEADERS;
     const headers: Record<string, string> = {
-      [WEBHOOK_HEADERS.timestamp]: timestamp,
-      [WEBHOOK_HEADERS.delivery]: deliveryId,
-      [WEBHOOK_HEADERS.signature]: signature,
+      [names.timestamp]: timestamp,
+      [names.delivery]: deliveryId,
+      [names.signature]: signature,
     };
-    for (const key of d.omit ?? []) delete headers[WEBHOOK_HEADERS[key]];
+    for (const key of d.omit ?? []) delete headers[names[key]];
     return ctx
       .http()
       .post(trigger.path)
@@ -164,6 +168,20 @@ describe('POST /hooks/:publicId (e2e, spec 26 D1–D7)', () => {
       actorType: 'system',
       actorUserId: null,
       actorOnBehalfOfId: adminId,
+    });
+  });
+
+  // ADR-0073: a caller set up before the rename keeps working until 0.16.0.
+  it('accepts a delivery signed under the legacy header names', async () => {
+    const trigger = await createTrigger();
+    const response = await deliver(trigger, {
+      deliveryId: 'gh-legacy',
+      legacy: true,
+    });
+    expect(response.status).toBe(202);
+    expect(response.body).toEqual({
+      deliveryId: 'gh-legacy',
+      status: 'accepted',
     });
   });
 

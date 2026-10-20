@@ -53,11 +53,11 @@ export type InboundSignatureVerdict =
   | { ok: false; reason: InboundSignatureFailure };
 
 export interface InboundSignatureInput {
-  /** `X-AgentDock-Timestamp`. */
+  /** `X-Nautelle-Timestamp`. */
   timestamp: string | undefined;
-  /** `X-AgentDock-Delivery`. */
+  /** `X-Nautelle-Delivery`. */
   deliveryId: string | undefined;
-  /** `X-AgentDock-Signature`. */
+  /** `X-Nautelle-Signature`. */
   signature: string | undefined;
   /** The body exactly as received, before any JSON parse (D8). */
   rawBody: Buffer;
@@ -116,7 +116,7 @@ export const verifyInboundSignature = (
 // ─── Outbound (D13) ─────────────────────────────────────────────────────────
 
 /**
- * `X-AgentDock-Signature` of an outbound delivery: `t=<unix>,v1=<hex>`, hex =
+ * `X-Nautelle-Signature` of an outbound delivery: `t=<unix>,v1=<hex>`, hex =
  * `HMAC-SHA256(secret, "<t>.<body>")`. Signed anew on every attempt.
  */
 export const signOutbound = (

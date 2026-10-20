@@ -62,7 +62,7 @@ export class CardDesignHarness extends DesignHarness {
     const defaults: Record<string, unknown> = {
       'card.run': {
         phase: 'starting',
-        tmuxSession: `agentdock-card-${String(args.shortId)}`,
+        tmuxSession: `nautelle-card-${String(args.shortId)}`,
       },
       'card.close': {
         stopped: false,

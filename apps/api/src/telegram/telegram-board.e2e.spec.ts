@@ -159,7 +159,7 @@ describe('Telegram Board commands (e2e, #576)', () => {
           name === 'card.run'
             ? {
                 phase: 'starting',
-                tmuxSession: `agentdock-card-${String((args as { shortId: string }).shortId)}`,
+                tmuxSession: `nautelle-card-${String((args as { shortId: string }).shortId)}`,
               }
             : { stopped: true },
       }));

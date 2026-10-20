@@ -242,7 +242,7 @@ describe('terminal attach (e2e)', () => {
       });
 
       it('gives an admin a ticket that resolves to the Claude session id', async () => {
-        const row = await manualSession('agentdock-manual-0a1b2c3d');
+        const row = await manualSession('nautelle-manual-0a1b2c3d');
         for (const id of [row.id, row.externalId]) {
           const value = await issued(admin, manual(id));
           const socket = connect(value);
@@ -259,7 +259,7 @@ describe('terminal attach (e2e)', () => {
       });
 
       it('is 403 for an operator and a viewer', async () => {
-        const row = await manualSession('agentdock-manual-0a1b2c3d');
+        const row = await manualSession('nautelle-manual-0a1b2c3d');
         for (const role of ['operator', 'viewer'] as const) {
           const user = await signIn(`${role}-m@example.com`, role);
           await ctx.prisma.projectMember.create({
@@ -289,7 +289,7 @@ describe('terminal attach (e2e)', () => {
             lastInspectedAt: new Date('2026-10-01T00:00:00Z'),
           },
         });
-        const row = await manualSession('agentdock-manual-0a1b2c3d', other.id);
+        const row = await manualSession('nautelle-manual-0a1b2c3d', other.id);
         expect((await ticket(admin, manual(row.id))).status).toBe(404);
       });
 
@@ -609,7 +609,7 @@ describe('terminal attach (e2e)', () => {
 
     it('passes a runner policy refusal on with its reason (ADR-0047)', async () => {
       const message =
-        "refused by this runner's policy (terminal.write): a write attach is off on this runner. On the runner's machine: `agentdock-runner policy set terminal.write true`";
+        "refused by this runner's policy (terminal.write): a write attach is off on this runner. On the runner's machine: `nautelle-runner policy set terminal.write true`";
       port.outcome = { status: 'error', code: 'policy_refused', message };
       const socket = connect(await issued());
       expect(await socket.frame('error')).toEqual({

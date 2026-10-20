@@ -67,8 +67,8 @@ describe('terminalSetup', () => {
       expect(plugin?.state).toBe('todo');
       expect(plugin?.optional).toBe(false);
       expect(commands(plugin?.steps ?? [])).toEqual([
-        'agentdock-runner profiles',
-        'agentdock-runner setup claude --profile main',
+        'nautelle-runner profiles',
+        'nautelle-runner setup claude --profile main',
       ]);
       expect(terminalSetup(facts).complete).toBe(false);
       expect(terminalSetup(facts).todo).toBe(1);
@@ -148,7 +148,7 @@ describe('terminalSetup', () => {
       };
       expect(
         commands(item(facts, 'plugin', "it's mine")?.steps ?? []),
-      ).toContain("agentdock-runner setup claude --profile 'it'\\''s mine'");
+      ).toContain("nautelle-runner setup claude --profile 'it'\\''s mine'");
     });
   });
 
@@ -165,9 +165,7 @@ describe('terminalSetup', () => {
       expect(item(facts, 'plugin', 'main')?.state).toBe('done');
       const loaded = item(facts, 'plugin_loaded', 'main');
       expect(loaded?.state).toBe('todo');
-      expect(commands(loaded?.steps ?? [])).toEqual([
-        'agentdock-runner status',
-      ]);
+      expect(commands(loaded?.steps ?? [])).toEqual(['nautelle-runner status']);
     });
 
     it('is not listed unless D1 reports a version', () => {
@@ -285,8 +283,8 @@ describe('terminalSetup', () => {
       });
       expect(plugins[0].profileKey).toBeUndefined();
       expect(commands(plugins[0].steps)).toEqual([
-        'agentdock-runner profiles',
-        'agentdock-runner setup claude --profile <key>',
+        'nautelle-runner profiles',
+        'nautelle-runner setup claude --profile <key>',
       ]);
       expect(terminalSetup(none).complete).toBe(false);
     });

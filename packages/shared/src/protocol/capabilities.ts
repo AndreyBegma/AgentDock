@@ -14,7 +14,7 @@ export type Runtime = z.infer<typeof runtimeSchema>;
 const portSchema = z.number().int().min(1).max(65_535);
 
 /**
- * The agentdock plugin in a Claude profile (#281 D1). `plugin` is the installed
+ * The nautelle plugin in a Claude profile (#281 D1). `plugin` is the installed
  * version of `agentdock@*` from `installed_plugins.json`, user scope first, or
  * null; `telemetry` is whether `settings.json` → `env.OTEL_EXPORTER_OTLP_ENDPOINT`
  * points at this runner's OTLP http port.

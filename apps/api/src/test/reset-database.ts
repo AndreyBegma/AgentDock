@@ -80,7 +80,7 @@ export const resetTestDatabase = async (
     if ((error as { code?: string }).code === LOCK_NOT_AVAILABLE) {
       throw new Error(
         `The e2e setup could not reset "${name}": another session still holds a lock on it after ${lockTimeoutMs} ms. ` +
-          `Is another e2e run using this database? Each checkout needs a TEST_DATABASE_URL of its own (a board card gets one from AGENTDOCK_CARD).`,
+          `Is another e2e run using this database? Each checkout needs a TEST_DATABASE_URL of its own (a board card gets one from NAUTELLE_CARD).`,
       );
     }
     throw error;

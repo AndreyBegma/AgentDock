@@ -34,7 +34,7 @@ export const cardTestDatabaseUrl = (
   if (!card) return url;
   if (!CARD_ID.test(card)) {
     throw new Error(
-      `AGENTDOCK_CARD is "${card}"; a board card's short id is 8 characters of a-z and 0-9.`,
+      `NAUTELLE_CARD is "${card}"; a board card's short id is 8 characters of a-z and 0-9.`,
     );
   }
   const copy = new URL(url);
@@ -54,7 +54,8 @@ export const cardTestDatabaseUrl = (
  * The database the e2e suite owns and wipes. Required: without it the suite
  * fails rather than silently skipping. The `_test` suffix is a guard against
  * pointing it at a database someone works in. In a board card's session
- * (`AGENTDOCK_CARD`, #389) it is the card's own, named after it.
+ * (`NAUTELLE_CARD`, #389; `AGENTDOCK_CARD` until runner 0.16.0, ADR-0073) it
+ * is the card's own, named after it.
  */
 export const testDatabaseUrl = (): string => {
   config({ path: resolve(API_ROOT, '.env'), quiet: true });
@@ -71,7 +72,10 @@ export const testDatabaseUrl = (): string => {
       `TEST_DATABASE_URL points at "${name}"; its name must end in _test, because the e2e suite wipes it.`,
     );
   }
-  return cardTestDatabaseUrl(value, process.env.AGENTDOCK_CARD);
+  return cardTestDatabaseUrl(
+    value,
+    process.env.NAUTELLE_CARD ?? process.env.AGENTDOCK_CARD,
+  );
 };
 
 /**

@@ -89,7 +89,7 @@ describe('runners admin and pairing (e2e)', () => {
       const created = await createRunner(admin, 'desk');
       expect(created.pairingCode).toMatch(PAIRING_CODE_PATTERN);
       expect(created.command).toBe(
-        `agentdock-runner pair --server ${ctx.origin} --code ${created.pairingCode}`,
+        `nautelle-runner pair --server ${ctx.origin} --code ${created.pairingCode}`,
       );
       expect(created.runner).toMatchObject({
         name: 'desk',
