@@ -3,7 +3,7 @@
 Each release's GitHub release links here. A release with an upgrade note says
 what to do on every machine that runs the runner.
 
-## Unreleased
+## 0.14.0
 
 **Upgrade note — the runner is renamed `nautelle-runner`
 ([ADR-0073](../../docs/adr/0073-the-runner-and-its-protocol-are-renamed-nautelle-with-a-compatibility-window.md)).**
