@@ -193,8 +193,27 @@ describe('stopRound after escalate_card (#750 D8)', () => {
     startedAt: '2026-10-21T12:00:00.000Z',
   });
 
+  // Without tmux, as on CI: the record is the round, and nothing touches a
+  // real tmux server.
+  const withoutTmux = async () => {
+    const { f } = await setup();
+    const executor = new CardExecutor({
+      deps: f.deps((binary, args, options) =>
+        binary === 'tmux'
+          ? Promise.resolve(null)
+          : f.exec(binary, args, options),
+      ),
+      cardsDir: join(f.ws, 'state', 'cards'),
+      selfCommand: ['true'],
+      attachmentSource: { server: 'http://127.0.0.1:1', token: 'test' },
+      emit: () => {},
+      log: memoryLogger().log,
+    });
+    return { f, executor };
+  };
+
   it('never stops the round that replaced the asking one', async () => {
-    const { f, executor } = await setup();
+    const { f, executor } = await withoutTmux();
     const store = new CardStore(join(f.ws, 'state', 'cards'));
     // The API's relaunch on Opus came first: another run, another session.
     store.save({ ...round(f), runId: 'run_2', sessionId: OPUS });
@@ -216,15 +235,18 @@ describe('stopRound after escalate_card (#750 D8)', () => {
     expect(store.load('card_1')?.phase).toBe('running');
   });
 
-  it('stops the asking round while it is still the card’s round', async () => {
-    const { f, executor } = await setup();
+  it('stops the asking round while it is still the card’s round, tmux or not', async () => {
+    const { f, executor } = await withoutTmux();
     const store = new CardStore(join(f.ws, 'state', 'cards'));
     store.save(round(f));
-    await executor.stopRound({
-      cardId: 'card_1',
-      runId: 'run_1',
-      sessionId: ASKING,
-    });
+    // No tmux to read: no session to kill, and the round still stops.
+    expect(
+      await executor.stopRound({
+        cardId: 'card_1',
+        runId: 'run_1',
+        sessionId: ASKING,
+      }),
+    ).toEqual({ stopped: false });
     expect(store.load('card_1')?.phase).toBe('stopped');
     // Once stopped, a second call does nothing.
     expect(

@@ -470,7 +470,11 @@ export class CardExecutor {
       ) {
         return { stopped: false };
       }
-      const alive = (await this.tmux.find(record.tmuxSession)) !== null;
+      // tmux that cannot be read has no session to kill; the round still stops.
+      const alive = await this.tmux
+        .find(record.tmuxSession)
+        .then((session) => session !== null)
+        .catch(() => false);
       this.setPhase(record, 'stopped');
       if (alive) await this.kill(record.tmuxSession);
       return { stopped: alive };
