@@ -1,6 +1,6 @@
 # Model and effort by card type, with an escalation to Opus
 
-Issue: #750 · Epic: [#745](745-token-economy.md) · Technique key: `model_by_type` ·
+Issue: #750 · Epic: [#745](745-token-economy.md) · Technique key: `model-by-type` ·
 Builds on: [#322](322-card-profile-and-model-recommendation.md) (ADR-0032),
 [#663](663-token-saver-v2.md) (ADR-0068 §5) ·
 Decision record: [ADR-0076](../adr/0076-a-cards-model-and-effort-follow-its-class-and-stay-fixed-per-session.md)
@@ -21,7 +21,7 @@ with a fixed list of *deciding* signals, maps the class to a model and an
 effort, lets a sonnet round **ask for Opus** (it is then relaunched on Opus in
 a fresh session), and makes model and effort **fixed for the life of a Claude
 session**. The class mapping and the escalation are a technique behind the
-per-card A/B flag `model_by_type` from #746; the session lock applies to both
+per-card A/B flag `model-by-type` from #746; the session lock applies to both
 arms.
 
 ## Scope
@@ -30,7 +30,7 @@ arms.
 - The `card.assess` answer gains a class (`mechanical | deciding | unsure`)
   and the deciding signals it found.
 - A deterministic class → model + effort mapping in the API, used in the B
-  arm of `model_by_type`.
+  arm of `model-by-type`.
 - Shown in the launch popover: the class, the signals and the reason. The
   person can still override model and effort on the card (#322 D3 unchanged).
 - An escalation tool for the card worker, `escalate_card`, offered only on a
@@ -68,13 +68,13 @@ arms.
 | D8 | **The escalation signal.** It is explicit and has one source. A non-Opus card round in the B arm gets a runner MCP tool `escalate_card({ reason, note })`, with `reason` ∈ `misclassified` (the task needs decisions the card did not show) or `gave_up` (the worker cannot finish it at this model), and `note` of at most 2,000 characters on what it found and why. The worker prompt tells it to call the tool instead of guessing at a decision in D2's list. Calling it ends the round like `finish_card` does: the runner stops the session after the tool answers. A session that just ends, a crash, a budget stop or a refused `finish_card` is **not** an escalation (Open question Q1). | person, 2026-10-21 ("gives up / reports misclassified"); signal definition *default* |
 | D9 | **The relaunch.** On an escalation the API: (1) marks the round `finishedBy: worker` with `escalation` set; (2) sets the card's class to `deciding` and stores the reason and note; (3) unless D10 applies, starts a new round with trigger `escalation`, model `opus`, effort `high`, in a fresh session (D7), with the note added to the round prompt as the previous worker's finding. Branch, worktree and draft PR are kept. The budget gate and the agent limit apply as for any start. A card escalates at most **once**. An Opus round never gets the tool. | person, 2026-10-21; once-only *default* |
 | D10 | **A person's override is not overruled.** When the round's model came from a person's override (`board_cards.model` set), the escalation does not relaunch. The card shows "The worker asks for Opus: <reason>" with **Run on Opus**, and waits in Finished. | *default* (Open question Q3) |
-| D11 | **Quality is measured, not assumed.** An escalated card counts its escalation round in "rounds per card" (#746 quality signals). The report shows escalations per arm. If `model_by_type` worsens any of the four signals, it is rolled back, as for every technique. | decisions Q-quality |
+| D11 | **Quality is measured, not assumed.** An escalated card counts its escalation round in "rounds per card" (#746 quality signals). The report shows escalations per arm. If `model-by-type` worsens any of the four signals, it is rolled back, as for every technique. | decisions Q-quality |
 | D12 | **Authorization.** Launch keeps `ProjectRole('operator')`. **Run on Opus** is a launch and needs the same role. The class and the escalation are read with the card. Nothing new is exposed across projects. | #322 D9 |
 
 ## Data / Schema
 
 `apps/api/prisma/schema.prisma`, one migration
-`apps/api/prisma/migrations/20261231000009_card_model_by_type/`. The newest on
+`apps/api/prisma/migrations/20261231000009_card_model-by-type/`. The newest on
 develop is `20261231000006_project_github_repo_id`; the epic orders the stamps
 (#746 `…07`, #748 `…08`, this issue `…09`, #751 `…10`, #752 `…11`). If
 `develop` already has a later stamp when the branch is cut, take the next free
@@ -108,7 +108,7 @@ one and keep the name.
     `class: mechanical` is stored as `deciding` (D2).
 - **Launch** (`apps/api/src/board/launch-choice.ts`): a pure
   `modelByType(class, assessedEffort, ciFix)` → `{ model, effort }` (D3), used
-  by `defaultCardLaunch` when the card's `model_by_type` arm is B (#746's
+  by `defaultCardLaunch` when the card's `model-by-type` arm is B (#746's
   per-card arm lookup). It is unit-tested against every class and signal.
 - **Session lock** (`apps/api/src/board/board-rounds.service.ts`, around the
   current `resume` computation): when `sessionModel`/`sessionEffort` are set and
@@ -173,7 +173,7 @@ None. The A/B share is #746's project setting. The class mapping is code
 
 | Slot | Owns | Touches | Depends on | Lead | Model |
 |---|---|---|---|---|---|
-| i750-contract | schema, migration, shared assess contract and limits, launch and local contracts, capability names | apps/api/prisma/schema.prisma, apps/api/prisma/migrations/20261231000009_card_model_by_type/**, packages/shared/src/assess/**, packages/shared/src/protocol/commands/cards.ts, packages/shared/src/protocol/local.ts, packages/shared/src/protocol/capabilities.ts, packages/shared/src/board/contracts.ts, packages/shared/src/board/types.ts, packages/shared/src/token-economy/techniques.ts (registers `model_by_type`, default mode `ab`) | #749 merged (chain order) | yes | opus |
+| i750-contract | schema, migration, shared assess contract and limits, launch and local contracts, capability names | apps/api/prisma/schema.prisma, apps/api/prisma/migrations/20261231000009_card_model-by-type/**, packages/shared/src/assess/**, packages/shared/src/protocol/commands/cards.ts, packages/shared/src/protocol/local.ts, packages/shared/src/protocol/capabilities.ts, packages/shared/src/board/contracts.ts, packages/shared/src/board/types.ts, packages/shared/src/token-economy/techniques.ts (registers `model-by-type`, default mode `ab`) | #749 merged (chain order) | yes | opus |
 | i750-api | assessment prompt and sink, class mapping, session lock, escalation handling, card view | apps/api/src/assess/**, apps/api/src/board/launch-choice.ts, apps/api/src/board/launch-choice.spec.ts, apps/api/src/board/board-rounds.service.ts, apps/api/src/board/board-mapper.ts, apps/api/src/board/*.e2e.spec.ts, apps/api/src/local/local-handlers.ts | i750-contract | no | opus |
 | i750-runner-web | `escalate_card` tool and stop, forced fresh start, effort verification, worker prompt text, popover, sheet and face | apps/runner/src/mcp/tools.ts, apps/runner/src/mcp/server.ts, apps/runner/src/cards/launch.ts, apps/runner/src/cards/launch.spec.ts, apps/runner/src/handoff/service.ts, apps/runner/src/detect/capabilities.ts, packages/shared/src/board/worker-prompt.ts, packages/shared/src/board/worker-prompt.spec.ts, apps/web/src/components/board/launch-popover.tsx, apps/web/src/components/board/card-sheet.tsx, apps/web/src/components/board/card-face.tsx, apps/web/src/lib/board/**, docs/ui/screens.md | i750-contract | no | opus |
 
@@ -233,7 +233,7 @@ there].
 
 ## ADR impact
 
-- Amends **ADR-0032 §2**. Under `model_by_type` the class mapping replaces the
+- Amends **ADR-0032 §2**. Under `model-by-type` the class mapping replaces the
   free-form rule, and `haiku` is no longer recommended for card work.
 - Amends **ADR-0032 §4**. In the B arm, a card with no recommendation defaults to
   `opus` (`unsure`), not to the project's model.
