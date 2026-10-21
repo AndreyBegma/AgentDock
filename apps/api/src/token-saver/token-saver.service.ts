@@ -1,9 +1,17 @@
 import {
+  CARD_TYPES,
   isActiveRoundPhase,
+  mcpByTypeSchema,
+  PREFIX_BUDGET_DEFAULT_TOKENS,
+  type PrefixByType,
+  prefixByTypeOf,
+  skillsOffByTypeSchema,
   type TechniqueFlags,
   TOKEN_SAVER_DEFAULT,
   type TokenSaverConfig,
+  type TokenSaverPrefixSettings,
   type TokenSaverSettingsView,
+  type UpdateTokenSaverSettingsBody,
 } from '@nautelle/shared';
 import {
   type CardTokenSaver,
@@ -11,7 +19,7 @@ import {
   tokenEconomyAvailable,
   tokenSaverAvailable,
 } from '@nautelle/shared/protocol';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import type { TokenSaverSettings } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
@@ -47,6 +55,21 @@ export const TOKEN_SAVER_OFF: TokenSaverLaunch = {
 const configOf = (row: TokenSaverSettings | null): TokenSaverConfig =>
   row ? { enabled: row.enabled, mcpAllow: row.mcpAllow } : TOKEN_SAVER_DEFAULT;
 
+/** #751 B3, B5: the prefix settings; no row is the defaults. */
+const prefixOf = (
+  row: TokenSaverSettings | null,
+): TokenSaverPrefixSettings => ({
+  prefixBudgetTokens: row?.prefixBudgetTokens ?? PREFIX_BUDGET_DEFAULT_TOKENS,
+  mcpByType: prefixByTypeOf(row?.mcpByType, mcpByTypeSchema),
+  skillsOffByType: prefixByTypeOf(row?.skillsOffByType, skillsOffByTypeSchema),
+});
+
+const viewOf = (row: TokenSaverSettings | null): TokenSaverSettingsView => ({
+  ...configOf(row),
+  ...prefixOf(row),
+  updatedAt: row?.updatedAt.toISOString() ?? null,
+});
+
 /**
  * The per-project Token saver setting (#445 D11, ADR-0039): no row is on with
  * an empty allowlist. Every launch sender asks `launch()` what to send.
@@ -62,22 +85,52 @@ export class TokenSaverService {
     const row = await this.prisma.tokenSaverSettings.findUnique({
       where: { projectId },
     });
-    return {
-      ...configOf(row),
-      updatedAt: row?.updatedAt.toISOString() ?? null,
-    };
+    return viewOf(row);
   }
 
-  /** A project admin; audited with the setting before and after. */
+  /**
+   * A project admin; audited with the setting before and after. #751 B5: a
+   * per-type MCP list must stay inside `mcpAllow`, and a hidden skill must be
+   * one the runner reported for the project; a prefix field left out keeps
+   * its value.
+   */
   async update(
     projectId: string,
-    config: TokenSaverConfig,
+    config: UpdateTokenSaverSettingsBody,
     actor: { userId: string; ctx: AuditContext },
   ): Promise<TokenSaverSettingsView> {
     const before = await this.view(projectId);
+    const mcpByType =
+      config.mcpByType === undefined
+        ? undefined
+        : this.checkedByType(config.mcpByType, mcpByTypeSchema, 'mcpByType');
+    const skillsOffByType =
+      config.skillsOffByType === undefined
+        ? undefined
+        : this.checkedByType(
+            config.skillsOffByType,
+            skillsOffByTypeSchema,
+            'skillsOffByType',
+          );
+    const outside = Object.values(mcpByType ?? before.mcpByType)
+      .flat()
+      .filter((name) => name !== undefined && !config.mcpAllow.includes(name));
+    if (outside.length > 0) {
+      throw new BadRequestException(
+        `mcpByType names a server not in mcpAllow: ${[...new Set(outside)].join(', ')}`,
+      );
+    }
+    if (skillsOffByType !== undefined) {
+      await this.assertReportedSkills(projectId, skillsOffByType);
+    }
     const data = {
       enabled: config.enabled,
       mcpAllow: config.mcpAllow,
+      ...(config.prefixBudgetTokens !== undefined
+        ? { prefixBudgetTokens: config.prefixBudgetTokens }
+        : {}),
+      ...(mcpByType !== undefined ? { mcpByType } : {}),
+      ...(skillsOffByType !== undefined ? { skillsOffByType } : {}),
       updatedById: actor.userId,
     };
     const row = await this.prisma.tokenSaverSettings.upsert({
@@ -85,19 +138,64 @@ export class TokenSaverService {
       create: { projectId, ...data },
       update: data,
     });
-    const after = configOf(row);
+    const after = viewOf(row);
+    const { updatedAt: _before, ...beforeSettings } = before;
+    const { updatedAt: _after, ...afterSettings } = after;
     await this.audit.record({
       ...actor.ctx,
       action: 'project.update',
       target: { type: 'project', id: projectId },
       projectId,
-      before: {
-        tokenSaver: { enabled: before.enabled, mcpAllow: before.mcpAllow },
-      },
-      after: { tokenSaver: after },
+      before: { tokenSaver: beforeSettings },
+      after: { tokenSaver: afterSettings },
       result: 'ok',
     });
-    return { ...after, updatedAt: row.updatedAt.toISOString() };
+    return after;
+  }
+
+  private checkedByType(
+    value: unknown,
+    schema: typeof mcpByTypeSchema | typeof skillsOffByTypeSchema,
+    field: string,
+  ): PrefixByType {
+    const parsed = schema.safeParse(value);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        `${field} must map card types (${CARD_TYPES.join(', ')}) to lists of names`,
+      );
+    }
+    for (const [type, names] of Object.entries(parsed.data)) {
+      if (names && new Set(names).size !== names.length) {
+        throw new BadRequestException(`${field}.${type} has a duplicate`);
+      }
+    }
+    return parsed.data;
+  }
+
+  /** B5: only skills the runner reported in a launch of the project. */
+  private async assertReportedSkills(
+    projectId: string,
+    byType: PrefixByType,
+  ): Promise<void> {
+    const named = [...new Set(Object.values(byType).flat())].filter(
+      (n): n is string => n !== undefined,
+    );
+    if (named.length === 0) return;
+    const reported = new Set(
+      (
+        await this.prisma.runPrefixPart.findMany({
+          where: { projectId, kind: 'skill', name: { in: named } },
+          distinct: ['name'],
+          select: { name: true },
+        })
+      ).map((p) => p.name),
+    );
+    const unknown = named.filter((n) => !reported.has(n));
+    if (unknown.length > 0) {
+      throw new BadRequestException(
+        `skillsOffByType names a skill no launch reported: ${unknown.join(', ')}`,
+      );
+    }
   }
 
   /**

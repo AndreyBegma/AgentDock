@@ -29,6 +29,7 @@ import { LocalModule } from './local';
 import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
 import { PlannerModule } from './planner';
+import { PrefixModule } from './prefix/prefix.module';
 import { PricesModule } from './prices/prices.module';
 import { ProjectRulesModule } from './project-rules';
 import { ProjectsModule } from './projects/projects.module';
@@ -113,6 +114,9 @@ import { WorkflowsModule } from './workflows';
     // Issue #752: the UI profile learns from approvals. Global, and here alone,
     // for the same reason.
     UiProfileLearnModule,
+    // Issue #751: the launch prefix — measurement, overlays, compressed rules.
+    // Global, and here alone, for the same reason.
+    PrefixModule,
     // Issue #309: attachments on board cards. Global, and `forRoot()` here:
     // its conditional queue must not be registered while the graph loads.
     AttachmentsModule.forRoot(),

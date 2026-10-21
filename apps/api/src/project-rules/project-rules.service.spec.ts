@@ -58,6 +58,7 @@ const fakePrisma = () => {
         enabled: data.enabled ?? true,
         position: data.position ?? 0,
         source: data.source ?? 'manual',
+        appliesTo: data.appliesTo ?? [],
         createdAt: at,
         updatedAt: at,
       };

@@ -31,7 +31,8 @@ export const cardTypeOf = (card: {
   ciFix: boolean;
   approvedDesign: boolean;
   kind: 'bug' | 'feature';
-}): CardType => (card.ciFix ? 'ci_fix' : card.approvedDesign ? 'ui' : card.kind);
+}): CardType =>
+  card.ciFix ? 'ci_fix' : card.approvedDesign ? 'ui' : card.kind;
 
 // The measurement (B1)
 
@@ -51,7 +52,12 @@ export const PREFIX_PART_KINDS = [
 export type PrefixPartKind = (typeof PREFIX_PART_KINDS)[number];
 
 /** B1: where a part comes from; only `repo` parts are proposed for (B8). */
-export const PREFIX_ORIGINS = ['repo', 'profile', 'plugin', 'nautelle'] as const;
+export const PREFIX_ORIGINS = [
+  'repo',
+  'profile',
+  'plugin',
+  'nautelle',
+] as const;
 export type PrefixOrigin = (typeof PREFIX_ORIGINS)[number];
 
 /** At most this many parts in one `prefix.measured`. */
@@ -186,9 +192,12 @@ export const launchOverlaySchema = z.strictObject({
   originalSha256: sha256Schema,
   content: z
     .string()
-    .refine((t) => new TextEncoder().encode(t).length <= PREFIX_FILE_MAX_BYTES, {
-      message: `must be at most ${PREFIX_FILE_MAX_BYTES} bytes`,
-    }),
+    .refine(
+      (t) => new TextEncoder().encode(t).length <= PREFIX_FILE_MAX_BYTES,
+      {
+        message: `must be at most ${PREFIX_FILE_MAX_BYTES} bytes`,
+      },
+    ),
 });
 export type LaunchOverlay = z.infer<typeof launchOverlaySchema>;
 
@@ -202,7 +211,10 @@ export type LaunchOverlay = z.infer<typeof launchOverlaySchema>;
  */
 export const cardPrefixSchema = z.strictObject({
   cardType: cardTypeSchema,
-  mcpAllow: z.array(mcpServerNameSchema).max(TOKEN_SAVER_MCP_ALLOW_MAX).optional(),
+  mcpAllow: z
+    .array(mcpServerNameSchema)
+    .max(TOKEN_SAVER_MCP_ALLOW_MAX)
+    .optional(),
   skillsOff: z.array(listedSkillNameSchema).max(PREFIX_SKILLS_OFF_MAX),
   overlays: z.array(launchOverlaySchema).max(PREFIX_LAUNCH_OVERLAYS_MAX),
 });
@@ -342,7 +354,7 @@ export interface PrefixOverlayView {
   originalEstTokens: number;
   contentEstTokens: number;
   rulesVersion: string | null;
-  decidedBy: { id: string; name: string } | null;
+  decidedBy: { id: string; name: string | null } | null;
   decidedAt: string | null;
   pullRequestCardId: string | null;
   createdAt: string;

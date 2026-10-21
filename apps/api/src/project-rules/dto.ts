@@ -1,4 +1,6 @@
 import {
+  CARD_TYPES,
+  type CardType,
   PROJECT_RULE_ACCEPT_MAX,
   PROJECT_RULE_DESCRIPTION_MAX,
   PROJECT_RULE_IMPORT_MAX,
@@ -18,6 +20,7 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -70,6 +73,13 @@ export class ProjectRuleUpdateDto implements ProjectRuleUpdateRequest {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  /** #751 B5: the card types it applies to; empty is all. */
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(CARD_TYPES, { each: true })
+  appliesTo?: CardType[];
 }
 
 /** `PUT /projects/:id/rules/order`. */

@@ -74,14 +74,33 @@ export const TOKEN_SAVER_DEFAULT: TokenSaverConfig = {
   mcpAllow: [],
 };
 
+/**
+ * #751 B3, B5: the prefix settings beside the launch setting. Not part of
+ * `TokenSaverConfig`, which every launch command carries as it is.
+ */
+export interface TokenSaverPrefixSettings {
+  /** B3: a launch kind's median prefix over this is flagged; default 25,000. */
+  prefixBudgetTokens: number;
+  /** B5: `{ [cardType]: server[] }`, each a subset of `mcpAllow`. */
+  mcpByType: Partial<Record<string, string[]>>;
+  /** B5: `{ [cardType]: skill[] }` hidden in that type's sessions. */
+  skillsOffByType: Partial<Record<string, string[]>>;
+}
+
 /** `GET /projects/:id/token-saver`. */
-export interface TokenSaverSettingsView extends TokenSaverConfig {
+export interface TokenSaverSettingsView
+  extends TokenSaverConfig,
+    TokenSaverPrefixSettings {
   /** `null` when the project has no row (the default applies). */
   updatedAt: string | null;
 }
 
-/** `PUT /projects/:id/token-saver` (admin). */
-export type UpdateTokenSaverSettingsBody = TokenSaverConfig;
+/**
+ * `PUT /projects/:id/token-saver` (admin). #751: a prefix field left out
+ * keeps its value.
+ */
+export type UpdateTokenSaverSettingsBody = TokenSaverConfig &
+  Partial<TokenSaverPrefixSettings>;
 
 // The runner event (D12)
 
