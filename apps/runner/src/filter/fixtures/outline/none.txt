@@ -1,0 +1,5 @@
+just some prose
+  indented thing
+	tab indented
+
+and nothing else
