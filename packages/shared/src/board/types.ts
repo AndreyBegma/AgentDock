@@ -66,9 +66,15 @@ export const isMirroredCardSource = (
 
 /**
  * D4: what started a round. `ci_fix` (#359 D6) is Nautelle's own round for a
- * red check or a merge conflict on the card's PR.
+ * red check or a merge conflict on the card's PR; `escalation` (#750 D9) is
+ * the relaunch on Opus after the worker's `escalate_card`.
  */
-export const CARD_ROUND_TRIGGERS = ['run', 'feedback', 'ci_fix'] as const;
+export const CARD_ROUND_TRIGGERS = [
+  'run',
+  'feedback',
+  'ci_fix',
+  'escalation',
+] as const;
 export type CardRoundTrigger = (typeof CARD_ROUND_TRIGGERS)[number];
 
 /**

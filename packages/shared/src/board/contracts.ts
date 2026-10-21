@@ -1,7 +1,10 @@
 import type {
+  CardDecidingSignal,
   CardDesignRecommendableModel,
   CardEffort,
+  CardEscalationReason,
   CardRecommendableModel,
+  CardWorkClass,
 } from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
@@ -421,6 +424,11 @@ export interface CardRoundView {
   finishedBy: CardFinishedBy | null;
   /** From `finish_card` (D6). */
   summary: string | null;
+  /**
+   * #750 D9: set on the round whose worker called `escalate_card`. Optional
+   * so older fixtures stay valid; absent reads as null.
+   */
+  escalation?: CardEscalationReason | null;
   exitCode: number | null;
   error: string | null;
   hooksMissing: boolean;
@@ -469,6 +477,23 @@ export interface CardModelRecommendation<
  */
 export interface CardWorkRecommendation extends CardModelRecommendation {
   effort: CardEffort | null;
+  // #750 — optional so no route must fill them yet.
+  /**
+   * #750 D1, D2: the stored class — `deciding` whenever a signal was found;
+   * `null` on a card assessed before #750. Absent reads as null.
+   */
+  class?: CardWorkClass | null;
+  /** #750 D2: the deciding signals found. Absent reads as none. */
+  signals?: CardDecidingSignal[];
+}
+
+/** #750 D9: a card's one escalation to Opus, from the worker's `escalate_card`. */
+export interface CardEscalationView {
+  reason: CardEscalationReason;
+  /** The worker's note, at most `CARD_ESCALATION_NOTE_MAX` characters. */
+  note: string;
+  /** ISO. */
+  at: string;
 }
 
 /**
@@ -510,6 +535,12 @@ export interface BoardCardDetail extends BoardCardView {
   designModel: string | null;
   /** #322 D6: the last applied assessment; its parts are `null` without one (D7). */
   recommendation: CardRecommendationView;
+  /**
+   * #750 D9, D10: the card's escalation; with `model` set (a person's
+   * override) the card waits with **Run on Opus**. Optional so no route must
+   * fill it yet; absent reads as null.
+   */
+  escalation?: CardEscalationView | null;
   /** Fixed at the first Run (D5). */
   branch: string | null;
   /** Display only: the runner owns the path. */

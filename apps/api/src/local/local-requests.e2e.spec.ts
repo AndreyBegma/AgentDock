@@ -51,6 +51,10 @@ const ARGS: Record<LocalMethodName, unknown> = {
   },
   'away.set': { on: true },
   'card.finish': { summary: 'Done.' },
+  'card.escalate': {
+    reason: 'misclassified',
+    note: 'The card needs a schema decision.',
+  },
   'card.track': { title: 'Track the pairing fix' },
 };
 
@@ -266,7 +270,9 @@ describe('local requests over the runner socket (e2e)', () => {
     // `card.track` asks from a person's own session (#282 D1).
     const manual = await seedManualSession();
     // `action.request` first: `action.status` asks about the request it made.
-    const swept = localMethodNames;
+    // #750: `card.escalate` is a stub until i750-api lands its handler; it
+    // is answered `not_escalatable` (asserted below) and joins the sweep then.
+    const swept = localMethodNames.filter((m) => m !== 'card.escalate');
     const order = [
       'action.request',
       ...swept.filter((m) => m !== 'action.request'),
@@ -550,6 +556,20 @@ describe('local requests over the runner socket (e2e)', () => {
     });
     expect(card.column).toBe('in_progress');
     expect(card.rounds[0].phase).toBe('running');
+  });
+
+  it('answers card.escalate not_escalatable until its handler lands (#750)', async () => {
+    await seedCardSession();
+    const response = await ask(
+      'card.escalate',
+      ARGS['card.escalate'],
+      projectId,
+      CARD_SESSION,
+    );
+    expect([response.ok, response.error?.code]).toEqual([
+      false,
+      'not_escalatable',
+    ]);
   });
 
   it('refuses card.track for a local user who is not a project member, and creates no card (#282 D1)', async () => {

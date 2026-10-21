@@ -244,6 +244,19 @@ export const capabilitiesSchema = z.object({
    */
   cardEffort: z.boolean().optional(),
   /**
+   * #750 D7: the runner takes `session.fresh` on `card.run` and starts the
+   * round in a fresh session seeded from the handoff. `card.run` args are
+   * strict, so the API sends the field only when this is `true`. Absent means
+   * `false` — the session lock then degrades to resuming.
+   */
+  cardFreshStart: z.boolean().optional(),
+  /**
+   * #750 D8: the runner takes `escalate` on `card.run`, offers the worker
+   * `escalate_card` and stops the session after it answers. Absent means
+   * `false` — the API sends no `escalate` and the escalation is not offered.
+   */
+  cardEscalate: z.boolean().optional(),
+  /**
    * ADR-0047: the runner's local security policy as it is now — values only,
    * no path beyond `allowedRoots`. The server cannot change it; the UI reads
    * it to explain a `policy_refused` before the person asks. Absent means
@@ -287,6 +300,14 @@ export const sessionMessageAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `card.run`'s `effort` (#663); absent is `false`. */
 export const cardEffortAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardEffort === true;
+
+/** Whether the API may send `card.run`'s `session.fresh` (#750); absent is `false`. */
+export const cardFreshStartAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardFreshStart === true;
+
+/** Whether the API may send `card.run`'s `escalate` (#750); absent is `false`. */
+export const cardEscalateAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardEscalate === true;
 
 /** The runner's policy (ADR-0047); null for a runner older than it. */
 export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {

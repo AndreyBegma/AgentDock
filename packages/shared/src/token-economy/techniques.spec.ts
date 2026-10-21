@@ -79,6 +79,19 @@ describe('the registry (#746)', () => {
       }).success,
     ).toBe(true);
   });
+
+  it('registers model-by-type of #750 for cards, on test by default', () => {
+    const def = TOKEN_ECONOMY_TECHNIQUES.find((t) => t.key === 'model-by-type');
+    expect(def?.defaultMode).toBe('ab');
+    expect(def?.runKinds).toEqual(['card']);
+    expect(
+      cardTokenSaverSchema.safeParse({
+        enabled: true,
+        mcpAllow: [],
+        techniques: { 'model-by-type': true },
+      }).success,
+    ).toBe(true);
+  });
 });
 
 describe('technique flags (#746 D11)', () => {
