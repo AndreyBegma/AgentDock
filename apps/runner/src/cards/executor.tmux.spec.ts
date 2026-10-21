@@ -362,6 +362,17 @@ describe.skipIf(!tmuxInstalled)(
       for (let i = 0; i < 3; i++) await t.executor.poll();
       expect(readFileSync(typedFile, 'utf8')).toBe('continue');
       expect(literal()).toHaveLength(1);
+      expect(
+        t.events.filter((e) => e.type === 'card_run.quota').map((e) => e.data),
+      ).toEqual([
+        expect.objectContaining({
+          cardId: 'card_l',
+          limit: 'session',
+          resetsAt: '2026-10-14T13:00:00.000Z',
+          resumed: false,
+        }),
+        expect.objectContaining({ cardId: 'card_l', resumed: true }),
+      ]);
       await t.tmux('kill-session', '-t', `=${session}`);
     });
 
