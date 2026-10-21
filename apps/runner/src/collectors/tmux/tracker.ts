@@ -8,6 +8,7 @@ export type PaneChange =
   | { type: 'pane.prompt'; dialog: PaneDialog }
   | { type: 'pane.idle'; polls: number }
   | { type: 'pane.quota_hit'; limit: QuotaLimit; resetsAt: string | null }
+  | { type: 'pane.quota_resumed' }
   | { type: 'pane.busy' };
 
 type Reported = 'prompt' | 'idle' | 'quota' | 'busy' | null;

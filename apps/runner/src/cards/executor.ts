@@ -30,7 +30,7 @@ import {
   type UnsequencedEvent,
 } from '@nautelle/shared/protocol';
 import { type Cancel, isoNow } from '../clock';
-import { DIALOG_PATTERNS } from '../collectors/tmux/classify';
+import { DIALOG_PATTERNS, detectQuota } from '../collectors/tmux/classify';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { projectCheckout, watchedProject } from '../control/target';
@@ -43,6 +43,7 @@ import {
 } from '../handoff/service';
 import type { SessionBinding } from '../local/session-tokens';
 import { errorMessage, type Logger } from '../log';
+import { QuotaResumer } from '../quota/resume';
 import { type DeliveryTmux, deliverText } from '../session/deliver';
 import { profileOf, type SkillsDeps } from '../skills/deps';
 import { RUN_FILES, writeJsonAtomic } from '../skills/run/record';
@@ -177,6 +178,8 @@ const eventError = (error: unknown): string =>
 export class CardExecutor {
   readonly store: CardStore;
   private readonly tmux: TmuxControl;
+  /** #741: types `continue` into a round once its usage limit has reset. */
+  private readonly quota: QuotaResumer;
   /** One operation per card at a time; `poll` skips a card that is busy. */
   private readonly chains = new Map<string, Promise<unknown>>();
   private polling: Promise<void> | null = null;
@@ -200,6 +203,7 @@ export class CardExecutor {
   constructor(private readonly options: CardExecutorOptions) {
     this.store = new CardStore(options.cardsDir);
     this.tmux = new TmuxControl(options.deps.exec, options.tmuxServer ?? []);
+    this.quota = new QuotaResumer(options.deps.clock, options.log);
   }
 
   /** Settles rounds a previous runner left mid-start, then starts polling. */
@@ -528,9 +532,11 @@ export class CardExecutor {
         }
         this.noticePendingQuestion(record, pane);
         this.noticeQuestion(record, pane);
+        this.resumeAtReset(record, pane);
         this.queuePush(record);
         continue;
       }
+      this.quota.forget(record.cardId);
       // Re-read: an operation may have started while tmux answered, and a
       // push step may have finished since the list was read.
       if (this.chains.has(record.cardId)) continue;
@@ -887,6 +893,31 @@ export class CardExecutor {
         error: errorMessage(error),
       });
     }
+  }
+
+  /**
+   * #741 D4: a round that stopped on a usage limit gets `continue` a minute
+   * after the banner's reset time, if the banner is still on screen. A pane
+   * that could not be read says nothing either way.
+   */
+  private resumeAtReset(record: CardRecord, pane: string | null): void {
+    if (pane === null) return;
+    const { clock } = this.options.deps;
+    this.quota.observe(
+      record.cardId,
+      detectQuota(pane, { now: new Date(clock.now()) }),
+      {
+        capture: () => this.tmux.capture(record.tmuxSession),
+        type: async (text) => {
+          await this.tmux.sendLiteral(record.tmuxSession, text);
+          await this.tmux.sendSubmit(record.tmuxSession);
+        },
+      },
+      () =>
+        this.options.log.info('cards: resumed a round after its limit reset', {
+          cardId: record.cardId,
+        }),
+    );
   }
 
   /** The visible pane of a live round; null when it cannot be read. */
