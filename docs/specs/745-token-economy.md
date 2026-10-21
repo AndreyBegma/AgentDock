@@ -70,7 +70,7 @@ Each spec that changes the schema names its own directory, ordered along the cha
 |---|---|
 | #746 | `20261231000007_token_economy_metrics` |
 | #748 | `20261231000008_token_saver_stat_session` |
-| #750 | `20261231000009_card_model_by_type` |
+| #750 | `20261231000009_card_model-by-type` |
 | #751 | `20261231000010_prefix_parts_and_overlays` |
 | #752 | `20261231000011_ui_profile_memory` |
 
@@ -80,9 +80,9 @@ Each spec that changes the schema names its own directory, ordered along the cha
 
 ADR-0068 / #663 are on `develop` and turned three things on for every card round. ADR-0074 §7 makes each one a technique; the default without a flag is today's behaviour:
 
-- **1-hour cache TTL** (ADR-0068 §1, `apps/runner/src/launch/token-saver.ts:375`) → `cache_ttl_1h` in #749. The control arm pins `CLAUDE_CODE_PROMPT_CACHE_TTL=5m`.
-- **Terse register** (ADR-0068 §3, `packages/shared/src/token-saver/register.ts`) → `terse_register` in #747. The control arm gets the #445 D7 two-register lines.
-- **Effort recommended with the model** (ADR-0068 §5, `board_cards.recommendedEffort` / `effort`) → stays as arm A of `model_by_type` in #750; arm B uses the class mapping of ADR-0076.
+- **1-hour cache TTL** (ADR-0068 §1, `apps/runner/src/launch/token-saver.ts:375`) → `cache-ttl-1h` in #749. The control arm pins `CLAUDE_CODE_PROMPT_CACHE_TTL=5m`.
+- **Terse register** (ADR-0068 §3, `packages/shared/src/token-saver/register.ts`) → `terse-register` in #747. The control arm gets the #445 D7 two-register lines.
+- **Effort recommended with the model** (ADR-0068 §5, `board_cards.recommendedEffort` / `effort`) → stays as arm A of `model-by-type` in #750; arm B uses the class mapping of ADR-0076.
 
 Also already on `develop`, and not a technique:
 - ADR-0068 §1's fixed-prefix target of 25k tokens or less. #751 turns it into a per-project budget measured on every launch.
