@@ -69,6 +69,26 @@ export class Tmux {
     ]);
     return result && result.code === 0 ? result.stdout : null;
   }
+
+  /**
+   * Types `text` into a pane, literally, then submits it. The submit is a
+   * call of its own: `Enter` right behind the text has been seen to leave it
+   * in the input box (#189). Throws when tmux refuses either.
+   */
+  async type(paneId: string, text: string): Promise<void> {
+    for (const keys of [['-l', text], ['C-m']]) {
+      const result = await this.exec('tmux', [
+        ...this.serverArgs,
+        'send-keys',
+        '-t',
+        paneId,
+        ...keys,
+      ]);
+      if (!result || result.code !== 0) {
+        throw new Error(`tmux send-keys ${paneId} failed`);
+      }
+    }
+  }
 }
 
 export const parsePanes = (stdout: string): TmuxPane[] =>

@@ -641,6 +641,11 @@ model Slot {
   /// null until the tmux session is first seen.
   sessionAlive   Boolean?
   pane           PaneState?
+  /// Which limit the quota banner names (`weekly`, `session`, `usage`,
+  /// `unknown`); set while `pane` is `quota`, null otherwise (spec 741 D3).
+  quotaLimit     String?
+  /// When that limit resets, read off the banner; null when it shows none.
+  quotaResetsAt  DateTime?
   worktreeExists Boolean         @default(true)
   ahead          Int?
   behind         Int?
@@ -3431,6 +3436,10 @@ model BoardCardRound {
   /// #624: the Claude Code dialog (shared `paneDialogSchema`) that blocks
   /// the round's session, from `card_run.dialog`; cleared when it runs again.
   blockingDialog      String?
+  /// #741: the usage limit (shared `quotaLimitSchema`) the round's pane shows
+  /// and when it resets, from `card_run.quota`; cleared when it resumes.
+  quotaLimit          String?
+  quotaResetsAt       DateTime?
   finishedAt          DateTime?
   endedAt             DateTime?
   /// #542: the card PR's head when the round started (`ciHeadSha`); `null`

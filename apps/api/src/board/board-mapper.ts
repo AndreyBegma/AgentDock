@@ -47,6 +47,7 @@ import {
   type PaneDialog,
   type ProfileAgentdock,
   paneDialogSchema,
+  quotaLimitSchema,
 } from '@nautelle/shared/protocol';
 import {
   type BoardCard,
@@ -316,6 +317,17 @@ export const blockingDialogOf = (
   return dialog.success ? dialog.data : null;
 };
 
+/** #741: the usage limit an active round waits on, as the runner reported it. */
+export const quotaWaitOf = (
+  round: Pick<BoardCardRound, 'phase' | 'quotaLimit' | 'quotaResetsAt'>,
+): CardRoundBrief['quotaWait'] => {
+  if (!isActiveRoundPhase(round.phase)) return null;
+  const limit = quotaLimitSchema.safeParse(round.quotaLimit);
+  return limit.success
+    ? { limit: limit.data, resetsAt: iso(round.quotaResetsAt) }
+    : null;
+};
+
 const brief = (
   card: BoardCard,
   round: BoardCardRound | undefined,
@@ -336,6 +348,7 @@ const brief = (
         pendingQuestion: pendingQuestionOf(round),
         finishRefused: finishRefusedOf(round),
         blockingDialog: blockingDialogOf(round),
+        quotaWait: quotaWaitOf(round),
       }
     : null;
 

@@ -1,0 +1,8 @@
+● Running the checks.
+
+  ⎿  You've hit your session limit · resets 2pm (Europe/Kyiv)
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

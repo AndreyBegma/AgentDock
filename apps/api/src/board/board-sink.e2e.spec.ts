@@ -213,6 +213,54 @@ describe('board sink (e2e)', () => {
     });
   });
 
+  describe('card_run.quota (#741)', () => {
+    const quota = (
+      card: { id: string },
+      runId: string,
+      over: Record<string, unknown> = {},
+      projectId = w.a,
+    ) =>
+      w.deliver('card_run.quota', {
+        cardId: card.id,
+        runId,
+        projectId,
+        at: new Date().toISOString(),
+        limit: 'session',
+        resetsAt: '2026-10-21T15:00:00.000Z',
+        ...over,
+      });
+    const brief = async () => {
+      const board = (await w.viewer.get(`${w.path()}/board`)).body as BoardView;
+      return board.columns.flatMap((c) => c.cards)[0]?.round;
+    };
+
+    it('shows the limit on the active round without moving its phase, and clears it on resume', async () => {
+      const { card, round } = await running();
+      await phase(card, round.runId, { phase: 'running' });
+      await quota(card, round.runId);
+      expect((await w.card(1)).rounds[0].phase).toBe('running');
+      expect((await brief())?.quotaWait).toEqual({
+        limit: 'session',
+        resetsAt: '2026-10-21T15:00:00.000Z',
+      });
+
+      await quota(card, round.runId, { resumed: true });
+      expect((await brief())?.quotaWait).toBeNull();
+    });
+
+    it('ignores a limit of an old run, another project or an ended round', async () => {
+      const { card, round } = await running();
+      await phase(card, round.runId, { phase: 'running' });
+      await quota(card, 'cm1run00000000000000000999');
+      await quota(card, round.runId, {}, w.b);
+      expect((await brief())?.quotaWait).toBeNull();
+
+      await phase(card, round.runId, { phase: 'failed', error: 'gone' });
+      await quota(card, round.runId);
+      expect((await w.card(1)).rounds[0].quotaLimit).toBeNull();
+    });
+  });
+
   describe('card_run.dialog (#624)', () => {
     const dialog = (
       card: { id: string },

@@ -5,6 +5,7 @@ import {
   type CardFacts,
   type CardWithRounds,
   hooksCauseOf,
+  quotaWaitOf,
   restartOf,
   stewardChipOf,
 } from './board-mapper';
@@ -176,5 +177,32 @@ describe('restartOf (#449 D9)', () => {
     expect(
       restartOf(withRounds({ id: 'r2', restartMode: 'fresh' }), {}),
     ).toEqual({ restartMode: 'fresh', warmupSavedUsd: null });
+  });
+});
+
+describe('quotaWaitOf (#741)', () => {
+  const round = (over: Partial<BoardCardRound>) =>
+    ({
+      phase: 'running',
+      quotaLimit: 'session',
+      quotaResetsAt: new Date('2026-10-21T15:00:00.000Z'),
+      ...over,
+    }) as BoardCardRound;
+
+  it('names the limit and its reset while the round is active', () => {
+    expect(quotaWaitOf(round({}))).toEqual({
+      limit: 'session',
+      resetsAt: '2026-10-21T15:00:00.000Z',
+    });
+    expect(quotaWaitOf(round({ quotaResetsAt: null }))).toEqual({
+      limit: 'session',
+      resetsAt: null,
+    });
+  });
+
+  it('is null once the round is over, without a limit, or for a limit it does not know', () => {
+    expect(quotaWaitOf(round({ phase: 'ended' }))).toBeNull();
+    expect(quotaWaitOf(round({ quotaLimit: null }))).toBeNull();
+    expect(quotaWaitOf(round({ quotaLimit: 'monthly' }))).toBeNull();
   });
 });

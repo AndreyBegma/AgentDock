@@ -9,6 +9,7 @@ import {
 } from '../fleet/project';
 import { SlotBook } from '../fleet/slots';
 import { errorMessage } from '../log';
+import { QuotaResumer } from '../quota/resume';
 import { AppPacing } from './app-pacing';
 import { BoardWatcher } from './board/board';
 import { OrchestratorWatcher } from './orchestrator/orchestrator';
@@ -92,7 +93,15 @@ export class FleetCollector implements Collector {
       tmux,
       board: new BoardWatcher({ ...shared, now }),
       worktrees: new WorktreeWatcher({ ...shared, exec, now }),
-      sessions: new SlotSessions({ ...shared, capture }),
+      sessions: new SlotSessions({
+        ...shared,
+        capture,
+        now,
+        resume: {
+          resumer: new QuotaResumer(clock, this.context.log),
+          type: (paneId, text) => tmux.type(paneId, text),
+        },
+      }),
       orchestrator: new OrchestratorWatcher({
         exec,
         project,
