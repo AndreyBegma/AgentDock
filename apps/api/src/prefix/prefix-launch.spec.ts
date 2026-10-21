@@ -1,4 +1,6 @@
+import type { Capabilities } from '@nautelle/shared/protocol';
 import type { PrismaService } from '../database/prisma.service';
+import { capabilities as runnerCapabilities } from '../runners/testing/runner-e2e';
 import { PrefixLaunchService } from './prefix-launch';
 import { rulesVersionOf } from './rules-version';
 
@@ -98,7 +100,11 @@ const stripProject = (where: Record<string, unknown>) => {
   return rest;
 };
 
-const capabilities = { tokenSaver: true, prefixOverlays: true } as const;
+const capabilities: Capabilities = {
+  ...runnerCapabilities,
+  tokenSaver: true,
+  prefixOverlays: true,
+};
 
 const input = (
   over: Partial<Parameters<PrefixLaunchService['resolve']>[0]> = {},
@@ -254,7 +260,7 @@ describe('the card launch prefix (#751 S2, B4–B7)', () => {
   it('sends no prefix to a runner without prefixOverlays', async () => {
     const { service } = world();
     const launch = await service.resolve(
-      input({ capabilities: { tokenSaver: true } }),
+      input({ capabilities: { ...runnerCapabilities, tokenSaver: true } }),
     );
     expect(launch.prefix).toBeNull();
     expect(launch.projectRules).toContain('All');
