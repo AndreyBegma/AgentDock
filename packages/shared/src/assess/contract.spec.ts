@@ -6,6 +6,8 @@ const answer = {
   work: {
     model: 'sonnet',
     effort: 'low',
+    class: 'mechanical',
+    signals: [],
     reason: 'Executes a clear, single-module change.',
   },
   design: { model: 'opus', reason: 'The layout is still undecided.' },
@@ -49,6 +51,42 @@ describe('cardAssessAnswerSchema (D6)', () => {
     expect(
       parse({ ...answer, design: { ...answer.design, effort: 'low' } }).success,
     ).toBe(false);
+  });
+
+  it('classifies the work, with the deciding signals it found (#750 D1, D2)', () => {
+    for (const workClass of ['mechanical', 'deciding', 'unsure']) {
+      expect(
+        parse({ ...answer, work: { ...answer.work, class: workClass } })
+          .success,
+      ).toBe(true);
+    }
+    expect(
+      parse({ ...answer, work: { ...answer.work, class: 'trivial' } }).success,
+    ).toBe(false);
+    const withSignals = (signals: unknown) =>
+      parse({ ...answer, work: { ...answer.work, signals } }).success;
+    expect(withSignals(['auth'])).toBe(true);
+    expect(
+      withSignals([
+        'schema',
+        'auth',
+        'tenancy',
+        'payments',
+        'deletion',
+        'bug_cause_unknown',
+        'no_precedent',
+      ]),
+    ).toBe(true);
+    expect(withSignals(['auth', 'auth'])).toBe(false);
+    expect(withSignals(['security'])).toBe(false);
+    expect(withSignals('auth')).toBe(false);
+  });
+
+  it('is out of contract without class or signals (#750 D1)', () => {
+    const { class: _, ...noClass } = answer.work;
+    expect(parse({ ...answer, work: noClass }).success).toBe(false);
+    const { signals: __, ...noSignals } = answer.work;
+    expect(parse({ ...answer, work: noSignals }).success).toBe(false);
   });
 
   it('chooses between opus and sonnet only for design', () => {

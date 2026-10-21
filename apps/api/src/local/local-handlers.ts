@@ -110,6 +110,11 @@ export class LocalHandlers {
     'away.set': (args, call) => this.awaySet(args.on, call),
     'card.finish': (args, call) =>
       this.cardFinish(args.summary, args.artifactIncomplete === true, call),
+    // #750: the contract lands first; i750-api replaces this stub with the
+    // D9 escalation. Until then no round is escalatable.
+    'card.escalate': async () => {
+      throw new LocalError('not_escalatable', 'escalation is not available');
+    },
     'card.track': (args, call) => this.cardTrack(args, call),
   };
 

@@ -2936,6 +2936,8 @@ enum CardRoundTrigger {
   feedback
   /// #359 D6: started by Nautelle for a red check or a merge conflict.
   ci_fix
+  /// #750 D9: the relaunch on Opus after the worker's `escalate_card`.
+  escalation
 }
 
 /// Shared `CARD_ROUND_PHASES` (D4, D6).
@@ -2998,27 +3000,41 @@ enum CardEffort {
   high
 }
 
+/// Shared `CARD_WORK_CLASSES` (#750 D1, ADR-0076): what the card's work still
+/// has to decide.
+enum CardWorkClass {
+  mechanical
+  deciding
+  unsure
+}
+
+/// Shared `CARD_ESCALATION_REASONS` (#750 D8): why a worker called `escalate_card`.
+enum CardEscalationReason {
+  misclassified
+  gave_up
+}
+
 /// A work item Nautelle owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
-  id                      String           @id @default(cuid())
+  id                      String                @id @default(cuid())
   projectId               String
   /// Per project, `C-<number>`: max + 1 under `pg_advisory_xact_lock` (D1).
   number                  Int
   /// `^[a-z0-9]{8}$`: the worktree, tmux session and runner record (D5).
-  shortId                 String           @unique
+  shortId                 String                @unique
   /// At most 200 characters, checked by the DTO.
   title                   String
   /// Markdown, at most 20 000 characters.
-  body                    String           @default("")
-  kind                    BoardCardKind    @default(feature)
+  body                    String                @default("")
+  kind                    BoardCardKind         @default(feature)
   /// #271 D9: `auto` lets the normalization classify `kind` until the first
   /// Run fixes the branch; a person setting kind makes it `person`.
-  kindSource              CardKindSource   @default(auto)
-  column                  BoardColumn      @default(todo)
+  kindSource              CardKindSource        @default(auto)
+  column                  BoardColumn           @default(todo)
   /// Fractional index inside the column (D3).
   position                Float
-  source                  BoardCardSource  @default(manual)
+  source                  BoardCardSource       @default(manual)
   issueOnRun              Boolean
   specOnRun               Boolean
   /// Overrides the project's model from the next round (D12). #322 D3: the
@@ -3050,12 +3066,27 @@ model BoardCard {
   assessedAt              DateTime?
   /// The `runs` row of the last `card.assess` call.
   assessRunId             String?
+  /// #750 D1, D2: the class and the deciding signals of the last applied
+  /// `card.assess`, stored in both arms of `model-by-type`. A signal makes
+  /// the class `deciding`; `null` before the first assessment.
+  workClass               CardWorkClass?
+  workSignals             String[]              @default([])
+  /// #750 D7: the model and effort `sessionId` was started with. A round
+  /// that resolves another pair starts a fresh session. Null for a card with
+  /// no session or one started before #750 — read as matching.
+  sessionModel            String?
+  sessionEffort           CardEffort?
+  /// #750 D9: the card's one escalation to Opus — when, why and the worker's
+  /// note (at most 2 000 characters). Null while it never escalated.
+  escalatedAt             DateTime?
+  escalationReason        CardEscalationReason?
+  escalationNote          String?
   /// #243 D5: approving the design starts round 1. Changeable until the design is approved.
-  continueAfterDesign     Boolean          @default(false)
+  continueAfterDesign     Boolean               @default(false)
   /// #243 D2: the design turns' Claude session — `--session-id` first, then `--resume`.
-  designSessionId         String?          @db.Uuid
+  designSessionId         String?               @db.Uuid
   /// The Claude session, fixed at the first Run (D6).
-  sessionId               String?          @db.Uuid
+  sessionId               String?               @db.Uuid
   branch                  String?
   /// Display only: the runner owns the path.
   worktree                String?
@@ -3073,16 +3104,16 @@ model BoardCard {
   /// `null` while the card has no PR or its state is not known yet.
   prState                 CardPrState?
   /// #329 D2: written on every collect attempt, for every source.
-  collectState            CardCollectState @default(none)
+  collectState            CardCollectState      @default(none)
   /// #329 D2: the runner's one-line message of a failed collect, at most 500
   /// characters; cleared by a collect that does not fail.
   collectError            String?
   /// #329 D4: automatic attempts since the last manual collect (at most 3).
-  collectAttempts         Int              @default(0)
+  collectAttempts         Int                   @default(0)
   /// When the last collect attempt ended.
   collectedAt             DateTime?
   /// #359 D5: the checks on `ciHeadSha`, from the last `card.checks`.
-  ciState                 CardCiState      @default(none)
+  ciState                 CardCiState           @default(none)
   /// #359 D5: the failed checks, `[{name, link}]` (shared `cardCiCheckSchema`);
   /// `null` unless `ciState` is `red`.
   ciChecks                Json?
@@ -3091,14 +3122,14 @@ model BoardCard {
   /// #359 D5: when `card.checks` last answered.
   ciCheckedAt             DateTime?
   /// #359 D6: `ci_fix` rounds on the current PR (at most 3).
-  ciFixAttempts           Int              @default(0)
+  ciFixAttempts           Int                   @default(0)
   /// #484: since when `ciHeadSha` has had no checks (`ciState` `none`);
   /// `null` while it has some. Reset when the head is retriggered.
   ciNoneSince             DateTime?
   /// #484: the head `card.ciRetrigger` was sent for — once per head.
   ciRetriggeredSha        String?
   /// #359 D6: CI still failing after the budget — no automation until a person acts.
-  needsPerson             Boolean          @default(false)
+  needsPerson             Boolean               @default(false)
   /// #542: why `needsPerson` is set (shared `CARD_NEEDS_PERSON_REASONS`);
   /// `null` while it is not, and for a card marked before #542.
   needsPersonReason       String?
@@ -3138,13 +3169,13 @@ model BoardCard {
   /// #443: Auto-run when ready — accepting the last open dependency starts
   /// the Run. Off by default; it turns itself off when it fires, so it starts
   /// the card at most once.
-  autoRunWhenReady        Boolean          @default(false)
+  autoRunWhenReady        Boolean               @default(false)
   /// #282 D1: the manual session a `terminal` card tracks; unique, so a
   /// second `card.track` of the session updates its card.
-  trackedSessionId        String?          @unique
+  trackedSessionId        String?               @unique
   /// #282 D3: Automatic work — collect when the tracked session finishes.
   /// Starts from `board_settings.autoCollectTracked`.
-  autoCollect             Boolean          @default(false)
+  autoCollect             Boolean               @default(false)
   /// #282 D4: a `fleet` card's key is `(projectId, fleetIssue, fleetSlot)`;
   /// `fleetSlot` is null for a `cs:ready` issue no slot has picked up. Postgres
   /// treats nulls as distinct, so that row is kept unique by the partial index
@@ -3154,7 +3185,7 @@ model BoardCard {
   /// Shared `FLEET_STAGES`, written by the fleet projector.
   fleetStage              String?
   /// The slot left the projection; the card keeps its last column.
-  fleetSlotGone           Boolean          @default(false)
+  fleetSlotGone           Boolean               @default(false)
   /// #337 D6, D7: the plan the card came from — a New Card intake or a New
   /// Plan's Create cards; kept as its origin.
   planId                  String?
@@ -3167,8 +3198,8 @@ model BoardCard {
   /// #636: the dependency `prBase` belongs to; both are cleared once that
   /// dependency merges and the card's PR is retargeted onto the base.
   prBaseCardId            String?
-  createdAt               DateTime         @default(now())
-  updatedAt               DateTime         @updatedAt
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 
   project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   prBaseCard           BoardCard?             @relation("BoardCardPrBase", fields: [prBaseCardId], references: [id], onDelete: SetNull)
@@ -3412,10 +3443,10 @@ model BoardCardPullRequest {
 
 /// One Run or feedback of a card (D4), with its `runs` row of kind `card`.
 model BoardCardRound {
-  id                  String           @id @default(cuid())
+  id                  String                @id @default(cuid())
   cardId              String
   round               Int
-  runId               String           @unique
+  runId               String                @unique
   trigger             CardRoundTrigger
   /// #443: started by Auto-run when ready, after this dependency (`C-<n>`)
   /// was accepted; `null` for a round a person or Nautelle started.
@@ -3428,10 +3459,10 @@ model BoardCardRound {
   cardKind            BoardCardKind
   /// #309 D10: the card's attachments this round's prompt was built from,
   /// `[{id, name, mime}]` (shared `cardAttachmentSnapshotSchema`).
-  cardAttachments     Json             @default("[]")
+  cardAttachments     Json                  @default("[]")
   /// Nullable so deleting the author keeps the round.
   authorId            String?
-  phase               CardRoundPhase   @default(queued)
+  phase               CardRoundPhase        @default(queued)
   /// `nautelle-card-<shortId>`.
   tmuxSession         String?
   /// #367 D3: how the round's session reports (`plugin` | `injected` | `none`),
@@ -3442,9 +3473,11 @@ model BoardCardRound {
   finishedBy          CardFinishedBy?
   /// From `finish_card` (D6), at most 4 000 characters.
   summary             String?
+  /// #750 D9: set on the round whose worker called `escalate_card`.
+  escalation          CardEscalationReason?
   exitCode            Int?
   error               String?
-  startedAt           DateTime         @default(now())
+  startedAt           DateTime              @default(now())
   waitingAt           DateTime?
   /// #390: when the round entered `background`; cleared when it leaves.
   backgroundAt        DateTime?
@@ -3486,7 +3519,7 @@ model BoardCardRound {
   /// #449 D3: the Claude session the round ran in, from `round.restart`. A
   /// `fresh` round starts a new one; the earlier rounds keep theirs, so an old
   /// session can still be resumed.
-  sessionId           String?          @db.Uuid
+  sessionId           String?               @db.Uuid
   /// #449 D9: tokens and ms from the round's start to its first file edit,
   /// from `round.warmup`.
   warmupTokens        Int?

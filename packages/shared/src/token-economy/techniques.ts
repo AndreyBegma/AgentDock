@@ -76,6 +76,15 @@ export const TOKEN_ECONOMY_TECHNIQUES: readonly TokenEconomyTechniqueDef[] = [
     defaultMode: 'ab',
     runKinds: ['card'],
   },
+  // #750 D3, D8 (ADR-0076): the class → model and effort mapping and the
+  // escalation to Opus. Off (arm A) keeps the #322/#663 recommendation; the
+  // session lock (D7) holds in both arms.
+  {
+    key: 'model-by-type',
+    label: 'Model and effort by card class, with an escalation to Opus',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
 ];
 
 /** A technique key: lower-case words joined by `-`. */

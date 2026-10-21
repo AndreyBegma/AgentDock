@@ -74,11 +74,11 @@ arms.
 ## Data / Schema
 
 `apps/api/prisma/schema.prisma`, one migration
-`apps/api/prisma/migrations/20261231000009_card_model-by-type/`. The newest on
-develop is `20261231000006_project_github_repo_id`; the epic orders the stamps
-(#746 `…07`, #748 `…08`, this issue `…09`, #751 `…10`, #752 `…11`). If
-`develop` already has a later stamp when the branch is cut, take the next free
-one and keep the name.
+`apps/api/prisma/migrations/20261231000013_card_model_by_type/`. The epic
+ordered the stamps (#746 `…07`, #748 `…08`, this issue `…09`, #751 `…10`,
+#752 `…11`), but `develop` already had `…12` when the branch was cut, so this
+issue took the next free one: a stamp older than an applied migration breaks
+`prisma migrate dev` history on an existing database.
 
 - `enum CardWorkClass { mechanical deciding unsure }`.
 - `enum CardEscalationReason { misclassified gave_up }`.
@@ -173,7 +173,7 @@ None. The A/B share is #746's project setting. The class mapping is code
 
 | Slot | Owns | Touches | Depends on | Lead | Model |
 |---|---|---|---|---|---|
-| i750-contract | schema, migration, shared assess contract and limits, launch and local contracts, capability names | apps/api/prisma/schema.prisma, apps/api/prisma/migrations/20261231000009_card_model-by-type/**, packages/shared/src/assess/**, packages/shared/src/protocol/commands/cards.ts, packages/shared/src/protocol/local.ts, packages/shared/src/protocol/capabilities.ts, packages/shared/src/board/contracts.ts, packages/shared/src/board/types.ts, packages/shared/src/token-economy/techniques.ts (registers `model-by-type`, default mode `ab`) | #749 merged (chain order) | yes | opus |
+| i750-contract | schema, migration, shared assess contract and limits, launch and local contracts, capability names | apps/api/prisma/schema.prisma, apps/api/prisma/migrations/20261231000013_card_model_by_type/**, packages/shared/src/assess/**, packages/shared/src/protocol/commands/cards.ts, packages/shared/src/protocol/local.ts, packages/shared/src/protocol/capabilities.ts, packages/shared/src/board/contracts.ts, packages/shared/src/board/types.ts, packages/shared/src/token-economy/techniques.ts (registers `model-by-type`, default mode `ab`) | #749 merged (chain order) | yes | opus |
 | i750-api | assessment prompt and sink, class mapping, session lock, escalation handling, card view | apps/api/src/assess/**, apps/api/src/board/launch-choice.ts, apps/api/src/board/launch-choice.spec.ts, apps/api/src/board/board-rounds.service.ts, apps/api/src/board/board-mapper.ts, apps/api/src/board/*.e2e.spec.ts, apps/api/src/local/local-handlers.ts | i750-contract | no | opus |
 | i750-runner-web | `escalate_card` tool and stop, forced fresh start, effort verification, worker prompt text, popover, sheet and face | apps/runner/src/mcp/tools.ts, apps/runner/src/mcp/server.ts, apps/runner/src/cards/launch.ts, apps/runner/src/cards/launch.spec.ts, apps/runner/src/handoff/service.ts, apps/runner/src/detect/capabilities.ts, packages/shared/src/board/worker-prompt.ts, packages/shared/src/board/worker-prompt.spec.ts, apps/web/src/components/board/launch-popover.tsx, apps/web/src/components/board/card-sheet.tsx, apps/web/src/components/board/card-face.tsx, apps/web/src/lib/board/**, docs/ui/screens.md | i750-contract | no | opus |
 

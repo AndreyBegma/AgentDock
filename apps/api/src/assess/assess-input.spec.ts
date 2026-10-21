@@ -19,6 +19,8 @@ const answer = {
   work: {
     model: 'sonnet',
     effort: 'low',
+    class: 'mechanical',
+    signals: [],
     reason: 'Executes a clear, single-module change.',
   },
   design: { model: 'opus', reason: 'The layout is still undecided.' },
