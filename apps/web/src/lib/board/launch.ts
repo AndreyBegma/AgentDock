@@ -24,7 +24,41 @@ export type LaunchCard = Pick<
   BoardCardDetail,
   'profileKey' | 'model' | 'designModel' | 'recommendation'
 > &
-  Partial<Pick<BoardCardDetail, 'effort'>>;
+  Partial<Pick<BoardCardDetail, 'effort'>> &
+  CardSessionPair;
+
+/**
+ * #750 D7: the model and effort the card's current session started with;
+ * absent or `null` for a card with no session or one from before #750.
+ */
+export interface CardSessionPair {
+  sessionModel?: string | null;
+  sessionEffort?: CardEffort | null;
+}
+
+/** #750 D7: the popover's line when the pick will not resume the session. */
+export const FRESH_SESSION_TEXT =
+  'Starts a fresh session (the model or effort changed)';
+
+/**
+ * #750 D7: the chosen model or effort differs from the pair the card's
+ * session started with, so the round starts a fresh session. A default
+ * pick is the API's to resolve and a null pair resumes, so neither counts.
+ */
+export function startsFreshSession(
+  card: CardSessionPair,
+  form: LaunchForm,
+): boolean {
+  const model =
+    form.model !== DEFAULT_VALUE &&
+    card.sessionModel != null &&
+    form.model !== card.sessionModel;
+  const effort =
+    isCardEffort(form.effort) &&
+    card.sessionEffort != null &&
+    form.effort !== card.sessionEffort;
+  return model || effort;
+}
 
 /** The empty `<option>`: the API's own fall-through (D2), shown honestly. */
 export const DEFAULT_VALUE = '';

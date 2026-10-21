@@ -1,4 +1,3 @@
-import type { CardEscalationReason } from '../assess/limits';
 import type { CardAttachmentBrief } from '../attachments/contracts';
 import { ATTACHMENTS_WORKTREE_DIR } from '../attachments/limits';
 import { attachmentWorktreePath } from '../attachments/names';
@@ -36,9 +35,8 @@ import type { BoardCardKind } from './types';
  * the shared terse register. Version 20 (C-295): the product is named
  * Nautelle. Version 21 (C-297, ADR-0073): the `NAUTELLE_*` variables.
  * Version 22 (#747 D10): the terse register behind `terse-register`; its
- * control arm gets the #445 D7 two-register lines. Version 23 (#750 D8, D9):
- * with `escalate`, when to call `escalate_card`; the escalation round's
- * prompt carries the previous worker's note.
+ * control arm gets the #445 D7 two-register lines. Version 23 (#750 D8):
+ * with `escalate`, when to call `escalate_card`.
  */
 export const CARD_WORKER_PROMPT_VERSION = 23;
 
@@ -581,23 +579,6 @@ const assemblePrompt = (
 /** D9: the prompt of a feedback round, resuming the same session. */
 export const cardFeedbackPrompt = (feedback: string): string =>
   `Review feedback (${CARD_DATA_LINE})\n\n${fence(feedback.trim())}\n\nAddress it on the same branch, commit, then call ${FINISH_CARD_TOOL}.`;
-
-/** #750 D9: why the previous round handed the card on, as the prompt says it. */
-const ESCALATION_REASON_TEXT: Record<CardEscalationReason, string> = {
-  misclassified: 'the card needs decisions it did not show',
-  gave_up: 'it could not finish the card at its model',
-};
-
-/**
- * #750 D9: the prompt of the round an escalation starts — on Opus, in a fresh
- * session seeded from the handoff. The previous worker's note is card data:
- * it sits in the `<card>` fence like feedback.
- */
-export const cardEscalationPrompt = (input: {
-  reason: CardEscalationReason;
-  note: string;
-}): string =>
-  `The previous worker on this card stopped and asked for Opus: ${ESCALATION_REASON_TEXT[input.reason]}. Its finding (${CARD_DATA_LINE})\n\n${fence(input.note.trim())}\n\nMake the decisions it left open, finish the card on the same branch, commit, then call ${FINISH_CARD_TOOL}.`;
 
 /** A retry after a failed, ended or cancelled round resumes with this. */
 export const CARD_CONTINUE_PROMPT = 'continue';

@@ -12,6 +12,7 @@ import {
   NO_RECOMMENDATION_TEXT,
   profileKeysWith,
   recommendationNote,
+  startsFreshSession,
   workClassText,
 } from './launch';
 
@@ -215,6 +216,32 @@ describe('launchEffortOptions (#663)', () => {
     expect(launchDefaults({ ...before, effort: 'medium' }, 'work').effort).toBe(
       'medium',
     );
+  });
+});
+
+describe('startsFreshSession (#750 D7)', () => {
+  const pair = { sessionModel: 'sonnet', sessionEffort: 'low' as const };
+  const form = (model: string, effort = '') => ({
+    profileKey: '',
+    model,
+    effort,
+  });
+
+  test('a model or effort other than the session’s starts fresh', () => {
+    expect(startsFreshSession(pair, form('opus'))).toBe(true);
+    expect(startsFreshSession(pair, form('sonnet', 'high'))).toBe(true);
+    expect(startsFreshSession(pair, form('sonnet', 'low'))).toBe(false);
+  });
+
+  test('a default pick, or a session from before #750, resumes', () => {
+    expect(startsFreshSession(pair, form(''))).toBe(false);
+    expect(startsFreshSession({}, form('opus', 'high'))).toBe(false);
+    expect(
+      startsFreshSession(
+        { sessionModel: null, sessionEffort: null },
+        form('opus', 'high'),
+      ),
+    ).toBe(false);
   });
 });
 

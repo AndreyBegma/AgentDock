@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import {
   AGENTDOCK_WORKTREE_DIR,
@@ -171,6 +172,26 @@ const eventError = (error: unknown): string =>
   );
 
 /**
+ * #750 D7: a forced start whose seed could not be made — a new session with
+ * the round's own prompt; `null` for any other round, which launches as
+ * asked.
+ */
+const forcedWithoutSeed = (args: CardRunArgs): PreparedRound | null =>
+  args.session.fresh === true
+    ? {
+        launch: {
+          session: { id: randomUUID(), resume: false },
+          prompt: args.prompt,
+        },
+        restart: {
+          mode: 'fresh',
+          estimate: { resumeTokens: 0, freshTokens: 0, cacheWarm: false },
+          previousSessionId: args.session.id,
+        },
+      }
+    : null;
+
+/**
  * Board card workers (issue #242 D5–D10, ADR-0024). Each card has its own
  * worktree and tmux session `nautelle-card-<shortId>`, where `exec-run`
  * starts an interactive Claude Code session — a person can attach and type.
@@ -329,7 +350,8 @@ export class CardExecutor {
             reason: wiring.wiringReason,
           });
         }
-        // #449 D3: with Token saver on, resume or a fresh seeded session.
+        // #449 D3: with Token saver on, resume or a fresh seeded session;
+        // #750 D7: a changed model or effort always starts fresh.
         prepared = await this.prepareHandoff(record, args, profile);
         const launch = prepared ? { ...args, ...prepared.launch } : args;
         record.sessionId = launch.session.id;
@@ -386,8 +408,11 @@ export class CardExecutor {
   }
 
   /**
-   * #449 D3: how a round with Context handoff on launches. Never fails the
-   * round: a decision that cannot be made launches as the API asked.
+   * #449 D3: how a round with Context handoff on launches; #750 D7: with it
+   * off, only round 1's prompt is kept and a `session.fresh` round is seeded.
+   * Never fails the round: a decision that cannot be made launches as the
+   * API asked — except a forced start, which still gets a new session with
+   * the round's own prompt, never `--resume` on another model or effort.
    */
   private async prepareHandoff(
     record: CardRecord,
@@ -395,16 +420,18 @@ export class CardExecutor {
     profile: ConfigProfile,
   ): Promise<PreparedRound | null> {
     const { handoff } = this.options;
-    if (!handoff || !handoffOn(args)) return null;
     try {
-      return await handoff.prepareRound(record, args, profile);
+      if (!handoff) return forcedWithoutSeed(args);
+      return handoffOn(args)
+        ? await handoff.prepareRound(record, args, profile)
+        : await handoff.prepareForcedOnly(record, args, profile);
     } catch (error) {
       this.options.log.warn('cards: the handoff restart decision failed', {
         cardId: record.cardId,
         runId: record.runId,
         error: errorMessage(error),
       });
-      return null;
+      return forcedWithoutSeed(args);
     }
   }
 
@@ -416,6 +443,35 @@ export class CardExecutor {
       if (!record) return { stopped: false };
       const alive = (await this.tmux.find(record.tmuxSession)) !== null;
       if (record.phase !== 'stopped') this.setPhase(record, 'stopped');
+      if (alive) await this.kill(record.tmuxSession);
+      return { stopped: alive };
+    });
+  }
+
+  /**
+   * #750 D8: stops one round — after its worker's `escalate_card` — and only
+   * while it is still the card's round in the same session. A later round
+   * (the API's relaunch on Opus) has another run id and session, and is
+   * never stopped; checked in the card's serial queue, after any `card.run`
+   * that came first.
+   */
+  async stopRound(round: {
+    cardId: string;
+    runId: string;
+    sessionId: string;
+  }): Promise<{ stopped: boolean }> {
+    return this.serial(round.cardId, async () => {
+      const record = this.store.load(round.cardId);
+      if (
+        !record ||
+        record.runId !== round.runId ||
+        record.sessionId !== round.sessionId ||
+        (record.phase !== 'starting' && record.phase !== 'running')
+      ) {
+        return { stopped: false };
+      }
+      const alive = (await this.tmux.find(record.tmuxSession)) !== null;
+      this.setPhase(record, 'stopped');
       if (alive) await this.kill(record.tmuxSession);
       return { stopped: alive };
     });

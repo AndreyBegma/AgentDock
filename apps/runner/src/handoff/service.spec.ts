@@ -371,6 +371,34 @@ describe('HandoffService — a forced fresh start (#750 D7)', () => {
     ]);
   });
 
+  it('says the model or effort changed, and seeds a card without a note from the reduced seed', async () => {
+    const t = await setup();
+    await t.round1();
+    t.transcript([
+      assistantLine({
+        at: new Date(t.clock.now() - 60_000).toISOString(),
+        id: 'm1',
+        cacheRead: 1_500,
+      }),
+    ]);
+    const prepared = await t.service.prepareRound(
+      t.card,
+      {
+        session: { id: OLD_SESSION, resume: true, fresh: true },
+        prompt: 'Continue on Opus.',
+        profileKey: 'claude',
+      },
+      t.profile,
+    );
+    expect(prepared.restart.mode).toBe('fresh');
+    const { session, prompt } = prepared.launch;
+    expect(session.resume).toBe(false);
+    expect(prompt.startsWith(CARD_PROMPT.trimEnd())).toBe(true);
+    expect(prompt).toContain('the model or effort changed');
+    expect(prompt).toContain('No handoff note was kept');
+    expect(prompt.trimEnd().endsWith('Continue on Opus.')).toBe(true);
+  });
+
   it('leaves a round without fresh to the cost rule', async () => {
     const t = await setup();
     await t.round1();
@@ -397,6 +425,77 @@ describe('HandoffService — a forced fresh start (#750 D7)', () => {
       resume: true,
       fresh: false,
     });
+  });
+});
+
+describe('HandoffService — Context handoff off (#750 D7)', () => {
+  const offRound = (
+    t: Awaited<ReturnType<typeof setup>>,
+    session: { id: string; resume: boolean; fresh?: boolean },
+    prompt = 'Continue on Opus.',
+  ) =>
+    t.service.prepareForcedOnly(
+      t.card,
+      { session, prompt, profileKey: 'claude' },
+      t.profile,
+    );
+
+  it('round 1 keeps its prompt and launches as asked, with nothing else of Context handoff', async () => {
+    const t = await setup();
+    expect(
+      await offRound(t, { id: OLD_SESSION, resume: false }, CARD_PROMPT),
+    ).toBeNull();
+    expect(t.state.cardPrompt(t.card.cardId)).toBe(CARD_PROMPT);
+    // Not an active round: a stop asks for no note.
+    await t.commit('form.ts');
+    await t.stop();
+    expect(t.typed).toEqual([]);
+  });
+
+  it('a later round resumes as asked unless the model or effort changed', async () => {
+    const t = await setup();
+    expect(await offRound(t, { id: OLD_SESSION, resume: true })).toBeNull();
+    expect(
+      await offRound(t, { id: OLD_SESSION, resume: true, fresh: false }),
+    ).toBeNull();
+  });
+
+  it('a forced start gets a new session from the reduced seed, keeping the old one', async () => {
+    const t = await setup();
+    await offRound(t, { id: OLD_SESSION, resume: false }, CARD_PROMPT);
+    await t.commit('login.ts');
+    const prepared = await offRound(t, {
+      id: OLD_SESSION,
+      resume: true,
+      fresh: true,
+    });
+    expect(prepared?.restart).toMatchObject({
+      mode: 'fresh',
+      previousSessionId: OLD_SESSION,
+    });
+    const launch = prepared?.launch;
+    expect(launch?.session.resume).toBe(false);
+    expect(launch?.session.id).not.toBe(OLD_SESSION);
+    expect(launch?.prompt.startsWith(CARD_PROMPT.trimEnd())).toBe(true);
+    expect(launch?.prompt).toContain('the model or effort changed');
+    expect(launch?.prompt).toContain('login.ts');
+    expect(t.state.load(t.card.cardId).sessions).toEqual([
+      OLD_SESSION,
+      launch?.session.id ?? '',
+    ]);
+  });
+
+  it('a card from before this change, with no kept prompt, still starts fresh', async () => {
+    const t = await setup();
+    const prepared = await offRound(t, {
+      id: OLD_SESSION,
+      resume: true,
+      fresh: true,
+    });
+    expect(prepared?.launch.session.resume).toBe(false);
+    expect(prepared?.launch.prompt).toContain('first prompt was not kept');
+    const prompt = prepared?.launch.prompt ?? '';
+    expect(prompt.trimEnd().endsWith('Continue on Opus.')).toBe(true);
   });
 });
 
