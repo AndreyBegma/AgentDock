@@ -7,13 +7,17 @@ import {
   type BoardUserRef,
   CAPTURE_MODEL_DEFAULT,
   CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
+  CARD_DECIDING_SIGNALS,
   CARD_HOOKS_GRACE_MS,
+  type CardDecidingSignal,
   type CardDependencyRef,
+  type CardEscalationView,
   type CardEvidenceView,
   type CardFleetView,
   type CardHooksCause,
   type CardPrTarget,
   type CardPullRequestRef,
+  type CardRecommendationView,
   type CardRoundBrief,
   type CardRoundView,
   type CardStackRef,
@@ -29,6 +33,7 @@ import {
   isCaptureModel,
   isCardAutoRunCode,
   isCardNeedsPersonReason,
+  modelByType,
   type PendingQuestion,
   pendingQuestionSchema,
   type RestartEstimate,
@@ -57,6 +62,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import type { TokenSaverCardFacts } from '../token-saver/token-saver-facts';
+import type { CardModelByTypeArm } from './launch-choice';
 
 /** #243: what a card's face shows of its design — the Design chip. */
 export const cardDesignSelect = {
@@ -471,6 +477,7 @@ export const toCardView = (
   planId: card.planId,
   steward: stewardChipOf(card, facts),
   ...restartOf(card, facts),
+  escalated: card.escalatedAt !== null,
 });
 
 const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
@@ -514,6 +521,7 @@ const toRoundView = (
   ...hooksCauseOf(card, round, facts),
   ...wiringOf(round),
   autoRunAfter: round.autoRunAfter,
+  escalation: round.escalation,
   finishRefused: finishRefusedOf(round),
   blockingDialog: blockingDialogOf(round),
   costUsd: facts.costs.get(round.runId) ?? null,
@@ -532,11 +540,55 @@ const toRoundView = (
   warmupMs: round.warmupMs,
 });
 
+/**
+ * #322 D6, #750 D1–D3: the card's recommendation, with the stored class and
+ * signals on the work one. In the B arm of `model-by-type` (`byType`) the
+ * work model and effort are the class mapping — what Run defaults to — so
+ * a choice equal to it is no override (D5).
+ */
+export const recommendationOf = (
+  card: CardWithRounds,
+  byType: CardModelByTypeArm | null,
+): CardRecommendationView => {
+  const recommendation = cardRecommendationOf(card);
+  const work = recommendation.work;
+  if (!work) return recommendation;
+  const mapped = byType
+    ? modelByType(byType.workClass, work.effort, false)
+    : null;
+  return {
+    ...recommendation,
+    work: {
+      ...work,
+      ...(mapped ?? {}),
+      class: card.workClass,
+      signals: card.workSignals.filter(isDecidingSignal),
+    },
+  };
+};
+
+const isDecidingSignal = (signal: string): signal is CardDecidingSignal =>
+  (CARD_DECIDING_SIGNALS as readonly string[]).includes(signal);
+
+/** #750 D9: the card's one escalation; `null` while it never escalated. */
+export const escalationOf = (
+  card: Pick<BoardCard, 'escalatedAt' | 'escalationReason' | 'escalationNote'>,
+): CardEscalationView | null =>
+  card.escalatedAt !== null && card.escalationReason !== null
+    ? {
+        reason: card.escalationReason,
+        note: card.escalationNote ?? '',
+        at: card.escalatedAt.toISOString(),
+      }
+    : null;
+
 /** `attachments`: the card's and its rounds', oldest first (#309). */
 export const toCardDetail = (
   card: CardWithPeople,
   facts: CardFacts,
   attachments: AttachmentView[],
+  /** #750 D3: the card's B arm of `model-by-type`; `null` is arm A. */
+  byType: CardModelByTypeArm | null = null,
 ): BoardCardDetail => ({
   ...toCardView(card, facts),
   body: card.body,
@@ -546,7 +598,8 @@ export const toCardDetail = (
   effort: card.effort,
   profileKey: card.profileKey,
   designModel: card.designModel,
-  recommendation: cardRecommendationOf(card),
+  recommendation: recommendationOf(card, byType),
+  escalation: escalationOf(card),
   branch: card.branch,
   worktree: card.worktree,
   specPath: card.specPath,
@@ -561,6 +614,8 @@ export const toCardDetail = (
         }
       : null,
   sessionId: card.sessionId,
+  sessionModel: card.sessionModel,
+  sessionEffort: card.sessionEffort,
   createdBy: card.createdBy,
   movedBy: card.movedBy,
   completedBy: card.completedBy,

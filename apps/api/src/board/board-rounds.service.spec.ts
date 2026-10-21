@@ -1,5 +1,14 @@
-import { cardWorkerPrompt, TERSE_REGISTER } from '@nautelle/shared';
-import { cardPromptSaver } from './board-rounds.service';
+import {
+  cardWorkerPrompt,
+  ESCALATE_CARD_TOOL,
+  TERSE_REGISTER,
+} from '@nautelle/shared';
+import { CARD_RUN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
+import {
+  cardPromptEscalate,
+  cardPromptSaver,
+  escalationRoundPrompt,
+} from './board-rounds.service';
 
 const card = {
   number: 12,
@@ -61,5 +70,50 @@ describe('cardPromptSaver (#747)', () => {
         ...cardPromptSaver({ on: true, techniques: null }),
       }),
     ).toContain(TERSE_REGISTER);
+  });
+});
+
+describe('cardPromptEscalate (#750 D8)', () => {
+  it('puts the escalate_card text in the round-1 prompt only when the tool is offered', () => {
+    expect(cardPromptEscalate(false)).toEqual({});
+    expect(
+      cardWorkerPrompt({ ...card, ...cardPromptEscalate(true) }),
+    ).toContain(ESCALATE_CARD_TOOL);
+    expect(
+      cardWorkerPrompt({ ...card, ...cardPromptEscalate(false) }),
+    ).not.toContain(ESCALATE_CARD_TOOL);
+  });
+});
+
+describe('escalationRoundPrompt (#750 D9)', () => {
+  const escalated = {
+    escalationReason: 'misclassified' as const,
+    escalationNote: 'The card needs a schema decision.',
+    sessionModel: 'sonnet',
+  };
+
+  it('adds the previous worker’s finding to the next-round prompt', () => {
+    const prompt = escalationRoundPrompt(escalated, 'continue', 'continue');
+    expect(prompt.startsWith('continue\n\n')).toBe(true);
+    expect(prompt).toContain('reason `misclassified`');
+    expect(prompt).toContain('(on `sonnet`)');
+    expect(prompt).toContain('The card needs a schema decision.');
+  });
+
+  it('falls back to the plain prompt when the change leaves no room', () => {
+    const huge = 'x'.repeat(CARD_RUN_PROMPT_MAX_BYTES);
+    const prompt = escalationRoundPrompt(escalated, huge, 'continue');
+    expect(prompt.startsWith('continue\n\n')).toBe(true);
+    expect(prompt).toContain('The card needs a schema decision.');
+  });
+
+  it('is the next-round prompt for a card with no escalation', () => {
+    expect(
+      escalationRoundPrompt(
+        { escalationReason: null, escalationNote: null, sessionModel: null },
+        'continue',
+        'continue',
+      ),
+    ).toBe('continue');
   });
 });
