@@ -4,6 +4,7 @@ import {
   ATTACHMENTS_PER_CARD_MAX,
   attachmentRefSchema,
 } from '../../attachments';
+import { techniqueFlagsSchema } from '../../token-economy/techniques';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
@@ -189,6 +190,17 @@ export type CardDraftPullRequest = z.infer<typeof cardDraftPullRequestSchema>;
  * release); an older one refuses them as `invalid_args`, so the API sends
  * them only to a runner that advertises it.
  */
+/**
+ * #746 D11: a card launch's Token saver — the project's setting plus the
+ * technique flags of the card's arms, `{ [technique]: on }`. `techniques` is
+ * sent only to a runner that advertises `tokenEconomy`; it is strict over the
+ * registered techniques, so an unknown key is refused.
+ */
+export const cardTokenSaverSchema = tokenSaverConfigSchema.extend({
+  techniques: techniqueFlagsSchema.optional(),
+});
+export type CardTokenSaver = z.infer<typeof cardTokenSaverSchema>;
+
 export const cardRunArgsSchema = z
   .strictObject({
     ...cardTarget,
@@ -218,7 +230,7 @@ export const cardRunArgsSchema = z
     /** #359 D8: create `branch` from the updated `origin/<base>` first. */
     newBranch: z.boolean().optional(),
     /** #445 D11: the project's Token saver; absent is off (a runner without the `tokenSaver` capability refuses it). */
-    tokenSaver: tokenSaverConfigSchema.optional(),
+    tokenSaver: cardTokenSaverSchema.optional(),
   })
   .refine(
     (a) =>

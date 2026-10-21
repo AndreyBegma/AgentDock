@@ -87,6 +87,8 @@ model User {
   textSettingsUpdated         TextSettings[]
   attachmentsUploaded         Attachment[]
   tokenSaverSettingsUpdated   TokenSaverSettings[]
+  tokenEconomySettingsUpdated TokenEconomySettings[]
+  tokenEconomyTechniquesSet   TokenEconomyTechnique[]
   stewardSettingsUpdated      StewardSettings[]
   aiDigestSettingsUpdated     AiDigestSettings[]
   settings                    UserSettings?
@@ -472,6 +474,9 @@ model Project {
   assistantConversations AssistantConversation[]
   tokenSaverSettings     TokenSaverSettings?
   tokenSaverStats        TokenSaverStat[]
+  tokenEconomySettings   TokenEconomySettings?
+  tokenEconomyTechniques TokenEconomyTechnique[]
+  runUsageFacts          RunUsageFact[]
   stewardSettings        StewardSettings?
   stewardIncidents       StewardIncident[]
   stewardDigests         StewardDigest[]
@@ -780,6 +785,7 @@ model AgentSession {
   cardCaptures         CardCapture[]
   capturedCards        BoardCard[]           @relation("BoardCardSourceSession")
   trackedCard          BoardCard?            @relation("BoardCardTrackedSession")
+  usageFact            RunUsageFact?
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
@@ -1726,6 +1732,12 @@ model Run {
   /// #445 D12: the launch carried `tokenSaver.enabled`. The before/after
   /// compares runs with `false` against runs with `true`, by kind.
   tokenSaver         Boolean    @default(false)
+  /// #746 D11: the technique flags launched, `{ [technique]: on }`; null for
+  /// a launch without techniques. Reports read this, never the setting.
+  techniques         Json?
+  /// #746 D4: the run's `bypassed` token-saver rows — unfiltered re-runs and
+  /// reads let through after a guard refusal.
+  retries            Int        @default(0)
 
   project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
@@ -1738,6 +1750,7 @@ model Run {
   textNormalization TextNormalization?
   inboundDeliveries InboundDelivery[]
   tokenSaverStats   TokenSaverStat[]
+  usageFact         RunUsageFact?
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
@@ -3170,6 +3183,8 @@ model BoardCard {
   stackRunEntry        BoardStackRunCard?
   /// #652: the stack runs this card paused.
   stackRunsPaused      BoardStackRun[]        @relation("BoardStackRunPausedCard")
+  /// #746: the card's A/B arm per technique, drawn at its first launch.
+  techniqueArms        CardTechniqueArm[]
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3796,6 +3811,102 @@ model TokenSaverStat {
   @@index([projectId, createdAt])
   @@index([runId])
   @@map("token_saver_stats")
+}
+
+/// Token economy (#746, ADR-0074): every saving technique is judged by billed
+/// cost per successful card, A against B.
+
+/// Shared `TECHNIQUE_MODES` (D9): nobody, randomised, every card.
+enum TechniqueMode {
+  off
+  ab
+  on
+}
+
+/// Shared `TECHNIQUE_ARMS` (D9): A runs without the technique, B with it.
+enum TechniqueArm {
+  a
+  b
+}
+
+/// A project's A/B setting (D2). No row: a B share of 50 %.
+model TokenEconomySettings {
+  projectId     String   @id
+  /// 0–100, checked by the DTO.
+  bSharePercent Int      @default(50)
+  updatedById   String?
+  updatedAt     DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("token_economy_settings")
+}
+
+/// A technique's mode in a project (D9). No row: the registry's default mode.
+model TokenEconomyTechnique {
+  projectId   String
+  /// A key of shared `TOKEN_ECONOMY_TECHNIQUES`.
+  technique   String
+  mode        TechniqueMode
+  changedById String?
+  changedAt   DateTime      @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  changedBy User?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@id([projectId, technique])
+  @@map("token_economy_techniques")
+}
+
+/// A card's arm for one technique (D2, D10): drawn at the card's first launch
+/// and sticky for all its rounds.
+model CardTechniqueArm {
+  cardId     String
+  technique  String
+  arm        TechniqueArm
+  /// The mode when the arm was drawn, so a card forced `on` is told apart
+  /// from a randomised B.
+  mode       TechniqueMode
+  assignedAt DateTime      @default(now())
+
+  card BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, technique])
+  @@index([technique, arm])
+  @@map("card_technique_arms")
+}
+
+/// The usage of one ended card run or manual session (D1), rebuilt from its
+/// `llm_requests` while late ones may still arrive. Exactly one of `runId`
+/// and `sessionId` is set (a CHECK in the migration).
+model RunUsageFact {
+  id               String   @id @default(cuid())
+  runId            String?  @unique
+  sessionId        String?  @unique
+  projectId        String
+  input            BigInt
+  output           BigInt
+  cacheRead        BigInt
+  cacheWrite5m     BigInt
+  cacheWrite1h     BigInt
+  /// The priced requests' cost, subagent sessions included; null while none is priced.
+  costUsd          Decimal? @db.Decimal(14, 6)
+  unpricedRequests Int
+  compactions      Int
+  /// The largest request: input + cache read + cache writes.
+  peakContext      Int
+  turns            Int
+  /// The part of `costUsd` from subagent sessions; null while none is priced.
+  subagentCostUsd  Decimal? @db.Decimal(14, 6)
+  builtAt          DateTime
+
+  run     Run?          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  session AgentSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, builtAt])
+  @@map("run_usage_facts")
 }
 
 // Steward (issue #447, ADR-0040)
