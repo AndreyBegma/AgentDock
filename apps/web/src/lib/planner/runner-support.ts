@@ -110,6 +110,7 @@ const FEATURE_VERB: Record<RunnerFeature, string> = {
   planner: 'plan',
   design: 'draw mockups',
   uiProfileBuild: 'build the UI profile',
+  uiProfileLearn: 'learn from approved designs',
   worktree: 'read worktrees',
   docsRepo: 'write specs to a docs repository',
   ruleScan: 'scan a project for coding rules',

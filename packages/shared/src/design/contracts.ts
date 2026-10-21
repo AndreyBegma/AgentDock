@@ -9,9 +9,11 @@ import type {
   DesignCommentKind,
   DesignTheme,
   TaskDesignStatus,
+  UiProfileScreen,
   UiProfileSnippet,
   UiProfileSource,
   UiProfileStatus,
+  UiProfileStyleRule,
   ViewportPreset,
 } from './types';
 
@@ -47,7 +49,26 @@ export interface UiProfileVersionView {
   /** The person behind a manual version. */
   author: DesignUserRef | null;
   createdAt: string;
+  /** #752: the approved-screen library, newest first. */
+  screens: UiProfileScreen[];
+  /** #752: style rules learned from design comments, or written by a person. */
+  styleRules: UiProfileStyleRule[];
+  /** #752: the approved revision a `memory` version learned from. */
+  learnedFromRevisionId: string | null;
+  /** #752: what the learn dropped — invalid or duplicate snippets. */
+  learnNotes: string | null;
+  /**
+   * #752: the designs `screens` and `styleRules` came from, by design id —
+   * this project's only. A design deleted since has no entry.
+   */
+  designs: Record<string, UiProfileDesignRef>;
 }
+
+/** #752: where a library entry or a style rule came from. */
+export type UiProfileDesignRef =
+  | { kind: 'card'; number: number; title: string }
+  | { kind: 'stack'; number: number; title: string }
+  | { kind: 'task'; planId: string; taskKey: string; title: string };
 
 /** A row of the version list, without the heavy fields. */
 export interface UiProfileVersionSummary {
@@ -80,6 +101,10 @@ export interface UiProfileUpdateRequest {
   snippets: UiProfileSnippet[];
   /** Default: the current version's. */
   hasUi?: boolean;
+  /** #752 A5: the library after an admin's edit; default: the current version's. */
+  screens?: UiProfileScreen[];
+  /** #752 A5: the style rules after an admin's edit; default: the current version's. */
+  styleRules?: UiProfileStyleRule[];
 }
 
 /** `POST /projects/:id/ui-profile/rebuild` (operator). */
@@ -93,6 +118,8 @@ export interface UiProfileRebuildResult {
 export interface DesignSettingsView {
   viewports: ViewportPreset[];
   defaultSkills: string[];
+  /** #752 A6: design prompts read the approved screens and style rules. */
+  useMemory: boolean;
   /** False when no row exists and the defaults are shown. */
   saved: boolean;
   updatedBy: DesignUserRef | null;
@@ -103,6 +130,8 @@ export interface DesignSettingsView {
 export interface DesignSettingsUpdateRequest {
   viewports: ViewportPreset[];
   defaultSkills: string[];
+  /** #752 A6: default: unchanged (`true` without a row). */
+  useMemory?: boolean;
 }
 
 // A task's design (D1–D4, D9, D10)

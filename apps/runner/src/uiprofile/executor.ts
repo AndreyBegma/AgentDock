@@ -15,11 +15,13 @@ import {
   uiProfileBuildPhaseChangedDataSchema,
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
+import type { CaptureSpawn } from '../capture/executor';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { watchedProject } from '../control/target';
 import { TmuxControl } from '../control/tmux';
+import type { Env } from '../env';
 import { resolveFleetProject } from '../fleet/project';
 import { type RunNotes, runWorkKey } from '../handoff/runs';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
@@ -47,6 +49,7 @@ import {
   readJson,
   writeJsonAtomic,
 } from '../skills/run/record';
+import { UiProfileLearner } from './learn';
 
 /** How often running builds are checked for an exit, a vanish or a timeout. */
 export const UIPROFILE_TICK_MS = 2000;
@@ -162,6 +165,12 @@ export interface UiProfileExecutorOptions {
    * same work picks up the last interrupted attempt's note.
    */
   runNotes?: RunNotes;
+  /** #752: default `uiprofile-learn` beside `buildsDir`. */
+  learnDir?: string;
+  /** #752: the learn's environment; default the runner's own. */
+  env?: Env;
+  /** #752: tests replace the learn's process. */
+  learnSpawn?: CaptureSpawn;
 }
 
 const slotId = (build: BuildRecord): string => `uiprofile:${build.runId}`;
@@ -186,8 +195,20 @@ export class UiProfileBuildExecutor {
   private cancelTick: Cancel = () => {};
   private offFree: () => void = () => {};
 
+  /** #752: `uiprofile.learn`, in `uiprofile-learn` beside the builds. */
+  readonly learner: UiProfileLearner;
+
   constructor(private readonly options: UiProfileExecutorOptions) {
     this.tmux = new TmuxControl(options.deps.exec, options.tmuxServer ?? []);
+    this.learner = new UiProfileLearner({
+      deps: options.deps,
+      learnDir:
+        options.learnDir ?? join(dirname(options.buildsDir), 'uiprofile-learn'),
+      env: options.env ?? process.env,
+      log: options.log,
+      otlpPort: options.otlpPort,
+      spawn: options.learnSpawn,
+    });
   }
 
   /** Picks up the builds a previous runner left, then starts the timer. */
@@ -220,6 +241,7 @@ export class UiProfileBuildExecutor {
   stop(): void {
     this.cancelTick();
     this.offFree();
+    this.learner.stop();
   }
 
   /** A build by its `runs` row, for the run log (#183). */

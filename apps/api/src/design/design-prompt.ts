@@ -6,7 +6,9 @@ import {
   PLANNER_BLOCK_TAG,
   plannerOutputContract,
   stackLabel,
+  type UiProfileScreen,
   type UiProfileSnippet,
+  type UiProfileStyleRule,
 } from '@nautelle/shared';
 import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 
@@ -39,6 +41,17 @@ export interface DesignPromptProfile {
   summary: string;
   kit: string;
   snippets: UiProfileSnippet[];
+  /**
+   * #752 A6: the profile's memory, with the project's `useMemory` on; null
+   * or absent with it off, and then the prompt has neither section.
+   */
+  memory?: DesignPromptMemory | null;
+}
+
+/** #752: the approved-screen library (newest first) and the style rules. */
+export interface DesignPromptMemory {
+  screens: UiProfileScreen[];
+  styleRules: UiProfileStyleRule[];
 }
 
 /** What a `design` turn carries besides the plan (D8). */
@@ -203,15 +216,57 @@ export const framesInFull = (ctx: DesignPromptContext): Set<string> => {
 };
 
 /**
+ * #752 A6: what approved designs taught the profile — the library, newest
+ * first, and the style rules taken from their comments.
+ */
+const memorySections = (
+  memory: DesignPromptMemory,
+  screenLimit: number,
+): string[] => {
+  const screens = memory.screens.slice(0, screenLimit);
+  const left = memory.screens.length - screens.length;
+  const sections = [
+    '### Approved screens',
+    screens.length > 0
+      ? [
+          'Screens people approved in earlier designs of this project, newest first. Where the new screen is alike, repeat their layout and component choices.',
+          ...screens.map(
+            (s) =>
+              `**${s.name}**${s.snippetsUsed.length > 0 ? ` (snippets: ${s.snippetsUsed.map((n) => `\`${n}\``).join(', ')})` : ''}\n${s.summary}`,
+          ),
+        ].join('\n\n')
+      : 'None.',
+  ];
+  if (left > 0) {
+    sections.push(
+      `${left} older approved screen${left === 1 ? ' was' : 's were'} left out to keep the prompt under its size limit.`,
+    );
+  }
+  sections.push(
+    '### Style rules',
+    memory.styleRules.length > 0
+      ? [
+          'Decisions people took in the comments of earlier designs. Follow them unless this turn asks otherwise.',
+          memory.styleRules.map((r) => `- ${r.text}`).join('\n'),
+        ].join('\n\n')
+      : 'None.',
+  );
+  return sections;
+};
+
+/**
  * #628: the parts of a design turn that stay the same from turn to turn of
  * one design — the UI profile and the skills. They come before the turn's
  * own sections, so the prompt's changing part is its tail. `snippetLimit`
  * caps how many of the profile's snippets are included, so a large kit can
  * still fit the prompt cap; the section says when some were left out.
+ * #752 A6: `screenLimit` caps the approved screens the same way, keeping the
+ * newest; style rules are never left out.
  */
 export const designProfileSections = (
   ctx: DesignPromptContext,
   snippetLimit = Number.POSITIVE_INFINITY,
+  screenLimit = Number.POSITIVE_INFINITY,
 ): string[] => {
   const sections: string[] = [];
   const profile = ctx.profile;
@@ -243,6 +298,9 @@ export const designProfileSections = (
           .map((s) => `\`${s.name}\``)
           .join(', ')}. Draw those components from the kit's tokens.`,
       );
+    }
+    if (profile.memory) {
+      sections.push(...memorySections(profile.memory, screenLimit));
     }
   }
   sections.push(
@@ -328,10 +386,52 @@ export const designSections = (
   ctx: DesignPromptContext,
   snippetLimit = Number.POSITIVE_INFINITY,
   withHtml = true,
+  screenLimit = Number.POSITIVE_INFINITY,
 ): string[] => [
-  ...designProfileSections(ctx, snippetLimit),
+  ...designProfileSections(ctx, snippetLimit, screenLimit),
   ...designTurnSections(ctx, withHtml),
 ];
+
+/** How much of a design turn's prompt a fitting step keeps. */
+export interface DesignFit {
+  /** Approved screens, newest first. */
+  screens: number;
+  snippets: number;
+  /** A reference design's HTML (#480). */
+  withReference: boolean;
+  /** The previous revision's frames in full (#628). */
+  withFrames: boolean;
+}
+
+/**
+ * A design turn's prompt under the `plan.turn` cap, for every owner (plan
+ * task, card, stack). It drops, until the prompt fits: the approved screens
+ * oldest first (#752 A6), then the kit's snippets from the end, then a
+ * reference design's HTML, then (#628) the previous revision's HTML. Style
+ * rules are never dropped. `render` builds the whole prompt for one step.
+ */
+export const fitDesignPrompt = (
+  design: DesignPromptContext,
+  render: (fit: DesignFit) => string,
+): string => {
+  let fit: DesignFit = {
+    screens: design.profile?.memory?.screens.length ?? 0,
+    snippets: design.profile?.snippets.length ?? 0,
+    withReference: true,
+    withFrames: true,
+  };
+  let prompt = render(fit);
+  const over = () => designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES;
+  const step = (next: Partial<DesignFit>) => {
+    fit = { ...fit, ...next };
+    prompt = render(fit);
+  };
+  while (over() && fit.screens > 0) step({ screens: fit.screens - 1 });
+  while (over() && fit.snippets > 0) step({ snippets: fit.snippets - 1 });
+  if (over()) step({ withReference: false });
+  if (over()) step({ withFrames: false });
+  return prompt;
+};
 
 /** The write turn's section for a task with an approved design (D16). */
 export const approvedDesignSections = (d: ApprovedDesignContext): string[] => [
@@ -456,39 +556,19 @@ const stackReferenceSections = (
       ]),
 ];
 
-/**
- * A design turn's prompt under the `plan.turn` cap: a large kit's snippets
- * are trimmed from the end first, then a reference design's HTML, then
- * (#628) the previous revision's HTML.
- */
+/** A card's or stack's design turn under the `plan.turn` cap (`fitDesignPrompt`). */
 const fittedDesignPrompt = (
   host: DesignTurnHost,
   reference: StackDesignReference | null,
-): string => {
-  const count = host.design.profile?.snippets.length ?? 0;
-  const build = (keep: number, withReference: boolean, withFrames = true) =>
+): string =>
+  fitDesignPrompt(host.design, (fit) =>
     designTurnPromptWith(
       host,
-      designProfileSections(host.design, keep),
-      designTurnSections(host.design, withFrames),
-      reference ? stackReferenceSections(reference, withReference) : [],
-    );
-  let prompt = build(count, true);
-  for (
-    let keep = count - 1;
-    keep >= 0 && designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES;
-    keep -= 1
-  ) {
-    prompt = build(keep, true);
-  }
-  if (reference && designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES) {
-    prompt = build(0, false);
-  }
-  if (designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES) {
-    prompt = build(0, false, false);
-  }
-  return prompt;
-};
+      designProfileSections(host.design, fit.snippets, fit.screens),
+      designTurnSections(host.design, fit.withFrames),
+      reference ? stackReferenceSections(reference, fit.withReference) : [],
+    ),
+  );
 
 /**
  * #243 D4: the prompt of a board card's design turn — the instructions, the

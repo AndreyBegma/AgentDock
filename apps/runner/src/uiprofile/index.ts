@@ -12,6 +12,7 @@ export {
   UiProfileBuildExecutor,
   type UiProfileExecutorOptions,
 } from './executor';
+export { UiProfileLearner, type UiProfileLearnerOptions } from './learn';
 
 /** The `uiprofile.*` handlers (docs/specs/223-design-stage.md "Protocol"). */
 export type UiProfileHandlers = {
@@ -27,4 +28,5 @@ export const createUiProfileHandlers = (
   'uiprofile.build': (args) => executor.run(args),
   'uiprofile.fingerprint': (args) => fingerprint(args, deps),
   'uiprofile.cancel': (args) => executor.cancel(args),
+  'uiprofile.learn': (args) => executor.learner.learn(args),
 });

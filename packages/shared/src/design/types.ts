@@ -7,8 +7,15 @@ import {
   DESIGN_VIEWPORT_NAME_MAX,
   DESIGN_VIEWPORTS_MAX,
   designBytes,
+  UI_PROFILE_RULE_COMMENTS_MAX,
+  UI_PROFILE_SCREEN_NAME_MAX,
+  UI_PROFILE_SCREEN_SUMMARY_MAX,
+  UI_PROFILE_SCREENS_MAX,
   UI_PROFILE_SNIPPET_MAX_BYTES,
   UI_PROFILE_SNIPPET_NAME_MAX,
+  UI_PROFILE_SNIPPETS_MAX,
+  UI_PROFILE_STYLE_RULE_MAX,
+  UI_PROFILE_STYLE_RULES_MAX,
   UIPROFILE_GLOB_MAX,
 } from './limits';
 
@@ -96,8 +103,12 @@ export type DesignCommentKind = z.infer<typeof designCommentKindSchema>;
 
 // UI profile (D12–D14)
 
-/** D14: `manual` is a person's edit, kept as obligations for the next build. */
-export const UI_PROFILE_SOURCES = ['agent', 'manual'] as const;
+/**
+ * D14: `manual` is a person's edit, kept as obligations for the next build.
+ * #752 (ADR-0075 §6): `memory` is what an approved design taught, kept the
+ * same way.
+ */
+export const UI_PROFILE_SOURCES = ['agent', 'manual', 'memory'] as const;
 export const uiProfileSourceSchema = z.enum(UI_PROFILE_SOURCES);
 export type UiProfileSource = z.infer<typeof uiProfileSourceSchema>;
 
@@ -122,6 +133,35 @@ export const uiProfileSnippetSchema = z.strictObject({
     }),
 });
 export type UiProfileSnippet = z.infer<typeof uiProfileSnippetSchema>;
+
+/** #752 A3: one approved screen of the profile's library. */
+export const uiProfileScreenSchema = z.strictObject({
+  designId: z.string().min(1),
+  revisionId: z.string().min(1),
+  name: z.string().trim().min(1).max(UI_PROFILE_SCREEN_NAME_MAX),
+  summary: z.string().trim().min(1).max(UI_PROFILE_SCREEN_SUMMARY_MAX),
+  snippetsUsed: z
+    .array(z.string().trim().min(1).max(UI_PROFILE_SNIPPET_NAME_MAX))
+    .max(UI_PROFILE_SNIPPETS_MAX),
+  approvedAt: z.iso.datetime(),
+});
+export type UiProfileScreen = z.infer<typeof uiProfileScreenSchema>;
+
+/** #752 A3: one style rule, with the design comments it came from. */
+export const uiProfileStyleRuleSchema = z.strictObject({
+  text: z.string().trim().min(1).max(UI_PROFILE_STYLE_RULE_MAX),
+  commentIds: z.array(z.string().min(1)).max(UI_PROFILE_RULE_COMMENTS_MAX),
+  /** The design it was learned from; null for a rule a person wrote. */
+  designId: z.string().min(1).nullable(),
+});
+export type UiProfileStyleRule = z.infer<typeof uiProfileStyleRuleSchema>;
+
+export const uiProfileScreensSchema = z
+  .array(uiProfileScreenSchema)
+  .max(UI_PROFILE_SCREENS_MAX);
+export const uiProfileStyleRulesSchema = z
+  .array(uiProfileStyleRuleSchema)
+  .max(UI_PROFILE_STYLE_RULES_MAX);
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to refuse them
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
