@@ -12,12 +12,15 @@ const { adoptLegacyEnv, migrateLegacyDirs } = await import('./legacy');
 const legacyEnv = adoptLegacyEnv(process.env);
 
 // `filter` and `filter-hook` run on every Bash call of every agent (#445 D3),
-// `read-hook` on every Read (#616): they load only their own modules. Everything else is imported lazily below,
-// and the build splits chunks, so the daemon's graph is never parsed here.
+// `read-hook` on every Read (#616), `tool-hook` after every cut MCP, Grep or
+// WebFetch call (#747): they load only their own modules. Everything else is
+// imported lazily below, and the build splits chunks, so the daemon's graph
+// is never parsed here.
 if (
   argv[0] === 'filter' ||
   argv[0] === 'filter-hook' ||
-  argv[0] === 'read-hook'
+  argv[0] === 'read-hook' ||
+  argv[0] === 'tool-hook'
 ) {
   const { runFilterCommand } = await import('./filter/main');
   process.exit(await runFilterCommand(argv));

@@ -1076,11 +1076,35 @@ describe('nautelle-runner CLI', () => {
       expect(stdout).toEqual([]);
     });
 
-    it('lists all three in the usage', async () => {
+    it('tool-hook fails open: no output, exit 0 (#747)', async () => {
+      for (const input of [
+        '',
+        'not json',
+        '{"tool_name":"mcp__x__y"}',
+        '{"tool_name":"Grep","tool_response":{"content":"' +
+          'x'.repeat(40_000) +
+          '"}}',
+      ]) {
+        expect(
+          await runCli(
+            ['tool-hook'],
+            deps({
+              env: { NAUTELLE_TECHNIQUES: 'mcp-cut,grep-cut' },
+              stdin: () =>
+                new Response(input).body as ReadableStream<Uint8Array>,
+            }),
+          ),
+        ).toBe(EXIT.ok);
+      }
+      expect(stdout).toEqual([]);
+    });
+
+    it('lists all four in the usage', async () => {
       await runCli(['help'], deps());
       expect(stdout.join('')).toContain('filter -- <command>');
       expect(stdout.join('')).toContain('filter-hook');
       expect(stdout.join('')).toContain('read-hook');
+      expect(stdout.join('')).toContain('tool-hook');
     });
   });
 });

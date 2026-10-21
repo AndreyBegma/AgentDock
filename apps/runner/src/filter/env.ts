@@ -53,6 +53,55 @@ export const switchedOffFamilies = (
       .filter(Boolean),
   );
 
+/**
+ * #747 D4: the techniques on for this launch, comma-separated
+ * (`mcp-cut,read-guard-400`). The launch sets it from `tokenSaver.techniques`;
+ * `read-hook` and `tool-hook` read it. Unset is no technique on — the
+ * behaviour before #747 (D3).
+ */
+export const TECHNIQUES_ENV = 'NAUTELLE_TECHNIQUES';
+
+/**
+ * #747 D2: the technique keys the hooks act on. Mirrors
+ * `TOKEN_ECONOMY_TECHNIQUES` from `@nautelle/shared`, which this hot path does
+ * not load; a test pins the two together.
+ */
+export const TECHNIQUE_MCP_CUT = 'mcp-cut';
+export const TECHNIQUE_GREP_CUT = 'grep-cut';
+export const TECHNIQUE_WEBFETCH_CUT = 'webfetch-cut';
+export const TECHNIQUE_READ_GUARD_400 = 'read-guard-400';
+export const TECHNIQUE_TERSE_REGISTER = 'terse-register';
+
+/** The techniques named in `NAUTELLE_TECHNIQUES`. */
+export const techniquesFrom = (
+  env: Readonly<Record<string, string | undefined>>,
+): ReadonlySet<string> =>
+  new Set(
+    (env[TECHNIQUES_ENV] ?? '')
+      .split(',')
+      .map((key) => key.trim())
+      .filter(Boolean),
+  );
+
+/** Whether `NAUTELLE_TECHNIQUES` names `key`. */
+export const techniqueOn = (
+  env: Readonly<Record<string, string | undefined>>,
+  key: string,
+): boolean => techniquesFrom(env).has(key);
+
+/**
+ * The env a launch adds for its technique flags: nothing when none is on, so
+ * a launch without flags is byte-identical to one before #747.
+ */
+export const techniquesEnv = (
+  flags: Readonly<Record<string, boolean | undefined>> | undefined,
+): Record<string, string> => {
+  const on = Object.entries(flags ?? {})
+    .filter(([, value]) => value === true)
+    .map(([key]) => key);
+  return on.length === 0 ? {} : { [TECHNIQUES_ENV]: on.join(',') };
+};
+
 /** `family/command` → `family`. */
 export const familyOf = (filterId: string): string =>
   filterId.split('/')[0] ?? filterId;

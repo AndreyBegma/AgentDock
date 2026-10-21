@@ -81,16 +81,37 @@ describe('prompt budgets — the card worker (C-254)', () => {
     ).toBeLessThanOrEqual(5);
   });
 
+  it('the round 1 prompt with the control register stays within its budget (#747)', () => {
+    expect(
+      tokens(cardWorkerPrompt({ ...card, terseRegister: false })),
+    ).toBeLessThanOrEqual(700);
+    expect(
+      tokens(
+        cardWorkerPrompt({ ...card, tokenSaver: true, terseRegister: false }),
+      ),
+    ).toBeLessThanOrEqual(1100);
+  });
+
   it('keeps everything per card after the static instructions', () => {
     for (const tokenSaver of [false, true]) {
-      const a = cardWorkerPrompt({ ...card, tokenSaver });
-      const b = cardWorkerPrompt({ ...other, tokenSaver });
-      const shared = a.slice(0, commonPrefix(a, b));
-      // The prefix reaches the card's heading: instructions only.
-      expect(shared).toContain('## When you are done');
-      expect(shared.endsWith('## Card C-')).toBe(true);
-      for (const value of ['Add login', 'c12', 'develop', 'docs/specs', '#7']) {
-        expect(shared).not.toContain(value);
+      // #747 D11: only `terse-register` changes prompt bytes — one prefix
+      // per value, the same across cards.
+      for (const terseRegister of [undefined, true, false]) {
+        const a = cardWorkerPrompt({ ...card, tokenSaver, terseRegister });
+        const b = cardWorkerPrompt({ ...other, tokenSaver, terseRegister });
+        const shared = a.slice(0, commonPrefix(a, b));
+        // The prefix reaches the card's heading: instructions only.
+        expect(shared).toContain('## When you are done');
+        expect(shared.endsWith('## Card C-')).toBe(true);
+        for (const value of [
+          'Add login',
+          'c12',
+          'develop',
+          'docs/specs',
+          '#7',
+        ]) {
+          expect(shared).not.toContain(value);
+        }
       }
     }
   });

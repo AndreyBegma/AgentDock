@@ -15,6 +15,7 @@ import {
   FILTER_RUN_KIND_ENV,
   FILTER_STATS_ENV,
   LAUNCH_SETTINGS_ENV,
+  TECHNIQUES_ENV,
 } from '../filter/env';
 import { tempDir } from '../testing/fixtures';
 import firstTurn from './fixtures/first-turn.json';
@@ -34,6 +35,7 @@ import {
   PROMPT_CACHE_TTL_ENV,
   type TokenSaverLaunchInput,
   tokenSaverLaunch,
+  toolCutMatcher,
 } from './token-saver';
 
 const SELF = ['/opt/nautelle/bin/nautelle-runner'];
@@ -278,6 +280,71 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(settings.hooks.PostToolUse[0].hooks[0].command).toBe(read);
   });
 
+  describe('technique flags (#747 D3, D4)', () => {
+    const launched = (techniques?: TokenSaverLaunchInput['techniques']) => {
+      const launch = tokenSaverLaunch(input({ techniques }));
+      return {
+        env: launch?.env,
+        settings: readFileSync(launch?.settingsFile ?? '', 'utf8'),
+      };
+    };
+
+    it('without flags, writes the same settings and env as with none on', () => {
+      const before = launched();
+      expect(before.env?.[TECHNIQUES_ENV]).toBeUndefined();
+      expect(before.settings).not.toContain('tool-hook');
+      for (const off of [
+        {},
+        { 'mcp-cut': false, 'grep-cut': false, 'webfetch-cut': false },
+      ]) {
+        const after = launched(off);
+        expect(after.env).toEqual(before.env);
+        expect(after.settings).toBe(before.settings);
+      }
+    });
+
+    it('runs tool-hook after the cut tools and names the keys that are on', () => {
+      const { env, settings } = launched({
+        'mcp-cut': true,
+        'grep-cut': true,
+        'webfetch-cut': true,
+      });
+      expect(env?.[TECHNIQUES_ENV]).toBe('mcp-cut,grep-cut,webfetch-cut');
+      expect(JSON.parse(settings).hooks.PostToolUse).toContainEqual({
+        matcher: 'mcp__.*|Grep|WebFetch',
+        hooks: [
+          {
+            type: 'command',
+            command: `${SELF[0]} tool-hook || true`,
+            timeout: 10,
+          },
+        ],
+      });
+    });
+
+    it('leaves a cut that is off out of the matcher', () => {
+      const { env, settings } = launched({
+        'mcp-cut': true,
+        'grep-cut': false,
+        'webfetch-cut': true,
+      });
+      expect(env?.[TECHNIQUES_ENV]).toBe('mcp-cut,webfetch-cut');
+      const matchers = JSON.parse(settings).hooks.PostToolUse.map(
+        (entry: { matcher?: string }) => entry.matcher,
+      );
+      expect(matchers).toEqual(['Read', 'mcp__.*|WebFetch']);
+    });
+
+    it('adds no tool-hook for the techniques that are not cuts', () => {
+      const { env, settings } = launched({
+        'read-guard-400': true,
+        'terse-register': true,
+      });
+      expect(env?.[TECHNIQUES_ENV]).toBe('read-guard-400,terse-register');
+      expect(settings).not.toContain('tool-hook');
+    });
+  });
+
   describe('early compaction (amendment 12)', () => {
     const env = (): Record<string, string> =>
       tokenSaverLaunch(input())?.env ?? {};
@@ -382,6 +449,17 @@ describe('filterHookSettings (#445 D3)', () => {
     const settings = filterHookSettings(SELF, base);
     expect(settings.hooks.Stop).toEqual(base.hooks.Stop);
     expect(settings.hooks.PreToolUse?.[0]?.matcher).toBe('Bash');
+  });
+});
+
+describe('toolCutMatcher (#747 D4)', () => {
+  it('is built from the cut techniques that are on, in a fixed order', () => {
+    expect(toolCutMatcher(undefined)).toBeNull();
+    expect(toolCutMatcher({ 'read-guard-400': true })).toBeNull();
+    expect(toolCutMatcher({ 'webfetch-cut': true, 'mcp-cut': true })).toBe(
+      'mcp__.*|WebFetch',
+    );
+    expect(toolCutMatcher({ 'grep-cut': true })).toBe('Grep');
   });
 });
 

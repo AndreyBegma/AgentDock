@@ -201,6 +201,21 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
     expect(prompt).toContain('Full sentences, every required section');
   });
 
+  it('keeps the terse register on unless its arm is off (#747 D10)', () => {
+    expect(cardWorkerPrompt({ ...plain, terseRegister: true })).toBe(
+      cardWorkerPrompt(plain),
+    );
+    const off = cardWorkerPrompt({ ...plain, terseRegister: false });
+    expect(off).not.toContain(TERSE_REGISTER);
+    expect(off).toContain('## How to write');
+    expect(off).toContain(
+      '- Working register — what only you read: do not narrate, do not restate the plan, keep status lines short.',
+    );
+    expect(off).toContain(
+      '- Audience register — what a person reads (a question, the PR description, the `finish_card` summary, a spec, a design file): full sentences, with every required section, and leave nothing out.',
+    );
+  });
+
   it('asks for offset/limit on big files and Grep/Glob first', () => {
     const prompt = cardWorkerPrompt(plain);
     expect(prompt).toContain('## Reading the codebase');
@@ -373,8 +388,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 20', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(21);
+  it('is version 22', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(22);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {

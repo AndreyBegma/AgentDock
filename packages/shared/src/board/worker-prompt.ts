@@ -34,8 +34,10 @@ import type { BoardCardKind } from './types';
  * commit Nautelle pushed. Version 19 (#663 D2, D3): the working register is
  * the shared terse register. Version 20 (C-295): the product is named
  * Nautelle. Version 21 (C-297, ADR-0073): the `NAUTELLE_*` variables.
+ * Version 22 (#747 D10): the terse register behind `terse-register`; its
+ * control arm gets the #445 D7 two-register lines.
  */
-export const CARD_WORKER_PROMPT_VERSION = 21;
+export const CARD_WORKER_PROMPT_VERSION = 22;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'NAUTELLE_CARD';
@@ -161,6 +163,11 @@ export interface CardWorkerPromptInput {
    * `NAUTELLE_RAW=1` bypass, which exist only then. Absent is off.
    */
   tokenSaver?: boolean;
+  /**
+   * #747 D10: the card's `terse-register` arm. `false` gives the #445 D7
+   * two-register lines; absent or `true` the shared terse register (D3).
+   */
+  terseRegister?: boolean;
   /**
    * C-227: the project's `## Project coding rules` section, from
    * `projectRulesBlock`; absent or `null` is none.
@@ -426,9 +433,21 @@ const pullRequestSection = (card: CardWorkerPromptInput): string[] => {
 
 /**
  * #445 D7: two registers. What only the worker reads is terse; what a person
- * reads is complete.
+ * reads is complete. #663 D2: the working register is the shared terse one.
  */
 const REGISTER_LINES = ['## How to write', '', ...TERSE_REGISTER_LINES];
+
+/**
+ * #747 D10: the control arm of `terse-register` — the #445 D7 lines #663
+ * replaced, kept word for word, so the audience-prose rule (ADR-0039 §4)
+ * stays.
+ */
+const TWO_REGISTER_LINES = [
+  '## How to write',
+  '',
+  '- Working register — what only you read: do not narrate, do not restate the plan, keep status lines short.',
+  `- Audience register — what a person reads (a question, the PR description, the \`${FINISH_CARD_TOOL}\` summary, a spec, a design file): full sentences, with every required section, and leave nothing out.`,
+];
 
 /**
  * #445 amendment 11: 629 of 634 card Bash calls were chains the hook may not
@@ -493,7 +512,7 @@ const assemblePrompt = (
     PUSHED_HISTORY_LINE,
     '- If anything is unclear, ask and wait.',
     '',
-    ...REGISTER_LINES,
+    ...(card.terseRegister === false ? TWO_REGISTER_LINES : REGISTER_LINES),
     '',
     ...READING_LINES,
     ...(card.tokenSaver ? TOKEN_SAVER_LINES : []),

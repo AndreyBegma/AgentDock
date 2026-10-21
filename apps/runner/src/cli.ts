@@ -122,7 +122,10 @@ Used by the runner's launches (Token saver):
   read-hook                                the Read hook that refuses a whole read
                                            of a big file and a repeated read once
                                            (JSON on stdin)
-  register                                 print the terse working register
+  tool-hook                                the PostToolUse hook that cuts a large
+                                           MCP, Grep or WebFetch result (JSON on
+                                           stdin)
+  register                                print the terse working register
 `;
 
 class UsageError extends Error {}
@@ -630,7 +633,8 @@ export const runCli = async (
   if (
     command === 'filter' ||
     command === 'filter-hook' ||
-    command === 'read-hook'
+    command === 'read-hook' ||
+    command === 'tool-hook'
   ) {
     const { runFilterCommand } = await import('./filter/main');
     // One decoder per stream: a character may span two chunks.

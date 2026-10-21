@@ -4,16 +4,22 @@ import { familyOf, switchedOffFamilies } from './env';
 import { ALL_FILTERS } from './families';
 import { runFilterHook } from './hook';
 import { runReadHook } from './read-guard';
+import { runToolHook } from './tool-cut';
 import type { Filter } from './types';
 
 /**
  * The filter's own entry (#445 D3). `main.ts` imports it before anything
- * else, so `filter`, `filter-hook` and `read-hook` start without loading the daemon's
- * module graph — they sit on every Bash call of every agent, and the budget
- * is 50 ms (p95) per command.
+ * else, so `filter`, `filter-hook`, `read-hook` and `tool-hook` start without
+ * loading the daemon's module graph — they sit on every Bash call of every
+ * agent, and the budget is 50 ms (p95) per command.
  */
 
-export const FILTER_COMMANDS = new Set(['filter', 'filter-hook', 'read-hook']);
+export const FILTER_COMMANDS = new Set([
+  'filter',
+  'filter-hook',
+  'read-hook',
+  'tool-hook',
+]);
 
 /** This runner as an argv: the compiled binary, or bun with the entry script. */
 const selfCommand = (): string[] =>
@@ -69,7 +75,10 @@ export const processIo = (): FilterIo => {
   };
 };
 
-/** Runs `filter …`, `filter-hook` or `read-hook`; returns the exit code. */
+/**
+ * Runs `filter …`, `filter-hook`, `read-hook` or `tool-hook`; returns the
+ * exit code.
+ */
 export const runFilterCommand = async (
   argv: readonly string[],
   io: FilterIo = processIo(),
@@ -82,10 +91,11 @@ export const runFilterCommand = async (
     off.size === 0
       ? allFilters
       : allFilters.filter((filter) => !off.has(familyOf(filter.id)));
-  if (command === 'read-hook') {
+  if (command === 'read-hook' || command === 'tool-hook') {
+    const run = command === 'read-hook' ? runReadHook : runToolHook;
     let output = '';
     try {
-      output = runReadHook(await io.stdin(), { env: io.env, now: Date.now });
+      output = run(await io.stdin(), { env: io.env, now: Date.now });
     } catch {
       // Fail open: no output is "no decision".
     }

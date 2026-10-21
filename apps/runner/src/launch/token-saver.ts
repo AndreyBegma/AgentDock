@@ -16,6 +16,10 @@ import {
   type FilterLaunch,
   filterEnv,
   LAUNCH_SETTINGS_ENV,
+  TECHNIQUE_GREP_CUT,
+  TECHNIQUE_MCP_CUT,
+  TECHNIQUE_WEBFETCH_CUT,
+  techniquesEnv,
 } from '../filter/env';
 import { writeJsonAtomic } from '../skills/run/record';
 import { readProfileMcpServers } from './profile-mcp';
@@ -222,15 +226,41 @@ export interface LaunchSettings {
 }
 
 /**
+ * #747 D4: the tools each cut technique governs, as matcher alternatives, in
+ * matcher order.
+ */
+export const TOOL_CUT_MATCHERS: readonly (readonly [string, string])[] = [
+  [TECHNIQUE_MCP_CUT, 'mcp__.*'],
+  [TECHNIQUE_GREP_CUT, 'Grep'],
+  [TECHNIQUE_WEBFETCH_CUT, 'WebFetch'],
+];
+
+/**
+ * #747 D4: the PostToolUse matcher of `tool-hook`, built only from the cut
+ * techniques that are on — a technique that is off spawns no process.
+ * `null` when none is on.
+ */
+export const toolCutMatcher = (
+  techniques: Partial<TechniqueFlags> | undefined,
+): string | null => {
+  const on = TOOL_CUT_MATCHERS.filter(
+    ([key]) => techniques?.[key] === true,
+  ).map(([, matcher]) => matcher);
+  return on.length === 0 ? null : on.join('|');
+};
+
+/**
  * D3: the PreToolUse hook that rewrites a Bash call into
  * `nautelle-runner filter -- <argv…>`, by the runner's absolute argv; and
  * #616's `read-hook` on `Read` (before and after) and on compaction, which
- * guards whole reads of big files and repeated reads.
+ * guards whole reads of big files and repeated reads; and #747's `tool-hook`
+ * after the MCP, Grep and WebFetch calls whose cut technique is on.
  * `|| true`: the hooks fail open — an exit code 2 would block the tool.
  */
 export const filterHookSettings = (
   selfCommand: readonly string[],
   base?: LaunchSettings,
+  techniques?: Partial<TechniqueFlags>,
 ): LaunchSettings => {
   const self = selfCommand.map(shellQuote).join(' ');
   const hook = (subcommand: string): LaunchHookCommand => ({
@@ -248,6 +278,10 @@ export const filterHookSettings = (
     ...(hooks.PostToolUse ?? []),
     { matcher: 'Read', hooks: [hook('read-hook')] },
   ];
+  const toolCut = toolCutMatcher(techniques);
+  if (toolCut !== null) {
+    hooks.PostToolUse.push({ matcher: toolCut, hooks: [hook('tool-hook')] });
+  }
   hooks.PreCompact = [
     ...(hooks.PreCompact ?? []),
     { hooks: [hook('read-hook')] },
@@ -281,9 +315,11 @@ export interface TokenSaverLaunchInput {
   /** Hooks the launch already carries (the card's injected wiring). */
   baseSettings?: LaunchSettings;
   /**
-   * #746 D11: the card's technique flags, `{ [technique]: on }`. Absent is
-   * every technique on. No technique changes the launch yet; one that does
-   * reads its flag from here.
+   * #746 D11: the card's technique flags, `{ [technique]: on }`. #747 D3: a
+   * key that is absent behaves as before its technique — no cut, the
+   * 1,500-line read guard — so a launch without flags is unchanged. The cut
+   * keys add `tool-hook` (D4); every key that is on reaches the hooks in
+   * `NAUTELLE_TECHNIQUES`.
    */
   techniques?: Partial<TechniqueFlags>;
 }
@@ -353,7 +389,11 @@ export const tokenSaverLaunch = (
     mkdirSync(rawDir, { recursive: true, mode: 0o700 });
     writeJsonAtomic(settingsFile, {
       ...PREFIX_SETTINGS,
-      ...filterHookSettings(input.selfCommand, input.baseSettings),
+      ...filterHookSettings(
+        input.selfCommand,
+        input.baseSettings,
+        input.techniques,
+      ),
     });
     // 0600 (writeJsonAtomic): the copied definitions may hold secrets.
     writeJsonAtomic(mcpFile, { mcpServers: servers });
@@ -385,6 +425,7 @@ export const tokenSaverLaunch = (
       [CS_ECO_ENV]: 'off',
       [LAUNCH_SETTINGS_ENV]: settingsFile,
       ...filterEnv(run),
+      ...techniquesEnv(input.techniques),
     },
     settingsFile,
     mcpFile,
