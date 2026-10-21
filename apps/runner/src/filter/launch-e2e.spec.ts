@@ -192,7 +192,10 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
       now: () => new Date(),
     });
     await reader.poll();
-    const rows = (events[0]?.data as { rows: FilterStatRow[] }).rows;
+    // #751: the run dir's prefix record is sent in the same pass, in
+    // directory order — pick the stats batch by type.
+    const stats = events.find((e) => e.type === FILTER_STATS_EVENT);
+    const rows = (stats?.data as { rows: FilterStatRow[] }).rows;
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       runKind,
