@@ -66,7 +66,10 @@ import { resolveSpecTarget, type SpecTarget } from '../planner/spec-target';
 import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TokenEconomyService } from '../token-economy/token-economy.service';
-import { TokenSaverService } from '../token-saver/token-saver.service';
+import {
+  type TokenSaverLaunch,
+  TokenSaverService,
+} from '../token-saver/token-saver.service';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import {
@@ -157,6 +160,23 @@ const changeSinceLastRound = (
     { title: card.title, body: card.body, kind: card.kind },
     { before: snapshotOf(last.cardAttachments), now: attachments },
   );
+};
+
+/**
+ * What the round-1 prompt takes from the launch's Token saver. #747: the
+ * scout, bypass and handoff lines exist only with it on — the card prompt
+ * never carried them before. D10: the `terse-register` arm only when the
+ * flags are launched, so the prompt matches the run's `techniques` snapshot;
+ * absent is on (D3).
+ */
+export const cardPromptSaver = (
+  saver: Pick<TokenSaverLaunch, 'on' | 'techniques'>,
+): { tokenSaver: boolean; terseRegister?: boolean } => {
+  const terseRegister = saver.techniques?.['terse-register'];
+  return {
+    tokenSaver: saver.on,
+    ...(terseRegister !== undefined ? { terseRegister } : {}),
+  };
 };
 
 /**
@@ -601,6 +621,17 @@ export class BoardRoundsService {
     const attachmentRefs = attached.map(toAttachmentRef);
     const attachmentBriefs = attached.map(toAttachmentBrief);
     const projectRules = await this.projectRulesSection(project.id);
+    // #445 D11: only a runner that advertises the token saver gets the field.
+    // #746 D2: the card's technique arms, drawn at its first round and sticky.
+    // Before the prompt: #747 D10 puts the `terse-register` arm in it.
+    const saver = await this.tokenSaver.launch(
+      project.id,
+      await this.economy.cardFlags(
+        project.id,
+        card.id,
+        card.rounds.length === 0,
+      ),
+    );
     const prompt = ciFix
       ? cardCiFixPrompt(ciFix)
       : resume || (trigger === 'feedback' && feedback !== null)
@@ -653,6 +684,7 @@ export class BoardRoundsService {
               : null,
             attachments: attachmentBriefs,
             projectRules,
+            ...cardPromptSaver(saver),
           });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null && specPr === null
@@ -661,16 +693,6 @@ export class BoardRoundsService {
       ...designFrames.map((f) => ({ path: f.path, content: f.content })),
       ...stackFrames.map((f) => ({ path: f.path, content: f.content })),
     ];
-    // #445 D11: only a runner that advertises the token saver gets the field.
-    // #746 D2: the card's technique arms, drawn at its first round and sticky.
-    const saver = await this.tokenSaver.launch(
-      project.id,
-      await this.economy.cardFlags(
-        project.id,
-        card.id,
-        card.rounds.length === 0,
-      ),
-    );
     const draft: Omit<CardRunArgs, 'runId'> = {
       cardId: card.id,
       projectId: project.id,

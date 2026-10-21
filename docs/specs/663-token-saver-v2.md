@@ -155,3 +155,10 @@ Follow-up, in AndreyBegma/code-sentinel-skills (one issue, after the 0.14.0 runn
 - **Design and Planner effort.** Default: `medium`.
 
 Depends on #662 (runner 0.13.0 release)
+
+## Amendments
+
+- **#747 (2026-10-21), D2-D3.** In the card worker prompt the terse register is
+  behind the `terse-register` technique flag. A card without the flag keeps it;
+  its control arm gets the #445 D7 two-register lines instead. See
+  [747](747-cut-large-mcp-grep-and-webfetch-results.md).

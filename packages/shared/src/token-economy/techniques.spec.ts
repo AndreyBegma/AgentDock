@@ -50,6 +50,20 @@ describe('the registry (#746)', () => {
     expect(new Set(keys).size).toBe(keys.length);
     for (const key of keys) expect(key).toMatch(TECHNIQUE_KEY_PATTERN);
   });
+
+  it('registers the runner savers of #747 for cards, on test by default', () => {
+    for (const key of [
+      'mcp-cut',
+      'grep-cut',
+      'webfetch-cut',
+      'read-guard-400',
+      'terse-register',
+    ]) {
+      const def = TOKEN_ECONOMY_TECHNIQUES.find((t) => t.key === key);
+      expect(def?.defaultMode).toBe('ab');
+      expect(def?.runKinds).toEqual(['card']);
+    }
+  });
 });
 
 describe('technique flags (#746 D11)', () => {
@@ -71,7 +85,12 @@ describe('technique flags (#746 D11)', () => {
     expect(
       cardTokenSaverSchema.safeParse({ ...base, techniques: {} }).success,
     ).toBe(true);
-    // The production registry is empty: any key is unknown.
+    expect(
+      cardTokenSaverSchema.safeParse({
+        ...base,
+        techniques: { 'mcp-cut': true, 'terse-register': false },
+      }).success,
+    ).toBe(true);
     expect(
       cardTokenSaverSchema.safeParse({ ...base, techniques: { nope: true } })
         .success,

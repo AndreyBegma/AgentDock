@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   FILTER_ID_NONE,
+  TOKEN_ECONOMY_TECHNIQUES,
   TOKEN_SAVER_RAW_ENV,
   TOKEN_SAVER_RUN_KINDS,
 } from '@nautelle/shared';
@@ -13,6 +14,15 @@ import {
   filterEnv,
   orchestratorFilterDir,
   RAW_ENV,
+  TECHNIQUE_GREP_CUT,
+  TECHNIQUE_MCP_CUT,
+  TECHNIQUE_READ_GUARD_400,
+  TECHNIQUE_TERSE_REGISTER,
+  TECHNIQUE_WEBFETCH_CUT,
+  TECHNIQUES_ENV,
+  techniqueOn,
+  techniquesEnv,
+  techniquesFrom,
 } from './env';
 import { RUN_KINDS, statsTarget } from './stats';
 
@@ -93,5 +103,47 @@ describe('filter env (#445 amendment 5)', () => {
     };
     expect(statsTarget(env)?.runId).toBeNull();
     expect(statsTarget({ ...env, [FILTER_RUN_ENV]: 's1' })?.runId).toBe('s1');
+  });
+});
+
+describe('technique flags (#747 D4)', () => {
+  it('mirrors the registered runner techniques the hot path does not load', () => {
+    const registered = TOKEN_ECONOMY_TECHNIQUES.map((t) => t.key);
+    for (const key of [
+      TECHNIQUE_MCP_CUT,
+      TECHNIQUE_GREP_CUT,
+      TECHNIQUE_WEBFETCH_CUT,
+      TECHNIQUE_READ_GUARD_400,
+      TECHNIQUE_TERSE_REGISTER,
+    ]) {
+      expect(registered).toContain(key);
+    }
+  });
+
+  it('sets nothing when no technique is on — the launch is as before', () => {
+    expect(techniquesEnv(undefined)).toEqual({});
+    expect(techniquesEnv({})).toEqual({});
+    expect(techniquesEnv({ 'mcp-cut': false })).toEqual({});
+  });
+
+  it('lists exactly the keys that are on', () => {
+    expect(
+      techniquesEnv({
+        'mcp-cut': true,
+        'grep-cut': false,
+        'read-guard-400': true,
+      }),
+    ).toEqual({ [TECHNIQUES_ENV]: 'mcp-cut,read-guard-400' });
+  });
+
+  it('reads back what the launch set, and unset as none', () => {
+    const env = techniquesEnv({ 'mcp-cut': true, 'read-guard-400': true });
+    expect([...techniquesFrom(env)]).toEqual(['mcp-cut', 'read-guard-400']);
+    expect(techniqueOn(env, TECHNIQUE_MCP_CUT)).toBe(true);
+    expect(techniqueOn(env, TECHNIQUE_GREP_CUT)).toBe(false);
+    expect(techniquesFrom({}).size).toBe(0);
+    expect([
+      ...techniquesFrom({ [TECHNIQUES_ENV]: ' mcp-cut, ,grep-cut ' }),
+    ]).toEqual(['mcp-cut', 'grep-cut']);
   });
 });

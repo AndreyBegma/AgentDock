@@ -29,7 +29,40 @@ export interface TokenEconomyTechniqueDef {
  * each add their key, in chain order. A key is never reused for another
  * technique: reports read the `runs.techniques` snapshots by it.
  */
-export const TOKEN_ECONOMY_TECHNIQUES: readonly TokenEconomyTechniqueDef[] = [];
+export const TOKEN_ECONOMY_TECHNIQUES: readonly TokenEconomyTechniqueDef[] = [
+  // #747 D2: the runner's savers. A launch without a key behaves as before
+  // #747 (D3): no cuts, the 1,500-line read guard, the terse register on.
+  {
+    key: 'mcp-cut',
+    label: 'Cut large MCP results',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
+  {
+    key: 'grep-cut',
+    label: 'Cut large Grep results',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
+  {
+    key: 'webfetch-cut',
+    label: 'Cut large WebFetch results',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
+  {
+    key: 'read-guard-400',
+    label: 'Read guard at 400 lines, with an outline',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
+  {
+    key: 'terse-register',
+    label: 'Terse working register',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
+];
 
 /** A technique key: lower-case words joined by `-`. */
 export const TECHNIQUE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;

@@ -39,3 +39,11 @@ Every guard decision writes a stats row with its own filter id (e.g. `tool/read-
 - **Stats.** A refusal writes `rawBytes` = the estimated read, `keptBytes` =
   the message. The retry it lets through writes a `bypassed` row of the same
   id with no bytes: the schema does not allow a negative correction.
+
+## Amendments
+
+- **#747 (2026-10-21).** On a card round under the `read-guard-400` technique
+  flag the threshold is 400 lines (64 KB unchanged) and the refusal carries
+  the plugin's file outline; without the flag this spec's 1,500 lines hold.
+  The MCP cut lost to `CS_ECO=off` comes back in the runner as `tool-hook`.
+  See [747](747-cut-large-mcp-grep-and-webfetch-results.md).
