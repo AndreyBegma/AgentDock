@@ -92,6 +92,14 @@ describe('the registry (#746)', () => {
       }).success,
     ).toBe(true);
   });
+
+  it('registers the three prefix techniques of #751 for cards, on test by default', () => {
+    for (const key of ['prefix-select', 'rules-compressed', 'prefix-overlays']) {
+      const def = TOKEN_ECONOMY_TECHNIQUES.find((t) => t.key === key);
+      expect(def?.defaultMode).toBe('ab');
+      expect(def?.runKinds).toEqual(['card']);
+    }
+  });
 });
 
 describe('technique flags (#746 D11)', () => {

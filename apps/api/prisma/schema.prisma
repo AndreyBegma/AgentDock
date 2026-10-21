@@ -87,6 +87,7 @@ model User {
   textSettingsUpdated         TextSettings[]
   attachmentsUploaded         Attachment[]
   tokenSaverSettingsUpdated   TokenSaverSettings[]
+  prefixOverlaysDecided       PrefixOverlay[]
   tokenEconomySettingsUpdated TokenEconomySettings[]
   tokenEconomyTechniquesSet   TokenEconomyTechnique[]
   stewardSettingsUpdated      StewardSettings[]
@@ -474,6 +475,8 @@ model Project {
   assistantConversations AssistantConversation[]
   tokenSaverSettings     TokenSaverSettings?
   tokenSaverStats        TokenSaverStat[]
+  runPrefixParts         RunPrefixPart[]
+  prefixOverlays         PrefixOverlay[]
   tokenEconomySettings   TokenEconomySettings?
   tokenEconomyTechniques TokenEconomyTechnique[]
   runUsageFacts          RunUsageFact[]
@@ -1679,6 +1682,10 @@ enum RunKind {
   code_ask
   /// A UI profile's learning from an approved design (issue #752, ADR-0075 §6).
   ui_profile_learn
+  /// The injected rules compressed with haiku, once per rules version (#751 B6).
+  rules_compress
+  /// An overlay proposal for one prefix part (#751 B8, ADR-0075).
+  prefix_propose
 }
 
 enum RunStatus {
@@ -1746,6 +1753,11 @@ model Run {
   /// #746 D4: the run's `bypassed` token-saver rows — unfiltered re-runs and
   /// reads let through after a guard refusal.
   retries            Int        @default(0)
+  /// #751 B2: turn 1's input + cache read + cache write — the measured
+  /// prefix. Null until the run's first request is known.
+  prefixTokens       Int?
+  /// #751 B4: the card type of a card session's round; null elsewhere.
+  cardType           String?
 
   project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
@@ -1759,6 +1771,7 @@ model Run {
   inboundDeliveries InboundDelivery[]
   tokenSaverStats   TokenSaverStat[]
   usageFact         RunUsageFact?
+  prefixParts       RunPrefixPart[]
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
@@ -3076,6 +3089,10 @@ model BoardCard {
   /// no session or one started before #750 — read as matching.
   sessionModel            String?
   sessionEffort           CardEffort?
+  /// #751 B4, S2: the card type and the prefix (selection, rules version,
+  /// overlay ids) `sessionId` was started with; a resumed round reuses them.
+  sessionCardType         String?
+  sessionPrefix           Json?
   /// #750 D9: the card's one escalation to Opus — when, why and the worker's
   /// note (at most 2 000 characters). Null while it never escalated.
   escalatedAt             DateTime?
@@ -3829,12 +3846,18 @@ enum TokenSaverRunKind {
 
 /// A project's Token saver setting (D11). No row: on, with an empty allowlist.
 model TokenSaverSettings {
-  projectId   String   @id
-  enabled     Boolean  @default(true)
+  projectId          String   @id
+  enabled            Boolean  @default(true)
   /// D6: MCP servers a launch may load besides `agentdock`, by name.
-  mcpAllow    String[] @default([])
-  updatedById String?
-  updatedAt   DateTime @updatedAt
+  mcpAllow           String[] @default([])
+  /// #751 B3: the budget a launch kind's median prefix is checked against.
+  prefixBudgetTokens Int      @default(25000)
+  /// #751 B5: `{ [cardType]: server[] }`, each a subset of `mcpAllow`.
+  mcpByType          Json     @default("{}")
+  /// #751 B5: `{ [cardType]: skill[] }` hidden with `skillOverrides: "off"`.
+  skillsOffByType    Json     @default("{}")
+  updatedById        String?
+  updatedAt          DateTime @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
@@ -3878,6 +3901,78 @@ model TokenSaverStat {
   @@index([sessionId])
   @@index([projectId, sessionExternalId])
   @@map("token_saver_stats")
+}
+
+/// One part of a launch's prefix (#751 B1), from the runner's
+/// `prefix.measured`. Sizes only — the runner never sends the content. A
+/// resent event inserts nothing twice: `(runId, kind, name)` is unique.
+model RunPrefixPart {
+  id         String   @id @default(cuid())
+  runId      String
+  projectId  String
+  /// `TokenSaverRunKind` of the launch.
+  launchKind String
+  /// `PREFIX_PART_KINDS`.
+  kind       String
+  name       String
+  /// Relative to the worktree, or to `~` for a profile file; "" for none.
+  path       String   @default("")
+  /// `PREFIX_ORIGINS`: repo, profile, plugin or nautelle.
+  origin     String
+  bytes      Int
+  /// ≈ bytes / 4 — an estimate; the run's `prefixTokens` is the fact.
+  estTokens  Int
+  sha256     String
+  createdAt  DateTime @default(now())
+
+  run     Run     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, kind, name])
+  @@index([projectId, createdAt])
+  @@index([runId])
+  @@map("run_prefix_parts")
+}
+
+/// Mirrors `PREFIX_OVERLAY_STATES` of the shared contract (#751 B7).
+enum PrefixOverlayState {
+  proposed
+  approved
+  rejected
+  stale
+}
+
+/// An admin-approved replacement of one prefix part (#751 B7, ADR-0075):
+/// `claude_md`, `skill:<name>` or `rules`. The original's text is kept for
+/// the diff; the project repository is never edited. At most one open
+/// (`proposed` or `approved`) overlay per part — a partial unique index in
+/// the migration.
+model PrefixOverlay {
+  id                String             @id @default(cuid())
+  projectId         String
+  part              String
+  originalSha256    String
+  originalBytes     Int
+  originalText      String
+  content           String
+  contentBytes      Int
+  state             PrefixOverlayState @default(proposed)
+  /// The `prefix_propose` or `rules_compress` run that made it.
+  runId             String?
+  /// B6: the rules version a `rules` overlay compresses.
+  rulesVersion      String?
+  decidedById       String?
+  decidedAt         DateTime?
+  /// B12: the one Board card **Open a pull request** created.
+  pullRequestCardId String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  decidedBy User?   @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, part])
+  @@map("prefix_overlays")
 }
 
 /// Token economy (#746, ADR-0074): every saving technique is judged by billed
@@ -4141,6 +4236,8 @@ model ProjectRule {
   enabled     Boolean           @default(true)
   position    Int
   source      ProjectRuleSource @default(manual)
+  /// #751 B5: the card types the rule applies to; empty is all.
+  appliesTo   String[]          @default([])
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 

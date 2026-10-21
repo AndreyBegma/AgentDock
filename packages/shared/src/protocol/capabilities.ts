@@ -257,6 +257,18 @@ export const capabilitiesSchema = z.object({
    */
   cardEscalate: z.boolean().optional(),
   /**
+   * #751 B1: the runner sends `prefix.measured` on every launch. Absent means
+   * `false` — the Prefix section then has nothing from this runner.
+   */
+  prefixMeasure: z.boolean().optional(),
+  /**
+   * #751: the runner takes `tokenSaver.prefix` on `card.run` — the card
+   * type's selection and the overlays, hash-checked at launch (B10).
+   * `card.run` args are strict, so the API sends the field only when this is
+   * `true`. Absent means `false`.
+   */
+  prefixOverlays: z.boolean().optional(),
+  /**
    * ADR-0047: the runner's local security policy as it is now — values only,
    * no path beyond `allowedRoots`. The server cannot change it; the UI reads
    * it to explain a `policy_refused` before the person asks. Absent means
@@ -308,6 +320,10 @@ export const cardFreshStartAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `card.run`'s `escalate` (#750); absent is `false`. */
 export const cardEscalateAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardEscalate === true;
+
+/** Whether the API may send `tokenSaver.prefix` on `card.run` (#751); absent is `false`. */
+export const prefixOverlaysAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.tokenSaver === true && capabilities.prefixOverlays === true;
 
 /** The runner's policy (ADR-0047); null for a runner older than it. */
 export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {
@@ -393,6 +409,8 @@ export const RUNNER_FEATURE_COMMANDS = {
   docsRepo: ['docs.publish_specs'],
   /** #584: coding-rule candidates read from the project's own docs. */
   ruleScan: ['project.scan_rules'],
+  /** #751 B6, B8: compressed rules and overlay proposals. */
+  prefixOptimise: ['rules.compress', 'prefix.propose'],
 } as const satisfies Record<string, readonly CommandName[]>;
 
 /** Facts about the host itself, sent next to the capabilities. */

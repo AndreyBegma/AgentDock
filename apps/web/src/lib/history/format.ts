@@ -52,6 +52,8 @@ export const RUN_KIND_LABEL: Record<RunKind, string> = {
   steward: 'Steward check',
   code_ask: 'Assistant code question',
   ui_profile_learn: 'UI profile learning',
+  rules_compress: 'Rules compression',
+  prefix_propose: 'Prefix overlay proposal',
 };
 
 export const isRunKind = (value: string): value is RunKind =>

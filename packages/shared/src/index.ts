@@ -24,6 +24,7 @@ export * from './llm';
 export * from './models';
 export * from './notifications';
 export * from './planner';
+export * from './prefix';
 export * from './project-rules';
 export * from './projects';
 export * from './queue';

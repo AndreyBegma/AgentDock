@@ -85,6 +85,26 @@ export const TOKEN_ECONOMY_TECHNIQUES: readonly TokenEconomyTechniqueDef[] = [
     defaultMode: 'ab',
     runKinds: ['card'],
   },
+  // #751 S1: the launch prefix. Off (arm A) launches the whole prefix as
+  // before #751; the measurement (B1) runs in both arms.
+  {
+    key: 'prefix-select',
+    label: 'Rules, skills and MCP servers selected by card type',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
+  {
+    key: 'rules-compressed',
+    label: 'Approved compressed rules',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
+  {
+    key: 'prefix-overlays',
+    label: 'Approved overlays of CLAUDE.md and project skills',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
 ];
 
 /** A technique key: lower-case words joined by `-`. */
