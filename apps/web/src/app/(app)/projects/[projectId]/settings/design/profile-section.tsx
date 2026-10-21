@@ -32,11 +32,13 @@ import {
   rebuildRunnerGate,
 } from '../../../../../../lib/design/format';
 import { runHref, uiProfileApi } from '../../../../../../lib/design/href';
+import { PROFILE_SOURCE_LABEL } from '../../../../../../lib/design/profile-memory';
 import { Time } from '../../../../../../lib/format/time';
 import { runnerGateCopy } from '../../../../../../lib/planner/runner-support';
 import { useErrorToast } from '../../../../../../lib/section/use-error-toast';
 import { useSection } from '../../../../../../lib/section/use-section';
 import { ProfileEditor } from './profile-editor';
+import { ProfileMemory } from './profile-memory';
 import { ProfilePreview } from './profile-preview';
 
 /** While a build runs the page asks again; a build takes minutes. */
@@ -45,7 +47,8 @@ const BUILDING_POLL_MS = 10_000;
 /**
  * Settings → Design → UI profile (spec 223 D12–D14): status, versions, the
  * rendered summary, the style kit and snippets, their preview through the
- * mockup endpoint, **Edit** (project admin) and **Rebuild** (operator).
+ * mockup endpoint, **Edit** (project admin) and **Rebuild** (operator). #752:
+ * the approved screens and style rules approvals taught it.
  */
 export function ProfileSection({
   projectId,
@@ -218,7 +221,17 @@ export function ProfileSection({
                   onChange={setPicked}
                 />
                 {shown ? (
-                  <ProfileBody projectId={projectId} profile={shown} />
+                  <ProfileBody
+                    projectId={projectId}
+                    profile={shown}
+                    memoryEditable={
+                      isAdmin && shown.version === data.current.version
+                    }
+                    onSaved={() => {
+                      setPicked(null);
+                      retry();
+                    }}
+                  />
                 ) : null}
               </>
             )}
@@ -265,7 +278,7 @@ function VersionPicker({
       >
         {versions.map((v) => (
           <option key={v.id} value={v.version}>
-            {`v${v.version} · ${v.source === 'manual' ? `edited by ${v.author?.name ?? 'a former member'}` : 'built'}${v.version === current ? ' (current)' : ''}`}
+            {`v${v.version} · ${v.source === 'manual' ? `edited by ${v.author?.name ?? 'a former member'}` : v.source === 'memory' ? 'learned from a design' : 'built'}${v.version === current ? ' (current)' : ''}`}
           </option>
         ))}
       </Select>
@@ -276,9 +289,13 @@ function VersionPicker({
 function ProfileBody({
   projectId,
   profile,
+  memoryEditable,
+  onSaved,
 }: {
   projectId: string;
   profile: UiProfileVersionView;
+  memoryEditable: boolean;
+  onSaved: () => void;
 }) {
   const [showKit, setShowKit] = useState(false);
   const [showSnippets, setShowSnippets] = useState(false);
@@ -289,7 +306,7 @@ function ProfileBody({
         <Badge
           size="md"
           tone="neutral"
-          label={profile.source === 'manual' ? 'Manual edit' : 'Built'}
+          label={PROFILE_SOURCE_LABEL[profile.source]}
         />
         {profile.hasUi ? null : (
           <Badge size="md" tone="warn" label="No user interface" />
@@ -303,7 +320,7 @@ function ProfileBody({
             href={runHref(projectId, profile.runId)}
             className={buttonClassName({ variant: 'ghost', size: 'sm' })}
           >
-            Build run
+            {profile.source === 'memory' ? 'Learn run' : 'Build run'}
           </Link>
         ) : null}
       </div>
@@ -346,10 +363,16 @@ function ProfileBody({
       >
         <CodeBlock code={profile.fingerprintGlobs.join('\n')} maxHeight={200} />
       </Disclosure>
+      <ProfileMemory
+        projectId={projectId}
+        profile={profile}
+        editable={memoryEditable}
+        onSaved={onSaved}
+      />
       {profile.obligations ? (
         <div className="flex flex-col gap-1">
           <h4 className="text-xs font-semibold text-ink-2">
-            Manual edits this build had to keep
+            Edits and approvals this build had to keep
           </h4>
           <CodeBlock
             code={profile.obligations}

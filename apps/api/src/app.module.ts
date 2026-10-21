@@ -17,6 +17,7 @@ import { CaptureModule } from './capture';
 import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { DesignModule } from './design/design.module';
+import { UiProfileLearnModule } from './design/learn/learn.module';
 import { FleetModule } from './fleet';
 import { GitHubAppModule } from './github-app';
 import { HandoffModule } from './handoff';
@@ -106,6 +107,9 @@ import { WorkflowsModule } from './workflows';
     // Issue #322: a card's model recommended on the runner. Global, and here
     // alone: its conditional queue must not be registered while the graph loads.
     AssessModule,
+    // Issue #752: the UI profile learns from approvals. Global, and here alone,
+    // for the same reason.
+    UiProfileLearnModule,
     // Issue #309: attachments on board cards. Global, and `forRoot()` here:
     // its conditional queue must not be registered while the graph loads.
     AttachmentsModule.forRoot(),

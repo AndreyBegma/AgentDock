@@ -33,6 +33,8 @@ export const RUN_KINDS = [
   'steward',
   /** The assistant's read-only code question on the runner (issue #622). */
   'code_ask',
+  /** A UI profile's learning from an approved design (issue #752). */
+  'ui_profile_learn',
 ] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 

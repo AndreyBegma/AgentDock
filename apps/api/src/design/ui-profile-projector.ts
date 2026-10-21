@@ -24,7 +24,7 @@ import {
 import { DesignService } from './design.service';
 import { currentProfile } from './design-store';
 import { settleBuildRun, UiProfileService } from './ui-profile.service';
-import { buildArgsOf } from './ui-profile-mapper';
+import { buildArgsOf, memoryOf } from './ui-profile-mapper';
 
 /**
  * Applies `uiprofile_build.*` (docs/specs/223-design-stage.md D12–D14). The
@@ -166,6 +166,8 @@ export class UiProfileProjector implements RunnerEventSink, OnModuleInit {
           fingerprint,
           obligations: args?.obligations ?? null,
           runId: run.id,
+          // #752 A4: the library and style rules ride on every later version.
+          ...memoryOf(current),
         },
         select: { id: true, version: true },
       });

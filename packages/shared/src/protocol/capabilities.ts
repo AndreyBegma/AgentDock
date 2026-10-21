@@ -356,6 +356,8 @@ export const RUNNER_FEATURE_COMMANDS = {
   planner: ['plan.turn'],
   design: ['plan.turn', 'uiprofile.fingerprint', 'uiprofile.build'],
   uiProfileBuild: ['uiprofile.build'],
+  /** #752 A2: a runner without it gets no `uiprofile.learn`; approvals still succeed. */
+  uiProfileLearn: ['uiprofile.learn'],
   worktree: ['worktree.status'],
   /** #379: specs written into an external docs repository. */
   docsRepo: ['docs.publish_specs'],

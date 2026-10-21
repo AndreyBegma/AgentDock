@@ -4,8 +4,12 @@ import {
   type DesignSuggestion,
   designFrameSlug,
   type TaskDesignSummary,
+  type UiProfileScreen,
   type UiProfileSnippet,
+  type UiProfileStyleRule,
+  uiProfileScreenSchema,
   uiProfileSnippetSchema,
+  uiProfileStyleRuleSchema,
 } from '@nautelle/shared';
 import type { Prisma, TaskDesignStatus, UiProfile } from '@prisma/client';
 import { z } from 'zod';
@@ -85,6 +89,30 @@ export const profileHasUi = async (
 export const snippetsOf = (value: Prisma.JsonValue): UiProfileSnippet[] => {
   const parsed = z.array(uiProfileSnippetSchema).safeParse(value);
   return parsed.success ? parsed.data : [];
+};
+
+/** #752: a stored library; one that no longer parses reads as empty. */
+export const screensOf = (value: Prisma.JsonValue): UiProfileScreen[] => {
+  const parsed = z.array(uiProfileScreenSchema).safeParse(value);
+  return parsed.success ? parsed.data : [];
+};
+
+/** #752: stored style rules; a list that no longer parses reads as empty. */
+export const styleRulesOf = (value: Prisma.JsonValue): UiProfileStyleRule[] => {
+  const parsed = z.array(uiProfileStyleRuleSchema).safeParse(value);
+  return parsed.success ? parsed.data : [];
+};
+
+/** #752 A6: whether design prompts read the profile's memory; on without a row. */
+export const useMemoryOf = async (
+  db: Db,
+  projectId: string,
+): Promise<boolean> => {
+  const settings = await db.designSettings.findUnique({
+    where: { projectId },
+    select: { useMemory: true },
+  });
+  return settings?.useMemory ?? true;
 };
 
 /** D15: the project's default design skills; none without a settings row. */
@@ -326,6 +354,36 @@ const revisionSelect = {
 } as const;
 
 /**
+ * #752 A2: every comment of a design, oldest first, with the frame it was
+ * left on and whether a later revision addressed it — what the learn reads.
+ */
+export const designCommentsOf = async (
+  db: Db,
+  designId: string,
+): Promise<
+  {
+    id: string;
+    kind: string;
+    frame: string;
+    body: string;
+    state: 'open' | 'addressed';
+  }[]
+> => {
+  const rows = await db.designComment.findMany({
+    where: { designId },
+    include: { revision: revisionSelect },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  return rows.map((c) => ({
+    id: c.id,
+    kind: c.kind,
+    frame: frameNameAt(c.revision.frames, c.frame),
+    body: c.body,
+    state: c.addressedInRevisionId ? 'addressed' : 'open',
+  }));
+};
+
+/**
  * D8: what a design turn carries — the profile it draws from, the design's
  * installed skills, the variant's latest revision on a revise, and the
  * comments open when its batch started.
@@ -336,6 +394,7 @@ export const loadDesignPrompt = async (
   design: { id: string; variantCount: number; skills: string[] },
   plan: DesignTurnPlan,
 ): Promise<DesignPromptContext> => {
+  const useMemory = await useMemoryOf(db, project.id);
   const [profile, installed, previous, comments] = await Promise.all([
     plan.profileId
       ? db.uiProfile.findUnique({ where: { id: plan.profileId } })
@@ -384,6 +443,13 @@ export const loadDesignPrompt = async (
           summary: profile.summary,
           kit: profile.kit,
           snippets: snippetsOf(profile.snippets),
+          // #752 A6: with the setting off, the prompt has neither section.
+          memory: useMemory
+            ? {
+                screens: screensOf(profile.screens),
+                styleRules: styleRulesOf(profile.styleRules),
+              }
+            : null,
         }
       : null,
     skills: design.skills.filter((s) => installed.has(s)),

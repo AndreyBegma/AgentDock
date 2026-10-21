@@ -1665,6 +1665,8 @@ enum RunKind {
   steward
   /// The assistant's read-only code question on the runner (issue #622).
   code_ask
+  /// A UI profile's learning from an approved design (issue #752, ADR-0075 §6).
+  ui_profile_learn
 }
 
 enum RunStatus {
@@ -2647,10 +2649,11 @@ model PlanTurn {
 
 // ─── Design stage (spec 223) ────────────────────────────────────────────────
 
-/// Shared `UI_PROFILE_SOURCES` (D14).
+/// Shared `UI_PROFILE_SOURCES` (D14; `memory`: issue #752, ADR-0075 §6).
 enum UiProfileSource {
   agent
   manual
+  memory
 }
 
 /// Shared `TASK_DESIGN_STATUSES`.
@@ -2679,27 +2682,37 @@ enum DesignTheme {
 /// built by a `ui_profile` run; a manual one is a person's edit, whose diff
 /// the next build keeps as `obligations` (D14).
 model UiProfile {
-  id               String          @id @default(cuid())
-  projectId        String
-  version          Int
-  source           UiProfileSource
-  hasUi            Boolean
+  id                    String          @id @default(cuid())
+  projectId             String
+  version               Int
+  source                UiProfileSource
+  hasUi                 Boolean
   /// Markdown: libraries, styling, tokens, components, patterns, themes, icons.
-  summary          String
+  summary               String
   /// The style kit's CSS (at most `UI_PROFILE_KIT_MAX_BYTES`).
-  kit              String
+  kit                   String
   /// `[{ name, html }]` (shared `uiProfileSnippetSchema`).
-  snippets         Json            @default("[]")
-  fingerprintGlobs String[]        @default([])
+  snippets              Json            @default("[]")
+  fingerprintGlobs      String[]        @default([])
   /// SHA-256 hex of the files matching `fingerprintGlobs` on `origin/<base>`.
-  fingerprint      String
+  fingerprint           String
   /// The manual edits this build was told to keep (D14).
-  obligations      String?
+  obligations           String?
+  /// #752: the approved-screen library, newest first —
+  /// `[{ designId, revisionId, name, summary, snippetsUsed[], approvedAt }]`.
+  /// Carried forward verbatim onto every later version.
+  screens               Json            @default("[]")
+  /// #752: style rules from design comments — `[{ text, commentIds[], designId }]`.
+  styleRules            Json            @default("[]")
+  /// #752: the approved revision a `memory` version learned from.
+  learnedFromRevisionId String?
+  /// #752: what a learn dropped (invalid or duplicate snippets).
+  learnNotes            String?
   /// The build's run; null for a manual version.
-  runId            String?
+  runId                 String?
   /// The person behind a manual version; null for an agent build.
-  authorId         String?
-  createdAt        DateTime        @default(now())
+  authorId              String?
+  createdAt             DateTime        @default(now())
 
   project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   run     Run?         @relation(fields: [runId], references: [id], onDelete: SetNull)
@@ -2717,6 +2730,8 @@ model DesignSettings {
   /// `[{ name, width, height, theme? }]` (shared `viewportPresetsSchema`).
   viewports     Json
   defaultSkills String[] @default([])
+  /// #752 A6: design prompts read the approved screens and style rules.
+  useMemory     Boolean  @default(true)
   updatedById   String?
   updatedAt     DateTime @updatedAt
 

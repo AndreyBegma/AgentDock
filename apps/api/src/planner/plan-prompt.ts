@@ -1,6 +1,5 @@
 import {
   answerOptionIds,
-  designBytes,
   PLANNER_BLOCK_TAG,
   PLANNER_DESIGN_CONTRACT,
   PLANNER_DISCUSS_CONTRACT,
@@ -14,13 +13,13 @@ import {
   type PlanTurnInput,
   plannerOutputContract,
 } from '@nautelle/shared';
-import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 import {
   type ApprovedDesignContext,
   approvedDesignSections,
   type DesignPromptContext,
   designSections,
   designWhat,
+  fitDesignPrompt,
 } from '../design/design-prompt';
 
 /** A task as the planner sees it in the plan state. */
@@ -229,22 +228,15 @@ const answersText = (
 export const assemblePrompt = (input: PromptInput): string => {
   const design = input.design;
   if (!design) return assembleWith(input, []);
-  // Spec 223: a large style kit's snippets are trimmed from the end until
-  // the prompt fits its cap; the prompt says which were left out.
-  const count = design.profile?.snippets.length ?? 0;
-  let prompt = assembleWith(input, designSections(design));
-  for (
-    let keep = count - 1;
-    keep >= 0 && designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES;
-    keep -= 1
-  ) {
-    prompt = assembleWith(input, designSections(design, keep));
-  }
-  // #628: last, the previous revision's frames are summarized only.
-  if (designBytes(prompt) > PLAN_TURN_PROMPT_MAX_BYTES) {
-    prompt = assembleWith(input, designSections(design, 0, false));
-  }
-  return prompt;
+  // Spec 223, #628, #752: the approved screens oldest first, then the kit's
+  // snippets from the end, then the previous revision's frames are dropped
+  // until the prompt fits its cap; the prompt says what was left out.
+  return fitDesignPrompt(design, (fit) =>
+    assembleWith(
+      input,
+      designSections(design, fit.snippets, fit.withFrames, fit.screens),
+    ),
+  );
 };
 
 /** The person's input of a turn: the last round's answers, then their message. */

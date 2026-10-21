@@ -1,14 +1,17 @@
 import {
   UI_PROFILE_OUTPUT_CONTRACT,
+  type UiProfileDesignRef,
   type UiProfileSnippet,
+  type UiProfileSource,
   type UiProfileStatus,
+  type UiProfileStyleRule,
   type UiProfileVersionSummary,
   type UiProfileVersionView,
 } from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { userRef, userSelect } from '../planner/plan-mapper';
-import { snippetsOf } from './design-store';
+import { screensOf, snippetsOf, styleRulesOf } from './design-store';
 
 /**
  * The UI profile's views, the D14 obligations and the build prompt
@@ -23,6 +26,7 @@ type ProfileRow = Prisma.UiProfileGetPayload<{
 
 export const toProfileVersionView = (
   row: ProfileRow,
+  designs: Record<string, UiProfileDesignRef> = {},
 ): UiProfileVersionView => ({
   id: row.id,
   projectId: row.projectId,
@@ -38,7 +42,25 @@ export const toProfileVersionView = (
   runId: row.runId,
   author: row.author ? userRef(row.author) : null,
   createdAt: row.createdAt.toISOString(),
+  screens: screensOf(row.screens),
+  styleRules: styleRulesOf(row.styleRules),
+  learnedFromRevisionId: row.learnedFromRevisionId,
+  learnNotes: row.learnNotes,
+  designs,
 });
+
+/** #752: the design ids a version's library and style rules name. */
+export const memoryDesignIds = (row: {
+  screens: Prisma.JsonValue;
+  styleRules: Prisma.JsonValue;
+}): string[] => [
+  ...new Set([
+    ...screensOf(row.screens).map((s) => s.designId),
+    ...styleRulesOf(row.styleRules).flatMap((r) =>
+      r.designId ? [r.designId] : [],
+    ),
+  ]),
+];
 
 export const toProfileVersionSummary = (
   row: ProfileRow,
@@ -119,6 +141,8 @@ export interface ProfileContent {
   kit: string;
   snippets: UiProfileSnippet[];
   hasUi: boolean;
+  /** #752: the version's style rules; a rebuild keeps the ones added since. */
+  styleRules: readonly UiProfileStyleRule[];
 }
 
 const fenced = (lang: string, body: string): string => {
@@ -152,30 +176,59 @@ const changesOf = (before: ProfileContent | null, after: ProfileContent) => {
   for (const name of old.keys()) {
     if (!now.has(name)) lines.push(`- Snippet \`${name}\` was removed.`);
   }
+  // #752: the style kit and snippets follow the style rules, so a rebuild
+  // must not write a kit that contradicts one.
+  const oldRules = new Set((before?.styleRules ?? []).map((r) => r.text));
+  for (const rule of after.styleRules) {
+    if (!oldRules.has(rule.text)) lines.push(`- Style rule: ${rule.text}`);
+  }
   return lines;
 };
 
+/** Where a version's changes came from, as its obligation heading says it. */
+const ORIGIN = {
+  manual: "a person's edit",
+  memory: 'learned from an approved design',
+} as const;
+
 /**
- * D14: the manual versions since the last agent build, oldest first, as
- * rules the next build must keep. `versions` is every version of the
- * project, oldest first. Null when there is nothing to keep.
+ * D14, extended by #752 (ADR-0075 §6): the manual and memory versions since
+ * the last agent build, oldest first, as rules the next build must keep —
+ * a rebuild never silently drops what a person fixed or an approval taught.
+ * `versions` is every version of the project, oldest first. Null when there
+ * is nothing to keep.
  */
 export const obligationsOf = (
-  versions: readonly (ProfileContent & { source: 'agent' | 'manual' })[],
+  versions: readonly (ProfileContent & { source: UiProfileSource })[],
 ): string | null => {
   const lastAgent = versions.findLastIndex((v) => v.source === 'agent');
   const parts: string[] = [];
   for (let i = lastAgent + 1; i < versions.length; i += 1) {
-    const changes = changesOf(versions[i - 1] ?? null, versions[i]);
+    const version = versions[i];
+    if (version.source === 'agent') continue;
+    const changes = changesOf(versions[i - 1] ?? null, version);
     if (changes.length > 0) {
       parts.push(
-        `### Version ${versions[i].version} (a person's edit)`,
+        `### Version ${version.version} (${ORIGIN[version.source]})`,
         changes.join('\n'),
       );
     }
   }
   return parts.length > 0 ? parts.join('\n\n') : null;
 };
+
+/**
+ * #752 A4: what every later version carries verbatim — the approved-screen
+ * library and the style rules. The build prompt never produces them.
+ */
+export const memoryOf = (
+  current: { screens: Prisma.JsonValue; styleRules: Prisma.JsonValue } | null,
+): { screens: Prisma.InputJsonValue; styleRules: Prisma.InputJsonValue } => ({
+  screens: (current ? screensOf(current.screens) : []) as Prisma.InputJsonValue,
+  styleRules: (current
+    ? styleRulesOf(current.styleRules)
+    : []) as Prisma.InputJsonValue,
+});
 
 /** The prompt of a `uiprofile.build` run (D12, D14). */
 export const buildPrompt = (obligations: string | null): string =>
@@ -185,7 +238,7 @@ export const buildPrompt = (obligations: string | null): string =>
     ...(obligations
       ? [
           '## Obligations',
-          "People edited the profile since the last build. Keep every edit below in the profile you write — a rebuild never silently undoes a person's fix. Change one only where the code now plainly contradicts it.",
+          "People edited the profile, or approved designs taught it, since the last build. Keep every change below in the profile you write — a rebuild never silently undoes a person's fix or what an approval taught. Change one only where the code now plainly contradicts it.",
           obligations,
         ]
       : []),

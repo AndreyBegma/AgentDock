@@ -263,6 +263,8 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
       context.uiprofile?.['uiprofile.fingerprint'](args) ?? noUiProfile(),
     'uiprofile.cancel': (args) =>
       context.uiprofile?.['uiprofile.cancel'](args) ?? noUiProfile(),
+    'uiprofile.learn': (args) =>
+      context.uiprofile?.['uiprofile.learn'](args) ?? noUiProfile(),
     'worktree.status': (args) =>
       worktreeStatus(args, {
         exec: context.exec,

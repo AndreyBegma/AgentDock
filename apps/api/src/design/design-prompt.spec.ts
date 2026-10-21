@@ -183,6 +183,120 @@ describe('design turn prompt (D8)', () => {
     expect(prompt).toContain('`s39`');
   });
 
+  describe('the profile memory (#752 A6)', () => {
+    const screen = (i: number, summary = `Summary ${i}.`) => ({
+      designId: `d${i}`,
+      revisionId: `r${i}`,
+      name: `Screen ${i}`,
+      summary,
+      snippetsUsed: i === 0 ? ['button'] : [],
+      approvedAt: '2026-10-21T10:00:00.000Z',
+    });
+    const rule = {
+      text: 'Primary actions sit bottom-right.',
+      commentIds: [],
+      designId: 'd0',
+    };
+    const withMemory = (
+      screens: ReturnType<typeof screen>[],
+      snippets = context().profile?.snippets ?? [],
+    ): DesignPromptContext => {
+      const ctx = context();
+      if (!ctx.profile) throw new Error('no profile');
+      return {
+        ...ctx,
+        profile: {
+          ...ctx.profile,
+          snippets,
+          memory: { screens, styleRules: [rule] },
+        },
+      };
+    };
+
+    it('adds the approved screens and the style rules after the snippets', () => {
+      const text = designSections(withMemory([screen(0), screen(1)])).join(
+        '\n\n',
+      );
+      expect(text.indexOf('### Component snippets')).toBeLessThan(
+        text.indexOf('### Approved screens'),
+      );
+      expect(text.indexOf('### Approved screens')).toBeLessThan(
+        text.indexOf('### Style rules'),
+      );
+      expect(text).toContain('**Screen 0** (snippets: `button`)');
+      expect(text).toContain('- Primary actions sit bottom-right.');
+    });
+
+    it('has neither section with the setting off', () => {
+      const text = designSections(context()).join('\n\n');
+      expect(text).not.toContain('### Approved screens');
+      expect(text).not.toContain('### Style rules');
+    });
+
+    it('fitting drops the library oldest first, before any snippet, and never a style rule', () => {
+      // 30 screens of ~1.4 KB (~42 KB), and as many 15 KiB snippets as leave
+      // about 20 KB of room: over the cap together, under it without screens.
+      const screens = Array.from({ length: 30 }, (_, i) =>
+        screen(i, `S${i} `.padEnd(1400, 'z')),
+      );
+      const big = '<div>'.padEnd(15 * 1024, 'x');
+      const bare = designBytes(
+        assemblePrompt({ ...base, design: withMemory([], []) }),
+      );
+      const count = Math.floor(
+        (PLAN_TURN_PROMPT_MAX_BYTES - 20 * 1024 - bare) / (15 * 1024 + 20),
+      );
+      const snippets = Array.from({ length: count }, (_, i) => ({
+        name: `s${i}`,
+        html: big,
+      }));
+      const design = withMemory(screens, snippets);
+      expect(
+        designBytes(
+          assemblePrompt({ ...base, design: withMemory([], snippets) }),
+        ),
+      ).toBeLessThan(PLAN_TURN_PROMPT_MAX_BYTES);
+      for (const prompt of [
+        assemblePrompt({ ...base, design }),
+        cardDesignPrompt({
+          instructions: 'INSTRUCTIONS',
+          card: { number: 12, title: 'Tiles', body: 'Make tiles.' },
+          taskKey: 'card-12',
+          design,
+        }),
+      ]) {
+        expect(designBytes(prompt)).toBeLessThanOrEqual(
+          PLAN_TURN_PROMPT_MAX_BYTES,
+        );
+        // Newest kept, oldest gone, and the note says so.
+        expect(prompt).toContain('**Screen 0**');
+        expect(prompt).not.toContain('**Screen 29**');
+        expect(prompt).toContain('older approved screens were left out');
+        expect(prompt).toContain('- Primary actions sit bottom-right.');
+        // Every snippet is still there: the library went first.
+        expect(prompt).not.toContain('more snippet');
+        expect(prompt).toContain(`s${count - 1}:`);
+      }
+    });
+
+    it('drops snippets only once the whole library is gone', () => {
+      const big = '<div>'.padEnd(15 * 1024, 'x');
+      const snippets = Array.from({ length: 40 }, (_, i) => ({
+        name: `s${i}`,
+        html: big,
+      }));
+      const prompt = assemblePrompt({
+        ...base,
+        design: withMemory([screen(0), screen(1)], snippets),
+      });
+      expect(prompt).toContain('2 older approved screens were left out');
+      expect(prompt).toContain(
+        'were left out to keep the prompt under its size limit: ',
+      );
+      expect(prompt).toContain('- Primary actions sit bottom-right.');
+    });
+  });
+
   it('appends the design action to a v1 plan’s contract', () => {
     const v1 = assemblePrompt({
       ...base,
