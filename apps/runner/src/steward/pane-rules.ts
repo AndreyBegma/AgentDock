@@ -6,7 +6,7 @@ import {
 } from '@nautelle/shared';
 import { matchKnownDialog } from '../cards/dialogs';
 import { matchQuestion } from '../cards/question';
-import { DIALOG_PATTERNS, QUOTA_MARKER } from '../collectors/tmux/classify';
+import { DIALOG_PATTERNS, detectQuota } from '../collectors/tmux/classify';
 import { redactText } from '../local/redact';
 
 /**
@@ -86,12 +86,6 @@ const isPermissionPrompt = (text: string): boolean =>
   PERMISSION_OPTION.test(text) ||
   (PERMISSION_QUESTION.test(text) && ANY_DIALOG.some((p) => p.test(text)));
 
-const QUOTA: readonly RegExp[] = [
-  new RegExp(QUOTA_MARKER, 'i'),
-  /usage limit reached/i,
-  /hit your (?:session|usage|5-hour) limit/i,
-];
-
 const isDialogId = (name: string): name is StewardDialogId =>
   (STEWARD_DIALOG_IDS as readonly string[]).includes(name);
 
@@ -164,7 +158,7 @@ export const readPane = (text: string): StewardPaneReading => {
       },
     };
   }
-  if (QUOTA.some((p) => p.test(text))) {
+  if (detectQuota(text)) {
     return {
       state: busy ? 'busy' : 'other',
       signal: { kind: 'quota', reason: 'the usage limit is reached' },

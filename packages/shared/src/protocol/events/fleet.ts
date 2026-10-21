@@ -73,8 +73,28 @@ export const paneIdleDataSchema = z.object({
   ...paneFields,
   polls: z.number().int().positive(),
 });
-/** The quota banner (`hit your weekly limit`) is on screen. */
-export const paneQuotaDataSchema = z.object(paneFields);
+/** Which limit a quota banner names (spec 741 D1). */
+export const quotaLimitSchema = z.enum([
+  'weekly',
+  'session',
+  'usage',
+  'unknown',
+]);
+export type QuotaLimit = z.infer<typeof quotaLimitSchema>;
+
+/**
+ * A quota banner (`hit your weekly limit`, `usage limit reached`, ...) is on
+ * screen. `resetsAt` is the banner's reset time as an ISO-8601 UTC string,
+ * null when the banner shows none that parses (spec 741 D3). Both fields are
+ * optional: an older runner sends neither.
+ */
+export const paneQuotaDataSchema = z.object({
+  ...paneFields,
+  limit: quotaLimitSchema.optional(),
+  resetsAt: z.iso.datetime().nullable().optional(),
+});
+/** The runner typed `continue` into a session once its limit had reset (D4). */
+export const paneQuotaResumedDataSchema = z.object(paneFields);
 /** `esc to interrupt` is on screen again: the pane left idle, prompt or quota. */
 export const paneBusyDataSchema = z.object(paneFields);
 
@@ -433,6 +453,7 @@ export const fleetEventDataSchemas = {
   'pane.prompt': panePromptDataSchema,
   'pane.idle': paneIdleDataSchema,
   'pane.quota_hit': paneQuotaDataSchema,
+  'pane.quota_resumed': paneQuotaResumedDataSchema,
   'pane.busy': paneBusyDataSchema,
   'worktree.changed': worktreeChangedDataSchema,
   'round.started': roundStartedDataSchema,
