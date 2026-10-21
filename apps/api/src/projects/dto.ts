@@ -37,8 +37,11 @@ const trim = ({ value }: { value: unknown }) =>
 
 const ABSOLUTE_PATH = /^\//;
 const REPO_NAME = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
-/** A git ref name, loosely: no whitespace, `~^:?*[\` or `..`. */
-const BRANCH = /^(?!.*\.\.)[^\s~^:?*[\\]+$/;
+/**
+ * A git ref name, loosely: no leading `-` (git would read it as an option), no
+ * whitespace, `~^:?*[\` or `..`.
+ */
+const BRANCH = /^(?!-)(?!.*\.\.)[^\s~^:?*[\\]+$/;
 
 export class InspectProjectDto implements InspectProjectRequest {
   @IsString()

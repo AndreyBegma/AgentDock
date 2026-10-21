@@ -11,14 +11,24 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
-  Matches,
   Max,
   MaxLength,
   Min,
+  ValidateBy,
 } from 'class-validator';
+import { parsePositiveBigInt } from '../common/pipes';
 
-/** A `seq` as it travels over HTTP: a positive decimal BigInt. */
-export const SEQ_PATTERN = /^[1-9]\d{0,18}$/;
+/** A `seq` as it travels over HTTP: a decimal BigInt in 1..2^63-1. */
+const IsSeq = () =>
+  ValidateBy({
+    name: 'isSeq',
+    validator: {
+      validate: (value: unknown) =>
+        typeof value === 'string' && parsePositiveBigInt(value) !== null,
+      defaultMessage: (args) =>
+        `${args?.property ?? 'seq'} must be an integer from 1 to 2^63-1`,
+    },
+  });
 
 /** Filters of the list and the CSV export (spec "API"). */
 export class AuditFiltersQuery implements AuditFilters {
@@ -63,7 +73,7 @@ export class AuditFiltersQuery implements AuditFilters {
 export class ListAuditQuery extends AuditFiltersQuery {
   /** `nextCursor` of the previous page: records with a lower `seq` follow. */
   @IsOptional()
-  @Matches(SEQ_PATTERN)
+  @IsSeq()
   cursor?: string;
 
   @IsOptional()

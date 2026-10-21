@@ -9,13 +9,13 @@ import {
   Get,
   HttpCode,
   Param,
-  ParseIntPipe,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';
+import { PositiveIntPipe } from '../common/pipes';
 import {
   ProjectAccess,
   ProjectAccessGuard,
@@ -50,7 +50,7 @@ export class ApprovalsController {
   @Get(':pr')
   detail(
     @ProjectAccess() access: ResolvedProjectAccess,
-    @Param('pr', ParseIntPipe) pr: number,
+    @Param('pr', PositiveIntPipe) pr: number,
     @AuditCtx() ctx: AuditContext,
   ): Promise<ApprovalDetail> {
     return this.query.detail({ ...access, ctx }, pr);
@@ -61,7 +61,7 @@ export class ApprovalsController {
   @ProjectRole('operator')
   approve(
     @ProjectAccess() access: ResolvedProjectAccess,
-    @Param('pr', ParseIntPipe) pr: number,
+    @Param('pr', PositiveIntPipe) pr: number,
     @Body() dto: ApproveDto,
     @AuditCtx() ctx: AuditContext,
   ): Promise<ApprovalItemView> {
@@ -73,7 +73,7 @@ export class ApprovalsController {
   @ProjectRole('operator')
   requestChanges(
     @ProjectAccess() access: ResolvedProjectAccess,
-    @Param('pr', ParseIntPipe) pr: number,
+    @Param('pr', PositiveIntPipe) pr: number,
     @Body() dto: RequestChangesDto,
     @AuditCtx() ctx: AuditContext,
   ): Promise<ApprovalItemView> {
