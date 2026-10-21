@@ -71,6 +71,8 @@ export const TECHNIQUE_GREP_CUT = 'grep-cut';
 export const TECHNIQUE_WEBFETCH_CUT = 'webfetch-cut';
 export const TECHNIQUE_READ_GUARD_400 = 'read-guard-400';
 export const TECHNIQUE_TERSE_REGISTER = 'terse-register';
+/** #749: the one-hour prompt-cache TTL of a card round; off pins `5m`. */
+export const TECHNIQUE_CACHE_TTL_1H = 'cache-ttl-1h';
 
 /** The techniques named in `NAUTELLE_TECHNIQUES`. */
 export const techniquesFrom = (

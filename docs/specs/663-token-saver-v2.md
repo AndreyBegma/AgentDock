@@ -65,7 +65,7 @@ Every decision below is the person's answer from the interview of 2026-10-19 unl
     - Deferred MCP tools.
     - Only the skills a launch kind needs.
     - `CLAUDE.md` shrinks to the never-traded rules; details move to `docs/` and skills.
-12. **Cache.** Card and CI-fix rounds use the one-hour prompt-cache TTL and exclude dynamic system-prompt sections, so the prefix is shared across rounds and runners.
+12. **Cache.** Card and CI-fix rounds use the one-hour prompt-cache TTL and exclude dynamic system-prompt sections, so the prefix is shared across rounds and runners. Since #749 the one-hour TTL sits behind technique `cache-ttl-1h`: absent or on keeps `1h`, off pins `CLAUDE_CODE_PROMPT_CACHE_TTL=5m` (an unset TTL becomes 1h on a subscription).
 
 ## Data / Schema
 

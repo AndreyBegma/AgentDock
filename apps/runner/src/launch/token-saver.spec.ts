@@ -149,6 +149,21 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(launch?.args.at(-1)).toBe(EXCLUDE_DYNAMIC_SECTIONS_FLAG);
   });
 
+  it('keeps the one-hour TTL when cache-ttl-1h is true or absent (#749)', () => {
+    for (const techniques of [undefined, {}, { 'cache-ttl-1h': true }]) {
+      const launch = tokenSaverLaunch(input({ runKind: 'card', techniques }));
+      expect(launch?.env[PROMPT_CACHE_TTL_ENV]).toBe('1h');
+    }
+  });
+
+  it('pins 5m for the control arm of cache-ttl-1h, card rounds only (#749)', () => {
+    const techniques = { 'cache-ttl-1h': false };
+    const card = tokenSaverLaunch(input({ runKind: 'card', techniques }));
+    expect(card?.env[PROMPT_CACHE_TTL_ENV]).toBe('5m');
+    const plan = tokenSaverLaunch(input({ runKind: 'plan', techniques }));
+    expect(plan?.env[PROMPT_CACHE_TTL_ENV]).toBeUndefined();
+  });
+
   it('leaves every other kind on the default TTL and the full prefix (#663)', () => {
     for (const runKind of [
       'skill',

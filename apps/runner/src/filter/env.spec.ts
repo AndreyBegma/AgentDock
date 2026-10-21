@@ -14,6 +14,7 @@ import {
   filterEnv,
   orchestratorFilterDir,
   RAW_ENV,
+  TECHNIQUE_CACHE_TTL_1H,
   TECHNIQUE_GREP_CUT,
   TECHNIQUE_MCP_CUT,
   TECHNIQUE_READ_GUARD_400,
@@ -115,6 +116,7 @@ describe('technique flags (#747 D4)', () => {
       TECHNIQUE_WEBFETCH_CUT,
       TECHNIQUE_READ_GUARD_400,
       TECHNIQUE_TERSE_REGISTER,
+      TECHNIQUE_CACHE_TTL_1H,
     ]) {
       expect(registered).toContain(key);
     }
