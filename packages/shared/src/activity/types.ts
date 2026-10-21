@@ -294,8 +294,11 @@ const EVENT_RULES: Record<string, EventRule> = {
   'pane.quota_hit': {
     category: 'fleet',
     severity: fixed('danger'),
-    title: (ctx) => `${who(ctx)} hit the quota`,
-    keep: ['target'],
+    title: (ctx) => {
+      const resetsAt = str(ctx.data, 'resetsAt');
+      return `${who(ctx)} hit the quota${resetsAt ? `, resets ${resetsAt.slice(0, 16).replace('T', ' ')} UTC` : ''}`;
+    },
+    keep: ['target', 'limit', 'resetsAt'],
   },
   // Only Code Sentinel's own `cs-*` sessions are fleet news (D3).
   'session.vanished': {
@@ -366,6 +369,7 @@ export const PLUGIN_ECHOED_EVENT_TYPES: ReadonlySet<string> = new Set([
   'pane.prompt',
   'pane.idle',
   'pane.quota_hit',
+  'pane.quota_resumed',
   'pane.busy',
   'worktree.changed',
   'commit.trailer_found',

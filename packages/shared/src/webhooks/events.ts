@@ -175,7 +175,8 @@ const DATA_BUILDERS: Record<WebhookEventType, (raw: Raw) => WebhookEventData> =
         recommendation: text(raw, 'recommendation', WEBHOOK_SUMMARY_MAX_CHARS),
       }),
     'pane.prompt': (raw) => compact({ dialog: text(raw, 'dialog') }),
-    'pane.quota_hit': () => ({}),
+    'pane.quota_hit': (raw) =>
+      compact({ limit: text(raw, 'limit'), resetsAt: text(raw, 'resetsAt') }),
     // From `ScheduleEventData` (#25, ADR-0014): the envelope keeps D10's names.
     'schedule.failed': (raw) =>
       compact({

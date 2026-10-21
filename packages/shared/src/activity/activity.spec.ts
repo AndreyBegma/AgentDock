@@ -123,6 +123,7 @@ describe('the curated event map (spec 21 D3)', () => {
       'tool.call',
       'pane.idle',
       'pane.busy',
+      'pane.quota_resumed',
       'worktree.changed',
       'events.unparsed',
       EVENTS_DUPLICATE_EVENT,
@@ -147,6 +148,23 @@ describe('the curated event map (spec 21 D3)', () => {
         'p1',
       ),
     ).not.toBeNull();
+  });
+
+  it('names the reset time in a quota title, and reads an old payload without one (#741)', () => {
+    const hit = activityFromEvent(
+      event('pane.quota_hit', {
+        limit: 'session',
+        resetsAt: '2026-10-21T15:00:00.000Z',
+      }),
+      'p1',
+    );
+    expect(hit?.title).toBe(
+      'i21-api hit the quota, resets 2026-10-21 15:00 UTC',
+    );
+    expect(hit?.data).toMatchObject({ limit: 'session' });
+    expect(activityFromEvent(event('pane.quota_hit'), 'p1')?.title).toBe(
+      'i21-api hit the quota',
+    );
   });
 
   it('shows pr.checks_changed only on red or green', () => {

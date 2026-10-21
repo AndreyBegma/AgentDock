@@ -20,6 +20,9 @@ export interface SlotPatch {
   round?: string;
   sessionAlive?: boolean;
   pane?: PaneState | null;
+  /** The limit the quota banner names, and when it resets (spec 741 D3). */
+  quotaLimit?: string | null;
+  quotaResetsAt?: Date | null;
   worktreeExists?: boolean;
   ahead?: number | null;
   behind?: number | null;

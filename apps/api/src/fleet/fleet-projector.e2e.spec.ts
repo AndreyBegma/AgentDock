@@ -149,6 +149,48 @@ describe('fleet projector (e2e)', () => {
     expect(await slot()).toMatchObject({ status: 'stale', pane: null });
   });
 
+  it('keeps the limit and its reset while the slot is on the quota banner (#741)', async () => {
+    await project(appeared());
+    const pane = (type: string, data: Record<string, unknown> = {}) =>
+      stream.next(type, data, { slot: 'i42' });
+
+    await project(
+      pane('pane.quota_hit', {
+        limit: 'session',
+        resetsAt: '2026-10-21T15:00:00.000Z',
+      }),
+    );
+    expect(await slot()).toMatchObject({
+      status: 'quota',
+      quotaLimit: 'session',
+      quotaResetsAt: new Date('2026-10-21T15:00:00.000Z'),
+    });
+
+    await project(pane('pane.quota_resumed'));
+    expect(await slot()).toMatchObject({
+      quotaLimit: null,
+      quotaResetsAt: null,
+    });
+
+    // An older runner sends neither field.
+    await project(pane('pane.quota_hit'));
+    expect(await slot()).toMatchObject({
+      status: 'quota',
+      quotaLimit: null,
+      quotaResetsAt: null,
+    });
+
+    await project(
+      pane('pane.quota_hit', { limit: 'weekly', resetsAt: null }),
+      pane('pane.busy'),
+    );
+    expect(await slot()).toMatchObject({
+      status: 'running',
+      quotaLimit: null,
+      quotaResetsAt: null,
+    });
+  });
+
   it('takes the brief: dispatched until the session appears, on the same run', async () => {
     await project(brief());
     const first = await slot();

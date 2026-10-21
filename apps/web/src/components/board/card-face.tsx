@@ -45,6 +45,7 @@ import { StewardChip } from '../steward/steward-chip';
 import { SavedBadge } from '../token-saver/saved-badge';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
 import { RestartChip } from './handoff/restart-chip';
+import { QuotaWaitLine } from './quota-wait-line';
 import {
   type FaceSelection,
   SelectedTint,
@@ -249,6 +250,9 @@ export function CardFace({
                 <Badge tone="warn" size="md" label="Dialog open" />
               </span>
             </Tooltip>
+          ) : null}
+          {card.round?.quotaWait ? (
+            <QuotaWaitLine wait={card.round.quotaWait} />
           ) : null}
           {card.round?.finishRefused ? (
             <Tooltip content={finishRefusedText(card.round.finishRefused)}>
