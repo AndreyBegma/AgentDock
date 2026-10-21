@@ -16,6 +16,7 @@ import type {
   PaneDialog,
   PrChecks,
   PrInspectState,
+  QuotaLimit,
 } from '../protocol';
 import type { ProfileSource } from '../readiness';
 import type { PendingQuestion } from '../session-message/contracts';
@@ -118,6 +119,12 @@ export interface CardRoundBrief {
    * `null` otherwise. Optional so older fixtures stay valid.
    */
   blockingDialog?: PaneDialog | null;
+  /**
+   * #741: the usage limit the active round's pane shows, with its reset time
+   * (ISO-8601, null when the banner shows none); `null` otherwise. Optional
+   * so older fixtures stay valid.
+   */
+  quotaWait?: { limit: QuotaLimit; resetsAt: string | null } | null;
 }
 
 /**

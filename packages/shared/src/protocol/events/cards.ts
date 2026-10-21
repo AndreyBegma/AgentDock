@@ -4,7 +4,7 @@ import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
 import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
 import { localErrorCodeSchema } from '../local';
-import { paneDialogSchema } from './fleet';
+import { paneDialogSchema, quotaLimitSchema } from './fleet';
 
 /**
  * Card worker events (issue #242 "Runner"). A round outlives the `card.run`
@@ -194,6 +194,34 @@ export const isCardDialogEventType = (
   type: string,
 ): type is CardDialogEventType =>
   Object.hasOwn(cardDialogEventDataSchemas, type);
+
+/**
+ * #741: a round's pane shows a usage-limit banner, or (`resumed`) the runner
+ * has typed `continue` into it after the limit reset. Sent once per banner
+ * and once on resume; the Board shows "waiting for the limit until <time>"
+ * from the first and drops it on the second. `resetsAt` is null when the
+ * banner shows no reset time that parses, and the runner then never resumes.
+ */
+export const cardRunQuotaDataSchema = z.object({
+  cardId: cardIdSchema,
+  runId: skillRunIdSchema,
+  projectId: z.string().min(1),
+  at: z.iso.datetime(),
+  limit: quotaLimitSchema,
+  resetsAt: z.iso.datetime().nullable(),
+  resumed: z.boolean().default(false),
+});
+export type CardRunQuotaData = z.infer<typeof cardRunQuotaDataSchema>;
+
+export const cardQuotaEventDataSchemas = {
+  'card_run.quota': cardRunQuotaDataSchema,
+} as const;
+
+export type CardQuotaEventType = keyof typeof cardQuotaEventDataSchemas;
+
+export const isCardQuotaEventType = (
+  type: string,
+): type is CardQuotaEventType => Object.hasOwn(cardQuotaEventDataSchemas, type);
 
 /**
  * #489 M4: the question selector a round's pane shows now — its text and

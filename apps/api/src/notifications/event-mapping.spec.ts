@@ -47,6 +47,24 @@ describe('draftFor (spec 22 D1)', () => {
     ).toBe('quota.hit');
   });
 
+  it('says when the limit resets, and still reads a payload without it (#741)', () => {
+    const hit = draftFor(
+      event({
+        type: 'pane.quota_hit',
+        data: {
+          target: 'slot',
+          limit: 'session',
+          resetsAt: '2026-10-21T15:00:00.000Z',
+        },
+      }),
+    );
+    expect(hit?.body).toContain('2026-10-21 15:00 UTC');
+    expect(
+      draftFor(event({ type: 'pane.quota_hit', data: { target: 'slot' } }))
+        ?.body,
+    ).not.toContain('UTC');
+  });
+
   it('ignores the plugin echo of a pane event', () => {
     expect(draftFor(event({ source: 'code-sentinel' }))).toBeNull();
   });

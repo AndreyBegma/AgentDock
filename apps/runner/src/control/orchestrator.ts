@@ -331,7 +331,7 @@ export const messageOrchestrator = async (
 /** #11's reading of one pane, as a single snapshot. */
 const stateOf = (text: string): Exclude<OrchestratorState, 'absent'> => {
   const reading = classifyPane(text);
-  if (reading.quota) return 'quota';
+  if (reading.quota !== null) return 'quota';
   if (reading.kind === 'dialog') return 'prompt';
   return reading.kind === 'busy' ? 'running' : 'idle';
 };
