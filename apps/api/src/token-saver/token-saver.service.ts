@@ -1,11 +1,14 @@
 import {
   isActiveRoundPhase,
+  type TechniqueFlags,
   TOKEN_SAVER_DEFAULT,
   type TokenSaverConfig,
   type TokenSaverSettingsView,
 } from '@nautelle/shared';
 import {
+  type CardTokenSaver,
   capabilitiesSchema,
+  tokenEconomyAvailable,
   tokenSaverAvailable,
 } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
@@ -23,14 +26,23 @@ import { projectNotFound } from '../projects';
  * `tokenSaver.enabled`.
  */
 export interface TokenSaverLaunch {
-  args: { tokenSaver?: TokenSaverConfig };
+  args: { tokenSaver?: CardTokenSaver };
   on: boolean;
+  /**
+   * #746 D11: the technique flags `args.tokenSaver` carries — `runs.techniques`;
+   * `null` when the launch carries none.
+   */
+  techniques: TechniqueFlags | null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A launch exactly as before #445. */
-export const TOKEN_SAVER_OFF: TokenSaverLaunch = { args: {}, on: false };
+export const TOKEN_SAVER_OFF: TokenSaverLaunch = {
+  args: {},
+  on: false,
+  techniques: null,
+};
 
 const configOf = (row: TokenSaverSettings | null): TokenSaverConfig =>
   row ? { enabled: row.enabled, mcpAllow: row.mcpAllow } : TOKEN_SAVER_DEFAULT;
@@ -88,8 +100,15 @@ export class TokenSaverService {
     return { ...after, updatedAt: row.updatedAt.toISOString() };
   }
 
-  /** What the next launch of the project sends and records. */
-  async launch(projectId: string): Promise<TokenSaverLaunch> {
+  /**
+   * What the next launch of the project sends and records. #746: a card
+   * launch passes its technique flags; they ride on `tokenSaver` only to a
+   * runner that advertises `tokenEconomy` (the args schema is strict).
+   */
+  async launch(
+    projectId: string,
+    techniques?: TechniqueFlags,
+  ): Promise<TokenSaverLaunch> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: {
@@ -105,7 +124,14 @@ export class TokenSaverService {
       return TOKEN_SAVER_OFF;
     }
     const tokenSaver = configOf(project.tokenSaverSettings);
-    return { args: { tokenSaver }, on: tokenSaver.enabled };
+    if (techniques === undefined || !tokenEconomyAvailable(capabilities.data)) {
+      return { args: { tokenSaver }, on: tokenSaver.enabled, techniques: null };
+    }
+    return {
+      args: { tokenSaver: { ...tokenSaver, techniques } },
+      on: tokenSaver.enabled,
+      techniques,
+    };
   }
 
   /**

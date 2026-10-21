@@ -1,4 +1,5 @@
 import type {
+  EstimateCachePrices,
   TokenSavedView,
   TokenSaverFilterSavings,
   TokenSaverRunKind,
@@ -15,14 +16,20 @@ import {
 } from '@nautelle/shared';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
-import { sessionModelByRun } from '../history/run-usage';
+import {
+  RUN_REQUESTS,
+  sessionModelByRun,
+  usageByRun,
+} from '../history/run-usage';
 import { toModelPrice } from '../prices/cost.service';
 import { compilePrices, matchModel } from '../prices/pricing';
 
 /**
  * One group of `token_saver_stats` rows. `tokens` is the sum of each row's
  * estimate (shared `estimateTokensSaved`: (raw − kept) / 4, rounded), so a
- * group's total is the sum of its commands' estimates.
+ * group's total is the sum of its commands' estimates. `turnTokens` is the
+ * sum of each row's tokens × its turns remaining (#746 D6), so the group
+ * prices as `tokens × write + turnTokens × read`.
  */
 export interface StatGroup {
   runId: string | null;
@@ -36,6 +43,7 @@ export interface StatGroup {
   bypassed: number;
   passedThrough: number;
   tokens: number;
+  turnTokens: number;
 }
 
 interface StatGroupRow {
@@ -49,7 +57,10 @@ interface StatGroupRow {
   bypassed: number;
   passedThrough: number;
   tokens: bigint;
+  turnTokens: bigint;
 }
+
+const ROW_TOKENS = Prisma.sql`GREATEST(0, ROUND((s."rawBytes" - s."keptBytes")::numeric / ${TOKEN_SAVER_BYTES_PER_TOKEN}))`;
 
 const STAT_GROUP_COLUMNS = Prisma.sql`
   s."runId", s."runKind"::text AS "runKind", s.filter,
@@ -59,13 +70,58 @@ const STAT_GROUP_COLUMNS = Prisma.sql`
   COALESCE(SUM(s."keptBytes"), 0)::bigint AS "keptBytes",
   (COUNT(*) FILTER (WHERE s.bypassed))::int AS bypassed,
   (COUNT(*) FILTER (WHERE s."passedThrough"))::int AS "passedThrough",
-  COALESCE(SUM(GREATEST(0, ROUND((s."rawBytes" - s."keptBytes")::numeric / ${TOKEN_SAVER_BYTES_PER_TOKEN}))), 0)::bigint AS tokens`;
+  COALESCE(SUM(${ROW_TOKENS}), 0)::bigint AS tokens,
+  COALESCE(SUM(${ROW_TOKENS} * t.turns), 0)::bigint AS "turnTokens"`;
+
+/**
+ * #746 D6: each picked row's turns remaining — the main-loop requests of its
+ * run after the row, up to the next compaction of the run's sessions. A run
+ * without requests has none (the estimate is the cache write only); a row
+ * outside its run's first..last request cannot be placed on the timeline and
+ * takes half the run's main-loop requests, rounded down. `picked` is a CTE of
+ * `token_saver_stats` rows.
+ */
+const withTurns = (picked: Prisma.Sql): Prisma.Sql => Prisma.sql`
+  WITH picked AS (${picked}),
+  run_requests AS (
+    SELECT r.id AS "runId", se.id AS "sessionId", l.ts, l."querySource"
+    ${RUN_REQUESTS}
+    WHERE r.id IN (SELECT DISTINCT "runId" FROM picked WHERE "runId" IS NOT NULL)
+  ),
+  bounds AS (
+    SELECT "runId", MIN(ts) AS first, MAX(ts) AS last,
+      (COUNT(*) FILTER (WHERE "querySource" = 'main'))::int AS main
+    FROM run_requests GROUP BY "runId"
+  ),
+  turns AS (
+    SELECT p.id,
+      CASE
+        WHEN b."runId" IS NULL THEN 0
+        WHEN p."createdAt" < b.first OR p."createdAt" > b.last THEN b.main / 2
+        ELSE (
+          SELECT COUNT(*)::int FROM run_requests q
+          WHERE q."runId" = p."runId" AND q."querySource" = 'main'
+            AND q.ts > p."createdAt"
+            AND q.ts < COALESCE((
+              SELECT MIN(c.ts) FROM session_compactions c
+              WHERE c.ts > p."createdAt"
+                AND c."sessionId" IN (
+                  SELECT q2."sessionId" FROM run_requests q2
+                  WHERE q2."runId" = p."runId"
+                )
+            ), 'infinity'::timestamp)
+        )
+      END AS turns
+    FROM picked p
+    LEFT JOIN bounds b ON b."runId" = p."runId"
+  )`;
 
 const toGroup = (row: StatGroupRow): StatGroup => ({
   ...row,
   rawBytes: Number(row.rawBytes),
   keptBytes: Number(row.keptBytes),
   tokens: Number(row.tokens),
+  turnTokens: Number(row.turnTokens),
 });
 
 /** The stats of some runs, grouped by run, filter and day. */
@@ -75,9 +131,12 @@ export const statGroupsOfRuns = async (
 ): Promise<StatGroup[]> => {
   if (runIds.length === 0) return [];
   const rows = await prisma.$queryRaw<StatGroupRow[]>`
+    ${withTurns(Prisma.sql`
+      SELECT * FROM token_saver_stats
+      WHERE "runId" IN (${Prisma.join(runIds)})`)}
     SELECT ${STAT_GROUP_COLUMNS}
-    FROM token_saver_stats s
-    WHERE s."runId" IN (${Prisma.join(runIds)})
+    FROM picked s
+    JOIN turns t ON t.id = s.id
     GROUP BY 1, 2, 3, 4`;
   return rows.map(toGroup);
 };
@@ -90,10 +149,13 @@ export const statGroupsOfProject = async (
   to: Date,
 ): Promise<StatGroup[]> => {
   const rows = await prisma.$queryRaw<StatGroupRow[]>`
+    ${withTurns(Prisma.sql`
+      SELECT * FROM token_saver_stats
+      WHERE "projectId" = ${projectId}
+        AND "createdAt" >= ${from} AND "createdAt" < ${to}`)}
     SELECT ${STAT_GROUP_COLUMNS}
-    FROM token_saver_stats s
-    WHERE s."projectId" = ${projectId}
-      AND s."createdAt" >= ${from} AND s."createdAt" < ${to}
+    FROM picked s
+    JOIN turns t ON t.id = s.id
     GROUP BY 1, 2, 3, 4`;
   return rows.map(toGroup);
 };
@@ -133,17 +195,21 @@ export const unfilteredProgramsOfProject = async (
 };
 
 /**
- * ADR-0009: the `input` price (USD per token) of each run's session model,
- * from the default tier of the newest price version. A run without requests
- * falls back to `runs.model`; an unpriced one is absent (prices at 0).
+ * #746 D6 (ADR-0074 §5): the cache prices (USD per token) of each run's
+ * session model, from the default tier of the newest price version (ADR-0009).
+ * `write` is the 1-hour write price when the run's requests wrote with the
+ * 1-hour TTL, else the 5-minute one. A bucket without a price falls back as
+ * the price table does: 1h → 5m → input, read → input. A run without
+ * requests falls back to `runs.model`; an unpriced one is absent (prices at 0).
  */
-export const inputPricesOfRuns = async (
+export const cachePricesOfRuns = async (
   prisma: PrismaService,
   runIds: string[],
-): Promise<Map<string, string>> => {
+): Promise<Map<string, EstimateCachePrices>> => {
   if (runIds.length === 0) return new Map();
-  const [sessionModels, runs, head] = await Promise.all([
+  const [sessionModels, usage, runs, head] = await Promise.all([
     sessionModelByRun(prisma, runIds),
+    usageByRun(prisma, runIds),
     prisma.run.findMany({
       where: { id: { in: runIds } },
       select: { id: true, model: true },
@@ -163,28 +229,40 @@ export const inputPricesOfRuns = async (
     }),
   ]);
   const prices = compilePrices((head?.models ?? []).map(toModelPrice));
-  const out = new Map<string, string>();
+  const out = new Map<string, EstimateCachePrices>();
   for (const run of runs) {
     const model = sessionModels.get(run.id) ?? run.model;
     if (model === null) continue;
-    const input = matchModel(prices, model)?.tiers.find((t) => t.isDefault)
-      ?.prices.input;
-    if (input !== undefined) out.set(run.id, input);
+    const tier = matchModel(prices, model)?.tiers.find((t) => t.isDefault);
+    if (tier === undefined) continue;
+    const p = tier.prices;
+    const write5m = p.cacheWrite5m ?? p.input;
+    const write1h = p.cacheWrite1h ?? write5m;
+    const wrote1h = (usage.get(run.id)?.cacheWrite1h ?? 0) > 0;
+    out.set(run.id, {
+      write: wrote1h ? write1h : write5m,
+      read: p.cacheRead ?? p.input,
+    });
   }
   return out;
 };
 
-/** The estimate of some groups, each priced at its run's input price. */
+/**
+ * The estimate of some groups, each priced at its run's cache prices over
+ * its rows' turns remaining (#746 D6).
+ */
 export const savedOf = (
   groups: readonly StatGroup[],
-  prices: ReadonlyMap<string, string>,
+  prices: ReadonlyMap<string, EstimateCachePrices>,
 ): TokenSavedView => {
   let estimateTokens = 0;
   let estimateUsd = 0;
   for (const g of groups) {
     estimateTokens += g.tokens;
     const price = g.runId === null ? undefined : prices.get(g.runId);
-    estimateUsd += price === undefined ? 0 : estimateUsdSaved(g.tokens, price);
+    if (price === undefined || g.tokens === 0) continue;
+    // Σ tokensᵢ × (write + read × turnsᵢ) = tokens × (write + read × turnTokens / tokens).
+    estimateUsd += estimateUsdSaved(g.tokens, price, g.turnTokens / g.tokens);
   }
   return { estimateTokens, estimateUsd };
 };
@@ -192,7 +270,7 @@ export const savedOf = (
 /** Per-filter savings of some groups, most saved first. */
 export const byFilterOf = (
   groups: readonly StatGroup[],
-  prices: ReadonlyMap<string, string>,
+  prices: ReadonlyMap<string, EstimateCachePrices>,
 ): TokenSaverFilterSavings[] => {
   const byFilter = new Map<string, StatGroup[]>();
   for (const g of groups) {
@@ -249,7 +327,7 @@ export const tokenSaverFactsOf = async (
   const filtered = [
     ...new Set(groups.flatMap((g) => (g.runId === null ? [] : [g.runId]))),
   ];
-  const prices = await inputPricesOfRuns(prisma, filtered);
+  const prices = await cachePricesOfRuns(prisma, filtered);
   const tokenSaved = new Map<string, TokenSavedView>();
   const tokenSaverFilters = new Map<string, TokenSaverFilterSavings[]>();
   for (const runId of filtered) {

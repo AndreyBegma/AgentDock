@@ -2,6 +2,13 @@
 
 Issue: [#445](https://github.com/AndreyBegma/Nautelle/issues/445) · Decision: [ADR-0039](../adr/0039-token-saver.md)
 
+> **Amended by [ADR-0074](../adr/0074-a-token-saving-is-judged-by-billed-cost-per-successful-card.md) (#746):**
+> D12 — the filter's estimate is priced as one cache write plus a cache read
+> per remaining turn, and the verdict on a saving is billed cost per successful
+> card, A against B per technique; D13 — the card leads with tokens
+> (`saved ≈ 42k tok · $0.13`), and the dashboard's headline is $/successful
+> card. See [the #746 spec](746-per-run-cache-metrics-per-card-a-b-flags.md).
+
 ## Summary
 
 Agents spend most of their input tokens re-reading things nobody needs in full:

@@ -20,7 +20,8 @@ import {
  * The project is the envelope's, by `(runner, root)`; a row's run is kept
  * only when it is a run of that project — else `null`, so another project's
  * run never shows a stranger's savings. The runner's row id makes a resent
- * batch insert nothing twice.
+ * batch insert nothing twice. #746 D4: each inserted `bypassed` row of a
+ * known run is one of its `runs.retries`.
  */
 @Injectable()
 export class TokenSaverSink implements RunnerEventSink, OnApplicationBootstrap {
@@ -75,7 +76,9 @@ export class TokenSaverSink implements RunnerEventSink, OnApplicationBootstrap {
             })
           ).map((r) => r.id),
     );
-    await this.prisma.tokenSaverStat.createMany({
+    // Only the rows actually inserted come back, so a resent batch counts no
+    // retry twice (#746 D4).
+    const inserted = await this.prisma.tokenSaverStat.createManyAndReturn({
       data: rows.map((r) => ({
         id: r.id,
         projectId,
@@ -90,6 +93,19 @@ export class TokenSaverSink implements RunnerEventSink, OnApplicationBootstrap {
         createdAt: new Date(r.at),
       })),
       skipDuplicates: true,
+      select: { runId: true, bypassed: true },
     });
+    const retries = new Map<string, number>();
+    for (const r of inserted) {
+      if (r.bypassed && r.runId !== null) {
+        retries.set(r.runId, (retries.get(r.runId) ?? 0) + 1);
+      }
+    }
+    for (const [id, count] of retries) {
+      await this.prisma.run.update({
+        where: { id },
+        data: { retries: { increment: count } },
+      });
+    }
   }
 }

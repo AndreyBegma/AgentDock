@@ -47,6 +47,7 @@ describe('TokenSaverService.launch (#445 amendment 4)', () => {
     ).toEqual({
       args: { tokenSaver: { enabled: true, mcpAllow: [] } },
       on: true,
+      techniques: null,
     });
   });
 
@@ -60,6 +61,7 @@ describe('TokenSaverService.launch (#445 amendment 4)', () => {
     ).toEqual({
       args: { tokenSaver: { enabled: true, mcpAllow: ['playwright'] } },
       on: true,
+      techniques: null,
     });
     expect(
       await serviceWith(advertised, { enabled: false, mcpAllow: [] }).launch(
@@ -68,6 +70,44 @@ describe('TokenSaverService.launch (#445 amendment 4)', () => {
     ).toEqual({
       args: { tokenSaver: { enabled: false, mcpAllow: [] } },
       on: false,
+      techniques: null,
     });
+  });
+});
+
+describe('TokenSaverService.launch with technique flags (#746 D11)', () => {
+  const flags = { fixture: true };
+
+  it('carries the flags only to a runner that advertises tokenEconomy', async () => {
+    expect(
+      await serviceWith({
+        ...capabilities,
+        tokenSaver: true,
+        tokenEconomy: true,
+      }).launch('p1', flags),
+    ).toEqual({
+      args: { tokenSaver: { enabled: true, mcpAllow: [], techniques: flags } },
+      on: true,
+      techniques: flags,
+    });
+  });
+
+  it('drops them for a runner without tokenEconomy, and without tokenSaver sends nothing', async () => {
+    expect(
+      await serviceWith({ ...capabilities, tokenSaver: true }).launch(
+        'p1',
+        flags,
+      ),
+    ).toEqual({
+      args: { tokenSaver: { enabled: true, mcpAllow: [] } },
+      on: true,
+      techniques: null,
+    });
+    expect(
+      await serviceWith({ ...capabilities, tokenEconomy: true }).launch(
+        'p1',
+        flags,
+      ),
+    ).toEqual(TOKEN_SAVER_OFF);
   });
 });

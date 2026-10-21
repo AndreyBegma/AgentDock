@@ -12,7 +12,7 @@ import { runCostsByKind, runPromptCacheByKind } from '../history/run-usage';
 import { costPerRoundOfProject } from './cost-per-round';
 import {
   byFilterOf,
-  inputPricesOfRuns,
+  cachePricesOfRuns,
   type StatGroup,
   savedOf,
   statGroupsOfProject,
@@ -80,7 +80,7 @@ export class TokenSaverSummaryService {
     const runIds = [
       ...new Set(groups.flatMap((g) => (g.runId === null ? [] : [g.runId]))),
     ];
-    const prices = await inputPricesOfRuns(this.prisma, runIds);
+    const prices = await cachePricesOfRuns(this.prisma, runIds);
     const commands = sum(groups, 'commands');
     const rate = (n: number) => (commands === 0 ? 0 : n / commands);
 
