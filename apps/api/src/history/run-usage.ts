@@ -47,7 +47,7 @@ export const EMPTY_USAGE: RunUsage = {
  *   it (`text_normalizations.sessionId`), the same way.
  * Skill runs record no session id, so they have no usage yet.
  */
-const RUN_SESSIONS = Prisma.sql`
+export const RUN_SESSIONS = Prisma.sql`
   SELECT r2.id AS "runId", se2.id AS "sessionId"
   FROM runs r2
   JOIN slots s ON s.id = r2."slotId"
@@ -107,7 +107,7 @@ const RUN_SESSIONS = Prisma.sql`
  * within the run's window. `usage_rollups` are not needed; when runs get a
  * `runId` on their requests (#13 D14) this join is the one place to change.
  */
-const RUN_REQUESTS = Prisma.sql`
+export const RUN_REQUESTS = Prisma.sql`
   FROM runs r
   JOIN (${RUN_SESSIONS}) rs ON rs."runId" = r.id
   JOIN sessions se ON se.id = rs."sessionId"

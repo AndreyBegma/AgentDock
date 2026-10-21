@@ -44,6 +44,7 @@ import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { TerminalSetupModule } from './terminal-setup';
 import { TextModule } from './text';
+import { TokenEconomyModule } from './token-economy';
 import { TokenSaverModule } from './token-saver';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
@@ -99,6 +100,8 @@ import { WorkflowsModule } from './workflows';
     TextModule,
     // Issue #445: Token saver. Global: every launch sender asks it what to send.
     TokenSaverModule,
+    // Issue #746: Token economy — A/B per technique, usage facts, the report.
+    TokenEconomyModule,
     // Issue #447: Steward — incidents, safe automatic fixes, escalation.
     StewardModule,
     // Issue #449: Context handoff — note copies, person edits, restarts.

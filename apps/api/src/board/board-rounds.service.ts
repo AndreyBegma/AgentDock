@@ -65,6 +65,7 @@ import {
 import { resolveSpecTarget, type SpecTarget } from '../planner/spec-target';
 import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
+import { TokenEconomyService } from '../token-economy/token-economy.service';
 import { TokenSaverService } from '../token-saver/token-saver.service';
 import { BoardService } from './board.service';
 import { BoardCommands, boardOutput } from './board-commands';
@@ -180,6 +181,7 @@ export class BoardRoundsService {
     private readonly dependencies: BoardDependencies,
     private readonly stacks: BoardStacks,
     private readonly tokenSaver: TokenSaverService,
+    private readonly economy: TokenEconomyService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -660,7 +662,15 @@ export class BoardRoundsService {
       ...stackFrames.map((f) => ({ path: f.path, content: f.content })),
     ];
     // #445 D11: only a runner that advertises the token saver gets the field.
-    const saver = await this.tokenSaver.launch(project.id);
+    // #746 D2: the card's technique arms, drawn at its first round and sticky.
+    const saver = await this.tokenSaver.launch(
+      project.id,
+      await this.economy.cardFlags(
+        project.id,
+        card.id,
+        card.rounds.length === 0,
+      ),
+    );
     const draft: Omit<CardRunArgs, 'runId'> = {
       cardId: card.id,
       projectId: project.id,
@@ -724,6 +734,8 @@ export class BoardRoundsService {
             permissionMode,
           },
           tokenSaver: saver.on,
+          // #746 D11: the flags launched; reports read this snapshot.
+          techniques: saver.techniques ?? Prisma.DbNull,
           status: 'running',
           triggeredByType: 'user',
           triggeredById: actor.userId,
