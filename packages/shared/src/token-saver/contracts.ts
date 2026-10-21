@@ -240,9 +240,27 @@ export const filterStatRowSchema = z
 export type FilterStatRow = z.infer<typeof filterStatRowSchema>;
 
 /** `data` of a `filter.stats` event. */
-export const filterStatsDataSchema = z.strictObject({
-  rows: z.array(filterStatRowSchema).min(1).max(FILTER_STATS_MAX_ROWS),
-});
+export const filterStatsDataSchema = z
+  .strictObject({
+    rows: z.array(filterStatRowSchema).min(1).max(FILTER_STATS_MAX_ROWS),
+    /**
+     * #748 D5: the Claude session the batch's rows were read from — the
+     * `/cs-eco` directory name. Valid only when every row is `manual`; the API
+     * keeps it only for a session of the same runner and project (D4).
+     */
+    session: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,128}$/)
+      .optional(),
+  })
+  .refine(
+    (d) =>
+      d.session === undefined || d.rows.every((r) => r.runKind === 'manual'),
+    {
+      message: 'a batch with a session holds manual rows only',
+      path: ['session'],
+    },
+  );
 export type FilterStatsData = z.infer<typeof filterStatsDataSchema>;
 
 // The views (D12, D13)
