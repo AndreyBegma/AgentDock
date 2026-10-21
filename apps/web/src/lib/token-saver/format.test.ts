@@ -16,10 +16,22 @@ import {
   toggleAllow,
 } from './format';
 
-describe('savedLabel (D13)', () => {
-  test('is "saved ≈ $x" next to the cost', () => {
-    expect(savedLabel({ estimateUsd: 0.41, estimateTokens: 90_000 })).toBe(
-      'saved ≈ $0.41',
+describe('savedLabel (#746 D7)', () => {
+  test('leads with the tokens, then the dollars', () => {
+    expect(savedLabel({ estimateTokens: 42_000, estimateUsd: 0.13 })).toBe(
+      'saved ≈ 42k tok · $0.13',
+    );
+  });
+
+  test('a sub-cent saving keeps <$0.01 after the tokens', () => {
+    expect(savedLabel({ estimateTokens: 900, estimateUsd: 0.004 })).toBe(
+      'saved ≈ 900 tok · <$0.01',
+    );
+  });
+
+  test('an unpriced saving shows the tokens alone', () => {
+    expect(savedLabel({ estimateTokens: 900, estimateUsd: 0 })).toBe(
+      'saved ≈ 900 tok',
     );
   });
 
