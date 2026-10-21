@@ -1,6 +1,14 @@
-import { cardWorkerPrompt, TERSE_REGISTER } from '@nautelle/shared';
+import {
+  cardWorkerPrompt,
+  ESCALATE_CARD_TOOL,
+  TERSE_REGISTER,
+} from '@nautelle/shared';
 import { CARD_RUN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
-import { cardPromptSaver, escalationRoundPrompt } from './board-rounds.service';
+import {
+  cardPromptEscalate,
+  cardPromptSaver,
+  escalationRoundPrompt,
+} from './board-rounds.service';
 
 const card = {
   number: 12,
@@ -62,6 +70,18 @@ describe('cardPromptSaver (#747)', () => {
         ...cardPromptSaver({ on: true, techniques: null }),
       }),
     ).toContain(TERSE_REGISTER);
+  });
+});
+
+describe('cardPromptEscalate (#750 D8)', () => {
+  it('puts the escalate_card text in the round-1 prompt only when the tool is offered', () => {
+    expect(cardPromptEscalate(false)).toEqual({});
+    expect(
+      cardWorkerPrompt({ ...card, ...cardPromptEscalate(true) }),
+    ).toContain(ESCALATE_CARD_TOOL);
+    expect(
+      cardWorkerPrompt({ ...card, ...cardPromptEscalate(false) }),
+    ).not.toContain(ESCALATE_CARD_TOOL);
   });
 });
 

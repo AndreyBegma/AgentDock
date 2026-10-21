@@ -109,10 +109,18 @@ describe('board model by card class (e2e, #750)', () => {
     );
   };
 
-  /** The relaunch starts once the answer is out; wait for its round. */
+  /**
+   * The relaunch starts once the answer is out, unawaited; wait for its
+   * round and for its `card.run`, which is sent after the round's row.
+   */
   const roundCount = async (number: number, count: number) => {
-    for (let i = 0; i < 100; i += 1) {
-      if ((await w.card(number)).rounds.length >= count) return;
+    for (let i = 0; i < 250; i += 1) {
+      if (
+        (await w.card(number)).rounds.length >= count &&
+        w.sent('card.run').length >= count
+      ) {
+        return;
+      }
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     throw new Error(`card ${number} never reached ${count} rounds`);
@@ -137,6 +145,9 @@ describe('board model by card class (e2e, #750)', () => {
         effort: 'low',
       });
       expect(w.sent('card.run')[1]).not.toHaveProperty('escalate');
+      expect(String(w.sent('card.run')[1].prompt)).not.toContain(
+        'escalate_card',
+      );
     });
 
     it('runs a deciding card on opus at high, and shows the mapped pair on the card', async () => {
@@ -259,6 +270,7 @@ describe('board model by card class (e2e, #750)', () => {
       const { number } = await classified('mechanical');
       await w.runCard(number);
       expect(w.sent('card.run')[0]).toMatchObject({ escalate: true });
+      expect(String(w.sent('card.run')[0].prompt)).toContain('escalate_card');
 
       await advertise({ cardEscalate: false });
       await stop(number);

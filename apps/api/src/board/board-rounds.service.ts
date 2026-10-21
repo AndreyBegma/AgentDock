@@ -251,6 +251,13 @@ export const cardPromptSaver = (
 };
 
 /**
+ * #750 D8: the round-1 prompt tells the worker when to call `escalate_card`
+ * only when the launch offers the tool (`escalate` on `card.run`).
+ */
+export const cardPromptEscalate = (escalate: boolean): { escalate?: true } =>
+  escalate ? { escalate: true } : {};
+
+/**
  * Starting a round (issue #242 D4, D5, D9, D12, D13): Run — round 1 or a
  * retry — and feedback. Everything that can be refused is refused before a
  * row exists or a command is sent; the round is then a `runs` row of kind
@@ -957,6 +964,8 @@ export class BoardRoundsService {
             attachments: attachmentBriefs,
             projectRules,
             ...cardPromptSaver(saver),
+            // #750 D8: the text goes with the tool the runner offers.
+            ...cardPromptEscalate(escalate),
           });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null && specPr === null
