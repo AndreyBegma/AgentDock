@@ -8,6 +8,7 @@ import {
   techniqueFixture,
 } from '../../lib/token-saver/economy.fixture';
 import { emptySummary } from '../../lib/token-saver/summary';
+import { BShareForm } from './b-share-card';
 import {
   CostPerRoundTable,
   CostPerRoundWeeksTable,
@@ -316,10 +317,7 @@ describe('cost per round (#663 D5)', () => {
 
 describe('TechniquesReport (#746)', () => {
   const noop = async () => {};
-  const render = (
-    report: TokenEconomyReport,
-    isAdmin: boolean,
-  ): string =>
+  const render = (report: TokenEconomyReport, isAdmin: boolean): string =>
     renderToStaticMarkup(
       <TechniquesReport report={report} isAdmin={isAdmin} onSetMode={noop} />,
     );
@@ -351,7 +349,10 @@ describe('TechniquesReport (#746)', () => {
   });
 
   test('a technique already on offers Stop, not Enable for all', () => {
-    const html = render(reportFixture([techniqueFixture({ mode: 'on' })]), true);
+    const html = render(
+      reportFixture([techniqueFixture({ mode: 'on' })]),
+      true,
+    );
     expect(html).not.toContain('Enable for all');
     expect(html).toContain('Stop');
   });
@@ -386,5 +387,29 @@ describe('TechniquesReport (#746)', () => {
     expect(render(reportFixture([]), true)).toContain(
       'No saving technique is under test yet',
     );
+  });
+});
+
+describe('BShareForm (#746 D2)', () => {
+  const noop = async () => {};
+
+  test('an admin edits the share and saves it', () => {
+    const html = renderToStaticMarkup(
+      <BShareForm isAdmin stored={50} onSave={noop} />,
+    );
+    expect(html).toContain('Share of cards in test arm B');
+    expect(html).toContain('value="50"');
+    expect(html).not.toMatch(/readonly/i);
+    expect(html).toContain('>Save<');
+  });
+
+  test('everyone else reads it', () => {
+    const html = renderToStaticMarkup(
+      <BShareForm isAdmin={false} stored={20} onSave={noop} />,
+    );
+    expect(html).toContain('value="20"');
+    expect(html).toMatch(/readonly/i);
+    expect(html).not.toContain('>Save<');
+    expect(html).toContain('Only project administrators');
   });
 });

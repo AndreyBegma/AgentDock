@@ -6,8 +6,8 @@ import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import {
-  TOKEN_ECONOMY_SIGNALS,
   type TechniqueMode,
+  TOKEN_ECONOMY_SIGNALS,
   type TokenEconomyArmReport,
   type TokenEconomyReport,
   type TokenEconomySignal,
@@ -99,7 +99,11 @@ const figure = (shown: ShownInterval) => (
   </span>
 );
 
-function MeasureTable({ technique }: { technique: TokenEconomyTechniqueReport }) {
+function MeasureTable({
+  technique,
+}: {
+  technique: TokenEconomyTechniqueReport;
+}) {
   return (
     <ResponsiveRows
       label={`${technique.label}: arm A against arm B`}

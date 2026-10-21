@@ -1,6 +1,6 @@
 import {
-  TOKEN_ECONOMY_SIGNALS,
   type TechniqueMode,
+  TOKEN_ECONOMY_SIGNALS,
   type TokenEconomyInterval,
   type TokenEconomySignal,
   type TokenEconomyTechniqueReport,
@@ -106,9 +106,7 @@ export const enableConsequence = (
   [
     `Every new card will run ${t.label}. Cards already in arm A keep running without it until they settle.`,
     `It should not cost quality on any of the four signals: ${listOf(TOKEN_ECONOMY_SIGNALS)}.`,
-    t.worsens.length > 0
-      ? `Arm B is worse on ${listOf(t.worsens)}.`
-      : null,
+    t.worsens.length > 0 ? `Arm B is worse on ${listOf(t.worsens)}.` : null,
     t.enoughData
       ? null
       : `There is not enough data for a verdict yet: ${t.a.settledCards} settled cards in A and ${t.b.settledCards} in B, of ${minCardsPerArm} each.`,

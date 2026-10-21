@@ -90,7 +90,8 @@ export function TechniquesSection({
         section={section}
         unavailable={{
           title: 'The technique report is not answering',
-          stillWorks: 'The cost per round and the filter savings below still load.',
+          stillWorks:
+            'The cost per round and the filter savings below still load.',
         }}
         empty={null}
       >

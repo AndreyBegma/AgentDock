@@ -20,7 +20,6 @@ import {
   UnmeasuredKindsNote,
 } from '../../../../../components/token-saver/cost-per-round';
 import { SavingsChart } from '../../../../../components/token-saver/savings-chart';
-import { TechniquesSection } from '../../../../../components/token-saver/techniques-section';
 import {
   FilterTable,
   PromptCacheTable,
@@ -32,6 +31,7 @@ import {
   PromptCacheTile,
   SummaryTiles,
 } from '../../../../../components/token-saver/summary-tiles';
+import { TechniquesSection } from '../../../../../components/token-saver/techniques-section';
 import { describeTokenSaverError } from '../../../../../lib/token-saver/format';
 import {
   mostPassedThrough,
