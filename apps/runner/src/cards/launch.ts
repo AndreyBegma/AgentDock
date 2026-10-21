@@ -169,6 +169,7 @@ export const cardTokenSaver = (
     runId: args.runId,
     runnerMcp: finishGuardArgs(cardIssueNumber(args)),
     scout: true,
+    techniques: args.tokenSaver?.techniques,
     baseSettings:
       wiring.wiring === 'injected' ? cardHooksSettings(selfCommand) : undefined,
   });

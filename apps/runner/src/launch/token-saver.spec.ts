@@ -97,6 +97,13 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(existsSync(join(dir, 'token-saver-settings.json'))).toBe(false);
   });
 
+  it('carries the technique flags it was given, and none by default (#746)', () => {
+    expect(tokenSaverLaunch(input())?.techniques).toEqual({});
+    expect(
+      tokenSaverLaunch(input({ techniques: { filter: false } }))?.techniques,
+    ).toEqual({ filter: false });
+  });
+
   it('passes the settings, a strict MCP list and the agents, in that order', () => {
     const launch = tokenSaverLaunch(input({ runKind: 'skill' }));
     expect(launch).not.toBeNull();
