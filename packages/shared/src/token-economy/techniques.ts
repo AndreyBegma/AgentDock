@@ -62,6 +62,20 @@ export const TOKEN_ECONOMY_TECHNIQUES: readonly TokenEconomyTechniqueDef[] = [
     defaultMode: 'ab',
     runKinds: ['card'],
   },
+  // #749 D3, D6: a launch without a key behaves as before #749 (D7): no size
+  // rule, and the 1-hour prompt-cache TTL.
+  {
+    key: 'resume-by-size',
+    label: 'Fresh session for a long history',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
+  {
+    key: 'cache-ttl-1h',
+    label: '1-hour prompt-cache TTL',
+    defaultMode: 'ab',
+    runKinds: ['card'],
+  },
 ];
 
 /** A technique key: lower-case words joined by `-`. */

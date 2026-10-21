@@ -37,7 +37,11 @@ import {
   readNote,
   readNoteFile,
 } from './note';
-import { decideRestart, type RestartDecision } from './restart';
+import {
+  decideRestart,
+  type RestartDecision,
+  TECHNIQUE_RESUME_BY_SIZE,
+} from './restart';
 import { acceptanceChecklist, branchDiff, freshSeed, seedTokens } from './seed';
 import {
   cardNumberOfPrompt,
@@ -129,7 +133,7 @@ export class HandoffService {
    */
   async prepareRound(
     card: HandoffCard,
-    args: Pick<CardRunArgs, 'session' | 'prompt' | 'profileKey'>,
+    args: Pick<CardRunArgs, 'session' | 'prompt' | 'profileKey' | 'tokenSaver'>,
     profile: ConfigProfile,
   ): Promise<PreparedRound> {
     const { state } = this.options;
@@ -260,7 +264,7 @@ export class HandoffService {
 
   private async decide(
     card: HandoffCard,
-    args: Pick<CardRunArgs, 'session' | 'prompt'>,
+    args: Pick<CardRunArgs, 'session' | 'prompt' | 'tokenSaver'>,
     profile: ConfigProfile,
   ): Promise<RestartDecision & { seed: string | null }> {
     const jsonl = this.transcriptOf(profile, args.session.id);
@@ -271,6 +275,10 @@ export class HandoffService {
         : { historyTokens: 0, lastTurnAt: null, cache1h: false },
       seed === null ? null : seedTokens(seed),
       this.options.deps.clock.now(),
+      {
+        resumeBySize:
+          args.tokenSaver?.techniques?.[TECHNIQUE_RESUME_BY_SIZE] === true,
+      },
     );
     return { ...decision, seed };
   }

@@ -2,6 +2,12 @@
 
 Issue: [#449](https://github.com/AndreyBegma/Nautelle/issues/449) · Decision: [ADR-0042](../adr/0042-context-handoff.md)
 
+> **Amended by [#749](749-start-a-fresh-session-for-a-long-card-ro.md):**
+> D3 gains a size rule — with technique `resume-by-size` on, a history of
+> 60,000 tokens or more starts fresh from this spec's seed whenever one
+> exists, warm cache or not; below it, or with the flag off or absent, D3
+> decides unchanged.
+
 ## Summary
 
 A card round already resumes the card's Claude session (`--resume card.sessionId`, `apps/api/src/board/board-rounds.service.ts` D5) [Confirmed]. Context is still lost or paid for in four cases:
