@@ -34,6 +34,7 @@ import {
   workerPromptBlock,
 } from '../../../../../../lib/project-rules/format';
 import { useErrorToast } from '../../../../../../lib/section/use-error-toast';
+import { CompressedRulesPanel } from './compressed-rules-panel';
 import { ImportDialog } from './import-dialog';
 import { type RuleDraft, RuleSheet } from './rule-sheet';
 import { ScanDialog } from './scan-dialog';
@@ -115,7 +116,12 @@ export function RulesTab({
       : await run(() =>
           api(`/projects/${projectId}/rules`, {
             method: 'POST',
-            body: draft satisfies ProjectRuleCreateRequest,
+            // A new rule applies to every card type; `appliesTo` is set by PATCH.
+            body: {
+              title: draft.title,
+              description: draft.description,
+              enabled: draft.enabled,
+            } satisfies ProjectRuleCreateRequest,
           }),
         );
     if (ok) setEditing(undefined);
@@ -381,6 +387,12 @@ export function RulesTab({
           </div>
         </Disclosure>
       ) : null}
+
+      <CompressedRulesPanel
+        projectId={projectId}
+        isAdmin={isAdmin}
+        version={rules.map((r) => `${r.id}:${r.updatedAt}`).join(',')}
+      />
 
       <RuleSheet
         open={editing !== undefined}

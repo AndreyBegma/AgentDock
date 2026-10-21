@@ -3,16 +3,21 @@
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
+import { Field } from '@andrewbehma/glass-ui/field';
+import { NumberInput } from '@andrewbehma/glass-ui/number-input';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
-import type {
-  ProjectRuntimeProfile,
-  TokenSaverSettingsView,
+import {
+  PREFIX_BUDGET_MAX_TOKENS,
+  PREFIX_BUDGET_MIN_TOKENS,
+  type ProjectRuntimeProfile,
+  type TokenSaverSettingsView,
 } from '@nautelle/shared';
 import Link from 'next/link';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { BShareCard } from '../../../../../components/token-saver/b-share-card';
+import { SelectionMatrix } from '../../../../../components/token-saver/selection-matrix';
 import { Time } from '../../../../../lib/format/time';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import {
@@ -27,6 +32,15 @@ import {
   sameAllow,
   toggleAllow,
 } from '../../../../../lib/token-saver/format';
+import {
+  fetchPrefixSummary,
+  pruneMcpByType,
+  sameByType,
+  skillChoices,
+} from '../../../../../lib/token-saver/prefix';
+import { presetRange } from '../../../../../lib/usage/format';
+
+type ByType = Partial<Record<string, string[]>>;
 
 /**
  * #445 D11: the project's Token saver — a switch (on by default) and the MCP
@@ -48,23 +62,50 @@ export function TokenSaverTab({
   const [profiles, setProfiles] = useState<ProjectRuntimeProfile[]>();
   const [enabled, setEnabled] = useState(true);
   const [allow, setAllow] = useState<string[]>([]);
+  const [budget, setBudget] = useState('');
+  const [mcpByType, setMcpByType] = useState<ByType>({});
+  const [skillsOffByType, setSkillsOffByType] = useState<ByType>({});
+  const [reportedSkills, setReportedSkills] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const showError = useErrorToast();
 
+  const adopt = useCallback((view: TokenSaverSettingsView) => {
+    setSettings(view);
+    setEnabled(view.enabled);
+    setAllow(view.mcpAllow);
+    setBudget(String(view.prefixBudgetTokens));
+    setMcpByType(view.mcpByType);
+    setSkillsOffByType(view.skillsOffByType);
+  }, []);
+
   const load = useCallback(async () => {
     try {
-      const view = await fetchTokenSaver(projectId);
-      setSettings(view);
-      setEnabled(view.enabled);
-      setAllow(view.mcpAllow);
+      adopt(await fetchTokenSaver(projectId));
     } catch (err) {
       showError(describeTokenSaverError(err));
     }
-  }, [projectId, showError]);
+  }, [projectId, showError, adopt]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // The skills a launch reported: the top parts of the last 30 days. Best
+  // effort — without them the matrix shows only the skills already hidden.
+  useEffect(() => {
+    let current = true;
+    fetchPrefixSummary(projectId, presetRange('30d'))
+      .then((summary) => {
+        if (!current) return;
+        setReportedSkills(
+          summary.topParts.filter((p) => p.kind === 'skill').map((p) => p.name),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     if (!canOperate) {
@@ -88,20 +129,36 @@ export function TokenSaverTab({
   if (!settings || !profiles) return <Skeleton className="h-64 w-full" />;
 
   const choices = mcpChoices(profiles, allow);
+  const budgetValue = Number(budget);
+  const budgetError =
+    !Number.isInteger(budgetValue) ||
+    budgetValue < PREFIX_BUDGET_MIN_TOKENS ||
+    budgetValue > PREFIX_BUDGET_MAX_TOKENS
+      ? `Enter a whole number from ${PREFIX_BUDGET_MIN_TOKENS.toLocaleString('en-US')} to ${PREFIX_BUDGET_MAX_TOKENS.toLocaleString('en-US')}.`
+      : undefined;
+  // A server unticked in the allowlist leaves every type's list (the API
+  // refuses a subset that is not within `mcpAllow`).
+  const prunedMcp = pruneMcpByType(mcpByType, allow);
   const dirty =
-    enabled !== settings.enabled || !sameAllow(allow, settings.mcpAllow);
+    enabled !== settings.enabled ||
+    !sameAllow(allow, settings.mcpAllow) ||
+    budgetValue !== settings.prefixBudgetTokens ||
+    !sameByType(prunedMcp, settings.mcpByType) ||
+    !sameByType(skillsOffByType, settings.skillsOffByType);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
+    if (budgetError) return;
     setBusy(true);
     try {
       const view = await saveTokenSaver(projectId, {
         enabled,
         mcpAllow: allow,
+        prefixBudgetTokens: budgetValue,
+        mcpByType: prunedMcp,
+        skillsOffByType,
       });
-      setSettings(view);
-      setEnabled(view.enabled);
-      setAllow(view.mcpAllow);
+      adopt(view);
       toast.success('Token saver saved.');
     } catch (err) {
       showError(describeTokenSaverError(err));
@@ -198,6 +255,37 @@ export function TokenSaverTab({
             ) : null}
           </fieldset>
 
+          <fieldset className="flex flex-col gap-2" disabled={!isAdmin}>
+            <legend className="font-medium text-sm">Prefix budget</legend>
+            <Field
+              label="Tokens per launch"
+              htmlFor="token-saver-prefix-budget"
+              hint="A launch kind whose median prefix is over this is flagged on the Token saver page. A warning never blocks a launch."
+              error={budgetError}
+            >
+              <NumberInput
+                id="token-saver-prefix-budget"
+                className="w-36"
+                min={PREFIX_BUDGET_MIN_TOKENS}
+                max={PREFIX_BUDGET_MAX_TOKENS}
+                value={budget}
+                disabled={!isAdmin}
+                aria-invalid={budgetError ? true : undefined}
+                onChange={(e) => setBudget(e.target.value)}
+              />
+            </Field>
+          </fieldset>
+
+          <SelectionMatrix
+            allow={allow}
+            skills={skillChoices(reportedSkills, skillsOffByType)}
+            mcpByType={prunedMcp}
+            skillsOffByType={skillsOffByType}
+            disabled={!isAdmin || !enabled}
+            onMcpChange={setMcpByType}
+            onSkillsChange={setSkillsOffByType}
+          />
+
           {isAdmin ? (
             <div className="flex items-center justify-between gap-2">
               <span className="text-ink-3 text-xs">
@@ -209,7 +297,11 @@ export function TokenSaverTab({
                   'Never changed — on, agentdock only.'
                 )}
               </span>
-              <Button variant="solid" type="submit" disabled={busy || !dirty}>
+              <Button
+                variant="solid"
+                type="submit"
+                disabled={busy || !dirty || budgetError !== undefined}
+              >
                 Save
               </Button>
             </div>
