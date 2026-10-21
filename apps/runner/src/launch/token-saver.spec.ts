@@ -17,6 +17,8 @@ import {
   LAUNCH_SETTINGS_ENV,
   TECHNIQUES_ENV,
 } from '../filter/env';
+import { sha256Hex } from '../prefix/measure';
+import { PREFIX_MEASURED_FILE, type PrefixRecord } from '../prefix/record';
 import { tempDir } from '../testing/fixtures';
 import firstTurn from './fixtures/first-turn.json';
 import { profileClaudeJson, profileMcpServerNames } from './profile-mcp';
@@ -293,6 +295,111 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(settings.hooks.PreToolUse[1].matcher).toBe('Read');
     expect(settings.hooks.PreToolUse[1].hooks[0].command).toBe(read);
     expect(settings.hooks.PostToolUse[0].hooks[0].command).toBe(read);
+  });
+
+  describe('the launch prefix (#751)', () => {
+    const recordOf = (): PrefixRecord =>
+      JSON.parse(readFileSync(join(dir, PREFIX_MEASURED_FILE), 'utf8'));
+    const CLAUDE_MD = '# Project\n';
+    const worktree = () => {
+      const cwd = join(home, 'wt');
+      mkdirSync(cwd, { recursive: true });
+      writeFileSync(join(cwd, 'CLAUDE.md'), CLAUDE_MD);
+      return cwd;
+    };
+
+    it('records the parts of every launch with a run, for the daemon to send', () => {
+      const cwd = worktree();
+      tokenSaverLaunch(
+        input({
+          config: { enabled: true, mcpAllow: ['playwright'] },
+          cwd,
+          prompt: '# Card\n\n## Project coding rules\n\n1. Bun',
+        }),
+      );
+      const { measured, stale } = recordOf();
+      expect(measured.runId).toBe('run-1');
+      expect(measured.launchKind).toBe('card');
+      expect(stale).toEqual([]);
+      const names = measured.parts.map((p) => `${p.kind}:${p.name}`);
+      expect(names).toContain('claude_md:CLAUDE.md');
+      expect(names).toContain('rules:rules');
+      expect(names).toContain('nautelle:prompt');
+      expect(names).toContain('mcp:nautelle');
+      expect(names).toContain('mcp:playwright');
+      expect(names).toContain('agents:agents');
+      expect(measured.parts.find((p) => p.kind === 'claude_md')?.sha256).toBe(
+        sha256Hex(CLAUDE_MD),
+      );
+    });
+
+    it('records nothing for a launch without a run', () => {
+      tokenSaverLaunch(input({ runId: null }));
+      expect(existsSync(join(dir, PREFIX_MEASURED_FILE))).toBe(false);
+    });
+
+    it('applies the card prefix: MCP subset, hidden skills, overlays', () => {
+      const cwd = worktree();
+      const launch = tokenSaverLaunch(
+        input({
+          config: { enabled: true, mcpAllow: ['playwright', 'woodpecker'] },
+          cwd,
+          prefix: {
+            cardType: 'bug',
+            mcpAllow: ['woodpecker'],
+            skillsOff: ['cs-seo'],
+            overlays: [
+              {
+                id: 'ov_1',
+                part: 'claude_md',
+                originalSha256: sha256Hex(CLAUDE_MD),
+                content: '# P\n',
+              },
+            ],
+          },
+        }),
+      );
+      expect(Object.keys(mcpOf(launch?.mcpFile ?? '')).sort()).toEqual([
+        'nautelle',
+        'woodpecker',
+      ]);
+      const settings = JSON.parse(
+        readFileSync(launch?.settingsFile ?? '', 'utf8'),
+      );
+      expect(settings.skillOverrides).toEqual({ 'cs-seo': 'off' });
+      expect(settings.claudeMdExcludes).toEqual([join(cwd, 'CLAUDE.md')]);
+      expect(settings.hooks.PreToolUse).toBeDefined();
+      expect(launch?.args.slice(-2)).toEqual([
+        '--append-system-prompt-file',
+        join(dir, 'prefix-claude-md.md'),
+      ]);
+      expect(launch?.prefix?.stale).toEqual([]);
+    });
+
+    it('records a stale overlay and launches with the original', () => {
+      const cwd = worktree();
+      const launch = tokenSaverLaunch(
+        input({
+          cwd,
+          prefix: {
+            cardType: 'feature',
+            skillsOff: [],
+            overlays: [
+              {
+                id: 'ov_1',
+                part: 'claude_md',
+                originalSha256: 'a'.repeat(64),
+                content: '# P\n',
+              },
+            ],
+          },
+        }),
+      );
+      expect(launch?.args).not.toContain('--append-system-prompt-file');
+      expect(recordOf().stale).toEqual([
+        { runId: 'run-1', overlayId: 'ov_1', sha256: sha256Hex(CLAUDE_MD) },
+      ]);
+    });
   });
 
   describe('technique flags (#747 D3, D4)', () => {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { CardRunArgs } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
+import { PREFIX_MEASURED_FILE } from '../prefix/record';
 import { tempDir } from '../testing/fixtures';
 import {
   CARD_PORT_BASE,
@@ -256,6 +259,60 @@ describe('card worker launch (#242 D5)', () => {
       // a command from an API without `tokenEconomy` carries none
       expect(launch({ enabled: true, mcpAllow: [] })?.techniques).toEqual({});
       expect(launch({ enabled: false, mcpAllow: [] })).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('applies the card prefix in the card worktree, which it never writes (#751)', () => {
+    const { dir, cleanup } = tempDir();
+    try {
+      const root = join(dir, 'app');
+      const worktree = cardWorktreePath(root, 'ab12cd34');
+      mkdirSync(worktree, { recursive: true });
+      writeFileSync(join(worktree, 'CLAUDE.md'), '# changed\n');
+      const roundDir = join(dir, 'round');
+      mkdirSync(roundDir);
+      const launch = cardTokenSaver(
+        profile,
+        {
+          ...args(false),
+          root,
+          pullRequest: undefined,
+          tokenSaver: {
+            enabled: true,
+            mcpAllow: [],
+            prefix: {
+              cardType: 'bug',
+              skillsOff: [],
+              overlays: [
+                {
+                  id: 'ov_1',
+                  part: 'claude_md',
+                  originalSha256: 'a'.repeat(64),
+                  content: '# P',
+                },
+              ],
+            },
+          },
+        },
+        dir,
+        roundDir,
+        ['/opt/nautelle/bin/nautelle-runner'],
+        { wiring: 'plugin' },
+      );
+      expect(launch?.prefix?.stale.map((s) => s.overlayId)).toEqual(['ov_1']);
+      const record = JSON.parse(
+        readFileSync(join(roundDir, PREFIX_MEASURED_FILE), 'utf8'),
+      );
+      expect(
+        record.measured.parts.some(
+          (p: { name: string }) => p.name === 'CLAUDE.md',
+        ),
+      ).toBe(true);
+      expect(readFileSync(join(worktree, 'CLAUDE.md'), 'utf8')).toBe(
+        '# changed\n',
+      );
     } finally {
       cleanup();
     }

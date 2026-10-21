@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   appendFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -13,12 +14,20 @@ import {
   FILTER_STATS_MAX_ROWS,
   type FilterStatRow,
   filterStatsDataSchema,
+  type PrefixPart,
 } from '@nautelle/shared';
 import {
   eventsMessageSchema,
+  PREFIX_MEASURED_EVENT,
+  PREFIX_OVERLAY_STALE_EVENT,
+  prefixMeasuredDataSchema,
   type UnsequencedEvent,
 } from '@nautelle/shared/protocol';
 import { createLogger } from '../log';
+import {
+  PREFIX_MEASURED_FILE,
+  PREFIX_MEASURED_SENT_FILE,
+} from '../prefix/record';
 import { FILTER_RUN_FILE, FILTER_STATS_FILE } from './env';
 import {
   FILTER_STATS_OFFSET_FILE,
@@ -250,6 +259,61 @@ describe('filter stats reader (#445 amendment 5)', () => {
     expect(events).toEqual([]);
     expect(readIdentity(bare)).toBeNull();
     expect(readIdentity(odd)).toBeNull();
+  });
+
+  describe('the launch prefix record (#751 B1, B10)', () => {
+    const part: PrefixPart = {
+      kind: 'claude_md',
+      name: 'CLAUDE.md',
+      path: 'CLAUDE.md',
+      origin: 'repo',
+      bytes: 8,
+      estTokens: 2,
+      sha256: 'a'.repeat(64),
+    };
+    const record = (runId = 'r1') => ({
+      measured: { runId, launchKind: 'card', parts: [part] },
+      stale: [{ runId, overlayId: 'ov_1', sha256: 'b'.repeat(64) }],
+    });
+    const recorded = (data: unknown, projectId = 'a'): string => {
+      const dir = join(root, 'cards', 'c1', 'rounds', 'r1');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, FILTER_RUN_FILE),
+        JSON.stringify(cardOf(projectId)),
+      );
+      writeFileSync(join(dir, PREFIX_MEASURED_FILE), JSON.stringify(data));
+      return dir;
+    };
+
+    it('sends prefix.measured and each stale overlay once, with the run dir’s project', async () => {
+      const dir = recorded(record());
+      await reader.poll();
+      await reader.poll();
+      expect(events.map((e) => e.type)).toEqual([
+        PREFIX_MEASURED_EVENT,
+        PREFIX_OVERLAY_STALE_EVENT,
+      ]);
+      expect(events[0]?.project).toEqual({ repo: 'acme/a', root: '/srv/a' });
+      expect(prefixMeasuredDataSchema.parse(events[0]?.data).parts).toEqual([
+        part,
+      ]);
+      expect(events[1]?.data).toEqual(record().stale[0]);
+      expect(existsSync(join(dir, PREFIX_MEASURED_SENT_FILE))).toBe(true);
+      expect(
+        eventsMessageSchema.safeParse({
+          type: 'events',
+          events: events.map((e, i) => ({ ...e, seq: i + 1 })),
+        }).success,
+      ).toBe(true);
+    });
+
+    it('drops a record of another run, and a malformed one', async () => {
+      recorded(record('r2'));
+      await reader.poll();
+      expect(events).toEqual([]);
+      expect(warnings.join('')).toContain('prefix record');
+    });
   });
 
   it('sends a /cs-eco batch with its session id, a run batch without (#748)', async () => {

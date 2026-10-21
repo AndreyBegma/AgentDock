@@ -330,5 +330,9 @@ export const detectCapabilities = async (
     cardFreshStart: true,
     // #750 D8: this runner offers `escalate_card` and stops the round after it.
     cardEscalate: true,
+    // #751 B1: this runner sends `prefix.measured` for its launches.
+    prefixMeasure: true,
+    // #751: this runner takes `card.run` `tokenSaver.prefix`.
+    prefixOverlays: true,
   };
 };

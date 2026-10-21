@@ -32,6 +32,7 @@ import type { NormalizeHandlers } from '../normalize';
 import type { PlannerHandlers } from '../planner';
 import type { Realpath } from '../policy/roots';
 import type { PolicyConfig } from '../policy/schema';
+import type { PrefixHandlers } from '../prefix';
 import type { ProjectFs } from '../projects/fs';
 import { inspectProject, refreshProject } from '../projects/inspect';
 import { scanProjectRules } from '../projects/rule-scan';
@@ -106,6 +107,8 @@ export interface HandlerContext {
   sessionMessage?: SessionMessenger;
   /** The assistant's code commands (#622); absent means this runner does not serve them. */
   repo?: RepoHandlers;
+  /** The launch prefix's calls (#751); absent means this runner does not serve them. */
+  prefix?: PrefixHandlers;
 }
 
 const noRepo = (): never => {
@@ -349,12 +352,16 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'repo.search': (args) => context.repo?.['repo.search'](args) ?? noRepo(),
     'repo.read': (args) => context.repo?.['repo.read'](args) ?? noRepo(),
     'code.ask': (args) => context.repo?.['code.ask'](args) ?? noRepo(),
-    // #751: stubs until i751-runner lands the handlers.
-    'rules.compress': () => noPrefix(),
-    'prefix.propose': () => noPrefix(),
+    'rules.compress': (args) =>
+      context.prefix?.['rules.compress'](args) ?? noPrefix(),
+    'prefix.propose': (args) =>
+      context.prefix?.['prefix.propose'](args) ?? noPrefix(),
   };
 };
 
 const noPrefix = (): never => {
-  throw new CommandFailure('unsupported', 'this runner does not serve #751');
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not serve the launch prefix calls',
+  );
 };

@@ -168,14 +168,16 @@ export const cardLaunchSpec = (
  * #445: the card round's Token saver — the filter hook over the injected
  * hooks (a plugin profile keeps its own), `nautelle` with the artifact
  * guard (D8), the scout, and the round dir for the filter's files. `null`
- * when it is off: the round launches as before.
+ * when it is off: the round launches as before. #751: the prefix is measured
+ * in the card's worktree, and its frozen selection and overlays applied.
  */
 export const cardTokenSaver = (
   profile: ConfigProfile,
   args: Pick<
     CardRunArgs,
     'tokenSaver' | 'runId' | 'projectId' | 'pullRequest' | 'prompt'
-  >,
+  > &
+    Partial<Pick<CardRunArgs, 'root' | 'shortId'>>,
   home: string,
   roundDir: string,
   selfCommand: readonly string[],
@@ -193,6 +195,12 @@ export const cardTokenSaver = (
     runnerMcp: finishGuardArgs(cardIssueNumber(args)),
     scout: true,
     techniques: args.tokenSaver?.techniques,
+    cwd:
+      args.root !== undefined && args.shortId !== undefined
+        ? cardWorktreePath(args.root, args.shortId)
+        : undefined,
+    prompt: args.prompt,
+    prefix: args.tokenSaver?.prefix,
     baseSettings:
       wiring.wiring === 'injected' ? cardHooksSettings(selfCommand) : undefined,
   });
