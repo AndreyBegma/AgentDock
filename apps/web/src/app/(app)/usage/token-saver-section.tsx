@@ -2,11 +2,13 @@
 
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Section } from '@andrewbehma/glass-ui/section';
+import type { TokenSaverSummary } from '@nautelle/shared';
 import Link from 'next/link';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import {
   BeforeAfterTable,
   FilterTable,
+  RunKindTable,
 } from '../../../components/token-saver/summary-tables';
 import { SummaryTiles } from '../../../components/token-saver/summary-tiles';
 import { describeTokenSaverError } from '../../../lib/token-saver/format';
@@ -15,6 +17,30 @@ import { useTokenSaverSummary } from '../../../lib/token-saver/use-token-saver-s
 import type { UsageRange } from '../../../lib/usage/format';
 
 const TOP_FILTERS = 8;
+
+/**
+ * #748: the saving by the launch that ran the command. The "Manual session"
+ * row is priced from each session's own model and turns (the API's figure),
+ * so it is not the project's input price times its tokens.
+ */
+export function RunKindBlock({
+  rows,
+}: {
+  rows: TokenSaverSummary['byRunKind'];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="font-medium text-sm">Saved by run kind</h3>
+      <RunKindTable rows={rows} empty={null} />
+      {rows.some((r) => r.runKind === 'manual') ? (
+        <p className="text-ink-3 text-sm">
+          Manual session is priced from each session's own model and turns.
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Usage's Token saver section (#445 D13): the period's savings, the cost per
@@ -84,6 +110,7 @@ export function TokenSaverSection({
                   }
                 />
               </div>
+              <RunKindBlock rows={summary.byRunKind} />
               <div className="flex flex-col gap-2">
                 <h3 className="font-medium text-sm">Top filters by savings</h3>
                 <FilterTable
