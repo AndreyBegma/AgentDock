@@ -41,6 +41,8 @@ export const toSlotSummary = (row: Slot): SlotSummary => ({
   ahead: row.ahead,
   behind: row.behind,
   dirty: row.dirty,
+  quotaLimit: row.quotaLimit,
+  quotaResetsAt: iso(row.quotaResetsAt),
   startedAt: row.startedAt.toISOString(),
   endedAt: iso(row.endedAt),
   updatedAt: row.updatedAt.toISOString(),

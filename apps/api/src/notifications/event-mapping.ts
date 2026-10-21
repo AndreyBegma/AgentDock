@@ -180,12 +180,16 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
           page: 'fleet',
         };
       }
+      const resetsAt = (parsed.event.data as { resetsAt?: string | null })
+        .resetsAt;
       return {
         kind: 'quota.hit',
         slot: target === 'orchestrator' ? null : slot,
         issue,
         title: `${subject} hit its usage limit`,
-        body: 'The quota banner is on screen; the session waits until the limit resets.',
+        body: resetsAt
+          ? `The quota banner is on screen; the session waits until the limit resets at ${resetsAt.slice(0, 16).replace('T', ' ')} UTC.`
+          : 'The quota banner is on screen; the session waits until the limit resets.',
         page: 'fleet',
       };
     }

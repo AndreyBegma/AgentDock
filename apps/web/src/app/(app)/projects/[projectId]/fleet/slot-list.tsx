@@ -2,6 +2,7 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import type { SlotSummary } from '@nautelle/shared';
+import { QuotaWaitLine } from '../../../../../components/board/quota-wait-line';
 import {
   CHECKS_LABEL,
   CHECKS_TONE,
@@ -141,6 +142,14 @@ export function SlotList({
             <ModelCell slot={slot} />
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
+            {slot.status === 'quota' && slot.quotaLimit ? (
+              <QuotaWaitLine
+                wait={{
+                  limit: slot.quotaLimit,
+                  resetsAt: slot.quotaResetsAt ?? null,
+                }}
+              />
+            ) : null}
             <span>{checkpointLabel(slot.lastCheckpoint)}</span>
             {slot.prNumber !== null ? (
               <span>

@@ -84,6 +84,20 @@ describe('CardFace pull request link (#329 D6)', () => {
   });
 });
 
+describe('CardFace usage limit (#741)', () => {
+  test('says the round waits for the limit, and nothing without one', () => {
+    const waiting = render('in_progress', {
+      round: round('running', {
+        quotaWait: { limit: 'session', resetsAt: '2026-10-21T15:00:00.000Z' },
+      }),
+    });
+    expect(waiting).toContain('Waiting for the limit until');
+    expect(render('in_progress', { round: round('running') })).not.toContain(
+      'the limit',
+    );
+  });
+});
+
 describe('CardFace shipping state (#359)', () => {
   test('red CI shows the dot and Fixing CI (n/3)', () => {
     const html = render('in_progress', { ciState: 'red', ciFixAttempts: 2 });
