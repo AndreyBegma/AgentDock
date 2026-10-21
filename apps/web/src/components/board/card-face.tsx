@@ -17,6 +17,11 @@ import type { ReactNode } from 'react';
 import { attachmentCountLabel } from '../../lib/attachments/format';
 import { dependencyChip, readinessChip } from '../../lib/board/dependencies';
 import {
+  ESCALATED_TAG,
+  ESCALATED_TAG_TITLE,
+  isEscalated,
+} from '../../lib/board/escalation';
+import {
   approveRunOffer,
   autoRunFailureText,
   blockingDialogText,
@@ -139,6 +144,11 @@ export function CardFace({
           {card.kind === 'bug' ? (
             <Chip size="sm" tone="danger" className={HEAD_CHIP}>
               Bug
+            </Chip>
+          ) : null}
+          {isEscalated(card) ? (
+            <Chip size="sm" title={ESCALATED_TAG_TITLE} className={HEAD_CHIP}>
+              {ESCALATED_TAG}
             </Chip>
           ) : null}
           {hints ? (

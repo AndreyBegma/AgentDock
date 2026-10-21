@@ -163,6 +163,8 @@ describe('capability detection', () => {
       handoff: true,
       sessionMessage: true,
       cardEffort: true,
+      cardFreshStart: true,
+      cardEscalate: true,
     });
   });
 

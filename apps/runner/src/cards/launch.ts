@@ -8,6 +8,7 @@ import type {
 import type { ConfigProfile } from '../config';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { SESSION_TOKEN_ENV } from '../local/session-tokens';
+import { CARD_ESCALATE_ENV } from '../mcp/tools';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
 import { cardIssueNumber, finishGuardArgs } from './finish-guard';
@@ -105,11 +106,32 @@ export const cardArgv = (
 });
 
 /**
+ * #750 D6: Claude Code's env override of the session's effort. Checked
+ * against Claude Code 2.1.306: `--effort` wins over a settings `effortLevel`,
+ * but this env wins over `--effort` — so a round with an effort sets it too,
+ * over whatever the profile's env says.
+ */
+export const CLAUDE_EFFORT_ENV = 'CLAUDE_CODE_EFFORT_LEVEL';
+
+/**
+ * #750: what the round's env adds for its effort and for `escalate_card`
+ * (D8). The MCP server reads `CARD_ESCALATE_ENV` from the session's env, so
+ * it reaches it under every wiring — plugin, injected or Token saver.
+ */
+const roundEnv = (
+  args: Partial<Pick<CardRunArgs, 'effort' | 'escalate'>>,
+): Record<string, string> => ({
+  ...(args.effort ? { [CLAUDE_EFFORT_ENV]: args.effort } : {}),
+  ...(args.escalate ? { [CARD_ESCALATE_ENV]: '1' } : {}),
+});
+
+/**
  * What `exec-run` starts in the card's tmux session. The round's `runId` is
  * in the resource attributes, so the cost of a resumed session is booked to
  * the round that resumed it; the card's own env (#389) is set over the
  * profile's, and with it the session's token (#113), which its hooks and its
- * MCP server present to the daemon.
+ * MCP server present to the daemon, and the round's effort and escalation
+ * (#750).
  */
 export const cardLaunchSpec = (
   profile: ConfigProfile,
@@ -123,7 +145,7 @@ export const cardLaunchSpec = (
     | 'runId'
     | 'shortId'
   > &
-    Partial<Pick<CardRunArgs, 'effort'>>,
+    Partial<Pick<CardRunArgs, 'effort' | 'escalate'>>,
   worktree: string,
   otlpPort: number | null,
   wiring?: CardWiringFiles,
@@ -135,6 +157,7 @@ export const cardLaunchSpec = (
     ...runEnv(profile, args, otlpPort),
     ...cardEnv(args.shortId),
     ...(tokenSaver?.env ?? {}),
+    ...roundEnv(args),
     ...(sessionToken ? { [SESSION_TOKEN_ENV]: sessionToken } : {}),
   },
   cwd: worktree,

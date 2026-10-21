@@ -326,5 +326,9 @@ export const detectCapabilities = async (
     sessionMessage: true,
     // #663: this runner takes `effort` on `card.run`.
     cardEffort: true,
+    // #750 D7: this runner starts a `session.fresh` round in a new session.
+    cardFreshStart: true,
+    // #750 D8: this runner offers `escalate_card` and stops the round after it.
+    cardEscalate: true,
   };
 };

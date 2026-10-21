@@ -92,6 +92,12 @@ import { bunSpawnPty, type SpawnPty, TerminalManager } from './terminal';
 import { createUiProfileHandlers, UiProfileBuildExecutor } from './uiprofile';
 import { RUNNER_VERSION } from './version';
 
+/**
+ * #750 D8: how long after `escalate_card` answers the runner stops the round,
+ * so the answer reaches the worker before its session goes.
+ */
+export const ESCALATED_STOP_DELAY_MS = 3_000;
+
 export interface DaemonOptions {
   config: PairedConfig;
   /** Where `config` was read from; the watch list is cached back into it. */
@@ -766,6 +772,18 @@ export const runDaemon = async (
             .filter((r) => r.phase === 'starting' || r.phase === 'running'),
           cwd,
         ),
+      // #750 D8: after the tool's answer has reached the worker.
+      stopRoundSoon: (round) => {
+        clock.setTimeout(() => {
+          cards.stopRound(round).catch((error) => {
+            log.warn('cards: stopping an escalated round failed', {
+              cardId: round.cardId,
+              runId: round.runId,
+              error: errorMessage(error),
+            });
+          });
+        }, ESCALATED_STOP_DELAY_MS);
+      },
       now: () => new Date(clock.now()).toISOString(),
       log,
     });

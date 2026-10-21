@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { CARD_RUN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
-import { acceptanceChecklist, freshSeed, type SeedInput } from './seed';
+import {
+  acceptanceChecklist,
+  freshSeed,
+  NO_CARD_PROMPT_TEXT,
+  type SeedInput,
+} from './seed';
 import { cardNumberOfPrompt } from './state';
 import { validNote } from './testing';
 
@@ -51,6 +56,33 @@ describe('the fresh seed (#449 D3)', () => {
         cardPrompt: 'x'.repeat(CARD_RUN_PROMPT_MAX_BYTES),
       }),
     ).toBeNull();
+  });
+
+  it('#750 D7: says why — the cost, or a changed model or effort', () => {
+    expect(freshSeed(input)).toContain('resuming it would have cost more');
+    const changed = freshSeed({ ...input, reason: 'changed' }) ?? '';
+    expect(changed).toContain('the model or effort changed');
+    expect(changed).not.toContain('cost more');
+  });
+
+  it('#750 D7: the reduced seed — no kept card prompt, no note — still carries the branch, the checklist and the round', () => {
+    const seed =
+      freshSeed({
+        ...input,
+        cardPrompt: null,
+        note: null,
+        reason: 'changed',
+      }) ?? '';
+    expect(seed.startsWith(NO_CARD_PROMPT_TEXT)).toBe(true);
+    expect(seed).not.toContain('<handoff-note>');
+    expect(seed).toContain('No handoff note was kept');
+    expect(seed).toContain('login.ts | 3 +++');
+    expect(seed).toContain('- [ ] the form submits');
+    expect(seed.trimEnd().endsWith('continue')).toBe(true);
+    // A kept card prompt without a note keeps the card.
+    const withCard = freshSeed({ ...input, note: null }) ?? '';
+    expect(withCard.startsWith('## Card C-12: Add login')).toBe(true);
+    expect(withCard).toContain('No handoff note was kept');
   });
 
   it('takes the PR description’s acceptance checklist', () => {
