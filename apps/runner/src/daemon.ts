@@ -71,6 +71,7 @@ import { watchedRootRefusal } from './policy/check';
 import { nodeRealpath, type Realpath } from './policy/roots';
 import { reportedPolicy } from './policy/schema';
 import { PolicyStore } from './policy/store';
+import { createPrefixHandlers, PrefixCalls } from './prefix';
 import { WatchList } from './projects/watch-list';
 import { CodeAsker, createRepoHandlers } from './repo';
 import { SessionMessenger } from './session';
@@ -385,6 +386,15 @@ export const runDaemon = async (
       otlpPort: () => otlp?.port ?? null,
       runNotes,
     });
+    // #751 B6, B8: the launch prefix's headless calls, beside the spool.
+    const prefixCalls = new PrefixCalls({
+      deps: skillsDeps,
+      policy: () => policy.current(),
+      dir: join(dirname(options.spoolDir), 'prefix-calls'),
+      env: process.env,
+      log,
+      otlpPort: () => otlp?.port ?? null,
+    });
     // Context handoff (#449): the card notes, the restart decision and the
     // warm-up. `cards` is built right below; nothing here runs before it.
     const cardsDir =
@@ -554,6 +564,7 @@ export const runDaemon = async (
       skills: createSkillHandlers(skillsDeps, runs),
       planner: createPlannerHandlers({ ...skillsDeps, log }, plans),
       uiprofile: createUiProfileHandlers(skillsDeps, uiProfiles),
+      prefix: createPrefixHandlers(prefixCalls),
       cards: createCardHandlers(cards),
       capture: createCaptureHandlers(capture),
       normalize: createNormalizeHandlers(normalize),
@@ -869,6 +880,7 @@ export const runDaemon = async (
     runs.stop();
     plans.stop();
     uiProfiles.stop();
+    prefixCalls.stop();
     cards.stop();
     steward.stop();
     capture.stop();

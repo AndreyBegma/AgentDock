@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
+  type CardPrefix,
   isRunnerMcpServer,
   RUNNER_MCP_SERVER,
   type TechniqueFlags,
@@ -22,6 +23,9 @@ import {
   TECHNIQUE_WEBFETCH_CUT,
   techniquesEnv,
 } from '../filter/env';
+import { measurePrefix } from '../prefix/measure';
+import { type AppliedPrefix, applyCardPrefix } from '../prefix/overlays';
+import { PREFIX_MEASURED_FILE, type PrefixRecord } from '../prefix/record';
 import { writeJsonAtomic } from '../skills/run/record';
 import { readProfileMcpServers } from './profile-mcp';
 
@@ -333,6 +337,18 @@ export interface TokenSaverLaunchInput {
    * `NAUTELLE_TECHNIQUES`.
    */
   techniques?: Partial<TechniqueFlags>;
+  /**
+   * #751 B1: the launch's working directory, for the repo parts of its
+   * prefix; a launch in a run dir of its own has none worth measuring.
+   */
+  cwd?: string;
+  /** #751 B1: the launch's prompt, for its rules block and Nautelle's part. */
+  prompt?: string;
+  /**
+   * #751: a card session's frozen prefix (`card.run` `tokenSaver.prefix`):
+   * the MCP subset, the hidden skills and the overlays. Needs `cwd`.
+   */
+  prefix?: CardPrefix;
 }
 
 export interface TokenSaverLaunch {
@@ -346,6 +362,8 @@ export interface TokenSaverLaunch {
   missing: string[];
   /** #746: the technique flags this launch ran with. */
   techniques: Partial<TechniqueFlags>;
+  /** #751: the card prefix as applied; null without one. */
+  prefix: AppliedPrefix | null;
 }
 
 /**
@@ -370,6 +388,23 @@ export const tokenSaverLaunch = (
   const [command, ...rest] = input.selfCommand;
   if (command === undefined) return null;
 
+  // #751: the overlays' files go into the run dir; one that cannot be
+  // written launches the round without Token saver, as for its own files.
+  let prefix: AppliedPrefix | null = null;
+  if (input.prefix !== undefined && input.cwd !== undefined) {
+    try {
+      prefix = applyCardPrefix(input.prefix, input.cwd, input.dir);
+    } catch {
+      return null;
+    }
+  }
+  // B5: the card type's subset narrows the setting's allowlist.
+  const narrowed = prefix?.mcpAllow;
+  const allowed =
+    narrowed === undefined
+      ? config.mcpAllow
+      : config.mcpAllow.filter((name) => narrowed.includes(name));
+
   const defined = readProfileMcpServers(input.profile, input.home);
   const servers: Record<string, unknown> = {};
   if (input.runnerMcp !== false) {
@@ -379,7 +414,7 @@ export const tokenSaverLaunch = (
     };
   }
   const missing: string[] = [];
-  for (const name of config.mcpAllow) {
+  for (const name of allowed) {
     // ADR-0073: an allowlist from before the rename names `agentdock`.
     if (isRunnerMcpServer(name) && input.runnerMcp !== false) continue;
     const definition = defined[name];
@@ -400,6 +435,7 @@ export const tokenSaverLaunch = (
     mkdirSync(rawDir, { recursive: true, mode: 0o700 });
     writeJsonAtomic(settingsFile, {
       ...PREFIX_SETTINGS,
+      ...(prefix?.settings ?? {}),
       ...filterHookSettings(
         input.selfCommand,
         input.baseSettings,
@@ -418,6 +454,28 @@ export const tokenSaverLaunch = (
     return null;
   }
 
+  const agents = input.scout ? JSON.stringify(LAUNCH_AGENTS) : undefined;
+  const { runId } = input;
+  if (runId !== null) {
+    writePrefixRecord(input.dir, {
+      measured: {
+        runId,
+        launchKind: input.runKind,
+        parts: measurePrefix({
+          profile: input.profile,
+          home: input.home,
+          cwd: input.cwd,
+          prompt: input.prompt,
+          agents,
+          mcpServers: servers,
+          skillsOff: prefix?.skillsOff,
+          overlays: prefix?.loaded,
+        }),
+      },
+      stale: (prefix?.stale ?? []).map((s) => ({ runId, ...s })),
+    });
+  }
+
   const sharedPrefix = SHARED_PREFIX_KINDS.includes(input.runKind);
   return {
     args: [
@@ -426,8 +484,9 @@ export const tokenSaverLaunch = (
       '--strict-mcp-config',
       '--mcp-config',
       mcpFile,
-      ...(input.scout ? ['--agents', JSON.stringify(LAUNCH_AGENTS)] : []),
+      ...(agents !== undefined ? ['--agents', agents] : []),
       ...(sharedPrefix ? [EXCLUDE_DYNAMIC_SECTIONS_FLAG] : []),
+      ...(prefix?.args ?? []),
     ],
     env: {
       [AUTOCOMPACT_WINDOW_ENV]: String(autoCompactWindowFor(COMPACT_AT_TOKENS)),
@@ -444,5 +503,16 @@ export const tokenSaverLaunch = (
     mcpFile,
     missing,
     techniques: input.techniques ?? {},
+    prefix,
   };
+};
+
+/**
+ * #751 B1: the measurement never fails a launch — a record that cannot be
+ * written is a launch not measured.
+ */
+const writePrefixRecord = (dir: string, record: PrefixRecord): void => {
+  try {
+    writeJsonAtomic(join(dir, PREFIX_MEASURED_FILE), record);
+  } catch {}
 };

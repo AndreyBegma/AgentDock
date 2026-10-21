@@ -165,6 +165,8 @@ describe('capability detection', () => {
       cardEffort: true,
       cardFreshStart: true,
       cardEscalate: true,
+      prefixMeasure: true,
+      prefixOverlays: true,
     });
   });
 
