@@ -15,6 +15,7 @@ import { stripHandoffContent } from '../handoff/handoff-content';
 import { stripHookContent } from '../sessions/session-hook-content';
 import { advanceCursor, type SeqRange } from './ack-cursor';
 import { tokenPrefix, verifyRunnerToken } from './credentials';
+import { stripCommandResult } from './runner-command-result';
 import { RunnerEventSinks } from './runner-event-sinks';
 
 /** C-137: how far past the cursor, in seqs and rows, one `advanceAck` read looks. */
@@ -205,10 +206,11 @@ export class RunnerIngestService {
     );
     if (fresh.length > 0) await this.sinks.dispatch(runnerId, fresh);
     // ADR-0021: the sinks read hook content; `events.data` never holds it.
-    // #449 DA-12: nor a handoff note's text.
+    // #449 DA-12: nor a handoff note's text. #740 D1: nor a command's output.
     for (const event of fresh) {
       stripHookContent(event);
       stripHandoffContent(event);
+      stripCommandResult(event);
     }
     const row = (event: RunnerEvent) => ({
       runnerId,

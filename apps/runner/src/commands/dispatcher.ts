@@ -17,12 +17,19 @@ import { commandRefusal } from '../policy/check';
 import { nodeRealpath, type Realpath } from '../policy/roots';
 import type { PolicyConfig } from '../policy/schema';
 import { redactUrlUserinfo } from '../redact-url';
+import { CommandDedup } from './dedup';
 import { CommandFailure } from './failure';
 
-/** One handler per allowlisted command; the compiler refuses a missing one. */
+/**
+ * One handler per allowlisted command; the compiler refuses a missing one.
+ * `signal` is aborted when the command times out (#740 D5): a handler kills
+ * what it spawned, or checks `signal.aborted` between steps and returns. The
+ * dispatcher always passes it; a direct call (a test) may leave it out.
+ */
 export type CommandHandlers = {
   [N in CommandName]: (
     args: CommandArgs<N>,
+    signal?: AbortSignal,
   ) => Promise<CommandResult<N>> | CommandResult<N>;
 };
 
@@ -55,29 +62,68 @@ const failure = (
 class CommandTimeout extends Error {}
 
 /**
- * Typed command dispatch (ADR-0010, D8). Order: unknown → disabled →
- * invalid args → the runner-local policy (ADR-0047) → handler under a
- * timeout → result checked against its schema. Every outcome is a
+ * Typed command dispatch (ADR-0010, D8). Order: a repeated id → unknown →
+ * disabled → invalid args → the runner-local policy (ADR-0047) → handler
+ * under a timeout → result checked against its schema. Every outcome is a
  * `command.result`; nothing here throws.
  */
 export const createDispatcher = (options: DispatcherOptions): Dispatch => {
   const { handlers, clock, log } = options;
   const realpath = options.realpath ?? nodeRealpath;
   const disabled = new Set(options.disabledCommands);
+  const seen = new CommandDedup<CommandResultMessage>(clock);
 
-  const invoke = <N extends CommandName>(name: N, args: unknown) =>
+  const invoke = <N extends CommandName>(
+    name: N,
+    args: unknown,
+    signal: AbortSignal,
+  ) =>
     // `args` was validated by `parseCommand` against `commands[name].args`.
-    handlers[name](args as CommandArgs<N>);
+    handlers[name](args as CommandArgs<N>, signal);
 
-  const withTimeout = <T>(work: Promise<T>, ms: number): Promise<T> => {
+  /** Runs `work` with a signal that a timeout aborts (#740 D5). */
+  const withTimeout = <T>(
+    work: (signal: AbortSignal) => Promise<T>,
+    ms: number,
+  ): Promise<T> => {
+    const controller = new AbortController();
     let cancel = () => {};
     const timeout = new Promise<never>((_, reject) => {
-      cancel = clock.setTimeout(() => reject(new CommandTimeout()), ms);
+      cancel = clock.setTimeout(() => {
+        reject(new CommandTimeout());
+        controller.abort(new CommandTimeout());
+      }, ms);
     });
-    return Promise.race([work, timeout]).finally(cancel);
+    return Promise.race([work(controller.signal), timeout]).finally(cancel);
   };
 
-  return async (message) => {
+  // #740 D3: a known id is not run again; it gets the first run's result. A
+  // timed-out run is forgotten, so a retry runs fresh (D5).
+  return (message) => {
+    const { id, name } = message;
+    const fingerprint = JSON.stringify([name, message.args ?? null]);
+    const { value, hit } = seen.run(id, fingerprint, () => dispatch(message));
+    if (hit === 'repeated') {
+      log.info('command: repeated id, not run again', { id, name });
+      return value;
+    }
+    if (hit === 'collision') {
+      log.warn('command: a known id with other content, run as new', {
+        id,
+        name,
+      });
+    }
+    void value.then((result) => {
+      if (!result.ok && result.error?.code === 'timeout') {
+        seen.forget(id, value);
+      }
+    });
+    return value;
+  };
+
+  async function dispatch(
+    message: CommandMessage,
+  ): Promise<CommandResultMessage> {
     const { id, name } = message;
     if (!isCommandName(name)) {
       log.warn('command: unknown', { id, name });
@@ -112,7 +158,8 @@ export const createDispatcher = (options: DispatcherOptions): Dispatch => {
     let output: unknown;
     try {
       output = await withTimeout(
-        Promise.resolve().then(() => invoke(name, parsed.args)),
+        (signal) =>
+          Promise.resolve().then(() => invoke(name, parsed.args, signal)),
         timeoutMs,
       );
     } catch (error) {
@@ -143,5 +190,5 @@ export const createDispatcher = (options: DispatcherOptions): Dispatch => {
     }
     log.debug('command: done', { id, name });
     return { type: 'command.result', id, ok: true, output: result.data };
-  };
+  }
 };

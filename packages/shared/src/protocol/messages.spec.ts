@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { heartbeatMessageSchema } from './messages';
+import {
+  heartbeatMessageSchema,
+  SERVER_FEATURES,
+  welcomeMessageSchema,
+} from './messages';
 
 const base = {
   type: 'heartbeat',
@@ -39,5 +43,27 @@ describe('heartbeat profiles (#348 D4)', () => {
         profiles: { work: { plugin: '', telemetry: false } },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('welcome features (#740 D6)', () => {
+  const welcome = {
+    type: 'welcome',
+    runnerId: 'rn_1',
+    config: { projects: [], pollIntervalsMs: {} },
+    ackedSeq: 0,
+  };
+
+  it('accepts a welcome without features (an older API)', () => {
+    expect(welcomeMessageSchema.parse(welcome).features).toBeUndefined();
+  });
+
+  it('keeps a feature this runner does not know, so a newer API adds freely', () => {
+    expect(
+      welcomeMessageSchema.parse({
+        ...welcome,
+        features: [SERVER_FEATURES.commandResultsSpooled, 'from_the_future'],
+      }).features,
+    ).toEqual(['command_results_spooled', 'from_the_future']);
   });
 });
