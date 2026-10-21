@@ -32,8 +32,9 @@ export interface SendOptions {
 }
 
 /**
- * How a command ended. `unknown`: no result within the timeout, the socket
- * closed first, or the runner is offline — nothing retries it (at-most-once).
+ * How a command ended. `unknown`: no result within the timeout (a reconnect
+ * inside it still delivers one, #740 D2), the runner was revoked first, or it
+ * is offline — nothing retries it (at-most-once).
  */
 export type CommandSendResult<N extends CommandName> =
   | { status: 'ok'; output: CommandResult<N>; rttMs: number }
@@ -118,18 +119,20 @@ export class RunnerCommandService {
         : DEFAULT_COMMAND_TIMEOUT_MS);
     const sentAt = performance.now();
 
+    // #740 D2: the waiter is the runner's, so a reconnect before the deadline
+    // still delivers the result the runner replays from its spool.
     const outcome = await new Promise<CommandOutcome | 'timeout'>((resolve) => {
       const timer = setTimeout(() => {
-        connection.forget(id);
+        this.connections.forget(runnerId, id);
         resolve('timeout');
       }, timeoutMs);
       timer.unref();
-      connection.expect(id, (o) => {
+      this.connections.expect(runnerId, id, name, (o) => {
         clearTimeout(timer);
         resolve(o);
       });
       if (!connection.send({ type: 'command', id, name, args })) {
-        connection.forget(id);
+        this.connections.forget(runnerId, id);
         clearTimeout(timer);
         resolve({ kind: 'lost' });
       }

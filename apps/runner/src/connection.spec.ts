@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
+  COMMAND_RESULT_EVENT,
+  type CommandResultMessage,
   MAX_EVENTS_PER_BATCH,
   RUNNER_CLOSE_CODES,
   type RunnerEvent,
+  SERVER_FEATURES,
   type ServerMessage,
 } from '@nautelle/shared/protocol';
 import { Backoff } from './backoff';
-import { createDispatcher } from './commands/dispatcher';
+import { createDispatcher, type Dispatch } from './commands/dispatcher';
 import { createHandlers } from './commands/handlers';
 import {
   batches,
@@ -78,6 +81,7 @@ describe('RunnerConnection', () => {
     terminal?: TerminalHandler,
     runLog?: RunLogHandler,
     access?: Record<string, string>,
+    dispatch?: Dispatch,
   ) => {
     const { log, lines } = memoryLogger();
     const spool = Spool.open({ dir, log });
@@ -100,23 +104,25 @@ describe('RunnerConnection', () => {
         tmuxSessions: 0,
         collectors: {},
       }),
-      dispatch: createDispatcher({
-        policy: permissivePolicy,
-        realpath: sameRealpath,
-        handlers: createHandlers({
+      dispatch:
+        dispatch ??
+        createDispatcher({
           policy: permissivePolicy,
+          realpath: sameRealpath,
+          handlers: createHandlers({
+            policy: permissivePolicy,
+            clock,
+            runnerVersion: '0.1.0',
+            host,
+            detectCapabilities: async () => capabilities,
+            exec: fakeExec({}),
+            watchedProjects: () => [],
+            profiles: () => [],
+          }),
+          disabledCommands: [],
           clock,
-          runnerVersion: '0.1.0',
-          host,
-          detectCapabilities: async () => capabilities,
-          exec: fakeExec({}),
-          watchedProjects: () => [],
-          profiles: () => [],
+          log,
         }),
-        disabledCommands: [],
-        clock,
-        log,
-      }),
       pane,
       terminal,
       runLog,
@@ -229,6 +235,92 @@ describe('RunnerConnection', () => {
       reason: 'no',
     });
     expect(clock.pending()).toEqual([]);
+  });
+
+  describe('command results go through the spool (#740 D1)', () => {
+    const spooledResults = (s: MockServer) =>
+      s
+        .of('events')
+        .flatMap((m) => m.events)
+        .filter((e) => e.type === COMMAND_RESULT_EVENT);
+
+    /** A dispatch the test answers by hand, once the command has arrived. */
+    const heldDispatch = () => {
+      let answer: (result: CommandResultMessage) => void = () => {};
+      let arrived = false;
+      const dispatch: Dispatch = () => {
+        arrived = true;
+        return new Promise((resolve) => {
+          answer = resolve;
+        });
+      };
+      return {
+        dispatch,
+        arrived: () => arrived,
+        answer: (result: CommandResultMessage) => answer(result),
+      };
+    };
+
+    const pong: CommandResultMessage = {
+      type: 'command.result',
+      id: 'c1',
+      ok: true,
+      output: { pong: true, ts: '2026-10-07T18:00:00.000Z' },
+    };
+
+    const withFeature = (s: MockServer, ackedSeq = 0) => {
+      s.welcome = () => ({
+        ...welcome(ackedSeq),
+        features: [SERVER_FEATURES.commandResultsSpooled],
+      });
+      return s;
+    };
+
+    it('delivers a result finished while the socket was down once, after welcome, and the ack clears it', async () => {
+      const first = withFeature(server());
+      const held = heldDispatch();
+      const { clock, connection, spool } = connect(
+        first.origin,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        held.dispatch,
+      );
+      await until(() => connection.isLive);
+      first.send({ type: 'command', id: 'c1', name: 'runner.ping', args: {} });
+      await until(held.arrived);
+
+      const port = Number(new URL(first.origin).port);
+      first.stop();
+      await until(() => !connection.isLive && clock.pending().length === 1);
+      held.answer(pong);
+      await until(() => spool.lastSeq === 1);
+
+      const second = withFeature(server(port));
+      clock.advance(1_000);
+      await until(() => spooledResults(second).length === 1);
+      await Bun.sleep(50);
+
+      expect(spooledResults(second).map((e) => e.data)).toEqual([pong]);
+      // An API with the feature gets it only through the spool.
+      expect(second.of('command.result')).toEqual([]);
+      expect(first.of('command.result')).toEqual([]);
+      second.send({ type: 'ack', seq: 1 });
+      await until(() => spool.ackedSeq === 1);
+    });
+
+    it('also sends the frame to an API without the feature (D6)', async () => {
+      const s = server();
+      const { connection } = connect(s.origin);
+      await until(() => connection.isLive);
+      s.send({ type: 'command', id: 'c1', name: 'runner.ping', args: {} });
+      const [frame] = await s.waitFor('command.result');
+      await until(() => spooledResults(s).length === 1);
+      expect(frame.id).toBe('c1');
+      expect(spooledResults(s)[0].data).toEqual(frame);
+    });
   });
 
   it('ignores an invalid server message and keeps answering commands', async () => {
