@@ -265,7 +265,12 @@ export class FilterStatsReader {
     }
   }
 
-  private emitRows(project: EnvelopeProject, rows: FilterStatRow[]): void {
+  /** `session`: a `/cs-eco` batch's Claude session id (#748 D5). */
+  private emitRows(
+    project: EnvelopeProject,
+    rows: FilterStatRow[],
+    session?: string,
+  ): void {
     for (let i = 0; i < rows.length; i += FILTER_STATS_MAX_ROWS) {
       this.options.emit({
         v: EVENT_SCHEMA_VERSION,
@@ -273,7 +278,10 @@ export class FilterStatsReader {
         type: FILTER_STATS_EVENT,
         source: 'runner',
         project,
-        data: { rows: rows.slice(i, i + FILTER_STATS_MAX_ROWS) },
+        data: {
+          rows: rows.slice(i, i + FILTER_STATS_MAX_ROWS),
+          ...(session ? { session } : {}),
+        },
       });
     }
   }
@@ -309,7 +317,7 @@ export class FilterStatsReader {
           { file, rejected },
         );
       }
-      this.emitRows(project, rows);
+      this.emitRows(project, rows, sessionId);
     }
     writeOffset(file, next);
   }
