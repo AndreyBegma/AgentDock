@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test';
+import type { TokenEconomyReport } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
+import {
+  armFixture,
+  emptyArmFixture,
+  reportFixture,
+  techniqueFixture,
+} from '../../lib/token-saver/economy.fixture';
 import { emptySummary } from '../../lib/token-saver/summary';
 import {
   CostPerRoundTable,
@@ -15,6 +22,7 @@ import {
   UnfilteredReasonTable,
 } from './summary-tables';
 import { PromptCacheTile, SummaryTiles } from './summary-tiles';
+import { TechniquesReport } from './techniques-report';
 
 describe('SavedBadge (#746 D7)', () => {
   test('shows the tokens first, and says how the dollars are priced', () => {
@@ -303,5 +311,80 @@ describe('cost per round (#663 D5)', () => {
     const html = renderToStaticMarkup(<UnmeasuredKindsNote />);
     expect(html).toContain('skill runs');
     expect(html).toContain('model assessments');
+  });
+});
+
+describe('TechniquesReport (#746)', () => {
+  const noop = async () => {};
+  const render = (
+    report: TokenEconomyReport,
+    isAdmin: boolean,
+  ): string =>
+    renderToStaticMarkup(
+      <TechniquesReport report={report} isAdmin={isAdmin} onSetMode={noop} />,
+    );
+
+  test('arm A against arm B, with $/successful card and every signal', () => {
+    const html = render(reportFixture(), false);
+    expect(html).toContain('Read guard');
+    expect(html).toContain('A/B test');
+    expect(html).toContain('Enough data');
+    expect(html).toContain('$ per successful card');
+    expect(html).toContain('$1.20');
+    expect(html).toContain('$0.90–$1.60');
+    expect(html).toContain('$0.80');
+    expect(html).toContain('Green on the first push');
+    expect(html).toContain('48–74%');
+    expect(html).toContain('Rounds per card');
+    expect(html).toContain('2.6–3.7');
+    expect(html).toContain('Merged without review returns');
+    expect(html).toContain('No retries');
+  });
+
+  test('Enable for all and Stop are for admins only', () => {
+    const admin = render(reportFixture(), true);
+    expect(admin).toContain('Enable for all');
+    expect(admin).toContain('>Stop<');
+    const member = render(reportFixture(), false);
+    expect(member).not.toContain('Enable for all');
+    expect(member).not.toContain('>Stop<');
+  });
+
+  test('a technique already on offers Stop, not Enable for all', () => {
+    const html = render(reportFixture([techniqueFixture({ mode: 'on' })]), true);
+    expect(html).not.toContain('Enable for all');
+    expect(html).toContain('Stop');
+  });
+
+  test('a signal B worsens is marked and named', () => {
+    const html = render(
+      reportFixture([techniqueFixture({ worsens: ['greenFirstPush'] })]),
+      false,
+    );
+    expect(html).toContain('Worse in B');
+    expect(html).toContain('Arm B is worse on a quality signal');
+  });
+
+  test('too few settled cards is Collecting, and an empty arm shows dashes', () => {
+    const html = render(
+      reportFixture([
+        techniqueFixture({
+          enoughData: false,
+          a: armFixture('a', { settledCards: 12 }),
+          b: emptyArmFixture('b'),
+        }),
+      ]),
+      false,
+    );
+    expect(html).toContain('Collecting · A 12/30 · B 0/30');
+    expect(html).not.toContain('Enough data');
+    expect(html).toContain('—');
+    expect(html).not.toContain('$0.00');
+  });
+
+  test('no registered technique says so', () => {
+    expect(render(reportFixture([]), true)).toContain(
+      'No saving technique is under test yet',
+    );
   });
 });
