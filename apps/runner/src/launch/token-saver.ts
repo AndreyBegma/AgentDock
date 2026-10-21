@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   isRunnerMcpServer,
   RUNNER_MCP_SERVER,
+  type TechniqueFlags,
   type TokenSaverConfig,
   type TokenSaverRunKind,
 } from '@nautelle/shared';
@@ -279,6 +280,12 @@ export interface TokenSaverLaunchInput {
   scout: boolean;
   /** Hooks the launch already carries (the card's injected wiring). */
   baseSettings?: LaunchSettings;
+  /**
+   * #746 D11: the card's technique flags, `{ [technique]: on }`. Absent is
+   * every technique on. No technique changes the launch yet; one that does
+   * reads its flag from here.
+   */
+  techniques?: Partial<TechniqueFlags>;
 }
 
 export interface TokenSaverLaunch {
@@ -290,6 +297,8 @@ export interface TokenSaverLaunch {
   mcpFile: string;
   /** Allowed servers the profile does not define — left out. */
   missing: string[];
+  /** #746: the technique flags this launch ran with. */
+  techniques: Partial<TechniqueFlags>;
 }
 
 /**
@@ -380,5 +389,6 @@ export const tokenSaverLaunch = (
     settingsFile,
     mcpFile,
     missing,
+    techniques: input.techniques ?? {},
   };
 };

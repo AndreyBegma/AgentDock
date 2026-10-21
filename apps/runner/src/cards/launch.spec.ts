@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { CardRunArgs } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
+import { tempDir } from '../testing/fixtures';
 import {
   CARD_PORT_BASE,
   CARD_PORT_SPAN,
@@ -8,6 +9,7 @@ import {
   cardEnv,
   cardLaunchSpec,
   cardPort,
+  cardTokenSaver,
   cardWorktreePath,
 } from './launch';
 
@@ -194,6 +196,30 @@ describe('card worker launch (#242 D5)', () => {
       AGENTDOCK_CARD: 'h74ymwpx',
       AGENTDOCK_CARD_PORT: String(cardPort('h74ymwpx')),
     });
+  });
+
+  it('passes the technique flags of tokenSaver into the launch (#746)', () => {
+    const { dir, cleanup } = tempDir();
+    try {
+      const launch = (tokenSaver: CardRunArgs['tokenSaver']) =>
+        cardTokenSaver(
+          profile,
+          { ...args(false), tokenSaver, pullRequest: undefined },
+          dir,
+          dir,
+          ['/opt/nautelle/bin/nautelle-runner'],
+          { wiring: 'plugin' },
+        );
+      expect(
+        launch({ enabled: true, mcpAllow: [], techniques: { filter: false } })
+          ?.techniques,
+      ).toEqual({ filter: false });
+      // a command from an API without `tokenEconomy` carries none
+      expect(launch({ enabled: true, mcpAllow: [] })?.techniques).toEqual({});
+      expect(launch({ enabled: false, mcpAllow: [] })).toBeNull();
+    } finally {
+      cleanup();
+    }
   });
 
   it('maps every permission mode to the CLI value', () => {
