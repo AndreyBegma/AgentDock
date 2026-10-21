@@ -80,6 +80,28 @@ It picks the cheaper one, stores both estimates on the round, and never
 discards the old session — it can still be resumed. A warm cache and a short
 history resume; a cold cache and a long history start fresh from the note.
 
+### Long sessions start fresh by size
+
+The first-turn price misses one thing: a resumed round re-reads its whole
+history on **every** turn, not just the first. So a long session that is
+still warm keeps resuming and pays for it all round. The size rule
+([#749](../specs/749-start-a-fresh-session-for-a-long-card-ro.md)) closes
+that gap. Once the session history reaches **60,000 tokens**, the next round
+starts a fresh session from the same seed (note, diff summary, checklist,
+card prompt), whatever the cache.
+
+- Below 60,000 tokens, the cheaper first turn decides, as above.
+- With no seed (no valid note, no saved card prompt, a seed that does not
+  fit), the round resumes.
+- The decision and both estimates are recorded on the round as usual, and the
+  old session stays resumable.
+
+The rule is the A/B technique `resume-by-size` (Token economy): it applies to
+cards in arm B, or every card when the project sets it `on`. A card launched
+without the flag — an older API, or a project that set it `off` — resumes by
+the first-turn price only. The threshold is one runner constant
+(`RESUME_BY_SIZE_TOKENS`); it changes by release once the A/B report says so.
+
 ## Steering a round by editing the note
 
 An operator can click **Edit** in the Handoff section, change the note and
