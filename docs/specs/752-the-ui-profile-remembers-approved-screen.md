@@ -53,7 +53,7 @@ ready when it is turned on.
 | A3 | The result is stored as a **new UI profile version** with `source: memory`, under the project row lock (as `UiProfileService.update` does, `apps/api/src/design/ui-profile.service.ts:185-225`). It holds: `screens` (the library, newest first, at most 30 entries, each summary at most 1,500 characters); `styleRules` (at most 50, each at most 300 characters, with the comment ids they came from); and the snippets plus `newSnippets`. A new snippet must pass `validateProfileContent` and must not reuse an existing name. An invalid snippet is dropped and reported on the version. | person; caps *default* |
 | A4 | **D14 holds, extended (ADR-0075 §6).** `obligationsOf` (`apps/api/src/design/ui-profile-mapper.ts:163`) treats `memory` versions like `manual` ones: their style rules and new snippets become obligations of the next agent rebuild, so a rebuild never silently drops what an approval taught. `screens` and `styleRules` are carried forward verbatim by the API onto every later version, agent builds included. The build prompt does not produce them. | spec 223 D14; ADR-0075 |
 | A5 | A project admin edits or deletes library entries and style rules through the existing profile editor (`PUT /projects/:projectId/ui-profile`). The edit saves a `manual` version (D14 unchanged). | spec 223 D14, D17 |
-| A6 | **A project setting, not an A/B technique.** `design_settings.useMemory` (default `false`) is edited by a project admin in Settings › Design. When it is on, the design prompt (`apps/api/src/design/design-prompt.ts`) adds `### Approved screens` (the library) and `### Style rules` after the snippets, for every design of the project (card, stack and plan task). The prompt fitting drops library entries oldest-first **before** it drops snippets. Style rules are never dropped. When it is off, nothing is added; learning still happens. | person, 2026-10-21 (design runs are not in the card A/B); default off per "nothing is enabled automatically" |
+| A6 | **A project setting, not an A/B technique.** `design_settings.useMemory` (default `true`) is edited by a project admin in Settings › Design. When it is on, the design prompt (`apps/api/src/design/design-prompt.ts`) adds `### Approved screens` (the library) and `### Style rules` after the snippets, for every design of the project (card, stack and plan task). The prompt fitting drops library entries oldest-first **before** it drops snippets. Style rules are never dropped. When it is off, nothing is added; learning still happens. | person, 2026-10-21 (design runs are not in the card A/B); default on (person, 2026-10-21): it only adds what people already approved, and an admin can switch it off |
 | A7 | A failed or out-of-contract learn stores nothing, and its `runs` row ends `failed`. The approval itself never waits on learning. | ADR-0032 §4 pattern |
 | A8 | **Authorization.** The library and style rules are read with the profile (project viewers). `PUT` of the profile and of `useMemory` need project admin. Nothing is returned for another project. | spec 223 D17 |
 
@@ -72,7 +72,7 @@ when the branch is cut, take the next free one and keep the name.
   (`[{ designId, revisionId, name, summary, snippetsUsed[], approvedAt }]`),
   `styleRules Json @default("[]")` (`[{ text, commentIds[], designId }]`),
   `learnedFromRevisionId String?`, `learnNotes String?` (dropped snippets).
-- `model DesignSettings`: `useMemory Boolean @default(false)`.
+- `model DesignSettings`: `useMemory Boolean @default(true)`.
 
 ## API
 
