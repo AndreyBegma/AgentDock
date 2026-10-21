@@ -16,6 +16,7 @@ import {
   type FilterLaunch,
   filterEnv,
   LAUNCH_SETTINGS_ENV,
+  TECHNIQUE_CACHE_TTL_1H,
   TECHNIQUE_GREP_CUT,
   TECHNIQUE_MCP_CUT,
   TECHNIQUE_WEBFETCH_CUT,
@@ -164,6 +165,16 @@ export const EXCLUDE_DYNAMIC_SECTIONS_FLAG =
  * sections.
  */
 export const SHARED_PREFIX_KINDS: readonly TokenSaverRunKind[] = ['card'];
+
+/**
+ * #749 (technique `cache-ttl-1h`): the TTL of a card round. A key that is
+ * absent or true keeps the one-hour TTL of #663; false is the control arm,
+ * which pins `5m` — an unset TTL becomes 1h on a subscription.
+ */
+export const cacheTtlFor = (
+  techniques: Partial<TechniqueFlags> | undefined,
+): '1h' | '5m' =>
+  techniques?.[TECHNIQUE_CACHE_TTL_1H] === false ? '5m' : '1h';
 
 /** One argument for `sh -c`: bare when it is safe, else single-quoted. */
 export const shellQuote = (arg: string): string =>
@@ -421,7 +432,9 @@ export const tokenSaverLaunch = (
     env: {
       [AUTOCOMPACT_WINDOW_ENV]: String(autoCompactWindowFor(COMPACT_AT_TOKENS)),
       [AUTOCOMPACT_PCT_ENV]: '100',
-      ...(sharedPrefix ? { [PROMPT_CACHE_TTL_ENV]: '1h' } : {}),
+      ...(sharedPrefix
+        ? { [PROMPT_CACHE_TTL_ENV]: cacheTtlFor(input.techniques) }
+        : {}),
       [CS_ECO_ENV]: 'off',
       [LAUNCH_SETTINGS_ENV]: settingsFile,
       ...filterEnv(run),
