@@ -228,7 +228,12 @@ export class PrefixLaunchService {
             },
           });
     const overlays = rows.flatMap((row) => {
-      const parsed = launchOverlaySchema.safeParse(row);
+      const parsed = launchOverlaySchema.safeParse({
+        id: row.id,
+        part: row.part,
+        originalSha256: row.originalSha256,
+        content: row.content,
+      });
       return parsed.success ? [parsed.data] : [];
     });
     return {
