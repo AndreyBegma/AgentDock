@@ -129,7 +129,8 @@ export class HandoffService {
   /**
    * D3, before a round launches (Token saver on): round 1 keeps its prompt
    * for later fresh starts; a later round resumes or starts fresh by the
-   * cheaper first turn. The session it does not resume stays recorded.
+   * cheaper first turn — or, with `session.fresh` (#750 D7), always fresh.
+   * The session it does not resume stays recorded.
    */
   async prepareRound(
     card: HandoffCard,
@@ -149,19 +150,25 @@ export class HandoffService {
       return { launch: asAsked, restart: { mode: 'first' } };
     }
     const decision = await this.decide(card, args, profile);
-    if (decision.mode === 'resume' || decision.seed === null) {
+    // #750 D7 (ADR-0076): the model or effort changed — a fresh session,
+    // whatever resuming would cost; never `--resume` on another pair.
+    const forced = args.session.fresh === true;
+    if (!forced && (decision.mode === 'resume' || decision.seed === null)) {
       this.startRound(card, args.session.id, null);
       return {
         launch: asAsked,
         restart: { mode: 'resume', estimate: decision.estimate },
       };
     }
+    // TODO(#750 Q2): a forced fresh start without a seed — waits on the
+    // orchestrator's answer; until then it is not advertised (cardFreshStart).
+    const seed = decision.seed ?? args.prompt;
     const sessionId = randomUUID();
     this.startRound(card, sessionId, null, args.session.id);
     return {
       launch: {
         session: { id: sessionId, resume: false },
-        prompt: decision.seed,
+        prompt: seed,
       },
       restart: {
         mode: 'fresh',

@@ -113,20 +113,40 @@ export function launchSavedNote(
 }
 
 /**
+ * #750 D1, D2: the assessed class, `deciding: schema, auth` or `mechanical`;
+ * `null` for a card assessed before #750.
+ */
+export function workClassText(
+  work: CardRecommendationView['work'],
+): string | null {
+  if (!work?.class) return null;
+  const signals = (work.signals ?? []).map((s) => s.replaceAll('_', ' '));
+  return signals.length > 0
+    ? `${work.class}: ${signals.join(', ')}`
+    : work.class;
+}
+
+/**
  * The model select's options (D2, D4): the catalog with the recommended one
- * suffixed, a stored value outside the catalog as its own option, and "Project
- * default" first while the form follows neither an override nor a
- * recommendation.
+ * suffixed (#750: with the work's class), a stored value outside the catalog
+ * as its own option, and "Project default" first while the form follows
+ * neither an override nor a recommendation.
  */
 export function launchModelOptions(
   card: LaunchCard,
   kind: LaunchKind,
 ): ClaudeModelOption[] {
   const recommended = recommendationFor(card.recommendation, kind)?.model;
+  const workClass =
+    kind === 'work' ? workClassText(card.recommendation.work) : null;
   const options = claudeModelOptions({
     selected: modelOverrideOf(card, kind),
     recommended,
-  });
+  }).map((option) =>
+    option.recommended && workClass
+      ? { ...option, label: `${option.label} · ${workClass}` }
+      : option,
+  );
   return recommended || modelOverrideOf(card, kind)
     ? options
     : [

@@ -332,6 +332,74 @@ describe('HandoffService — the restart decision (#449 D3)', () => {
   });
 });
 
+describe('HandoffService — a forced fresh start (#750 D7)', () => {
+  it('starts fresh when the model or effort changed, though resuming would be cheaper, keeping the old session', async () => {
+    const t = await setup();
+    await t.round1();
+    t.writeNote(validNote('Ship the login page.', '1. Rename the button.'));
+    t.transcript([
+      assistantLine({
+        at: new Date(t.clock.now() - 60_000).toISOString(),
+        id: 'm1',
+        input: 10,
+        cacheRead: 1_500,
+      }),
+    ]);
+    const prepared = await t.service.prepareRound(
+      t.card,
+      {
+        session: { id: OLD_SESSION, resume: true, fresh: true },
+        prompt: 'Continue on Opus.',
+        profileKey: 'claude',
+      },
+      t.profile,
+    );
+    expect(prepared.restart).toMatchObject({
+      mode: 'fresh',
+      estimate: { resumeTokens: 1_510, cacheWarm: true },
+      previousSessionId: OLD_SESSION,
+    });
+    const { session, prompt } = prepared.launch;
+    expect(session).toEqual({ id: expect.any(String), resume: false });
+    expect(session.id).not.toBe(OLD_SESSION);
+    expect(prompt.startsWith(CARD_PROMPT.trimEnd())).toBe(true);
+    expect(prompt).toContain('1. Rename the button.');
+    expect(prompt.trimEnd().endsWith('Continue on Opus.')).toBe(true);
+    expect(t.state.load(t.card.cardId).sessions).toEqual([
+      OLD_SESSION,
+      session.id,
+    ]);
+  });
+
+  it('leaves a round without fresh to the cost rule', async () => {
+    const t = await setup();
+    await t.round1();
+    t.writeNote(validNote());
+    t.transcript([
+      assistantLine({
+        at: new Date(t.clock.now() - 60_000).toISOString(),
+        id: 'm1',
+        cacheRead: 1_500,
+      }),
+    ]);
+    const prepared = await t.service.prepareRound(
+      t.card,
+      {
+        session: { id: OLD_SESSION, resume: true, fresh: false },
+        prompt: 'continue',
+        profileKey: 'claude',
+      },
+      t.profile,
+    );
+    expect(prepared.restart.mode).toBe('resume');
+    expect(prepared.launch.session).toEqual({
+      id: OLD_SESSION,
+      resume: true,
+      fresh: false,
+    });
+  });
+});
+
 describe('HandoffService — the size rule (#749 D3)', () => {
   /**
    * Round 1, a valid note and checklist, a warm 60,010-token history, and a

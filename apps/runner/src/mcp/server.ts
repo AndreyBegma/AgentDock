@@ -15,7 +15,11 @@ import {
 } from '../handoff/context';
 import type { LocalResult } from '../local/types';
 import { RUNNER_VERSION } from '../version';
-import { MCP_TOOLS, type McpToolDefinition } from './tools';
+import {
+  ESCALATE_CARD_MCP_TOOL,
+  MCP_TOOLS,
+  type McpToolDefinition,
+} from './tools';
 
 /** Asks the daemon one local method; the context (cwd, ppid) is the caller's. */
 export type McpRequest = (
@@ -103,11 +107,16 @@ const withCardNote = async (
 /**
  * The twelve tools of spec 201 D20 and `finish_card` (#242 D6), each a thin
  * call to one local method (D7). With a `finishGuard` (#445 D8),
- * `finish_card` passes it first.
+ * `finish_card` passes it first. With `escalate` (#750 D8), `escalate_card`
+ * is listed too.
  */
 export const buildMcpServer = (
   request: McpRequest,
-  options: { finishGuard?: FinishGuard; cardNote?: McpCardNote } = {},
+  options: {
+    finishGuard?: FinishGuard;
+    cardNote?: McpCardNote;
+    escalate?: boolean;
+  } = {},
 ): McpServer => {
   const server = new McpServer({
     name: MCP_SERVER_NAME,
@@ -122,7 +131,9 @@ export const buildMcpServer = (
     },
     () => resumeContext(options.cardNote),
   );
-  const tools: readonly McpToolDefinition[] = MCP_TOOLS;
+  const tools: readonly McpToolDefinition[] = options.escalate
+    ? [...MCP_TOOLS, ESCALATE_CARD_MCP_TOOL]
+    : MCP_TOOLS;
   for (const tool of tools) {
     server.registerTool(
       tool.name,

@@ -12,6 +12,7 @@ import {
   NO_RECOMMENDATION_TEXT,
   profileKeysWith,
   recommendationNote,
+  workClassText,
 } from './launch';
 
 const NONE = { work: null, design: null, assessedAt: null };
@@ -114,6 +115,49 @@ describe('launchModelOptions', () => {
       'Sonnet 5.5 (recommended)',
     );
     expect(options.some((o) => o.value === '')).toBe(false);
+  });
+
+  test('#750: the recommended work option names the class and its signals', () => {
+    const withClass = (
+      work: Partial<NonNullable<LaunchCard['recommendation']['work']>>,
+    ) =>
+      launchCard({
+        recommendation: {
+          ...launchCard().recommendation,
+          work: {
+            model: 'opus',
+            effort: 'high',
+            reason: 'x',
+            ...work,
+          },
+        },
+      });
+    const deciding = launchModelOptions(
+      withClass({ class: 'deciding', signals: ['schema', 'auth'] }),
+      'work',
+    );
+    expect(deciding.find((o) => o.recommended)?.label).toBe(
+      'Opus 5.5 (recommended) · deciding: schema, auth',
+    );
+    expect(
+      launchModelOptions(
+        withClass({ model: 'sonnet', class: 'mechanical', signals: [] }),
+        'work',
+      ).find((o) => o.recommended)?.label,
+    ).toBe('Sonnet 5.5 (recommended) · mechanical');
+    expect(
+      workClassText(
+        withClass({ class: 'deciding', signals: ['bug_cause_unknown'] })
+          .recommendation.work,
+      ),
+    ).toBe('deciding: bug cause unknown');
+    // Assessed before #750, or a design launch: no class.
+    expect(workClassText(launchCard().recommendation.work)).toBeNull();
+    expect(
+      launchModelOptions(withClass({ class: 'unsure' }), 'design').some((o) =>
+        o.label.includes('unsure'),
+      ),
+    ).toBe(false);
   });
 
   test('offers "Project default" first when there is nothing to follow (D7)', () => {

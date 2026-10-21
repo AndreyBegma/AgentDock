@@ -170,6 +170,45 @@ describe('card worker launch (#242 D5)', () => {
     }
   });
 
+  // #750 D6, checked against Claude Code 2.1.306 (the session's
+  // `CLAUDE_EFFORT` as its Bash tool sees it): `--effort low` over a
+  // settings `effortLevel: high` gives low, but `CLAUDE_CODE_EFFORT_LEVEL=high`
+  // over `--effort low` gives high — so the env is set to the same value.
+  it('#750 D6: a round with an effort also sets CLAUDE_CODE_EFFORT_LEVEL, over the profile', () => {
+    const withEffort = cardLaunchSpec(
+      {
+        ...profile,
+        env: { ...profile.env, CLAUDE_CODE_EFFORT_LEVEL: 'max' },
+      },
+      { ...args(true), effort: 'low' },
+      '/wt',
+      null,
+    );
+    expect(withEffort.env.CLAUDE_CODE_EFFORT_LEVEL).toBe('low');
+    const at = withEffort.args.indexOf('--model');
+    expect(withEffort.args.slice(at, at + 4)).toEqual([
+      '--model',
+      'opus',
+      '--effort',
+      'low',
+    ]);
+    expect(
+      cardLaunchSpec(profile, args(true), '/wt', null).env
+        .CLAUDE_CODE_EFFORT_LEVEL,
+    ).toBeUndefined();
+  });
+
+  it('#750 D8: offers escalate_card through the env only when the round may escalate', () => {
+    expect(
+      cardLaunchSpec(profile, { ...args(false), escalate: true }, '/wt', null)
+        .env.NAUTELLE_CARD_ESCALATE,
+    ).toBe('1');
+    expect(
+      cardLaunchSpec(profile, args(false), '/wt', null).env
+        .NAUTELLE_CARD_ESCALATE,
+    ).toBeUndefined();
+  });
+
   it("#389: the card's env wins over a profile that sets the same names", () => {
     const spec = cardLaunchSpec(
       { ...profile, env: { ...profile.env, NAUTELLE_CARD: 'other' } },
