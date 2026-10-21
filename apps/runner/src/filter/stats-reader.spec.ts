@@ -252,6 +252,50 @@ describe('filter stats reader (#445 amendment 5)', () => {
     expect(readIdentity(odd)).toBeNull();
   });
 
+  it('sends a /cs-eco batch with its session id, a run batch without (#748)', async () => {
+    const eco = join(root, 'eco');
+    const dir = join(eco, 'sessions', 'sess-1');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, FILTER_STATS_FILE),
+      line('a', { ...row('e1', 'manual'), runId: null }),
+    );
+    const card = launched(cardOf('a'), 'cards', 'c1');
+    writeFileSync(card, line('a', row('r1')));
+    const ecoReader = new FilterStatsReader({
+      roots: () => [join(root, 'cards')],
+      eco: {
+        dir: join(eco, 'sessions'),
+        projects: () => [{ id: 'a', root: '/srv/a' }],
+        sessionCwd: () => '/srv/a',
+      },
+      resolve: async (ids) =>
+        new Map(
+          ids.map((id) => [id, { repo: `acme/${id}`, root: `/srv/${id}` }]),
+        ),
+      emit: (event) => events.push(event),
+      log: createLogger({
+        level: 'warn',
+        write: (text) => warnings.push(text),
+        now: () => new Date(0),
+      }),
+      now: () => new Date('2026-10-16T12:00:05.000Z'),
+    });
+    try {
+      await ecoReader.poll();
+    } finally {
+      ecoReader.stop();
+    }
+    const data = (id: string) =>
+      events.find((e) => ids(e).includes(id))?.data as
+        | { session?: string }
+        | undefined;
+    expect(data('e1')?.session).toBe('sess-1');
+    expect(filterStatsDataSchema.safeParse(data('e1')).success).toBe(true);
+    expect(data('r1')).toBeDefined();
+    expect(data('r1')).not.toHaveProperty('session');
+  });
+
   it('starts a file over when it was replaced by a shorter one', () => {
     const file = join(runDir('cards', 'c1'), FILTER_STATS_FILE);
     writeFileSync(file, 'a\nb\n');
