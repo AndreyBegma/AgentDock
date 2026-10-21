@@ -101,6 +101,28 @@ export const commandResultMessageSchema = z
     path: ['error'],
   });
 
+/**
+ * A `command.result` as a spooled event (#740 D1): `source: "runner"`, `data`
+ * the whole `command.result` message. It is delivered at least once, in order
+ * with every other event, and replayed after `welcome`. The API settles the
+ * waiter from it and stores the row with `data` cut to `{ id, ok }` — the seq
+ * is filled, the output is never kept.
+ */
+export const COMMAND_RESULT_EVENT = 'runner.command_result';
+
+/**
+ * Features of the API a runner adapts to, from `welcome.features`. Additive:
+ * an older runner ignores the field, a newer one reads its absence as an
+ * older API (#740 D6, no protocol version bump).
+ */
+export const SERVER_FEATURES = {
+  /**
+   * Results arrive as `runner.command_result` events (#740 D1). Without it
+   * the runner also sends each result as a `command.result` frame.
+   */
+  commandResultsSpooled: 'command_results_spooled',
+} as const;
+
 export const commandProgressMessageSchema = z.object({
   type: z.literal('command.progress'),
   id: messageId,
@@ -128,6 +150,8 @@ export const welcomeMessageSchema = z.object({
   config: runnerServerConfigSchema,
   /** Highest contiguous seq persisted; the runner resends everything above it. */
   ackedSeq: seqCursorSchema,
+  /** `SERVER_FEATURES` this API has; absent from an older one (#740 D6). */
+  features: z.array(boundedName(TEXT_NAME_MAX)).max(LIST_MAX).optional(),
 });
 
 /**

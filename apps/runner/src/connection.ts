@@ -1,4 +1,7 @@
 import {
+  COMMAND_RESULT_EVENT,
+  type CommandResultMessage,
+  EVENT_SCHEMA_VERSION,
   type HeartbeatMessage,
   type HelloMessage,
   LOCAL_REQUEST_TIMEOUT_MS,
@@ -10,6 +13,7 @@ import {
   type RunnerEvent,
   type RunnerMessage,
   type RunnerServerConfig,
+  SERVER_FEATURES,
   type ServerMessage,
   type SubscribeMessage,
   serverMessageSchema,
@@ -156,6 +160,8 @@ export class RunnerConnection {
   private openedAt: number | null = null;
   /** Highest seq sent on the current connection. */
   private sentSeq = 0;
+  /** `welcome.features` of the last connection; empty for an older API. */
+  private serverFeatures: ReadonlySet<string> = new Set();
   private cancelHeartbeat: Cancel = () => {};
   private cancelReconnect: Cancel = () => {};
   private resolveDone: (reason: StopReason) => void = () => {};
@@ -382,6 +388,7 @@ export class RunnerConnection {
         });
         spool.ack(message.ackedSeq);
         this.sentSeq = message.ackedSeq;
+        this.serverFeatures = new Set(message.features ?? []);
         this.state = 'live';
         this.flush();
         this.startHeartbeat();
@@ -398,7 +405,9 @@ export class RunnerConnection {
         spool.ack(message.seq);
         return;
       case 'command':
-        void this.options.dispatch(message).then((result) => this.send(result));
+        void this.options
+          .dispatch(message)
+          .then((result) => this.deliverResult(result));
         return;
       case 'subscribe':
         switch (message.kind) {
@@ -430,6 +439,37 @@ export class RunnerConnection {
       case 'local.response':
         this.localResponse(message);
         return;
+    }
+  }
+
+  /**
+   * A result goes through the spool (#740 D1), so a socket that closed while
+   * the command ran still gets it after the next `welcome`. It is also sent
+   * as a frame to an API without `command_results_spooled` (D6), and is sent
+   * only that way when the spool refuses it (over the batch size).
+   */
+  private deliverResult(result: CommandResultMessage): void {
+    let spooled = false;
+    try {
+      this.emit({
+        v: EVENT_SCHEMA_VERSION,
+        ts: isoNow(this.options.clock),
+        type: COMMAND_RESULT_EVENT,
+        source: 'runner',
+        data: result,
+      });
+      spooled = true;
+    } catch (error) {
+      this.options.log.warn('command result not spooled, sent directly', {
+        id: result.id,
+        error: errorMessage(error),
+      });
+    }
+    if (
+      !spooled ||
+      !this.serverFeatures.has(SERVER_FEATURES.commandResultsSpooled)
+    ) {
+      this.send(result);
     }
   }
 
