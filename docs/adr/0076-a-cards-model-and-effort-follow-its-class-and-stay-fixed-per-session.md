@@ -18,7 +18,7 @@ Two more facts matter for cost. Changing the model, or the effort, of a running 
 
 1. **The assessment classifies the card** as `mechanical`, `deciding` or `unsure`, and lists the deciding signals it found from a closed list: `schema`, `auth`, `tenancy`, `payments`, `deletion`, `bug_cause_unknown`, `no_precedent`. Any signal makes the class `deciding`, whatever the model said. A missing, failed, stale or out-of-contract assessment is `unsure`.
 
-2. **Class → model and effort (amends ADR-0032 §2),** in arm B of the technique `model_by_type`:
+2. **Class → model and effort (amends ADR-0032 §2),** in arm B of the technique `model-by-type`:
    - `deciding` → `opus` at `high`;
    - `unsure` → `opus` at `medium`;
    - `mechanical` → `sonnet` at the assessed effort, capped at `medium`;

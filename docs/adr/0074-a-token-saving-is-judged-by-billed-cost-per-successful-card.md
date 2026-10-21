@@ -65,9 +65,9 @@ ADR-0068 §2 already moved the headline to cost per round, comparing before a ch
 6. **Scope.** This covers card runs, and manual and `/cs-eco` sessions; their estimate is priced the same way. Planner, spec and assess runs are out of scope: their output is a document for people, and no merge measures it.
 
 7. **What ADR-0068 shipped unconditionally becomes a technique.** Three behaviours are on for every card round today. Each keeps its current behaviour as the default when no flag is sent, and becomes an A/B technique of its own:
-   - the one-hour cache TTL of ADR-0068 §1 → `cache_ttl_1h` ([#749](https://github.com/AndreyBegma/Nautelle/issues/749)); the control arm pins 5 minutes;
-   - the terse register of ADR-0068 §3 → `terse_register` ([#747](https://github.com/AndreyBegma/Nautelle/issues/747)); the control arm gets the earlier two-register text;
-   - the effort recommended with the model (ADR-0068 §5) stays in the control arm; the class mapping of [ADR-0076](0076-a-cards-model-and-effort-follow-its-class-and-stay-fixed-per-session.md) is technique `model_by_type` ([#750](https://github.com/AndreyBegma/Nautelle/issues/750)).
+   - the one-hour cache TTL of ADR-0068 §1 → `cache-ttl-1h` ([#749](https://github.com/AndreyBegma/Nautelle/issues/749)); the control arm pins 5 minutes;
+   - the terse register of ADR-0068 §3 → `terse-register` ([#747](https://github.com/AndreyBegma/Nautelle/issues/747)); the control arm gets the earlier two-register text;
+   - the effort recommended with the model (ADR-0068 §5) stays in the control arm; the class mapping of [ADR-0076](0076-a-cards-model-and-effort-follow-its-class-and-stay-fixed-per-session.md) is technique `model-by-type` ([#750](https://github.com/AndreyBegma/Nautelle/issues/750)).
 
    ADR-0068 §1's 150k compaction and 25k prefix target are not techniques and stay on.
 
