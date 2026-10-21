@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C-304 · Card header fits narrow columns</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71 / .96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / .62);--color-ink-3:rgb(242 242 246 / .53);--color-line:rgb(255 255 255 / .1);--color-line-strong:rgb(255 255 255 / .18);--color-hover:rgb(255 255 255 / .06);--color-accent:#5b5bf6;--color-accent-soft:rgb(91 91 246 / .2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-7:#a68bfa;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90 / .18);--color-hue-3-ink:#ade58f;--glass-shadow-clear:rgb(0 0 0 / .15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255 / .96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / .72);--color-ink-3:rgb(24 24 27 / .64);--color-line:rgb(0 0 0 / .1);--color-line-strong:rgb(0 0 0 / .23);--color-hover:rgb(0 0 0 / .06);--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229 / .12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-7:#7244e0;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28 / .12);--color-hue-3-ink:#2f6617;--glass-shadow-clear:rgb(0 0 0 / .08);--canvas-glow:10%}
+:root{--radius-control:6px;--radius-surface:8px;--font-sans:'SF Pro Text',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;--dur-fast:100ms}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:3px solid var(--color-focus);outline-offset:4px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.wrap{max-width:1180px;margin:0 auto;padding:24px;display:flex;flex-direction:column;gap:24px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-.02em}
+.desc{max-width:65ch;color:var(--color-ink-2);margin-top:4px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+@media (width<1024px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (width<640px){.grid{grid-template-columns:1fr}}
+.case{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:var(--radius-surface)}
+.case h2{font-size:15px;line-height:22px;font-weight:600}
+.case p{font-size:12px;line-height:16px;color:var(--color-ink-3)}
+.tag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:999px;font-size:10px;font-weight:600;background:var(--color-hover);color:var(--color-ink-2)}
+.tag--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.tag--ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.column{border-radius:var(--radius-surface);background:color-mix(in oklab,var(--color-surface) 70%,transparent);border:1px dashed var(--color-line-strong);padding:8px;display:flex;flex-direction:column;gap:8px}
+.column__title{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--color-ink-2);padding:0 2px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--color-hue-3)}
+.ruler{font-family:var(--font-mono);font-size:10px;color:var(--color-ink-3);margin-left:auto}
+
+/* ---- the card face (mirrors card-face.tsx) ---- */
+.card{container-type:inline-size;position:relative;border-radius:var(--radius-surface);padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.card--over{overflow:visible}
+.hdr{display:flex;height:16px;min-width:0;align-items:center;gap:6px;white-space:nowrap;font-size:12px;line-height:16px;color:var(--color-ink-2)}
+.id{flex-shrink:0;font-family:var(--font-mono)}
+.chip{display:inline-flex;align-items:center;height:16px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:500;flex-shrink:0}
+.chip--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.right{margin-inline-start:auto;display:flex;align-items:center;gap:4px}
+.right--before{flex-shrink:0}
+.right--after{flex-shrink:0}
+.cost{font-variant-numeric:tabular-nums;flex-shrink:0;color:var(--color-ink-2)}
+.saved{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--color-ok)}
+.menu{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;border:0;background:none;color:var(--color-ink-3);padding:0;cursor:pointer;flex-shrink:0}
+.menu:hover{background:var(--color-hover);color:var(--color-ink)}
+.menu svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.title{font-weight:500;overflow-wrap:break-word;color:var(--color-ink)}
+.status{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;background:var(--color-hue-3-soft);color:var(--color-hue-3-ink)}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--color-hue-3)}
+/* After: the saved badge sits inline when the card has room, and moves to its own truncating line when it does not */
+.saved-inline{display:inline}
+.saved-row{display:none;min-width:0;margin-top:-4px;justify-content:flex-end;font-size:12px;line-height:16px}
+.saved-row .saved{overflow:hidden;text-overflow:ellipsis;min-width:0}
+@container (width < 15rem){
+  .after .saved-inline{display:none}
+  .after .saved-row{display:flex}
+}
+/* overflow highlight on the "before" card */
+.overflow-mark{position:absolute;top:4px;bottom:4px;right:-1px;width:2px;background:var(--color-danger);border-radius:2px}
+.clip{overflow:hidden}
+.ghost{color:var(--color-danger);opacity:.85}
+
+.legend{display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:var(--radius-surface);font-size:13px;color:var(--color-ink-2)}
+.legend code{font-family:var(--font-mono);font-size:12px;color:var(--color-ink)}
+.legend strong{color:var(--color-ink)}
+.slider{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--color-ink-2)}
+.slider input{flex:1;accent-color:var(--color-accent)}
+.tooltip{position:absolute;right:0;top:calc(100% + 4px);z-index:2;width:220px;padding:6px 8px;border-radius:var(--radius-control);background:var(--color-raised);border:1px solid var(--color-line-strong);font-size:11px;line-height:15px;color:var(--color-ink);white-space:normal;box-shadow:0 8px 24px rgb(0 0 0 / .3)}
+.anchor{position:relative}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<main class="wrap">
+  <div class="head">
+    <div>
+      <div class="eyebrow">Board · card face · C-304</div>
+      <h1>Card header fits the column</h1>
+      <p class="desc">The cost and the menu stay on the header line. When the column is too narrow, the <code class="mono">saved ≈</code> badge moves to its own right-aligned line under the header and truncates if it still does not fit. Its <code class="mono">title</code> keeps the full figure.</p>
+    </div>
+    <button class="btn" type="button" id="theme">Toggle theme</button>
+  </div>
+
+  <div class="grid">
+    <!-- 1. today, wide -->
+    <section class="case surface-content">
+      <div style="display:flex;gap:6px;align-items:center"><h2>Wide column</h2><span class="tag">unchanged</span></div>
+      <p>There is room, so the header looks the same as today, on one line.</p>
+      <div class="column" style="width:100%">
+        <div class="column__title"><span class="dot"></span>In progress<span class="ruler">288px</span></div>
+        <article class="card surface-content after">
+          <div class="hdr">
+            <span class="id">C-296</span><span class="chip chip--danger">Bug</span>
+            <span class="right right--after"><span class="cost">$0.30</span><span class="saved saved-inline" title="saved ≈ <$0.01 · Token saver kept 1.2k tokens out of what the agent read (an estimate, bytes ÷ 4)">saved ≈ &lt;$0.01</span><button class="menu" type="button" aria-label="Card menu"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></span>
+          </div>
+          <div class="saved-row"><span class="saved" title="saved ≈ <$0.01 · 1.2k tokens">saved ≈ &lt;$0.01</span></div>
+          <div class="title">Fix the stale lock on the runner queue</div>
+          <div class="status"><span class="pill"><i></i>Done</span></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 2. before, narrow -->
+    <section class="case surface-content">
+      <div style="display:flex;gap:6px;align-items:center"><h2>Narrow · today</h2><span class="tag tag--danger">bug</span></div>
+      <p>The right group is <code class="mono">shrink-0</code> and the badge is <code class="mono">whitespace-nowrap</code>, so the text runs past the border and is clipped.</p>
+      <div class="column" style="width:208px">
+        <div class="column__title"><span class="dot"></span>Completed<span class="ruler">208px</span></div>
+        <article class="card surface-content card--over">
+          <span class="overflow-mark" aria-hidden="true"></span>
+          <div class="hdr">
+            <span class="id">C-295</span><span class="chip chip--danger">Bug</span>
+            <span class="right right--before"><span class="cost">$0.30</span><span class="saved ghost">saved ≈ &lt;$0.01</span><button class="menu ghost" type="button" aria-label="Card menu"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></span>
+          </div>
+          <div class="title">Board drag drops cards into the wrong lane</div>
+          <div class="status"><span class="pill"><i></i>Done</span></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 3. after, narrow: wraps -->
+    <section class="case surface-content">
+      <div style="display:flex;gap:6px;align-items:center"><h2>Narrow · fixed</h2><span class="tag tag--ok">wraps</span></div>
+      <p>The cost and the menu stay on the line, and the saved badge moves to its own line, right-aligned under the cost. Hover it for the full figure.</p>
+      <div class="column" style="width:208px">
+        <div class="column__title"><span class="dot"></span>Completed<span class="ruler">208px</span></div>
+        <article class="card surface-content after">
+          <div class="hdr">
+            <span class="id">C-295</span><span class="chip chip--danger">Bug</span>
+            <span class="right right--after"><span class="cost">$0.30</span><span class="saved saved-inline">saved ≈ &lt;$0.01</span><button class="menu" type="button" aria-label="Card menu"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></span>
+          </div>
+          <div class="saved-row anchor"><span class="saved" title="saved ≈ <$0.01 · Token saver kept 1.2k tokens out of what the agent read (an estimate, bytes ÷ 4)">saved ≈ &lt;$0.01</span>
+            <div class="tooltip" role="tooltip">saved ≈ &lt;$0.01 · Token saver kept 1.2k tokens out of what the agent read (an estimate, bytes ÷ 4)</div>
+          </div>
+          <div class="title" style="margin-top:2px">Board drag drops cards into the wrong lane</div>
+          <div class="status"><span class="pill"><i></i>Done</span></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 4. after, very narrow: truncates -->
+    <section class="case surface-content">
+      <div style="display:flex;gap:6px;align-items:center"><h2>Very narrow</h2><span class="tag tag--ok">truncates</span></div>
+      <p>If the badge's own line still does not fit, it ends in an ellipsis. Nothing goes past the border.</p>
+      <div class="column" style="width:150px">
+        <div class="column__title"><span class="dot"></span>Done<span class="ruler">150px</span></div>
+        <article class="card surface-content after">
+          <div class="hdr">
+            <span class="id">C-303</span><span class="chip chip--danger">Bug</span>
+            <span class="right right--after"><span class="cost">$12.84</span><span class="saved saved-inline">saved ≈ $1.27</span><button class="menu" type="button" aria-label="Card menu"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></span>
+          </div>
+          <div class="saved-row" style="max-width:72px;margin-left:auto"><span class="saved" title="saved ≈ $1.27 · Token saver kept 412k tokens">saved ≈ $1.27</span></div>
+          <div class="title">Token figures overflow</div>
+        </article>
+      </div>
+    </section>
+  </div>
+
+  <section class="case surface-content">
+    <div style="display:flex;gap:6px;align-items:center"><h2>Try it</h2><span class="tag">live</span></div>
+    <div class="slider"><label for="w">Column width</label><input id="w" type="range" min="140" max="340" value="220"><output id="wo" class="mono">220px</output></div>
+    <div class="column" id="live" style="width:220px">
+      <div class="column__title"><span class="dot"></span>Completed</div>
+      <article class="card surface-content after">
+        <div class="hdr">
+          <span class="id">C-304</span><span class="chip chip--danger">Bug</span>
+          <span class="right right--after"><span class="cost">$0.30</span><span class="saved saved-inline" title="saved ≈ <$0.01 · 1.2k tokens">saved ≈ &lt;$0.01</span><button class="menu" type="button" aria-label="Card menu"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></span>
+        </div>
+        <div class="saved-row"><span class="saved" title="saved ≈ <$0.01 · 1.2k tokens">saved ≈ &lt;$0.01</span></div>
+        <div class="title">Keep the token-saver badge inside the card header</div>
+        <div class="status"><span class="pill"><i></i>Done</span></div>
+      </article>
+    </div>
+  </section>
+
+  <aside class="legend surface-content">
+    <strong>How it is built (Tailwind and glass-ui only, per ADR-0011)</strong>
+    <span>The card root becomes a container (<code>@container</code>). The header row keeps <code>h-4 whitespace-nowrap</code>.</span>
+    <span>Right group: <code>ms-auto flex shrink-0</code> with cost and menu. The inline <code>&lt;SavedBadge&gt;</code> gets <code>@max-[15rem]:hidden</code>.</span>
+    <span>Below the header: a second <code>&lt;SavedBadge&gt;</code> in a <code>hidden @max-[15rem]:flex justify-end min-w-0</code> row. The badge takes <code>min-w-0 truncate</code> through its <code>className</code> prop, and its <code>title</code> is unchanged.</span>
+    <span>The <code>after</code> chip keeps its own <code>min-w-0 shrink</code> + <code>truncate</code> rule.</span>
+  </aside>
+</main>
+<script>
+(function () {
+  var root = document.documentElement;
+  document.getElementById('theme').addEventListener('click', function () {
+    root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  var range = document.getElementById('w');
+  var out = document.getElementById('wo');
+  var live = document.getElementById('live');
+  range.addEventListener('input', function () {
+    live.style.width = range.value + 'px';
+    out.textContent = range.value + 'px';
+  });
+})();
+</script>
+</body>
+</html>
