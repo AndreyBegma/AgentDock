@@ -141,6 +141,8 @@ export const AUDIT_ACTIONS = [
   'card.run_started',
   'card.feedback',
   'card.finished',
+  // #750 D9: the worker's `escalate_card` (reason, model, relaunched).
+  'card.escalated',
   'card.accepted',
   'card.stopped',
   /** #243 D10: the card's Continue after design switch. */

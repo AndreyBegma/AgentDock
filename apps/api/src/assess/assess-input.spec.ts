@@ -1,3 +1,4 @@
+import { CARD_DECIDING_SIGNALS, CARD_WORK_CLASSES } from '@nautelle/shared';
 import {
   buildCardAssessPrompt,
   CARD_ASSESS_BODY_MAX,
@@ -56,6 +57,17 @@ describe('buildCardAssessPrompt (#322 D5, D6)', () => {
     expect(prompt).toContain('"title": "Add login"');
     expect(prompt).toContain('"name": "mock.png"');
     expect(prompt).toContain('"latestFeedback": "More tests"');
+  });
+
+  it('asks for the class and every deciding signal (#750 D1, D2)', () => {
+    const prompt = buildCardAssessPrompt(input);
+    for (const workClass of CARD_WORK_CLASSES) {
+      expect(prompt).toContain(`"${workClass}"`);
+    }
+    for (const signal of CARD_DECIDING_SIGNALS) {
+      expect(prompt).toContain(`- "${signal}": `);
+    }
+    expect(prompt).toContain('"class": "mechanical", "signals": []');
   });
 
   it('names attachments but never their contents', () => {

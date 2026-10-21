@@ -311,6 +311,8 @@ export interface BoardCardView {
    * (`restartChipLabel`). Absent reads as null.
    */
   restartMode?: CardRestartMode | null;
+  /** #750 D9: the card escalated to Opus once — the face's `→ Opus` tag. */
+  escalated?: boolean;
   /**
    * #449 D9: the latest `fresh` round's first-turn saving — its resume
    * estimate's cost less its fresh estimate's, a decimal string like
@@ -557,6 +559,13 @@ export interface BoardCardDetail extends BoardCardView {
   specPr: { repo: string; number: number; url: string } | null;
   /** The card's Claude session (D6); `null` before the first Run. */
   sessionId: string | null;
+  /**
+   * #750 D7: the model and effort `sessionId` was started with — a Run on
+   * another pair starts a fresh session. Null for a card with no session or
+   * one started before #750. Absent reads as null.
+   */
+  sessionModel?: string | null;
+  sessionEffort?: CardEffort | null;
   createdBy: BoardUserRef | null;
   movedBy: BoardUserRef | null;
   completedBy: BoardUserRef | null;
