@@ -1,0 +1,21 @@
+{
+  "claudeCode": "2.1.306",
+  "tool_name": "Grep",
+  "tool_input": {
+    "pattern": "writeStat",
+    "path": "apps/runner/src",
+    "output_mode": "files_with_matches"
+  },
+  "tool_response": {
+    "mode": "files_with_matches",
+    "filenames": [
+      "apps/runner/src/filter/stats.ts",
+      "apps/runner/src/filter/read-guard.ts",
+      "apps/runner/src/filter/hook.ts",
+      "apps/runner/src/filter/families/lang/corpus/rg-no-line-numbers.out",
+      "apps/runner/src/filter/engine.ts"
+    ],
+    "numFiles": 5,
+    "totalFiles": 5
+  }
+}

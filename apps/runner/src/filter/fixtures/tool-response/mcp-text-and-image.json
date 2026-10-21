@@ -1,0 +1,27 @@
+{
+  "claudeCode": "2.1.306",
+  "tool_name": "mcp__big__big",
+  "tool_input": {},
+  "mcp_server": {
+    "name": "big",
+    "source": "dynamic"
+  },
+  "tool_response": [
+    {
+      "type": "text",
+      "text": "HEAD-START line 0 filler filler filler\nline 1 filler filler filler\n"
+    },
+    {
+      "type": "image",
+      "source": {
+        "type": "base64",
+        "media_type": "image/png",
+        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+      }
+    },
+    {
+      "type": "text",
+      "text": "[Image: source: /home/user/.claude/projects/-work-repo/session/tool-results/mcp-big-blob-1.png]"
+    }
+  ]
+}
