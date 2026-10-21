@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { CACHE_TTL_1H_MS, CACHE_TTL_5M_MS, decideRestart } from './restart';
+import {
+  CACHE_TTL_1H_MS,
+  CACHE_TTL_5M_MS,
+  decideRestart,
+  RESUME_BY_SIZE_TOKENS,
+} from './restart';
 
 const now = Date.parse('2026-10-16T12:00:00.000Z');
 
@@ -53,5 +58,50 @@ describe('the restart decision (#449 D3)', () => {
       mode: 'resume',
       estimate: { resumeTokens: 500_000, freshTokens: 0, cacheWarm: false },
     });
+  });
+});
+
+describe('the size rule (#749 D3)', () => {
+  const warm = (historyTokens: number) => ({
+    historyTokens,
+    lastTurnAt: now - 60_000,
+    cache1h: false,
+  });
+  const bySize = { resumeBySize: true };
+
+  it('is 60,000 tokens of history by default (D4)', () => {
+    expect(RESUME_BY_SIZE_TOKENS).toBe(60_000);
+  });
+
+  it('starts a warm session of 60,000 history tokens fresh, recording both estimates', () => {
+    expect(decideRestart(warm(60_000), 9_000, now, bySize)).toEqual({
+      mode: 'fresh',
+      estimate: { resumeTokens: 60_000, freshTokens: 9_000, cacheWarm: true },
+    });
+  });
+
+  it('leaves 59,999 tokens to #449 D3: warm with a small seed resumes', () => {
+    expect(decideRestart(warm(59_999), 9_000, now, bySize).mode).toBe('resume');
+    // D3 still starts fresh where the first turn is cheaper that way.
+    expect(decideRestart(warm(59_999), 5_000, now, bySize).mode).toBe('fresh');
+  });
+
+  it('resumes when there is no seed, however long the history', () => {
+    expect(decideRestart(warm(500_000), null, now, bySize)).toEqual({
+      mode: 'resume',
+      estimate: { resumeTokens: 500_000, freshTokens: 0, cacheWarm: true },
+    });
+  });
+
+  it('starts fresh even when the seed is larger than the warm first turn', () => {
+    expect(decideRestart(warm(60_000), 15_000, now, bySize).mode).toBe('fresh');
+  });
+
+  it('does nothing when off or absent (D7)', () => {
+    for (const rules of [undefined, {}, { resumeBySize: false }]) {
+      expect(decideRestart(warm(80_000), 9_000, now, rules).mode).toBe(
+        'resume',
+      );
+    }
   });
 });

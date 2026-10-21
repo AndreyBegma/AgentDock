@@ -64,6 +64,21 @@ describe('the registry (#746)', () => {
       expect(def?.runKinds).toEqual(['card']);
     }
   });
+
+  it('registers the session techniques of #749 for cards, on test by default', () => {
+    for (const key of ['resume-by-size', 'cache-ttl-1h']) {
+      const def = TOKEN_ECONOMY_TECHNIQUES.find((t) => t.key === key);
+      expect(def?.defaultMode).toBe('ab');
+      expect(def?.runKinds).toEqual(['card']);
+    }
+    expect(
+      cardTokenSaverSchema.safeParse({
+        enabled: true,
+        mcpAllow: [],
+        techniques: { 'resume-by-size': true, 'cache-ttl-1h': false },
+      }).success,
+    ).toBe(true);
+  });
 });
 
 describe('technique flags (#746 D11)', () => {
