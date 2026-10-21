@@ -36,7 +36,7 @@ const render = (
   );
 
 /** The markup of one `data-card-row`, up to the next row or the end. */
-const row = (html: string, name: 'header' | 'status' | 'footer') => {
+const row = (html: string, name: 'header' | 'saved' | 'status' | 'footer') => {
   const start = html.indexOf(`data-card-row="${name}"`);
   if (start < 0) return null;
   const next = html.indexOf('data-card-row="', start + 1);
@@ -344,6 +344,31 @@ describe('CardFace touch targets (#497)', () => {
     expect(row(render('todo', {}, { menu: false }), 'header')).not.toContain(
       coarse,
     );
+  });
+});
+
+describe('CardFace token-saver badge on a narrow card (#738)', () => {
+  const tokenSaved = { estimateUsd: 0.004, estimateTokens: 1_000 };
+
+  test('the header badge gives way below 15rem and the right group still holds cost and menu', () => {
+    const html = render('completed', { costUsd: '0.3', tokenSaved });
+    const header = row(html, 'header') ?? '';
+    expect(header).toContain('@max-[15rem]:hidden');
+    expect(header).toContain('data-menu-trigger');
+    expect(header).toContain('$0.30');
+  });
+
+  test('the same badge shows on its own truncating line, title intact', () => {
+    const html = render('completed', { costUsd: '0.3', tokenSaved });
+    const saved = row(html, 'saved') ?? '';
+    expect(html).toContain('@container');
+    expect(saved).toContain('@max-[15rem]:flex');
+    expect(saved).toContain('min-w-0 truncate');
+    expect(saved).toContain('title="Token saver kept');
+  });
+
+  test('a card that saved nothing has no saved line', () => {
+    expect(row(render('completed'), 'saved')).toBeNull();
   });
 });
 

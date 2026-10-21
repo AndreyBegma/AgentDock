@@ -107,7 +107,7 @@ export function CardFace({
         data-select-column={card.column}
         data-selected={selection ? selection.selected : undefined}
         onClickCapture={(event) => toggleOnClick(event, selection)}
-        className="relative flex min-w-0 flex-col gap-1.5 text-sm"
+        className="@container relative flex min-w-0 flex-col gap-1.5 text-sm"
       >
         <div
           data-card-row="header"
@@ -175,11 +175,23 @@ export function CardFace({
           {cost || menu || card.tokenSaved ? (
             <span className="ms-auto flex shrink-0 items-center gap-1">
               {cost ? <span className="tabular-nums">{cost}</span> : null}
-              <SavedBadge saved={card.tokenSaved} />
+              <SavedBadge
+                saved={card.tokenSaved}
+                className="@max-[15rem]:hidden"
+              />
               {menu}
             </span>
           ) : null}
         </div>
+        {card.tokenSaved ? (
+          // On a narrow card the badge leaves the header for its own line.
+          <div
+            data-card-row="saved"
+            className="hidden min-w-0 justify-end text-xs @max-[15rem]:flex"
+          >
+            <SavedBadge saved={card.tokenSaved} className="min-w-0 truncate" />
+          </div>
+        ) : null}
         <button
           type="button"
           className={`${TAP} break-words text-left font-medium underline-offset-2 hover:underline`}
