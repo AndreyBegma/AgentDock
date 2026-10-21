@@ -19,6 +19,7 @@ import {
   CostPerRoundWeeksTable,
   UnmeasuredKindsNote,
 } from '../../../../../components/token-saver/cost-per-round';
+import { PrefixSection } from '../../../../../components/token-saver/prefix-section';
 import { SavingsChart } from '../../../../../components/token-saver/savings-chart';
 import {
   FilterTable,
@@ -107,6 +108,13 @@ export default function TokenSaverPage() {
       />
       <div className="mb-6">
         <TechniquesSection
+          projectId={projectId}
+          range={range}
+          isAdmin={project?.role === 'admin'}
+        />
+      </div>
+      <div className="mb-6">
+        <PrefixSection
           projectId={projectId}
           range={range}
           isAdmin={project?.role === 'admin'}

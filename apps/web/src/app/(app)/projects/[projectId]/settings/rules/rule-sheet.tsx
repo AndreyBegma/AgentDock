@@ -2,24 +2,39 @@
 
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { Field, Input, Textarea } from '@andrewbehma/glass-ui/field';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import {
+  CARD_TYPES,
+  type CardType,
   PROJECT_RULE_DESCRIPTION_MAX,
   PROJECT_RULE_TITLE_MAX,
   type ProjectRuleView,
 } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
-import { SOURCE_LABEL } from '../../../../../../lib/project-rules/format';
+import {
+  SOURCE_LABEL,
+  sameCardTypes,
+  toggleCardType,
+} from '../../../../../../lib/project-rules/format';
+import { CARD_TYPE_LABEL } from '../../../../../../lib/token-saver/prefix';
 
 export interface RuleDraft {
   title: string;
   description: string;
   enabled: boolean;
+  /** #751 B5: the card types it applies to; empty is all. */
+  appliesTo: CardType[];
 }
 
-const EMPTY_DRAFT: RuleDraft = { title: '', description: '', enabled: true };
+const EMPTY_DRAFT: RuleDraft = {
+  title: '',
+  description: '',
+  enabled: true,
+  appliesTo: [],
+};
 
 /**
  * The editor for one rule. `rule` undefined is a new rule; `readOnly` shows
@@ -54,6 +69,7 @@ export function RuleSheet({
             title: rule.title,
             description: rule.description,
             enabled: rule.enabled,
+            appliesTo: rule.appliesTo,
           }
         : EMPTY_DRAFT,
     );
@@ -68,7 +84,8 @@ export function RuleSheet({
     !rule ||
     title !== rule.title ||
     draft.description.trim() !== rule.description ||
-    draft.enabled !== rule.enabled;
+    draft.enabled !== rule.enabled ||
+    !sameCardTypes(draft.appliesTo, rule.appliesTo);
 
   return (
     <SheetRoot
@@ -160,6 +177,39 @@ export function RuleSheet({
               Enabled — include in agent prompts
             </span>
           </div>
+          <fieldset
+            className="flex flex-col gap-2"
+            disabled={readOnly}
+            // A new rule is created for every type; narrow it once it exists.
+            hidden={!rule}
+          >
+            <legend className="font-medium text-sm">Applies to</legend>
+            <p className="text-ink-3 text-xs">
+              In the Token saver test arm a card session gets only the rules
+              that apply to its type. None ticked means every type.
+            </p>
+            <ul className="flex flex-wrap gap-x-4 gap-y-2">
+              {CARD_TYPES.map((type) => (
+                <li key={type}>
+                  <Checkbox
+                    id={`rule-applies-${type}`}
+                    label={CARD_TYPE_LABEL[type]}
+                    checked={draft.appliesTo.includes(type)}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        appliesTo: toggleCardType(
+                          draft.appliesTo,
+                          type,
+                          e.target.checked,
+                        ),
+                      })
+                    }
+                  />
+                </li>
+              ))}
+            </ul>
+          </fieldset>
           {rule ? (
             <dl className="flex flex-col gap-2 text-sm">
               <div className="flex items-center gap-2">
