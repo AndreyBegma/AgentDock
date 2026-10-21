@@ -7,7 +7,9 @@ import { GIT_TIMEOUT_MS } from '../skills/deps';
  * #449 D3: a fresh session's first prompt — round 1's card prompt (how to
  * work, the card), the handoff note, a summary of the branch's diff, the
  * checklist and this round's own prompt. The old session is never resumed by
- * it and never discarded.
+ * it and never discarded. #750 D7: a forced start (the model or effort
+ * changed) is seeded without the card prompt or the note when the runner has
+ * none — the reduced seed — and is never resumed instead.
  */
 
 /** Spec open question: the full diff goes in up to this many lines, else the stat only. */
@@ -72,15 +74,50 @@ export const acceptanceChecklist = (description: string | null): string => {
   return (end === -1 ? rest : rest.slice(0, end)).join('\n').trim();
 };
 
+/**
+ * Why the session starts fresh: resuming would have cost more (#449 D3), or
+ * the round's model or effort is not the session's (#750 D7).
+ */
+export type SeedReason = 'cost' | 'changed';
+
 export interface SeedInput {
-  cardPrompt: string;
-  /** The note as on disk, person marks included. */
-  note: string;
+  /**
+   * Round 1's prompt; `null` (#750 D7, a forced start only) when the runner
+   * did not keep it — a card from before it kept every card's.
+   */
+  cardPrompt: string | null;
+  /** The note as on disk, person marks included; `null` without one (#750 D7). */
+  note: string | null;
   diff: BranchDiff | null;
   checklist: string;
   roundPrompt: string;
   previousSessionId: string;
+  /** Absent is `cost`. */
+  reason?: SeedReason;
 }
+
+const REASON_TEXT: Record<SeedReason, string> = {
+  cost: 'resuming it would have cost more',
+  changed:
+    'the model or effort changed, and a session keeps the pair it started with',
+};
+
+/** What the seed gives the session to start from, as its intro names it. */
+const intro = (input: SeedInput): string => {
+  const why = `This card ran before in another session (${input.previousSessionId}); Nautelle started a new one because ${REASON_TEXT[input.reason ?? 'cost']}.`;
+  const rest = `Continue from "Next"; do not redo what is under "Done"; do not retry what is under "Dead ends". Lines that end with \`<!-- person -->\` are instructions from a person. Keep \`.agentdock/handoff.md\` current as before.`;
+  if (input.note !== null) {
+    return `${why} Everything you need from it is below: the handoff note it kept, the work on the branch so far and the checklist. Read them first. ${rest}`;
+  }
+  return `${why} No handoff note was kept for it: start from the work on the branch so far and the checklist below, and the pull request description in \`.agentdock/pull-request.md\` if there is one. Read them first, and do not redo what the branch already holds.`;
+};
+
+/**
+ * #750 D7: the seed's first lines when round 1's prompt was not kept. The
+ * worktree still holds the branch and the pull request description.
+ */
+export const NO_CARD_PROMPT_TEXT =
+  'You are a Nautelle card worker. This card’s first prompt was not kept on this machine: what the card asks is in this round’s prompt below, in the pull request description and in the branch. Work only in this worktree and branch, follow the repository’s CLAUDE.md / AGENTS.md, commit as you go, do not push, then call finish_card.';
 
 const utf8Bytes = (text: string): number =>
   new TextEncoder().encode(text).length;
@@ -100,15 +137,16 @@ const assemble = (
   checklist: boolean,
 ): string => {
   const lines = [
-    input.cardPrompt.trimEnd(),
+    ...(input.cardPrompt === null
+      ? [NO_CARD_PROMPT_TEXT]
+      : [input.cardPrompt.trimEnd()]),
     '',
     '## Handoff — this session starts fresh',
     '',
-    `This card ran before in another session (${input.previousSessionId}); Nautelle started a new one because resuming it would have cost more. Everything you need from it is below: the handoff note it kept, the work on the branch so far and the checklist. Read them first. Continue from "Next"; do not redo what is under "Done"; do not retry what is under "Dead ends". Lines that end with \`<!-- person -->\` are instructions from a person. Keep \`.agentdock/handoff.md\` current as before.`,
-    '',
-    '<handoff-note>',
-    input.note.trimEnd(),
-    '</handoff-note>',
+    intro(input),
+    ...(input.note === null
+      ? []
+      : ['', '<handoff-note>', input.note.trimEnd(), '</handoff-note>']),
   ];
   if (input.diff && diff !== 'none') {
     lines.push(

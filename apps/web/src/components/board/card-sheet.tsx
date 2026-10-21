@@ -20,6 +20,7 @@ import {
   type BoardCardDetail,
   type BoardCardKind,
   CARD_FEEDBACK_MAX,
+  type CardEscalationView,
   type CardPrTarget,
   type CardRoundView,
   isActiveRoundPhase,
@@ -37,6 +38,12 @@ import {
 import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
 import { runWaitsFor } from '../../lib/board/dependencies';
+import {
+  escalationAsk,
+  escalationTitle,
+  RUN_ON_OPUS_MODEL,
+  waitsForOpus,
+} from '../../lib/board/escalation';
 import {
   AUTO_COLLECT_HINT,
   AUTO_COLLECT_LABEL,
@@ -405,6 +412,32 @@ export function CardBranchLine({
  * #709: a stacked PR's target, prominent on the sheet — and a warning once the
  * dependency's own PR has merged; nothing for a PR into the base.
  */
+/**
+ * #750 D9, D10: the card's escalation to Opus. While it waits for a person
+ * (D10) it is the ask beside **Run on Opus**; otherwise the record of it.
+ */
+export function EscalationRow({
+  card,
+  escalation,
+}: {
+  card: Pick<BoardCardDetail, 'model'>;
+  escalation: CardEscalationView;
+}) {
+  if (waitsForOpus({ ...card, escalation })) {
+    return (
+      <Banner tone="warn" title={escalationAsk(escalation)}>
+        <span className="whitespace-pre-wrap">{escalation.note}</span>
+      </Banner>
+    );
+  }
+  return (
+    <p className="text-xs text-ink-2">
+      <span className="font-medium">{escalationTitle(escalation)}</span> ·{' '}
+      {escalation.note}
+    </p>
+  );
+}
+
 export function PrTargetBanner({ target }: { target: CardPrTarget | null }) {
   const notice = prTargetNotice(target);
   return notice ? <Banner tone={notice.tone}>{notice.text}</Banner> : null;
@@ -706,6 +739,9 @@ export function CardDetailBody({
       ) : null}
       <CardBranchLine branch={card.branch} target={card.prTarget} />
       <PrTargetBanner target={card.prTarget} />
+      {card.escalation ? (
+        <EscalationRow card={card} escalation={card.escalation} />
+      ) : null}
       {card.round?.hooksMissing
         ? (() => {
             const notice = hooksNotice(card, card.round);
@@ -784,6 +820,23 @@ export function CardDetailBody({
                 }
               }}
             />
+          ) : null}
+          {waitsForOpus(card) && (canRun(card) || canRetry(card)) ? (
+            // #750 D10: a launch like Run, so operator-only like it.
+            <Button
+              variant="solid"
+              disabled={
+                actions.busy ||
+                runBlocked ||
+                stackGate !== null ||
+                waitsFor !== null
+              }
+              onClick={() =>
+                void actions.run(card, { model: RUN_ON_OPUS_MODEL })
+              }
+            >
+              Run on Opus
+            </Button>
           ) : null}
           {offer ? (
             <ApproveRunLink

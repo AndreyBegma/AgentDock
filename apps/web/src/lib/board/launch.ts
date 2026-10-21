@@ -24,7 +24,41 @@ export type LaunchCard = Pick<
   BoardCardDetail,
   'profileKey' | 'model' | 'designModel' | 'recommendation'
 > &
-  Partial<Pick<BoardCardDetail, 'effort'>>;
+  Partial<Pick<BoardCardDetail, 'effort'>> &
+  CardSessionPair;
+
+/**
+ * #750 D7: the model and effort the card's current session started with;
+ * absent or `null` for a card with no session or one from before #750.
+ */
+export interface CardSessionPair {
+  sessionModel?: string | null;
+  sessionEffort?: CardEffort | null;
+}
+
+/** #750 D7: the popover's line when the pick will not resume the session. */
+export const FRESH_SESSION_TEXT =
+  'Starts a fresh session (the model or effort changed)';
+
+/**
+ * #750 D7: the chosen model or effort differs from the pair the card's
+ * session started with, so the round starts a fresh session. A default
+ * pick is the API's to resolve and a null pair resumes, so neither counts.
+ */
+export function startsFreshSession(
+  card: CardSessionPair,
+  form: LaunchForm,
+): boolean {
+  const model =
+    form.model !== DEFAULT_VALUE &&
+    card.sessionModel != null &&
+    form.model !== card.sessionModel;
+  const effort =
+    isCardEffort(form.effort) &&
+    card.sessionEffort != null &&
+    form.effort !== card.sessionEffort;
+  return model || effort;
+}
 
 /** The empty `<option>`: the API's own fall-through (D2), shown honestly. */
 export const DEFAULT_VALUE = '';
@@ -113,20 +147,40 @@ export function launchSavedNote(
 }
 
 /**
+ * #750 D1, D2: the assessed class, `deciding: schema, auth` or `mechanical`;
+ * `null` for a card assessed before #750.
+ */
+export function workClassText(
+  work: CardRecommendationView['work'],
+): string | null {
+  if (!work?.class) return null;
+  const signals = (work.signals ?? []).map((s) => s.replaceAll('_', ' '));
+  return signals.length > 0
+    ? `${work.class}: ${signals.join(', ')}`
+    : work.class;
+}
+
+/**
  * The model select's options (D2, D4): the catalog with the recommended one
- * suffixed, a stored value outside the catalog as its own option, and "Project
- * default" first while the form follows neither an override nor a
- * recommendation.
+ * suffixed (#750: with the work's class), a stored value outside the catalog
+ * as its own option, and "Project default" first while the form follows
+ * neither an override nor a recommendation.
  */
 export function launchModelOptions(
   card: LaunchCard,
   kind: LaunchKind,
 ): ClaudeModelOption[] {
   const recommended = recommendationFor(card.recommendation, kind)?.model;
+  const workClass =
+    kind === 'work' ? workClassText(card.recommendation.work) : null;
   const options = claudeModelOptions({
     selected: modelOverrideOf(card, kind),
     recommended,
-  });
+  }).map((option) =>
+    option.recommended && workClass
+      ? { ...option, label: `${option.label} · ${workClass}` }
+      : option,
+  );
   return recommended || modelOverrideOf(card, kind)
     ? options
     : [

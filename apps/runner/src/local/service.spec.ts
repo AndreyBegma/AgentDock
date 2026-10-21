@@ -10,7 +10,11 @@ import {
 import type { CardRecord } from '../cards/record';
 import { MASK } from '../pane/redact';
 import { memoryLogger } from '../testing/fixtures';
-import { LocalService, type LocalServiceDeps } from './service';
+import {
+  type EscalatedRound,
+  LocalService,
+  type LocalServiceDeps,
+} from './service';
 import { SessionTokens } from './session-tokens';
 import { HookSessions } from './sessions';
 import type { LocalCaller, LocalRelayRequest, LocalResult } from './types';
@@ -27,6 +31,7 @@ interface SetupOptions
     >
   > {
   reply?: LocalResult<unknown>;
+  duringRelay?: () => void;
 }
 
 const tokens = new SessionTokens(Buffer.alloc(32, 7));
@@ -45,6 +50,7 @@ const setup = (
 ) => {
   const emitted: UnsequencedEvent[] = [];
   const relayed: LocalRelayRequest[] = [];
+  const stopped: EscalatedRound[] = [];
   const sessions = new HookSessions();
   const projects: WatchedProject[] = [
     { id: 'prj_app', root: ROOT, ...(shipContent ? { shipContent } : {}) },
@@ -57,8 +63,11 @@ const setup = (
     emit: (event) => emitted.push(event),
     relay: async (request): Promise<LocalResult<unknown>> => {
       relayed.push(request);
+      // #750: the API may start the relaunch before it answers.
+      options.duringRelay?.();
       return options.reply ?? { ok: true, data: { echoed: true } };
     },
+    stopRoundSoon: (round) => stopped.push(round),
     envelope: async (id) =>
       id === 'prj_app' ? { repo: 'acme/app', root: ROOT } : undefined,
     sessions,
@@ -72,7 +81,7 @@ const setup = (
     now: () => '2026-10-14T10:00:00.000Z',
     log: memoryLogger().log,
   });
-  return { service, emitted, relayed, sessions };
+  return { service, emitted, relayed, sessions, stopped };
 };
 
 const prompt = (text: string, cwd = ROOT) => ({
@@ -470,6 +479,82 @@ describe('LocalService — card rounds after a restart (#482)', () => {
       as(SESSION, WORKTREE),
     );
     expect(emitted).toEqual([]);
+  });
+});
+
+describe('LocalService — escalate_card stops the asking round (#750 D8)', () => {
+  const WORKTREE = '/home/person/dev/.wt-app-card-abc12345';
+  const SESSION = '0b0f6f2e-8f5e-4c1e-9a43-3d6f3b1f2c11';
+  const OPUS = '9c0f7a52-6d3e-4b8a-9f1e-2a4b6c8d0e1f';
+  let current: CardRecord;
+  const asking: CardRecord = {
+    cardId: 'card_1',
+    projectId: 'prj_app',
+    root: ROOT,
+    repo: 'acme/app',
+    shortId: 'abc12345',
+    worktree: WORKTREE,
+    branch: 'fix/1-x',
+    base: 'develop',
+    tmuxSession: 'nautelle-card-abc12345',
+    runId: 'run_1',
+    phase: 'running',
+    sessionId: SESSION,
+    startedAt: '2026-10-14T09:00:00.000Z',
+  };
+  const liveRound = (cwd: string) =>
+    cwd.startsWith(WORKTREE) ? current : null;
+  const escalate = {
+    method: 'card.escalate',
+    args: { reason: 'misclassified', note: 'Needs a migration.' },
+    via: 'mcp',
+    cwd: WORKTREE,
+    ppid: 4242,
+  };
+  const relaunched = {
+    ok: true as const,
+    data: { number: 1, escalated: true, relaunched: true },
+  };
+
+  it('stops the round that asked, even when the relaunch replaced it before the answer', async () => {
+    current = asking;
+    const { service, stopped } = setup(false, true, {
+      liveRound,
+      reply: relaunched,
+      // The API's relaunch on Opus: another run, another session.
+      duringRelay: () => {
+        current = { ...asking, runId: 'run_2', sessionId: OPUS };
+      },
+    });
+    const result = await service.handle(
+      'request',
+      escalate,
+      as(SESSION, WORKTREE),
+    );
+    expect(result).toEqual(relaunched);
+    // The asking round, as it was when the call came in — never run_2.
+    expect(stopped).toEqual([
+      { cardId: 'card_1', runId: 'run_1', sessionId: SESSION },
+    ]);
+  });
+
+  it('stops nothing on a refused escalation, another method, or a session that is not the round’s', async () => {
+    current = asking;
+    const refused = setup(false, true, {
+      liveRound,
+      reply: { ok: false, error: { code: 'not_escalatable' } },
+    });
+    await refused.service.handle('request', escalate, as(SESSION, WORKTREE));
+    expect(refused.stopped).toEqual([]);
+
+    const other = setup(false, true, { liveRound, reply: relaunched });
+    await other.service.handle(
+      'request',
+      { ...escalate, method: 'card.finish', args: { summary: 'Done. x.' } },
+      as(SESSION, WORKTREE),
+    );
+    await other.service.handle('request', escalate, as('s-own', WORKTREE));
+    expect(other.stopped).toEqual([]);
   });
 });
 
