@@ -390,7 +390,8 @@ export class BoardService implements OnModuleInit {
       dependencies: deps,
       stacks,
       // #445: each round run's savings and artifact-guard flag.
-      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds),
+      // #748 D1: and the figure of each card's tracked session.
+      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds, trackedIds),
       // #447 D15: the live Steward incident of each card's latest round.
       steward: await stewardChipsFor(
         this.prisma,

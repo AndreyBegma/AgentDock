@@ -392,3 +392,32 @@ describe('runnerPredatesFilterReasons (#648)', () => {
     expect(runnerPredatesFilterReasons('dev')).toBe(false);
   });
 });
+
+describe('filter.stats session (#748 D5)', () => {
+  const manual: FilterStatRow = { ...row, runId: null, runKind: 'manual' };
+
+  it('accepts a session on a batch of manual rows, and none (older runner)', () => {
+    expect(
+      filterStatsDataSchema.safeParse({ rows: [manual], session: 'abc-123_X' })
+        .success,
+    ).toBe(true);
+    expect(filterStatsDataSchema.safeParse({ rows: [manual] }).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects a session beside a non-manual row', () => {
+    expect(
+      filterStatsDataSchema.safeParse({ rows: [manual, row], session: 'abc' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects a session that is not a bare id', () => {
+    for (const session of ['', '../x', 'a b', 'a'.repeat(129)]) {
+      expect(
+        filterStatsDataSchema.safeParse({ rows: [manual], session }).success,
+      ).toBe(false);
+    }
+  });
+});

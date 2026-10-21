@@ -377,12 +377,23 @@ const cardCost = (
   return total?.toFixed(6) ?? null;
 };
 
-/** #445 D13: the rounds' estimates summed, as `cardCost`; `null` when none. */
+/**
+ * #445 D13: the rounds' estimates summed, as `cardCost`; `null` when none.
+ * #748 D2: plus the tracked session's, which a terminal card has instead of
+ * rounds.
+ */
 const cardTokenSaved = (
-  rounds: readonly BoardCardRound[],
-  saved: TokenSaverCardFacts['tokenSaved'],
+  card: CardWithRounds,
+  facts: TokenSaverCardFacts,
 ): TokenSavedView | null => {
-  const of = rounds.flatMap((round) => saved.get(round.runId) ?? []);
+  const session =
+    card.trackedSessionId === null
+      ? undefined
+      : facts.tokenSavedBySession.get(card.trackedSessionId);
+  const of = [
+    ...card.rounds.flatMap((round) => facts.tokenSaved.get(round.runId) ?? []),
+    ...(session === undefined ? [] : [session]),
+  ];
   if (of.length === 0) return null;
   return {
     estimateTokens: of.reduce((sum, s) => sum + s.estimateTokens, 0),
@@ -426,7 +437,7 @@ export const toCardView = (
   design: designOf(card.design),
   continueAfterDesign: card.continueAfterDesign,
   costUsd: cardCost(card.rounds, facts.costs),
-  tokenSaved: cardTokenSaved(card.rounds, facts.tokenSaver.tokenSaved),
+  tokenSaved: cardTokenSaved(card, facts.tokenSaver),
   // #445 D8: the latest round's finish.
   artifactIncomplete:
     card.rounds[0] !== undefined &&

@@ -41,6 +41,8 @@ const facts = (
     tokenSaved: new Map(),
     tokenSaverFilters: new Map(),
     artifactIncomplete: new Set(),
+    tokenSavedBySession: new Map(),
+    tokenSaverFiltersBySession: new Map(),
   },
   now,
 });

@@ -791,6 +791,7 @@ model AgentSession {
   capturedCards        BoardCard[]           @relation("BoardCardSourceSession")
   trackedCard          BoardCard?            @relation("BoardCardTrackedSession")
   usageFact            RunUsageFact?
+  tokenSaverStats      TokenSaverStat[]
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
@@ -3796,29 +3797,38 @@ model TokenSaverSettings {
 /// One filtered command (D12), from the runner's `filter.stats` event.
 /// `id` is the runner's, so a resent `events` batch inserts nothing twice.
 model TokenSaverStat {
-  id            String            @id
-  projectId     String
+  id                String            @id
+  projectId         String
   /// Null for the orchestrator and manual sessions, or a run the API does not know.
-  runId         String?
-  runKind       TokenSaverRunKind
+  runId             String?
+  runKind           TokenSaverRunKind
   /// `<family>/<command>`, e.g. `js/jest`; `none` or a `none:*` reason when no filter matched.
-  filter        String
+  filter            String
   /// #648: the program the command ran (`git log`), never its arguments;
   /// null on rows of older runners and on reads.
-  program       String?
-  rawBytes      Int
-  keptBytes     Int
+  program           String?
+  rawBytes          Int
+  keptBytes         Int
   /// `NAUTELLE_RAW=1`: the command ran unfiltered.
-  bypassed      Boolean
+  bypassed          Boolean
   /// The filter returned the original output.
-  passedThrough Boolean
-  createdAt     DateTime
+  passedThrough     Boolean
+  createdAt         DateTime
+  /// #748 D4: the manual session the row was read from, kept only when it is a
+  /// session of the project's runner and project; null otherwise.
+  sessionId         String?
+  /// #748: the Claude session id as the runner sent it, so a session the API
+  /// learns of after the batch still joins at read time.
+  sessionExternalId String?
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  run     Run?    @relation(fields: [runId], references: [id], onDelete: SetNull)
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     Run?          @relation(fields: [runId], references: [id], onDelete: SetNull)
+  session AgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([projectId, createdAt])
   @@index([runId])
+  @@index([sessionId])
+  @@index([projectId, sessionExternalId])
   @@map("token_saver_stats")
 }
 
