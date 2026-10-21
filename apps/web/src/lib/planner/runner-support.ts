@@ -114,6 +114,7 @@ const FEATURE_VERB: Record<RunnerFeature, string> = {
   worktree: 'read worktrees',
   docsRepo: 'write specs to a docs repository',
   ruleScan: 'scan a project for coding rules',
+  prefixOptimise: 'compress rules and propose prefix overlays',
 };
 
 const DISABLED_BODY =

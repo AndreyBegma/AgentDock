@@ -35,6 +35,10 @@ export const RUN_KINDS = [
   'code_ask',
   /** A UI profile's learning from an approved design (issue #752). */
   'ui_profile_learn',
+  /** The injected rules compressed with haiku (issue #751 B6). */
+  'rules_compress',
+  /** An overlay proposal for one prefix part (issue #751 B8). */
+  'prefix_propose',
 ] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 

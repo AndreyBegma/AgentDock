@@ -1,7 +1,7 @@
 # Measure the launch prefix, select it per card type, and shorten it with approved overlays
 
 Issue: #751 · Epic: [#745](745-token-economy.md) · Technique keys:
-`prefix_select`, `rules_compressed`, `prefix_overlays` ·
+`prefix-select`, `rules-compressed`, `prefix-overlays` ·
 Builds on: [#586](586-inject-enabled-project-rules-into-agent.md),
 [#445](445-token-saver.md) (ADR-0039), [#663](663-token-saver-v2.md) (ADR-0068) ·
 Decision record: [ADR-0075](../adr/0075-agent-instruction-files-may-be-stored-as-prefix-overlays.md)
@@ -60,7 +60,7 @@ split out as #752 and shares no logic with this issue.
 
 | # | Decision | Source |
 |---|---|---|
-| S1 | Each technique has its own A/B flag from #746, with a sticky per-card arm, delivered to the runner in the launch command's `tokenSaver.techniques`: `prefix_select` (c), `rules_compressed` (d), `prefix_overlays` (e). Measurement (b) has no flag: it runs in both arms. Per #746, prefix measurement belongs to this issue. | decisions Q-proof; #746 |
+| S1 | Each technique has its own A/B flag from #746, with a sticky per-card arm, delivered to the runner in the launch command's `tokenSaver.techniques`: `prefix-select` (c), `rules-compressed` (d), `prefix-overlays` (e) — kebab-case, as the technique registry's key pattern requires. Measurement (b) has no flag: it runs in both arms. Per #746, prefix measurement belongs to this issue. | decisions Q-proof; #746 |
 | S2 | **Frozen per session.** The selection (c), the compressed rules version (d) and the overlays (e) a session started with stay with it. A resumed round reuses them, and a change applies to the next fresh session. [Reported] Claude Code 2.1.306's `--system-prompt-snapshot` is `on` by default: it records the system prompt on the first request and reuses it on resume, so a mid-session change would not take effect anyway. | decisions (cache stability); `claude --help` |
 
 ### The prefix
@@ -71,9 +71,9 @@ split out as #752 and shares no logic with this issue.
 | B2 | **The total is the fact; the parts are estimates.** The run's first-turn input (input + cache read + cache write of turn 1, from #746's per-run usage) is the measured prefix. `other` is the total minus the sum of the parts: the system prompt and built-in tools. [Unknown] An MCP server's real cost when its tools are deferred (ADR-0068: deferred by default on a first-party host). The row then counts the tool names only. The runner slot checks it once against a recorded first turn with and without one server, as `apps/runner/src/launch/fixtures/first-turn.json` was recorded, and fixes the estimate rule. | ADR-0068 Consequences ("tests measure the effect") |
 | B3 | **Dashboard and budget.** The Token saver page gets a **Prefix** section with these parts: the median first-turn prefix per launch kind; the top 10 parts by ≈tokens × launches in the period; and each part's origin and its overlay state (e). A budget per project, `prefixBudgetTokens`, defaults to 25,000 (ADR-0068 §1). A launch kind whose median is over budget shows a warning on the page and in Project settings › Token saver. Warnings never block a launch. | person (Q-prefix); ADR-0068 §1 |
 | B4 | **Card type**, for selection. It is computed when a card session starts and stored with the session (S2): `ci_fix` for a CI-fix round; else `ui` for a card with an approved design; else the card's kind, `bug` or `feature`. It is deterministic, and it uses only fields the card already has. | *default* (Open question QB1) |
-| B5 | **Selection per card type (c)**, in the `prefix_select` B arm: (1) **rules**: each `ProjectRule` gains `appliesTo` (card types; empty means all), and the rules block includes only the rules for the session's type; (2) **MCP servers**: `mcpAllow` stays the superset, and a per-type subset `mcpByType` narrows it; (3) **skills**: a per-type list of skills hidden with Claude Code's `skillOverrides` setting `"off"`, written into the launch's `--settings`. [Confirmed] `skillOverrides` is in the settings schema of the installed Claude Code 2.1.306, described as "Per-skill listing overrides keyed by skill name … \"off\" hides it from both [model and /name]". A project admin edits the selection. Nautelle **suggests** the MCP subsets from usage: an allowed server none of whose tools a card round of that type called in the last 50 rounds (`tool_calls.name` `mcp__<server>__*` [Confirmed] `ToolCall.name`, `schema.prisma:850-868`). [Unknown] Skill usage: `ToolCall` stores the tool name `Skill` but not which skill. Until the runner reports it, skills have no suggestion. | person (Q-prefix); *default* for suggestions |
-| B6 | **Rules compression (d).** When the enabled rules change (the rules version is the SHA-256 of the ordered `(id, title, description, appliesTo)`), the API runs a typed command `rules.compress` on the runner: `haiku`, no tools, the `card.assess` pattern. It answers one compressed text per rule. It is a `runs` row of kind `rules_compress`. The result waits for a project admin to approve it from a per-rule diff with before/after bytes and ≈tokens. The approved version is used in the `rules_compressed` B arm, and a changed rules version makes it inapplicable at once: launches use the originals until the next one is approved. At most one compression runs per project, and it runs once per rules version. | person (Q-prefix) |
-| B7 | **Overlays (e).** An overlay is stored text that replaces one prefix part for a launch. It has these properties: `part` (`claude_md` for the repo root `CLAUDE.md` or `.claude/CLAUDE.md`, `skill:<name>` for a project skill under `.claude/skills/`, and `rules` for the injected rules, whose overlay is B6's approved compression); `originalSha256` and `originalBytes`; `content`; `state` (`proposed`, `approved`, `rejected`, `stale`); and the approver. Only `approved` overlays whose hash matches are used, in the `prefix_overlays` B arm. | person (Q-prefix) |
+| B5 | **Selection per card type (c)**, in the `prefix-select` B arm: (1) **rules**: each `ProjectRule` gains `appliesTo` (card types; empty means all), and the rules block includes only the rules for the session's type; (2) **MCP servers**: `mcpAllow` stays the superset, and a per-type subset `mcpByType` narrows it; (3) **skills**: a per-type list of skills hidden with Claude Code's `skillOverrides` setting `"off"`, written into the launch's `--settings`. [Confirmed] `skillOverrides` is in the settings schema of the installed Claude Code 2.1.306, described as "Per-skill listing overrides keyed by skill name … \"off\" hides it from both [model and /name]". A project admin edits the selection. Nautelle **suggests** the MCP subsets from usage: an allowed server none of whose tools a card round of that type called in the last 50 rounds (`tool_calls.name` `mcp__<server>__*` [Confirmed] `ToolCall.name`, `schema.prisma:850-868`). [Unknown] Skill usage: `ToolCall` stores the tool name `Skill` but not which skill. Until the runner reports it, skills have no suggestion. | person (Q-prefix); *default* for suggestions |
+| B6 | **Rules compression (d).** When the enabled rules change (the rules version is the SHA-256 of the ordered `(id, title, description, appliesTo)`), the API runs a typed command `rules.compress` on the runner: `haiku`, no tools, the `card.assess` pattern. It answers one compressed text per rule. It is a `runs` row of kind `rules_compress`. The result waits for a project admin to approve it from a per-rule diff with before/after bytes and ≈tokens. The approved version is used in the `rules-compressed` B arm, and a changed rules version makes it inapplicable at once: launches use the originals until the next one is approved. At most one compression runs per project, and it runs once per rules version. | person (Q-prefix) |
+| B7 | **Overlays (e).** An overlay is stored text that replaces one prefix part for a launch. It has these properties: `part` (`claude_md` for the repo root `CLAUDE.md` or `.claude/CLAUDE.md`, `skill:<name>` for a project skill under `.claude/skills/`, and `rules` for the injected rules, whose overlay is B6's approved compression); `originalSha256` and `originalBytes`; `content`; `state` (`proposed`, `approved`, `rejected`, `stale`); and the approver. Only `approved` overlays whose hash matches are used, in the `prefix-overlays` B arm. | person (Q-prefix) |
 | B8 | **Proposal.** The API asks the runner for a proposal with a typed command `prefix.propose { projectId, root, part }`. The runner reads the file itself. It refuses secret names and `code.deny` paths (ADR-0063 §4, ADR-0047) and files over 64 KiB (ADR-0075 §2). It runs a headless no-tools call (model `sonnet`, Open question QB3) with an instruction to keep every rule and drop only repetition and prose. It answers `{ originalSha256, originalText, proposedText }`. A proposal is made automatically for the largest `repo`-origin part of a launch kind over budget (B3), when it has no open proposal. It is also made on an admin's **Propose** on the dashboard, and after a stale mark (B10). There is at most one open proposal per part. | person (Q-prefix); ADR-0063 |
 | B9 | **Approval and use.** A project admin approves or rejects a proposal from a side-by-side diff with before/after bytes and ≈tokens. An approved overlay enters A/B (S1). It never applies to a card whose session already started (S2). | person (Q-prefix) |
 | B10 | **Stale.** At every launch that would use an overlay, the runner hashes the original in the round's worktree. A different hash means it launches with the **original**, never with a stale overlay, and reports `prefix.overlay_stale { overlayId, sha256 }`. The API then marks the overlay `stale` and enqueues a new proposal (B8). | person (Q-prefix) |
@@ -84,11 +84,9 @@ split out as #752 and shares no logic with this issue.
 ## Data / Schema
 
 `apps/api/prisma/schema.prisma`, migration
-`apps/api/prisma/migrations/20261231000010_prefix_parts_and_overlays/`. The
-newest on develop is `20261231000006_project_github_repo_id`; the epic orders
-the stamps (#746 `…07`, #748 `…08`, #750 `…09`, this issue `…10`, #752 `…11`).
-If `develop` already has a later stamp when the branch is cut, take the next
-free one and keep the name.
+`apps/api/prisma/migrations/20261231000014_prefix_parts_and_overlays/`.
+`develop` had `…13` (#750) when the branch was cut, so this issue takes the
+next free stamp; an older one would break `prisma migrate dev` history.
 
 - `enum RunKind`: add `rules_compress`, `prefix_propose`.
 - `run_prefix_parts`: `id`, `runId` → runs (cascade), `projectId` → projects
@@ -106,8 +104,14 @@ free one and keep the name.
 - `prefix_overlays`: `id`, `projectId` (cascade), `part`, `originalSha256`,
   `originalBytes`, `originalText` (for the diff; ADR-0075),
   `content`, `contentBytes`, `state`, `runId?`, `rulesVersion?` (for
-  `part = rules`), `decidedById?` → users, `decidedAt?`, `createdAt`. A partial
-  unique index on `(projectId, part)` where `state IN ('proposed','approved')`.
+  `part = rules`), `decidedById?` → users, `decidedAt?`, `pullRequestCardId?`
+  (B12's one card), `createdAt`, `updatedAt`. A partial unique index on
+  `(projectId, part)` where `state IN ('proposed','approved')`. For
+  `part = rules`, `content` is the compressed rules as JSON
+  (`{ rules: [{ id, title, description }] }`) and `originalText` the rendered
+  original block; the sizes are of the rendered blocks.
+- `run_prefix_parts` is unique on `(runId, kind, name)`, so a resent
+  `prefix.measured` inserts nothing twice.
 
 ## API
 
@@ -121,6 +125,11 @@ free one and keep the name.
   `GET …/overlays/:id` (admin: content and original for the diff).
 - `POST …/overlays/propose { part }`, `POST …/overlays/:id/approve`,
   `POST …/overlays/:id/reject`, `POST …/overlays/:id/pull-request` (admin).
+  `propose` answers `202 { queued }`: the proposal is a job, and `409` while
+  the part has an open overlay. B6's compression is a `rules` overlay, so it
+  is reviewed and approved through the same endpoints. Each action is audited
+  as `project.prefix_overlay` with `meta.change` and `meta.part`, never the
+  content.
 - `PUT /projects/:projectId/token-saver` gains `prefixBudgetTokens`,
   `mcpByType` and `skillsOffByType`, validated against the reported servers and
   skills.
@@ -163,7 +172,7 @@ Models are code defaults (B6, B8).
 
 - [ ] Every card launch emits `prefix.measured`, with a row for the repo `CLAUDE.md` (hash equal to the file's SHA-256), the rules block, each skill and each MCP server. `runs.prefixTokens` equals turn 1's input + cache read + cache write.
 - [ ] The dashboard lists the top parts, and it flags a launch kind whose median prefix exceeds `prefixBudgetTokens`. Changing the budget changes the flag.
-- [ ] In the `prefix_select` B arm, a `bug` card's session gets only the rules whose `appliesTo` is empty or contains `bug`, only the MCP servers in `mcpByType.bug`, and `skillOverrides` "off" for `skillsOffByType.bug`. A resumed round reuses the frozen selection after the settings change.
+- [ ] In the `prefix-select` B arm, a `bug` card's session gets only the rules whose `appliesTo` is empty or contains `bug`, only the MCP servers in `mcpByType.bug`, and `skillOverrides` "off" for `skillsOffByType.bug`. A resumed round reuses the frozen selection after the settings change.
 - [ ] Changing an enabled rule creates one `rules_compress` run. Until an admin approves it, B-arm launches use the original rules. After approval, they use the compressed texts. The A arm always uses the originals.
 - [ ] A `prefix.propose` for `CLAUDE.md` stores a `proposed` overlay with its original text and hash. A path in `code.deny`, or a secret name, is refused `policy_refused`.
 - [ ] An approved `CLAUDE.md` overlay in the B arm launches with the original excluded and the overlay loaded. The test records a first turn whose prefix shrinks by the overlay's difference (B11 effect). If B11 proves impossible, the slot records that in the spec, ships the default, and the `CLAUDE.md` row shows **Open a pull request** only.
@@ -177,7 +186,7 @@ Models are code defaults (B6, B8).
 
 | Slot | Owns | Touches | Depends on | Lead | Model |
 |---|---|---|---|---|---|
-| i751-core | schema and migration, shared prefix contracts, events and commands, the API prefix module, rules selection and compression, the launch payload | apps/api/prisma/schema.prisma (Part B models and fields, RunKind rules_compress and prefix_propose), apps/api/prisma/migrations/20261231000010_prefix_parts_and_overlays/**, packages/shared/src/prefix/**, packages/shared/src/protocol/events/prefix.ts, packages/shared/src/protocol/commands/prefix.ts, packages/shared/src/protocol/commands.ts, packages/shared/src/protocol/index.ts, packages/shared/src/protocol/capabilities.ts, packages/shared/src/token-saver/contracts.ts, packages/shared/src/token-economy/techniques.ts (registers `prefix_select`, `rules_compressed`, `prefix_overlays`, default mode `ab`), packages/shared/src/project-rules/**, apps/api/src/prefix/**, apps/api/src/project-rules/**, apps/api/src/token-saver/dto.ts, apps/api/src/token-saver/token-saver.service.ts, apps/api/src/board/board-rounds.service.ts, apps/api/src/app.module.ts | #750 merged (chain order) | yes | opus |
+| i751-core | schema and migration, shared prefix contracts, events and commands, the API prefix module, rules selection and compression, the launch payload | apps/api/prisma/schema.prisma (Part B models and fields, RunKind rules_compress and prefix_propose), apps/api/prisma/migrations/20261231000014_prefix_parts_and_overlays/**, packages/shared/src/prefix/**, packages/shared/src/protocol/events/prefix.ts, packages/shared/src/protocol/commands/prefix.ts, packages/shared/src/protocol/commands.ts, packages/shared/src/protocol/index.ts, packages/shared/src/protocol/capabilities.ts, packages/shared/src/token-saver/contracts.ts, packages/shared/src/token-economy/techniques.ts (registers `prefix-select`, `rules-compressed`, `prefix-overlays`, default mode `ab`), packages/shared/src/project-rules/**, apps/api/src/prefix/**, apps/api/src/project-rules/**, apps/api/src/token-saver/dto.ts, apps/api/src/token-saver/token-saver.service.ts, apps/api/src/board/board-rounds.service.ts, apps/api/src/app.module.ts | #750 merged (chain order) | yes | opus |
 | i751-runner | measurement, selection and overlay wiring, B11 verification, `rules.compress` and `prefix.propose` handlers | apps/runner/src/prefix/**, apps/runner/src/launch/token-saver.ts, apps/runner/src/launch/token-saver.spec.ts, apps/runner/src/launch/fixtures/**, apps/runner/src/cards/launch.ts, apps/runner/src/commands/handlers.ts, apps/runner/src/detect/capabilities.ts | i751-core | no | opus |
 | i751-web | Prefix section, overlay review, selection matrix, rule Applies to | apps/web/src/components/token-saver/prefix-section.tsx, apps/web/src/components/token-saver/overlay-review.tsx, apps/web/src/app/(app)/projects/[projectId]/token-saver/page.tsx, apps/web/src/app/(app)/projects/[projectId]/settings/token-saver-tab.tsx, apps/web/src/app/(app)/projects/[projectId]/settings/rules/**, apps/web/src/lib/token-saver/**, apps/web/src/lib/project-rules/**, docs/ui/screens.md | i751-core | no | sonnet |
 

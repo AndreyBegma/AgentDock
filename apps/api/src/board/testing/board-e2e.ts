@@ -339,6 +339,15 @@ export class BoardWorld {
     // its random id; the board's suites run the A arm unless they opt in.
     await this.modelByType('off', this.a);
     await this.modelByType('off', this.b);
+    // #751: the prefix techniques are `ab` too; the A arm unless opted in.
+    for (const key of [
+      'prefix-select',
+      'rules-compressed',
+      'prefix-overlays',
+    ]) {
+      await this.technique(key, 'off', this.a);
+      await this.technique(key, 'off', this.b);
+    }
     await createUser(this.ctx.prisma, 'admin@x.test', 'admin');
     this.admin = await login(this.ctx, 'admin@x.test');
     this.operator = await this.member('op@x.test', this.a, 'operator');
@@ -493,11 +502,18 @@ export class BoardWorld {
    * arm (class mapping, escalation), `off` in the A arm.
    */
   async modelByType(mode: 'off' | 'on', projectId = this.a): Promise<void> {
+    await this.technique('model-by-type', mode, projectId);
+  }
+
+  /** A technique's mode in the project (#746 D9). */
+  async technique(
+    technique: string,
+    mode: 'off' | 'ab' | 'on',
+    projectId = this.a,
+  ): Promise<void> {
     await this.ctx.prisma.tokenEconomyTechnique.upsert({
-      where: {
-        projectId_technique: { projectId, technique: 'model-by-type' },
-      },
-      create: { projectId, technique: 'model-by-type', mode },
+      where: { projectId_technique: { projectId, technique } },
+      create: { projectId, technique, mode },
       update: { mode },
     });
   }

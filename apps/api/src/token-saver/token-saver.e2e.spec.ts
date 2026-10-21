@@ -96,6 +96,9 @@ describe('token saver (e2e)', () => {
       expect(response.body).toEqual({
         enabled: true,
         mcpAllow: [],
+        prefixBudgetTokens: 25_000,
+        mcpByType: {},
+        skillsOffByType: {},
         updatedAt: null,
       });
     });

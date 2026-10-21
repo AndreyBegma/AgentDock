@@ -1,4 +1,6 @@
 import {
+  PREFIX_BUDGET_MAX_TOKENS,
+  PREFIX_BUDGET_MIN_TOKENS,
   TOKEN_SAVER_MCP_ALLOW_MAX,
   type UpdateTokenSaverSettingsBody,
 } from '@nautelle/shared';
@@ -8,9 +10,14 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsInt,
   IsISO8601,
+  IsObject,
+  IsOptional,
   isISO8601,
   Matches,
+  Max,
+  Min,
 } from 'class-validator';
 
 /** `mcpServerNameSchema` of the shared contract. */
@@ -31,6 +38,23 @@ export class UpdateTokenSaverSettingsDto
     message: 'each of mcpAllow must be an MCP server name',
   })
   mcpAllow!: string[];
+
+  /** #751 B3. */
+  @IsOptional()
+  @IsInt()
+  @Min(PREFIX_BUDGET_MIN_TOKENS)
+  @Max(PREFIX_BUDGET_MAX_TOKENS)
+  prefixBudgetTokens?: number;
+
+  /** #751 B5: `{ [cardType]: server[] }`; its shape is checked by the service. */
+  @IsOptional()
+  @IsObject()
+  mcpByType?: Partial<Record<string, string[]>>;
+
+  /** #751 B5: `{ [cardType]: skill[] }`; checked by the service. */
+  @IsOptional()
+  @IsObject()
+  skillsOffByType?: Partial<Record<string, string[]>>;
 }
 
 /** An ISO 8601 string as `…Z`; anything else is left for `IsISO8601` to refuse. */

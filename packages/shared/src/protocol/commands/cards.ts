@@ -4,6 +4,7 @@ import {
   ATTACHMENTS_PER_CARD_MAX,
   attachmentRefSchema,
 } from '../../attachments';
+import { cardPrefixSchema } from '../../prefix/contracts';
 import { techniqueFlagsSchema } from '../../token-economy/techniques';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
@@ -206,6 +207,8 @@ export type CardDraftPullRequest = z.infer<typeof cardDraftPullRequestSchema>;
  */
 export const cardTokenSaverSchema = tokenSaverConfigSchema.extend({
   techniques: techniqueFlagsSchema.optional(),
+  /** #751: the session's frozen prefix; only to a runner with `prefixOverlays`. */
+  prefix: cardPrefixSchema.optional(),
 });
 export type CardTokenSaver = z.infer<typeof cardTokenSaverSchema>;
 

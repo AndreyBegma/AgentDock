@@ -25,8 +25,6 @@ import {
   cardSpecPrBody,
   cardWorkerPrompt,
   isActiveRoundPhase,
-  PROJECT_RULES_BLOCK_MAX_BYTES,
-  projectRulesBlock,
   stackDesignPath,
   stackLabel,
 } from '@nautelle/shared';
@@ -72,6 +70,8 @@ import {
   revisionFrames,
 } from '../design/design-store';
 import { resolveSpecTarget, type SpecTarget } from '../planner/spec-target';
+import { withCardPrefix } from '../prefix/card-prefix';
+import { PrefixLaunchService } from '../prefix/prefix-launch';
 import { RuntimeProfileResolver } from '../readiness';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TokenEconomyService } from '../token-economy/token-economy.service';
@@ -281,6 +281,7 @@ export class BoardRoundsService {
     private readonly tokenSaver: TokenSaverService,
     private readonly economy: TokenEconomyService,
     private readonly assessor: CardAssessor,
+    private readonly prefixLaunch: PrefixLaunchService,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
@@ -885,7 +886,6 @@ export class BoardRoundsService {
     const attached = await this.attachments.withClaim(card.id, claimIds);
     const attachmentRefs = attached.map(toAttachmentRef);
     const attachmentBriefs = attached.map(toAttachmentBrief);
-    const projectRules = await this.projectRulesSection(project.id);
     // #445 D11: only a runner that advertises the token saver gets the field.
     // Before the prompt: #747 D10 puts the `terse-register` arm in it.
     const saver = await this.tokenSaver.launch(project.id, flags);
@@ -898,6 +898,20 @@ export class BoardRoundsService {
       (card.sessionModel !== model || card.sessionEffort !== effort) &&
       capabilities !== null &&
       cardFreshStartAvailable(capabilities);
+    // #751 S2: the session's frozen prefix — card type, selection, compressed
+    // rules, overlays. A resumed session keeps what it started with; a new or
+    // fresh one takes the settings and approvals as they are now. C-227: the
+    // rules section is read at dispatch, so an edit reaches the next session.
+    const prefix = await this.prefixLaunch.resolve({
+      projectId: project.id,
+      card,
+      ciFix: trigger === 'ci_fix',
+      reuse: resume && !fresh,
+      flags,
+      mcpAllow: saver.args.tokenSaver?.mcpAllow ?? null,
+      capabilities,
+    });
+    const projectRules = prefix.projectRules;
     // #750 D8: a non-Opus round of the B arm may ask for Opus, once.
     const escalate =
       byType &&
@@ -1001,7 +1015,7 @@ export class BoardRoundsService {
         : {}),
       ...(followUp ? { newBranch: true } : {}),
       ...(escalate ? { escalate: true as const } : {}),
-      ...saver.args,
+      ...withCardPrefix(saver.args, prefix.prefix),
     };
     const valid = cardRunArgsSchema.safeParse({ ...draft, runId: 'pending' });
     if (!valid.success) {
@@ -1040,6 +1054,8 @@ export class BoardRoundsService {
           tokenSaver: saver.on,
           // #746 D11: the flags launched; reports read this snapshot.
           techniques: saver.techniques ?? Prisma.DbNull,
+          // #751 B4: the session's card type, for the report.
+          cardType: prefix.cardType,
           status: 'running',
           triggeredByType: 'user',
           triggeredById: actor.userId,
@@ -1084,6 +1100,13 @@ export class BoardRoundsService {
           // #750 D7: the pair this round's session runs at.
           sessionModel: model,
           sessionEffort: effort,
+          // #751 S2: frozen with the session it starts.
+          ...(prefix.started
+            ? {
+                sessionCardType: prefix.cardType,
+                sessionPrefix: prefix.session,
+              }
+            : {}),
           branch,
           specPath,
           ...(choosesBase
@@ -1256,27 +1279,6 @@ export class BoardRoundsService {
    * issue, so GitHub links the two. Stored at once, like the issue: a Run
    * that fails later does not publish again.
    */
-  /**
-   * C-227: the project's enabled rules as the prompt's section, read now —
-   * at dispatch — so an edit or a toggle reaches the next run. `null`
-   * without an enabled rule. Oversized rules are cut with a marker and a
-   * warning.
-   */
-  private async projectRulesSection(projectId: string): Promise<string | null> {
-    const rules = await this.prisma.projectRule.findMany({
-      where: { projectId, enabled: true },
-      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-      select: { title: true, description: true, enabled: true },
-    });
-    const block = projectRulesBlock(rules);
-    if (block.omitted > 0) {
-      this.logger.warn(
-        `Project ${projectId}: ${block.omitted} of ${rules.length} enabled coding rules did not fit the ${PROJECT_RULES_BLOCK_MAX_BYTES}-byte prompt block and were left out`,
-      );
-    }
-    return block.text;
-  }
-
   private async publishSpec(
     project: BoardProject,
     card: CardWithRounds,

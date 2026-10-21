@@ -45,7 +45,13 @@ export class TokenSaverController {
   ): Promise<TokenSaverSettingsView> {
     return this.settings.update(
       access.projectId,
-      { enabled: dto.enabled, mcpAllow: dto.mcpAllow },
+      {
+        enabled: dto.enabled,
+        mcpAllow: dto.mcpAllow,
+        prefixBudgetTokens: dto.prefixBudgetTokens,
+        mcpByType: dto.mcpByType,
+        skillsOffByType: dto.skillsOffByType,
+      },
       { userId: user.id, ctx },
     );
   }
