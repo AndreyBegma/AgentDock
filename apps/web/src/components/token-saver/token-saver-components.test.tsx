@@ -16,14 +16,21 @@ import {
 } from './summary-tables';
 import { PromptCacheTile, SummaryTiles } from './summary-tiles';
 
-describe('SavedBadge (#445 D13)', () => {
-  test('shows "saved ≈ $x" with the tokens behind it', () => {
+describe('SavedBadge (#746 D7)', () => {
+  test('shows the tokens first, and says how the dollars are priced', () => {
     const html = renderToStaticMarkup(
-      <SavedBadge saved={{ estimateUsd: 0.41, estimateTokens: 90_000 }} />,
+      <SavedBadge saved={{ estimateUsd: 0.13, estimateTokens: 42_000 }} />,
     );
-    expect(html).toContain('saved ≈ $0.41');
-    expect(html).toContain('90');
+    expect(html).toContain('saved ≈ 42k tok · $0.13');
     expect(html).toContain('estimate');
+    expect(html).toContain('cache write');
+  });
+
+  test('a sub-cent saving stays <$0.01 after the tokens', () => {
+    const html = renderToStaticMarkup(
+      <SavedBadge saved={{ estimateUsd: 0.004, estimateTokens: 900 }} />,
+    );
+    expect(html).toContain('saved ≈ 900 tok · &lt;$0.01');
   });
 
   test('renders nothing without a saving', () => {
