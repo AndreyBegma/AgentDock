@@ -64,6 +64,18 @@ const prefixOf = (
   skillsOffByType: prefixByTypeOf(row?.skillsOffByType, skillsOffByTypeSchema),
 });
 
+/** `byType` without the servers outside `mcpAllow`. */
+const prunedByType = (
+  byType: PrefixByType,
+  mcpAllow: readonly string[],
+): PrefixByType =>
+  Object.fromEntries(
+    Object.entries(byType).map(([type, names]) => [
+      type,
+      (names ?? []).filter((name) => mcpAllow.includes(name)),
+    ]),
+  );
+
 const viewOf = (row: TokenSaverSettings | null): TokenSaverSettingsView => ({
   ...configOf(row),
   ...prefixOf(row),
@@ -100,9 +112,10 @@ export class TokenSaverService {
     actor: { userId: string; ctx: AuditContext },
   ): Promise<TokenSaverSettingsView> {
     const before = await this.view(projectId);
+    // A server leaving `mcpAllow` leaves the kept per-type lists with it.
     const mcpByType =
       config.mcpByType === undefined
-        ? undefined
+        ? prunedByType(before.mcpByType, config.mcpAllow)
         : this.checkedByType(config.mcpByType, mcpByTypeSchema, 'mcpByType');
     const skillsOffByType =
       config.skillsOffByType === undefined
@@ -112,7 +125,7 @@ export class TokenSaverService {
             skillsOffByTypeSchema,
             'skillsOffByType',
           );
-    const outside = Object.values(mcpByType ?? before.mcpByType)
+    const outside = Object.values(mcpByType)
       .flat()
       .filter((name) => name !== undefined && !config.mcpAllow.includes(name));
     if (outside.length > 0) {
@@ -129,7 +142,7 @@ export class TokenSaverService {
       ...(config.prefixBudgetTokens !== undefined
         ? { prefixBudgetTokens: config.prefixBudgetTokens }
         : {}),
-      ...(mcpByType !== undefined ? { mcpByType } : {}),
+      mcpByType,
       ...(skillsOffByType !== undefined ? { skillsOffByType } : {}),
       updatedById: actor.userId,
     };
