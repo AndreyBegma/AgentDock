@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 import { cardAssessAnswerSchema } from './contract';
-import { CARD_ASSESS_REASON_MAX, cardAssessJobId } from './limits';
+import {
+  CARD_ASSESS_REASON_MAX,
+  type CardDecidingSignal,
+  cardAssessJobId,
+} from './limits';
 
 const answer = {
   work: {
     model: 'sonnet',
     effort: 'low',
     class: 'mechanical',
-    signals: [],
+    signals: [] as CardDecidingSignal[],
     reason: 'Executes a clear, single-module change.',
   },
   design: { model: 'opus', reason: 'The layout is still undecided.' },
