@@ -74,7 +74,7 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
   'account.throttled':
     'Ana Diaz’s account had 5 wrong passwords from 203.0.113.7',
   'telegram.link_pending':
-    '@ana_tg used your link code — confirm it if that chat is yours',
+    '@anatg used your link code — confirm it if that chat is yours',
 };
 
 export type RuleGroup =

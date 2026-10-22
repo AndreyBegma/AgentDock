@@ -41,7 +41,9 @@ export class TelegramPendingLinkExpiryJob
 
   onModuleDestroy(): void {
     clearInterval(this.timer);
-    if (this.scheduler.doesExist('interval', TELEGRAM_PENDING_LINK_EXPIRY_JOB)) {
+    if (
+      this.scheduler.doesExist('interval', TELEGRAM_PENDING_LINK_EXPIRY_JOB)
+    ) {
       this.scheduler.deleteInterval(TELEGRAM_PENDING_LINK_EXPIRY_JOB);
     }
   }

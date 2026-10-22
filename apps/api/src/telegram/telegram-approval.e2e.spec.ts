@@ -313,7 +313,10 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
       // The operator's chat becomes a pending link only: the code was redeemed.
       await ctx.prisma.telegramLink.delete({ where: { userId: operatorId } });
       const session = await login(ctx, 'op@example.com');
-      const created = await session.send('post', '/notifications/telegram/link');
+      const created = await session.send(
+        'post',
+        '/notifications/telegram/link',
+      );
       const code = new URL(created.body.url).searchParams.get('start');
       await poll(privateMessage(nextUpdate++, OPERATOR_CHAT, `/start ${code}`));
       expect(lastTextTo(OPERATOR_CHAT)).toBe(LINK_REPLIES.pending);
