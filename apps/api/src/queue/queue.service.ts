@@ -7,7 +7,10 @@ import {
   type Role,
   specGap,
 } from '@nautelle/shared';
-import { issueCreateArgsSchema } from '@nautelle/shared/protocol';
+import {
+  issueCreateArgsSchema,
+  issueLabelSchema,
+} from '@nautelle/shared/protocol';
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
@@ -194,6 +197,16 @@ export class QueueService {
     dto: CreateIssueDto,
     labels: string[],
   ): Promise<HttpException | null> {
+    // L-27: the DTO checks this for HTTP callers; a local session's labels
+    // reach here without it.
+    const malformed = labels.filter(
+      (l) => !issueLabelSchema.safeParse(l).success,
+    );
+    if (malformed.length > 0) {
+      return new BadRequestException(
+        `Labels must have no commas or control characters and must not be orchestrator control labels (cs:*): ${malformed.join(', ')}`,
+      );
+    }
     if (dto.queue) {
       const gap = specGap(dto.body, labels);
       if (gap === 'no_acceptance_criteria') {

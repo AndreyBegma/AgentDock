@@ -18,6 +18,35 @@ export const ISSUES_REFRESH_TIMEOUT_MS = 45_000;
 export const ISSUE_TITLE_MAX = 256;
 export const ISSUE_LABELS_MAX = 20;
 
+export const ISSUE_LABEL_MAX = 100;
+
+/**
+ * L-27: an issue label. `gh --label` splits on commas, so a comma would let
+ * one label carry another past the runner's ready-label filter; control
+ * characters have no place in a label either.
+ */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to refuse them
+export const ISSUE_LABEL_PATTERN = /^[^,\u0000-\u001f]{1,100}$/;
+
+/**
+ * L-27: the orchestrator's control labels (`cs:ready`, `cs:in-flight`, …).
+ * Only the orchestrator and the runner's `queue` set them, never a caller.
+ */
+export const NOT_CONTROL_LABEL = /^(?!\s*cs:)/i;
+
+export const isControlLabel = (label: string): boolean =>
+  !NOT_CONTROL_LABEL.test(label);
+
+/** A label a caller may ask for. */
+export const issueLabelSchema = z
+  .string()
+  .regex(ISSUE_LABEL_PATTERN, {
+    message: `must be 1-${ISSUE_LABEL_MAX} characters without commas or control characters`,
+  })
+  .refine((l) => !isControlLabel(l), {
+    message: 'must not be an orchestrator control label (cs:*)',
+  });
+
 const byteLength = (text: string): number =>
   new TextEncoder().encode(text).length;
 
@@ -32,7 +61,7 @@ export const issueCreateArgsSchema = z.strictObject({
   body: z.string().refine((b) => byteLength(b) <= ISSUE_BODY_MAX_BYTES, {
     message: `must be at most ${ISSUE_BODY_MAX_BYTES} bytes`,
   }),
-  labels: z.array(z.string().min(1).max(100)).max(ISSUE_LABELS_MAX),
+  labels: z.array(issueLabelSchema).max(ISSUE_LABELS_MAX),
   queue: z.boolean(),
   /**
    * The project's effective ready label (override, else config snapshot, else
