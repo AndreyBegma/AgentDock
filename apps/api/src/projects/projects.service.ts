@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import {
   type DocsSourceOverrideRequest,
   effectiveProjectRole,
@@ -7,6 +8,7 @@ import {
   type Role,
 } from '@nautelle/shared';
 import {
+  hasParentSegment,
   type ProjectInspection,
   repoRelativeDirSchema,
 } from '@nautelle/shared/protocol';
@@ -473,8 +475,9 @@ const invalid = (message: string) =>
  */
 export const manualDocsData = (
   rootPath: string,
-  { kind, localPath, repo, specDir }: DocsSourceOverrideRequest,
+  { kind, localPath: given, repo, specDir }: DocsSourceOverrideRequest,
 ) => {
+  const localPath = given ? localPathOf(given) : given;
   switch (kind) {
     case 'in_repo':
       if (!localPath || repo) {
@@ -513,6 +516,20 @@ export const manualDocsData = (
     manual: true,
     specDir: folder,
   };
+};
+
+/**
+ * L-08: the docs root as stored — normalised, without a trailing `/`, so the
+ * in-repo prefix check compares like with like. A `..` segment is refused
+ * before normalising: `<root>/../..` must not pass, nor fold into a path that
+ * happens to land back inside the root.
+ */
+const localPathOf = (localPath: string): string => {
+  if (hasParentSegment(localPath)) {
+    throw invalid('localPath must not have a ".." segment');
+  }
+  const normalized = posix.normalize(localPath);
+  return normalized.length > 1 ? normalized.replace(/\/+$/, '') : normalized;
 };
 
 /**

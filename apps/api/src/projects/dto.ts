@@ -16,6 +16,8 @@ import {
 import {
   type DocsSourceKind,
   docsSourceKindSchema,
+  hasControlCharacter,
+  hasParentSegment,
 } from '@nautelle/shared/protocol';
 import { Transform } from 'class-transformer';
 import {
@@ -29,6 +31,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateBy,
   ValidateIf,
 } from 'class-validator';
 
@@ -43,6 +46,30 @@ const REPO_NAME = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
  */
 const BRANCH = /^(?!-)(?!.*\.\.)[^\s~^:?*[\\]+$/;
 
+/** L-08: a path with a NUL, a newline or another control character. */
+const HasNoControlCharacter = () =>
+  ValidateBy({
+    name: 'hasNoControlCharacter',
+    validator: {
+      validate: (value: unknown) =>
+        typeof value === 'string' && !hasControlCharacter(value),
+      defaultMessage: (args) =>
+        `${args?.property ?? 'path'} must not have a control character`,
+    },
+  });
+
+/** L-08: a path with a `..` segment could point outside the root it names. */
+const HasNoParentSegment = () =>
+  ValidateBy({
+    name: 'hasNoParentSegment',
+    validator: {
+      validate: (value: unknown) =>
+        typeof value === 'string' && !hasParentSegment(value),
+      defaultMessage: (args) =>
+        `${args?.property ?? 'path'} must not have a ".." segment`,
+    },
+  });
+
 export class InspectProjectDto implements InspectProjectRequest {
   @IsString()
   @IsNotEmpty()
@@ -53,6 +80,8 @@ export class InspectProjectDto implements InspectProjectRequest {
   @IsString()
   @MaxLength(PROJECT_PATH_MAX_LENGTH)
   @Matches(ABSOLUTE_PATH, { message: 'path must be absolute' })
+  @HasNoControlCharacter()
+  @HasNoParentSegment()
   path!: string;
 }
 
@@ -123,6 +152,7 @@ export class DocsSourceOverrideDto implements DocsSourceOverrideRequest {
   @IsString()
   @MaxLength(PROJECT_PATH_MAX_LENGTH)
   @Matches(ABSOLUTE_PATH, { message: 'localPath must be absolute' })
+  @HasNoControlCharacter()
   localPath?: string;
 
   @IsOptional()

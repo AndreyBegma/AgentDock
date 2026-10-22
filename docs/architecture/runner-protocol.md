@@ -989,6 +989,10 @@ command takes a shell string.
 Schemas in `projects.ts`; the rules are [spec 10](../specs/10-projects.md)
 D2–D8 and D10.
 
+- Every absolute path of the protocol (`absolutePathSchema`: a command's
+  `root` or `path`, a watched project's `root`, an inspection's `root`) starts
+  with `/`, has no `..` segment and no control character, and is at most
+  4096 UTF-8 bytes (C-139, L-08).
 - `project.inspect { path }` takes any existing absolute directory and is
   admin-only. It never refuses a git checkout that is not the main one: it
   reports `isMainCheckout: false` with `root` set to the main checkout to

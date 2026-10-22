@@ -288,6 +288,14 @@ describe('projects (e2e)', () => {
         path: 'dev/widget',
       });
       expect(relative.status).toBe(400);
+      // L-08: a path that climbs out or carries a control character.
+      for (const path of [`${ROOT}/../../etc`, `${ROOT}\n/etc`]) {
+        const refused = await admin.send('post', '/admin/projects/inspect', {
+          runnerId,
+          path,
+        });
+        expect([path, refused.status]).toEqual([path, 400]);
+      }
     });
   });
 
@@ -692,6 +700,47 @@ describe('projects (e2e)', () => {
         where: { projectId: a.id },
       });
       expect(stored?.manual).toBe(true);
+    });
+
+    it('keeps an in_repo docs source inside the project root (L-08)', async () => {
+      const a = await seedProject('/srv/a');
+      for (const localPath of [
+        '/srv/a/../../etc',
+        '/srv/a/docs/../../b',
+        // A `..` that folds back into the root is refused all the same.
+        '/srv/a/docs/../docs',
+      ]) {
+        const response = await admin.send(
+          'put',
+          `/projects/${a.id}/docs-source`,
+          { kind: 'in_repo', localPath },
+        );
+        expect([localPath, response.status, response.body.error]).toEqual([
+          localPath,
+          422,
+          'invalid_docs_source',
+        ]);
+      }
+      const sibling = await admin.send('put', `/projects/${a.id}/docs-source`, {
+        kind: 'sibling_repo',
+        localPath: '/srv/a/../b',
+      });
+      expect(sibling.status).toBe(422);
+      const control = await admin.send('put', `/projects/${a.id}/docs-source`, {
+        kind: 'in_repo',
+        localPath: '/srv/a/do\0cs',
+      });
+      expect(control.status).toBe(400);
+      const normalized = await admin.send(
+        'put',
+        `/projects/${a.id}/docs-source`,
+        { kind: 'in_repo', localPath: '/srv/a//./docs/' },
+      );
+      expect(normalized.status).toBe(200);
+      expect(normalized.body.docsSource).toMatchObject({
+        kind: 'in_repo',
+        localPath: '/srv/a/docs',
+      });
     });
 
     it('stores the Spec folder and a remote docs clone (#379)', async () => {
