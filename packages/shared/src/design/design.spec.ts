@@ -4,10 +4,13 @@ import {
   buildMockupCsp,
   checkCdnUrl,
   DESIGN_CDN_ALLOWLIST,
+  DESIGN_CDN_CSP_SOURCES,
+  DESIGN_CDN_PACKAGES,
   DESIGN_HTML_MAX_BYTES,
   designFailureReasonOf,
   fingerprintGlobSchema,
   injectPinHelper,
+  isExactVersion,
   MOCKUP_PIN_HELPER_ATTRIBUTE,
   MOCKUP_RESPONSE_HEADERS,
   mockupMessageSchema,
@@ -27,14 +30,14 @@ describe('checkCdnUrl', () => {
     'https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js',
     'https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js',
     'https://cdn.jsdelivr.net/npm/@radix-ui/themes@3.1.4/styles.css',
-    'https://unpkg.com/lucide@0.460.0',
+    'https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js',
     'https://unpkg.com/@picocss/pico@2.0.6/css/pico.min.css',
     'https://cdn.tailwindcss.com/3.4.16',
     'https://cdn.tailwindcss.com/3.4.16?plugins=forms',
     'https://fonts.googleapis.com/css2?family=Inter:wght@400;600',
     'https://fonts.gstatic.com/s/inter/v13/abc.woff2',
-    '//unpkg.com/htmx.org@2.0.3',
-    'https://cdn.jsdelivr.net/npm/daisyui@5.0.0-beta.1/daisyui.css',
+    '//unpkg.com/htmx.org@2.0.3/dist/htmx.min.js',
+    'https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css',
   ])('allows %s', (url) => {
     expect(checkCdnUrl(url)).toEqual({ ok: true });
   });
@@ -52,10 +55,40 @@ describe('checkCdnUrl', () => {
     ['https://cdnjs.cloudflare.com/ajax/libs/react/18/react.js', 'version'],
     ['https://cdn.tailwindcss.com', 'version'],
     ['https://cdn.tailwindcss.com/3.4', 'version'],
+    // C-168: an npm CDN serves only the listed packages, at their listed version.
+    ['https://unpkg.com/evil-pkg@1.0.0/index.js', 'host'],
+    ['https://cdn.jsdelivr.net/npm/evil-pkg@1.0.0/index.js', 'host'],
+    ['https://unpkg.com/@evil/react@18.3.1/index.js', 'host'],
+    ['https://unpkg.com/react-evil@18.3.1/index.js', 'host'],
+    ['https://unpkg.com/react@18.2.0/umd/react.production.min.js', 'host'],
+    ['https://unpkg.com/react@18.3.1/../evil-pkg@1.0.0/x.js', 'host'],
+    ['https://unpkg.com/react@18.3.1', 'host'],
+    ['https://unpkg.com/react@18.3.1/', 'host'],
   ] as const)('refuses %s (%s)', (url, problem) => {
     const check = checkCdnUrl(url);
     expect(check.ok).toBe(false);
     if (!check.ok) expect(check.problem).toBe(problem);
+  });
+
+  it('accepts a file of every listed package on both npm CDNs', () => {
+    for (const p of DESIGN_CDN_PACKAGES) {
+      for (const base of [
+        'https://unpkg.com/',
+        'https://cdn.jsdelivr.net/npm/',
+      ]) {
+        expect(checkCdnUrl(`${base}${p.name}@${p.version}/x.js`)).toEqual({
+          ok: true,
+        });
+      }
+    }
+  });
+
+  it('pins every listed package to an exact version, once', () => {
+    for (const p of DESIGN_CDN_PACKAGES) {
+      expect(isExactVersion(p.version)).toBe(true);
+    }
+    const names = DESIGN_CDN_PACKAGES.map((p) => p.name);
+    expect(new Set(names).size).toBe(names.length);
   });
 });
 
@@ -118,6 +151,14 @@ describe('validateMockup', () => {
     [
       '<script src="https://cdn.jsdelivr.net/npm/vue@latest"></script>',
       'design_unpinned_version',
+    ],
+    [
+      '<script src="https://unpkg.com/evil-pkg@1.0.0/index.js"></script>',
+      'design_host_not_allowed',
+    ],
+    [
+      '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/evil-pkg@1.0.0/a.css">',
+      'design_host_not_allowed',
     ],
     ['<script>fetch("/api/me")</script>', 'design_forbidden_feature'],
     ['<script>new XMLHttpRequest()</script>', 'design_forbidden_feature'],
@@ -186,6 +227,15 @@ describe('validateMockup', () => {
     expect(validateMockup(html)).toEqual({ ok: true });
   });
 
+  it('accepts the listed npm packages', () => {
+    const html = doc(
+      '<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>' +
+        '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.js"></script>' +
+        '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">',
+    );
+    expect(validateMockup(html)).toEqual({ ok: true });
+  });
+
   it('ignores URLs inside HTML comments and words in text', () => {
     const html = doc(
       '<!-- <script src="https://evil.example/x.js"></script> -->',
@@ -197,12 +247,40 @@ describe('validateMockup', () => {
 
 describe('buildMockupCsp', () => {
   it('is the spec header, built from the allowlist', () => {
-    const cdn =
-      'https://cdnjs.cloudflare.com https://cdn.jsdelivr.net/npm/ https://unpkg.com https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com';
+    const cdn = DESIGN_CDN_CSP_SOURCES.join(' ');
     expect(buildMockupCsp()).toBe(
       `sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' ${cdn}; style-src 'unsafe-inline' ${cdn}; font-src ${cdn} data:; img-src ${cdn} data:; connect-src 'none'; form-action 'none'; frame-ancestors 'self'`,
     );
     expect(DESIGN_CDN_ALLOWLIST).toHaveLength(6);
+  });
+
+  it('lists exact package paths for the npm CDNs, never a bare prefix (C-168)', () => {
+    const scriptSrc = buildMockupCsp()
+      .split('; ')
+      .find((d) => d.startsWith('script-src '))
+      ?.split(' ')
+      .slice(1);
+    expect(scriptSrc).toContain('https://unpkg.com/react@18.3.1/');
+    expect(scriptSrc).toContain(
+      'https://cdn.jsdelivr.net/npm/@radix-ui/themes@3.1.4/',
+    );
+    for (const bare of [
+      'https://unpkg.com',
+      'https://unpkg.com/',
+      'https://cdn.jsdelivr.net',
+      'https://cdn.jsdelivr.net/npm/',
+    ]) {
+      expect(scriptSrc).not.toContain(bare);
+    }
+    const npm = (scriptSrc ?? []).filter(
+      (s) =>
+        s.startsWith('https://unpkg.com') ||
+        s.startsWith('https://cdn.jsdelivr.net'),
+    );
+    expect(npm).toHaveLength(DESIGN_CDN_PACKAGES.length * 2);
+    for (const source of npm) {
+      expect(source).toMatch(/@\d+\.\d+\.\d+[^/]*\/$/);
+    }
   });
 
   it('never grants same-origin, and blocks every network call', () => {
