@@ -20,15 +20,26 @@ const variantOf = (progress: DesignProgressView): string =>
 export const STARTING = 'Starting the next turn…';
 
 /**
+ * Whether a design run is under way: the status is busy, or — #840 — a
+ * design turn is still queued or running, which the status may no longer
+ * say while the turn finishes.
+ */
+export const isDesignBusy = (
+  design: Pick<TaskDesignView, 'status' | 'activeTurnId'>,
+): boolean =>
+  design.status === 'generating' ||
+  design.status === 'revising' ||
+  design.activeTurnId !== null;
+
+/**
  * #606: busy with neither a turn nor a build (D1's `null` progress) — the
  * gap between two variants of a batch, or a batch whose next turn never
- * started. It shows as starting, with Stop, never as the Generate panel.
+ * started — or, #840, a turn with no progress reported. It shows as
+ * starting, with Stop, never as the Generate panel.
  */
 export const isStarting = (
-  design: Pick<TaskDesignView, 'status' | 'progress'>,
-): boolean =>
-  (design.status === 'generating' || design.status === 'revising') &&
-  design.progress === null;
+  design: Pick<TaskDesignView, 'status' | 'progress' | 'activeTurnId'>,
+): boolean => isDesignBusy(design) && design.progress === null;
 
 /** D1: the stage line of the progress card. */
 export function progressLabel(progress: DesignProgressView): string {
