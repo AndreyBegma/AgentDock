@@ -40,7 +40,7 @@ describe('design stop (e2e)', () => {
     ]);
     const [record] = await h.auditOf('design.stopped');
     expect(record.after).toMatchObject({
-      key: 't1',
+      task: 't1',
       stage: 'draw',
       runId: turn.runId,
       turnId: turn.id,

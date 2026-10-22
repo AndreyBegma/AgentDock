@@ -26,7 +26,7 @@ interface StopOwner {
   /** The `planId` its turns run under on the runner: the plan's, the card's or the stack's. */
   hostId: string;
   target: { type: 'plan' | 'board_card' | 'board_stack'; id: string };
-  label: { key: string } | { number: number } | { stack: number };
+  label: { task: string } | { number: number } | { stack: number };
   publish(): void;
 }
 
@@ -66,7 +66,7 @@ export class DesignStopService {
         projectId: plan.projectId,
         hostId: plan.id,
         target: { type: 'plan', id: plan.id },
-        label: { key: taskKey },
+        label: { task: taskKey },
         publish: () =>
           this.store.publishDesign(plan.projectId, plan.id, taskKey),
       },
