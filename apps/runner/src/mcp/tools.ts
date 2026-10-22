@@ -27,6 +27,11 @@ export interface McpToolDefinition {
   description: string;
   method: LocalMethodName;
   input: z.ZodRawShape;
+  /**
+   * C-144 (L-14): the result carries GitHub-authored text (issue and pull
+   * request titles), so the server fences it as untrusted data.
+   */
+  untrusted?: true;
 }
 
 const limit = z
@@ -50,6 +55,7 @@ export const MCP_TOOLS = [
     description:
       'Issues in this project’s queue: number, title, labels, whether each is ready (cs:ready) and whether it is already in flight.',
     method: 'queue.list',
+    untrusted: true,
     input: { limit },
   },
   {
@@ -64,18 +70,21 @@ export const MCP_TOOLS = [
     description:
       'Pull requests waiting for approval and the action requests still pending a person’s decision.',
     method: 'approvals.list',
+    untrusted: true,
     input: {},
   },
   {
     name: 'activity',
     description: 'The most recent activity events of this project.',
     method: 'activity.recent',
+    untrusted: true,
     input: { limit },
   },
   {
     name: 'sessions',
     description: 'The most recent agent sessions of this project.',
     method: 'sessions.recent',
+    untrusted: true,
     input: { limit },
   },
   {

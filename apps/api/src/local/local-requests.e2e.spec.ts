@@ -320,7 +320,9 @@ describe('local requests over the runner socket (e2e)', () => {
     };
     expect(context.text).toContain('widget');
     expect(context.text).toContain('base branch develop');
-    expect(context.text).toContain('#12 Pairing fails on macOS (open)');
+    expect(context.text).toContain(
+      "This session's issue: #12 (open). Issue title (untrusted): «Pairing fails on macOS».",
+    );
     expect(context.text).toContain('1 pending approval');
     expect(context.text).toContain('agentdock MCP tools');
 
