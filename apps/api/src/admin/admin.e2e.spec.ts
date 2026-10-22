@@ -170,7 +170,20 @@ describe('admin and authorization (e2e)', () => {
           .post('/auth/register')
           .set('X-Forwarded-For', nextIp())
           .send({ email: 'new@example.com', password: PASSWORD });
-      expect((await register()).status).toBe(409);
+      const again = await register();
+      expect(again.status).toBe(201);
+      expect(again.body).toEqual({ status: 'pending' });
+      expect(await ctx.prisma.user.count()).toBe(2);
+      const stillRejected = await ctx.prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(stillRejected.status).toBe('rejected');
+      const loginAfter = await ctx
+        .http()
+        .post('/auth/login')
+        .set('X-Forwarded-For', nextIp())
+        .send({ email: 'new@example.com', password: PASSWORD });
+      expect(loginAfter.body.error).toBe(AUTH_ERROR.invalidCredentials);
 
       await adminSession.send('delete', `/admin/users/${user.id}`).expect(204);
       expect((await register()).status).toBe(201);
