@@ -1,8 +1,16 @@
 import {
+  builtinDesignTemplate,
+  DEFAULT_DESIGN_TEMPLATE_KEY,
   DESIGN_COMMENTS_PER_TURN_MAX,
   DESIGN_LEGACY_FRAME_NAME,
+  type DesignConformance,
+  type DesignFrameKind,
   type DesignSuggestion,
+  type DesignTemplate,
+  designConformanceSchema,
   designFrameSlug,
+  designTemplateSchema,
+  resolveDesignTemplate,
   type TaskDesignSummary,
   type UiProfileScreen,
   type UiProfileSnippet,
@@ -270,10 +278,15 @@ export const applySuggestions = async (
   }
 };
 
-/** #441: a frame's name and slug, in order, without its HTML. */
+/**
+ * #441: a frame's name and slug, in order, without its HTML; #833: its kind
+ * and the template frame it fills.
+ */
 export interface FrameName {
   name: string;
   slug: string;
+  kind: DesignFrameKind;
+  templateFrameKey: string | null;
 }
 
 /** #441: a frame with its HTML, as publication commits it. */
@@ -285,17 +298,24 @@ export interface FrameFile extends FrameName {
 export const LEGACY_FRAME: FrameName = {
   name: DESIGN_LEGACY_FRAME_NAME,
   slug: designFrameSlug(DESIGN_LEGACY_FRAME_NAME),
+  kind: 'legacy',
+  templateFrameKey: null,
 };
 
 /** A revision's frame names: its rows, or the one legacy frame. */
 export const frameNamesOf = (rows: readonly FrameName[]): FrameName[] =>
   rows.length > 0
-    ? rows.map(({ name, slug }) => ({ name, slug }))
+    ? rows.map(({ name, slug, kind, templateFrameKey }) => ({
+        name,
+        slug,
+        kind,
+        templateFrameKey,
+      }))
     : [LEGACY_FRAME];
 
 /** The `frames` select of a revision: names in order, no HTML. */
 export const frameNameSelect = {
-  select: { name: true, slug: true },
+  select: { name: true, slug: true, kind: true, templateFrameKey: true },
   orderBy: { position: 'asc' },
 } as const;
 
@@ -312,7 +332,7 @@ export const revisionFrames = async (
     select: {
       html: true,
       frames: {
-        select: { name: true, slug: true, html: true },
+        select: { ...frameNameSelect.select, html: true },
         orderBy: { position: 'asc' },
       },
     },
@@ -384,6 +404,84 @@ export const designCommentsOf = async (
 };
 
 /**
+ * #833 D9: the project's template of `key` — a built-in with the project's
+ * override merged in, or the project's own. Null when neither exists; a
+ * stored definition that no longer parses is ignored.
+ */
+export const projectDesignTemplate = async (
+  db: Db,
+  projectId: string,
+  key: string,
+): Promise<DesignTemplate | null> => {
+  const row = await db.designTemplate.findUnique({
+    where: { projectId_key: { projectId, key } },
+    select: { key: true, name: true, definition: true },
+  });
+  const stored = row
+    ? designTemplateSchema.safeParse({
+        ...(typeof row.definition === 'object' && row.definition !== null
+          ? row.definition
+          : {}),
+        key: row.key,
+        name: row.name,
+      })
+    : null;
+  return resolveDesignTemplate(
+    builtinDesignTemplate(key),
+    stored?.success ? stored.data : null,
+  );
+};
+
+/** The template a key names, or the project's `page` when it names none. */
+export const designTemplateOf = async (
+  db: Db,
+  projectId: string,
+  key: string | null,
+): Promise<DesignTemplate> =>
+  (key ? await projectDesignTemplate(db, projectId, key) : null) ??
+  (await projectDesignTemplate(db, projectId, DEFAULT_DESIGN_TEMPLATE_KEY)) ??
+  (builtinDesignTemplate(DEFAULT_DESIGN_TEMPLATE_KEY) as DesignTemplate);
+
+/**
+ * #833 D8: the template a design draws by — a card's
+ * `BoardCard.designTemplate`, a plan task's or a stack's
+ * `TaskDesign.templateKey`; `page` when it has none.
+ */
+export const designTemplateFor = async (
+  db: Db,
+  designId: string,
+): Promise<DesignTemplate> => {
+  const design = await db.taskDesign.findUniqueOrThrow({
+    where: { id: designId },
+    select: {
+      templateKey: true,
+      plan: { select: { projectId: true } },
+      card: { select: { projectId: true, designTemplate: true } },
+      stack: { select: { projectId: true } },
+    },
+  });
+  const projectId =
+    design.card?.projectId ??
+    design.stack?.projectId ??
+    design.plan?.projectId ??
+    null;
+  const key = design.card ? design.card.designTemplate : design.templateKey;
+  if (!projectId) {
+    return (builtinDesignTemplate(key ?? '') ??
+      builtinDesignTemplate(DEFAULT_DESIGN_TEMPLATE_KEY)) as DesignTemplate;
+  }
+  return designTemplateOf(db, projectId, key);
+};
+
+/** A stored `design_revisions.conformance`; null when unset or unreadable. */
+export const conformanceOfRow = (
+  value: Prisma.JsonValue,
+): DesignConformance | null => {
+  const parsed = designConformanceSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
+
+/**
  * D8: what a design turn carries — the profile it draws from, the design's
  * installed skills, the variant's latest revision on a revise, and the
  * comments open when its batch started.
@@ -395,6 +493,7 @@ export const loadDesignPrompt = async (
   plan: DesignTurnPlan,
 ): Promise<DesignPromptContext> => {
   const useMemory = await useMemoryOf(db, project.id);
+  const template = await designTemplateFor(db, design.id);
   const [profile, installed, previous, comments] = await Promise.all([
     plan.profileId
       ? db.uiProfile.findUnique({ where: { id: plan.profileId } })
@@ -409,6 +508,7 @@ export const loadDesignPrompt = async (
             revision: true,
             title: true,
             rationale: true,
+            conformance: true,
           },
         })
       : Promise.resolve(null),
@@ -421,10 +521,15 @@ export const loadDesignPrompt = async (
         })
       : Promise.resolve([]),
   ]);
+  const repair =
+    plan.repair && previous ? conformanceOfRow(previous.conformance) : null;
   return {
     variant: plan.variant,
     variantCount: design.variantCount,
     mode: plan.mode,
+    template,
+    // #833 D7: a repair turn names what the revision it repairs got wrong.
+    repair: repair && !repair.ok ? repair : null,
     previous: previous
       ? {
           revision: previous.revision,
@@ -432,7 +537,7 @@ export const loadDesignPrompt = async (
           rationale: previous.rationale,
           // #628: the prompt picks which of them it sends in full.
           frames: (await revisionFrames(db, previous.id)).map(
-            ({ name, html }) => ({ name, html }),
+            ({ name, kind, html }) => ({ name, kind, html }),
           ),
         }
       : null,

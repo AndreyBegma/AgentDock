@@ -1,4 +1,5 @@
 import {
+  BUILTIN_DESIGN_TEMPLATES,
   designBytes,
   PLANNER_DISCUSS_CONTRACT,
   PLANNER_INTAKE_CONTRACT,
@@ -275,6 +276,7 @@ describe('assemblePrompt: a retried turn (#687)', () => {
         profile: null,
         skills: [],
         comments: [],
+        template: BUILTIN_DESIGN_TEMPLATES[0],
       },
     });
     expect(prompt).toContain('design_too_large');

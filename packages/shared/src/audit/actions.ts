@@ -134,7 +134,13 @@ export const AUDIT_ACTIONS = [
   'design.generated',
   'design.revised',
   'design.approved',
+  /** #833 D7: Complete — `after` `{revisions, variants, turnId}`. */
+  'design.completed',
   'design.settings_updated',
+  /** #833 D9: a project's frame template created, updated or deleted. */
+  'design.template_created',
+  'design.template_updated',
+  'design.template_deleted',
   /** #275 D5: `meta` `{stage, runId, turnId?}`. */
   'design.stopped',
   'uiprofile.built',

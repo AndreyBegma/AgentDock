@@ -20,8 +20,13 @@ export const PLAN_TURN_ERROR_MAX = 2000;
  * text, JSON-encoded, is at most this, so the event fits a batch…
  */
 export const PLAN_TURN_RESULT_CHUNK_BYTES = 128 * 1024;
-/** …and the whole result, chunked, at most this; the runner cuts the rest. */
-export const PLAN_TURN_RESULT_TOTAL_MAX_BYTES = 2 * 1024 * 1024;
+/**
+ * …and the whole result, chunked, at most this; the runner cuts the rest.
+ * #833 D12: a 2 MiB design (`DESIGN_TOTAL_MAX_BYTES`) plus room for the plan
+ * block. A runner released before it cuts at 2 MiB; the API fails such a
+ * turn as "runner too old".
+ */
+export const PLAN_TURN_RESULT_TOTAL_MAX_BYTES = 2 * 1024 * 1024 + 256 * 1024;
 /** Chunks of one result: enough for the total even when escaping doubles it. */
 export const PLAN_TURN_RESULT_CHUNKS_MAX = Math.ceil(
   (2 * PLAN_TURN_RESULT_TOTAL_MAX_BYTES) / PLAN_TURN_RESULT_CHUNK_BYTES,

@@ -142,7 +142,7 @@ export class CardDesignHarness extends DesignHarness {
   async finishCard(
     cardId: string,
     resultText: string,
-    extra: { phase?: 'succeeded' | 'failed' } = {},
+    extra: { phase?: 'succeeded' | 'failed'; resultTruncated?: boolean } = {},
   ): Promise<void> {
     const turn = await this.activeCardTurn(cardId);
     await this.sinks.dispatch(this.runnerId, [
@@ -155,7 +155,7 @@ export class CardDesignHarness extends DesignHarness {
         at: new Date().toISOString(),
         exitCode: 0,
         resultText,
-        resultTruncated: false,
+        resultTruncated: extra.resultTruncated ?? false,
       }),
     ]);
   }

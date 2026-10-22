@@ -1,4 +1,8 @@
-import { designBytes } from '@nautelle/shared';
+import {
+  BUILTIN_DESIGN_TEMPLATES,
+  type DesignTemplate,
+  designBytes,
+} from '@nautelle/shared';
 import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 import { assemblePrompt, type PromptInput } from '../planner/plan-prompt';
 import {
@@ -8,6 +12,8 @@ import {
   frameSummary,
 } from './design-prompt';
 import { profilePreviewHtml } from './mockup-response';
+
+const [page, , flow] = BUILTIN_DESIGN_TEMPLATES as DesignTemplate[];
 
 const context = (
   over: Partial<DesignPromptContext> = {},
@@ -38,6 +44,7 @@ const context = (
     snippets: [{ name: 'button', html: '<button>Go</button>' }],
   },
   skills: ['frontend-design'],
+  template: page,
   comments: [
     {
       id: 'c1',
@@ -81,9 +88,7 @@ describe('design turn prompt (D8)', () => {
 
   it('asks for named frames, and passes each comment with its frame (#441)', () => {
     const text = designSections(context()).join('\n\n');
-    expect(text).toContain(
-      'Use one frame unless the task touches several pages',
-    );
+    expect(text).not.toContain('Use one frame unless');
     expect(text).toContain('one `agentdock-design` block per frame');
     expect(text).toContain('Its frames, in order: "Board page", "Card tile".');
     expect(text).toContain('"frame": "Card tile"');
@@ -91,6 +96,92 @@ describe('design turn prompt (D8)', () => {
       context({ mode: 'generate', previous: null, comments: [] }),
     ).join('\n\n');
     expect(generate).not.toContain('Its frames, in order');
+  });
+
+  // #833 (ADR-0082): the template's frames, numbered, in order.
+  it('lists the frames to draw from the template, with kind, need and instruction', () => {
+    const text = designSections(
+      context({ mode: 'generate', previous: null }),
+    ).join('\n\n');
+    expect(text).toContain('# Frames to draw');
+    expect(text).toContain('Template: "Page" (`page`)');
+    expect(text).toContain(
+      '1. Screen — kind `screen`, required. The finished page',
+    );
+    expect(text).toContain('2. Breakdown — kind `breakdown`, required.');
+    expect(text).toContain('3. States and mobile — kind `states`, optional.');
+    // D4: service frames are drawn in the project's kit.
+    expect(text).toContain(
+      'Service frames (Breakdown) use the same kit and custom properties as the screen',
+    );
+    expect(text).toContain('as `{ "name", "kind" }`');
+  });
+
+  it('leaves a disabled frame out, and names a custom frame exactly', () => {
+    const own: DesignTemplate = {
+      key: 'landing',
+      name: 'Landing',
+      frames: [
+        page.frames[0],
+        { ...page.frames[2], enabled: false },
+        {
+          key: 'hero',
+          kind: 'custom',
+          name: 'Hero copy',
+          instruction: 'The hero headline variants.',
+          required: true,
+          enabled: true,
+        },
+      ],
+    };
+    const text = designSections(context({ template: own })).join('\n\n');
+    expect(text).not.toContain('States and mobile');
+    expect(text).toContain(
+      '2. Hero copy — kind `custom`, named exactly "Hero copy", required. The hero headline variants.',
+    );
+  });
+
+  it('gives a flow its step limit', () => {
+    const text = designSections(context({ template: flow })).join('\n\n');
+    expect(text).toContain('one frame per step, 1–6 steps');
+    expect(text).toContain(
+      'If the flow needs more than 6 steps, draw the first 6.',
+    );
+  });
+
+  it('names what a repair turn must fix (D7)', () => {
+    const text = designSections(
+      context({
+        repair: {
+          ok: false,
+          missing: ['breakdown'],
+          extra: ['Notes'],
+          misplaced: [],
+        },
+      }),
+    ).join('\n\n');
+    expect(text).toContain('## Repair');
+    expect(text).toContain('Revision 1 does not follow the template.');
+    expect(text).toContain('Missing: "breakdown".');
+    expect(text).toContain('Extra, not in the template: "Notes".');
+    expect(designSections(context()).join('\n\n')).not.toContain('## Repair');
+  });
+
+  it('never drops the frames to draw to fit the cap', () => {
+    const ctx = context();
+    const prompt = cardDesignPrompt({
+      instructions: 'INSTRUCTIONS',
+      card: { number: 12, title: 'Tiles', body: 'Make tiles.' },
+      taskKey: 'card-12',
+      design: {
+        ...ctx,
+        profile: ctx.profile
+          ? { ...ctx.profile, kit: 'k'.repeat(200 * 1024) }
+          : null,
+      },
+    });
+    expect(prompt).toContain('# Frames to draw');
+    expect(prompt).toContain('2. Breakdown — kind `breakdown`, required.');
   });
 
   // #628: a revise sends the frames the comments point at, and a summary of the rest.

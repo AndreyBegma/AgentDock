@@ -141,6 +141,24 @@ export class CardDesignController {
     return this.designs.cardView(access.projectId, n);
   }
 
+  /** #833 D7: no body; the repair turn of every variant off its template. */
+  @Post('complete')
+  @ProjectRole('operator')
+  async complete(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<TaskDesignView> {
+    const n = cardNumber(number);
+    await this.designs.cardComplete(
+      access.projectId,
+      n,
+      actorOf(access, user, ctx),
+    );
+    return this.designs.cardView(access.projectId, n);
+  }
+
   /** #275 D5: no body; nothing running is 409 `design_not_running`. */
   @Post('stop')
   @HttpCode(200)

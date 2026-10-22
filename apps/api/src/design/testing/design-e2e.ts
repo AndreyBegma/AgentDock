@@ -1,4 +1,7 @@
-import { PLANNER_DESIGN_BLOCK_TAG } from '@nautelle/shared';
+import {
+  type DesignFrameKind,
+  PLANNER_DESIGN_BLOCK_TAG,
+} from '@nautelle/shared';
 import type { UiProfileCommandName } from '@nautelle/shared/protocol';
 import type { PlannerSendResult } from '../../planner/planner-commands';
 import {
@@ -16,9 +19,26 @@ export const hash = (char: string): string => char.repeat(64);
 export const MOCKUP =
   '<!doctype html><html lang="en" data-theme="light"><head><style>:root[data-theme="dark"]{color-scheme:dark}</style></head><body><main id="app"><button>Export</button></main></body></html>';
 
+/** A frame of a test answer; without `kind` it is named by a plain string (legacy). */
+export interface TestFrame {
+  name: string;
+  html: string;
+  kind?: DesignFrameKind;
+}
+
 /**
- * A design turn's final message: the plan block and one design block (D7) —
- * or, given `frames` (#441), one block per named frame, in order.
+ * #833: the frames of the built-in `page` template — what a design turn
+ * answers by default, so it conforms and no repair turn follows.
+ */
+export const pageFrames = (html: string = MOCKUP): TestFrame[] => [
+  { name: 'Screen', kind: 'screen', html },
+  { name: 'Breakdown', kind: 'breakdown', html },
+];
+
+/**
+ * A design turn's final message: the plan block and one design block per
+ * frame, in order (D7, #441). Given one HTML string, it answers the `page`
+ * template's two frames with it (#833).
  */
 export const designResult = (
   output: {
@@ -30,13 +50,11 @@ export const designResult = (
     /** #628: frames named but left as the previous revision drew them. */
     kept?: string[];
   },
-  html: string | readonly { name: string; html: string }[] = MOCKUP,
+  html: string | readonly TestFrame[] = MOCKUP,
 ): string => {
-  const frames = typeof html === 'string' ? null : html;
+  const frames = typeof html === 'string' ? pageFrames(html) : html;
   const kept = new Set(output.kept ?? []);
-  const bodies = frames
-    ? frames.filter((f) => !kept.has(f.name)).map((f) => f.html)
-    : [html as string];
+  const bodies = frames.filter((f) => !kept.has(f.name)).map((f) => f.html);
   return `${block({
     action: 'design',
     taskKey: output.taskKey,
@@ -44,7 +62,9 @@ export const designResult = (
     title: output.title ?? `Variant ${output.variant}`,
     rationale: output.rationale ?? 'A single column.',
     addressed: output.addressed ?? [],
-    ...(frames ? { frames: frames.map((f) => f.name) } : {}),
+    frames: frames.map((f) =>
+      f.kind ? { name: f.name, kind: f.kind } : f.name,
+    ),
     ...(output.kept ? { kept: output.kept } : {}),
   })}\n${bodies
     .map((b) => `\`\`\`\`${PLANNER_DESIGN_BLOCK_TAG}\n${b}\n\`\`\`\``)

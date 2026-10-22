@@ -7,5 +7,6 @@ export * from './limits';
 export * from './pin';
 export * from './profile';
 export * from './progress';
+export * from './templates';
 export * from './types';
 export * from './validate';

@@ -231,6 +231,21 @@ export class DesignController {
     return this.designs.view(access.projectId, user.id, planId, key);
   }
 
+  /** #833 D7: no body; the repair turn of every variant off its template. */
+  @Post('plans/:planId/tasks/:key/design/complete')
+  @ProjectRole('operator')
+  async complete(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('planId') planId: string,
+    @Param('key') key: string,
+  ): Promise<TaskDesignView> {
+    const plan = await this.store.readable(user.id, access.projectId, planId);
+    await this.designs.complete(plan, key, actorOf(access, user, ctx));
+    return this.designs.view(access.projectId, user.id, planId, key);
+  }
+
   @Post('plans/:planId/tasks/:key/design/approve')
   @HttpCode(200)
   @ProjectRole('operator')

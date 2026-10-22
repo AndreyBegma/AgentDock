@@ -1,3 +1,5 @@
+import type { DesignFrameKind } from './templates';
+
 /**
  * #441: a design revision holds one or more named frames — each a separately
  * rendered HTML mockup: a whole page, one of its components, or another page
@@ -59,8 +61,12 @@ export const designFrameSlugs = (names: readonly string[]): string[] => {
   });
 };
 
-/** A frame the design turn drew: its name and its validated HTML. */
+/**
+ * A frame the design turn drew: its name, its kind (#833 D13: `legacy` when
+ * the turn named it by a plain string) and its validated HTML.
+ */
 export interface DesignFrameDraft {
   name: string;
+  kind: DesignFrameKind;
   html: string;
 }
