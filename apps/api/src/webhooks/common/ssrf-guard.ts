@@ -243,14 +243,28 @@ const pinnedLookup =
     }
   };
 
+/** A GET through the same guard (C-328: the runner release check). */
+export type GuardedGetRequest = Omit<GuardedPostRequest, 'body'>;
+
 /**
  * D12 + D15: check the target, then POST to the checked address with the
  * original host name (Host header, TLS SNI and certificate check unchanged).
  * Redirects are never followed — a 3xx is a failed attempt (`redirect`). The
  * response body is read up to the cap and the connection then dropped.
  */
-export const guardedPost = async (
+export const guardedPost = (
   request: GuardedPostRequest,
+): Promise<GuardedPostResult> => guardedRequest('POST', request, request.body);
+
+/** `guardedPost`'s check, pinning and caps, for a GET without a body. */
+export const guardedGet = (
+  request: GuardedGetRequest,
+): Promise<GuardedPostResult> => guardedRequest('GET', request, null);
+
+const guardedRequest = async (
+  method: 'GET' | 'POST',
+  request: GuardedGetRequest,
+  payload: string | null,
 ): Promise<GuardedPostResult> => {
   const check = await checkWebhookTarget(
     request.url,
@@ -292,12 +306,15 @@ export const guardedPost = async (
     const req = client.request(
       check.url,
       {
-        method: 'POST',
-        headers: {
-          ...request.headers,
-          'Content-Type': 'application/json',
-          'Content-Length': String(Buffer.byteLength(request.body)),
-        },
+        method,
+        headers:
+          payload === null
+            ? request.headers
+            : {
+                ...request.headers,
+                'Content-Type': 'application/json',
+                'Content-Length': String(Buffer.byteLength(payload)),
+              },
         lookup: pinnedLookup(check.connectTo),
         // No pooled socket: every attempt connects to the address it checked.
         agent: false,
@@ -343,6 +360,7 @@ export const guardedPost = async (
     }, timeoutMs);
 
     req.on('error', () => finish(failed(WEBHOOK_ATTEMPT_ERRORS.network)));
-    req.end(request.body);
+    if (payload === null) req.end();
+    else req.end(payload);
   });
 };

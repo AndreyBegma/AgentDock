@@ -148,7 +148,16 @@ describe('runner settings (e2e)', () => {
     expect(on.body).toMatchObject({ id: runnerId, awayMode: true });
     expect((await socket.next('config')).config.awayMode).toBe(true);
     expect((await me.get('/runners/local')).body).toEqual([
-      { id: runnerId, name: 'desk', localUserId: meId, awayMode: true },
+      {
+        id: runnerId,
+        name: 'desk',
+        localUserId: meId,
+        awayMode: true,
+        hostname: 'test-host',
+        version: '0.1.0',
+        // The suite never reads the registry: no release is known.
+        update: null,
+      },
     ]);
 
     expect(
