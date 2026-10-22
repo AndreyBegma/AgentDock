@@ -100,7 +100,7 @@ with `class-validator`; responses never include `passwordHash` or token hashes.
 
 | Method | Path | Who | Behaviour |
 |---|---|---|---|
-| POST | `/auth/register` | anyone, when open | `{ email, password, name? }` → 201 `{ status: "pending" }`; 403 `registration_closed`; 409 `email_taken` |
+| POST | `/auth/register` | anyone, when open | `{ email, password, name? }` → 201 `{ status: "pending" }`; 403 `registration_closed`; a taken email gets the same 201, no row is created (C-141) |
 | POST | `/auth/login` | anyone | `{ email, password }` → 200 user + sets `ad_session`, `ad_csrf`; errors per D8/D9 |
 | POST | `/auth/logout` | session | revokes current session, clears cookies |
 | GET | `/auth/me` | session | current user `{ id, email, name, role, status }` |
