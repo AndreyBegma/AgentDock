@@ -132,7 +132,14 @@ export const claudeAdapter: RuntimeAdapter = {
   ): AsyncIterable<TailChunk> {
     let observed = state.observed;
     let parser = readParserState(state.parser);
-    for await (const batch of readLines(source.path, state.offset)) {
+    const batches = readLines(source.path, state.offset, {
+      onDropped: (drop) =>
+        options.log?.warn('sessions: dropped an oversized transcript line', {
+          path: source.path,
+          ...drop,
+        }),
+    });
+    for await (const batch of batches) {
       const parsed = parseClaudeLines(
         batch.lines,
         { observed, parser },

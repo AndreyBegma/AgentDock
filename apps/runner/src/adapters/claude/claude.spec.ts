@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type LlmRequestData,
@@ -13,6 +13,8 @@ import {
   type WatchedProject,
 } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../../config';
+import { memoryLogger, tempDir } from '../../testing/fixtures';
+import { MAX_LINE_BYTES } from '../lines';
 import { freshState, type TranscriptSource } from '../types';
 import { claudeAdapter } from './adapter';
 import { freshClaudeParserState, parseClaudeLines } from './parse';
@@ -406,5 +408,34 @@ describe('claude adapter: no content leaves the runner (D9)', () => {
     expect(text).toContain('SENTINEL_PROMPT_ONE');
     expect(text).not.toMatch(/\/home\/|\/Users\//);
     expect(text).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/);
+  });
+});
+
+describe('claude adapter: oversized lines (C-161)', () => {
+  it('warns about a line too long to keep and reads the lines after it', async () => {
+    const temp = tempDir();
+    try {
+      const lines = readFileSync(main().path, 'utf8').split('\n');
+      const path = join(temp.dir, `${SESSION}.jsonl`);
+      writeFileSync(
+        path,
+        `${'x'.repeat(MAX_LINE_BYTES + 1)}\n${lines.join('\n')}`,
+      );
+      const { log, lines: logged } = memoryLogger();
+      const source = { ...main(), path, size: statSync(path).size };
+      let events = 0;
+      for await (const chunk of claudeAdapter.tail(source, freshState(), {
+        projects: [ACME],
+        log,
+      })) {
+        events += chunk.events.length;
+      }
+      expect(events).toBe((await read(main())).length);
+      expect(logged.join('')).toContain(
+        'sessions: dropped an oversized transcript line',
+      );
+    } finally {
+      temp.cleanup();
+    }
   });
 });
