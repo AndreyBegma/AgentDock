@@ -1,4 +1,5 @@
 import type { BoardCardDetail } from '@nautelle/shared';
+import { BudgetGate } from '../budgets/budget-gate';
 import { BoardService } from './board.service';
 import { BoardShipping } from './board-shipping';
 import {
@@ -708,6 +709,88 @@ describe('a card ships itself (e2e, #359)', () => {
       const card = await w.card(1);
       expect(card.ciState).toBe('red');
       expect(card.rounds).toHaveLength(1);
+    });
+
+    /** C-181 (D-09, D-10): a ci_fix round runs as the round's starter. */
+    describe('runs as the person who started the round (C-181)', () => {
+      const bypassByDefault = () =>
+        w.ctx.prisma.projectOrchestratorSettings.upsert({
+          where: { projectId: w.a },
+          create: { projectId: w.a, permissionMode: 'bypassPermissions' },
+          update: { permissionMode: 'bypassPermissions' },
+        });
+
+      it("an operator's round is fixed in the operator's mode, never bypass, and charged to them", async () => {
+        await bypassByDefault();
+        checksAnswer(RED);
+        await w.createCard();
+        expect(
+          (await w.runCard(1, { permissionMode: 'acceptEdits' })).status,
+        ).toBe(200);
+        await ended();
+
+        const runs = w.sent('card.run');
+        expect(runs).toHaveLength(2);
+        expect(runs[1].permissionMode).toBe('acceptEdits');
+        const card = await w.card(1);
+        expect(card.rounds[1]).toMatchObject({
+          trigger: 'ci_fix',
+          authorId: null,
+        });
+        const run = await w.ctx.prisma.run.findUniqueOrThrow({
+          where: { id: card.rounds[1].runId },
+        });
+        expect(run).toMatchObject({
+          triggeredByType: 'user',
+          triggeredById: w.operatorId,
+        });
+        const [fix] = (await w.audit('card.run_started')).slice(-1);
+        expect(fix).toMatchObject({
+          actorType: 'system',
+          actorOnBehalfOfId: w.operatorId,
+        });
+      });
+
+      it('an operator who somehow started in bypass is refused it for the fix', async () => {
+        checksAnswer(RED);
+        await started();
+        const { round } = await latest();
+        await w.ctx.prisma.run.update({
+          where: { id: round.runId },
+          data: { args: { permissionMode: 'bypassPermissions' } },
+        });
+        await ended();
+        expect(w.sent('card.run')).toHaveLength(1);
+        expect((await w.card(1)).rounds).toHaveLength(1);
+      });
+
+      it("the operator's budget hard-stop blocks the fix round", async () => {
+        checksAnswer(RED);
+        await started();
+        const gate = w.ctx.app.get(BudgetGate);
+        const check = jest
+          .spyOn(gate, 'check')
+          .mockImplementation(async ({ userId }) =>
+            userId === w.operatorId
+              ? {
+                  allowed: false,
+                  budgetId: 'b1',
+                  scope: 'user',
+                  resetsAt: new Date('2026-11-01T00:00:00Z'),
+                }
+              : { allowed: true },
+          );
+        try {
+          await ended();
+          expect(w.sent('card.run')).toHaveLength(1);
+          expect((await w.card(1)).rounds).toHaveLength(1);
+          expect(check).toHaveBeenCalledWith(
+            expect.objectContaining({ userId: w.operatorId }),
+          );
+        } finally {
+          check.mockRestore();
+        }
+      });
     });
   });
 

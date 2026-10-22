@@ -718,6 +718,17 @@ export class BoardService implements OnModuleInit {
         : {}),
       ...(issueLink ?? {}),
     };
+    // C-181 (D-09): a person who edits what an armed card runs becomes whom
+    // its Auto-run runs as — never someone else's authority on their text.
+    const armed = await this.prisma.boardCard.findUniqueOrThrow({
+      where: { id: card.id },
+      select: { autoRunWhenReady: true, autoRunArmedById: true },
+    });
+    const reowned =
+      armed.autoRunWhenReady &&
+      actor.userId !== null &&
+      armed.autoRunArmedById !== actor.userId &&
+      Object.keys(data).length > 0;
     await this.prisma.boardCard.update({
       where: { id: card.id },
       data: {
@@ -726,6 +737,7 @@ export class BoardService implements OnModuleInit {
         ...(data.title !== undefined
           ? { fingerprint: captureFingerprint(data.title) }
           : {}),
+        ...(reowned ? { autoRunArmedById: actor.userId } : {}),
       },
     });
     const before = Object.fromEntries(
@@ -739,6 +751,14 @@ export class BoardService implements OnModuleInit {
       before,
       after: { number, ...data },
       result: 'ok',
+      ...(reowned
+        ? {
+            meta: {
+              autoRunReowned: true,
+              previousArmedById: armed.autoRunArmedById,
+            },
+          }
+        : {}),
     });
     this.work.publish(projectId, card.id);
     // #271 D8: only what changed; editing the English text is a save too.
@@ -833,7 +853,8 @@ export class BoardService implements OnModuleInit {
   /**
    * #443: Auto-run when ready — accepting the last open dependency starts the
    * Run (`BoardAutoRun`). Turning it on does not start a card that is
-   * already ready; that one is run by hand.
+   * already ready; that one is run by hand. C-181 (D-09): turning it on
+   * records who did — the Run runs as them.
    */
   private async toggleAutoRun(
     card: CardWithRounds,
@@ -843,7 +864,10 @@ export class BoardService implements OnModuleInit {
     if (card.autoRunWhenReady === on) return;
     await this.prisma.boardCard.update({
       where: { id: card.id },
-      data: { autoRunWhenReady: on },
+      data: {
+        autoRunWhenReady: on,
+        autoRunArmedById: on ? actor.userId : null,
+      },
     });
     await this.audit.record({
       ...actor.ctx,

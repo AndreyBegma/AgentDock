@@ -88,6 +88,7 @@ import {
 import { autoRunFailureOf, BoardFailure, boardError } from './board-error';
 import type { CardWithRounds } from './board-mapper';
 import { toSettingsView } from './board-mapper';
+import { BoardPrincipals } from './board-principal';
 import { BoardStacks } from './board-stacks';
 import {
   ACTIVE_PHASES,
@@ -282,13 +283,14 @@ export class BoardRoundsService {
     private readonly economy: TokenEconomyService,
     private readonly assessor: CardAssessor,
     private readonly prefixLaunch: PrefixLaunchService,
+    private readonly principals: BoardPrincipals,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
 
   /**
    * `POST …/run`: round 1, or a retry after failed / ended / cancelled.
-   * #443: Auto-run when ready calls it too, as the person who accepted the
-   * last open dependency, with `autoRunAfter` that dependency's number.
+   * #443: Auto-run when ready calls it too, with `autoRunAfter` that
+   * dependency's number — C-181: as the person who armed the switch.
    */
   async run(
     projectId: string,
@@ -363,9 +365,11 @@ export class BoardRoundsService {
 
   /**
    * #359 D6: Nautelle's own round for a red check or a merge conflict on
-   * the card's PR — the system actor, the card's session resumed, the
-   * `ci_fix` prompt. Counts one of the PR's `ci_fix` attempts. Refused like
-   * any round (running, no room, budget); the poller tries again.
+   * the card's PR — the card's session resumed, the `ci_fix` prompt. Counts
+   * one of the PR's `ci_fix` attempts. Refused like any round (running, no
+   * room, budget); the poller tries again. C-181 (D-09, D-10): it runs as the
+   * person who started the card's latest round, in that round's mode — their
+   * role now (bypass needs admin), their budget, charged to them.
    */
   async ciFix(
     projectId: string,
@@ -380,7 +384,27 @@ export class BoardRoundsService {
         'A CI fix resumes the card worker, which has not run',
       );
     }
-    await this.start(card, 'ci_fix', {}, null, BOARD_SYSTEM_ACTOR, [], input);
+    const started = card.rounds.find((r) => r.authorId !== null);
+    const actor = await this.principals.actor(
+      projectId,
+      started?.authorId ?? null,
+    );
+    const run = started
+      ? await this.prisma.run.findUnique({
+          where: { id: started.runId },
+          select: { args: true },
+        })
+      : null;
+    const permissionMode = run ? permissionModeOf(run.args) : undefined;
+    await this.start(
+      card,
+      'ci_fix',
+      permissionMode ? { permissionMode } : {},
+      null,
+      actor,
+      [],
+      input,
+    );
   }
 
   /**
@@ -679,13 +703,12 @@ export class BoardRoundsService {
       dto.permissionMode ??
       settings?.permissionMode ??
       ORCHESTRATOR_DEFAULTS.permissionMode;
-    // #359 D6: a `ci_fix` round runs as the project's admin configured it.
     // #750 D9: an `escalation` round continues the round a person started,
-    // in its mode.
+    // in its mode. C-181: a `ci_fix` round is checked like any other, against
+    // the person it runs as.
     if (
       permissionMode === 'bypassPermissions' &&
       actor.role !== 'admin' &&
-      trigger !== 'ci_fix' &&
       trigger !== 'escalation'
     ) {
       throw new ForbiddenException(
@@ -1076,7 +1099,8 @@ export class BoardRoundsService {
           cardBody: card.body,
           cardKind: card.kind,
           cardAttachments: attachmentBriefs,
-          authorId: actor.userId,
+          // C-181: a `ci_fix` round runs as a person but is Nautelle's own.
+          authorId: trigger === 'ci_fix' ? null : actor.userId,
           phase: 'queued',
           startedAt: now,
           // #542: the head the round starts on; a follow-up starts a new PR.
