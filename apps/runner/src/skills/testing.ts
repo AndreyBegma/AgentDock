@@ -34,10 +34,20 @@ export interface GhCall {
  * `pr view` answers `prState.value`. Every call is recorded. The project's
  * origin is a local bare repository, so `remote get-url origin` on `root` is
  * answered as GitHub's `acme/widget` — the runner only opens PRs there.
+ *
+ * C-148: the push guard's reads — `repo view --json defaultBranchRef` and
+ * `api repos/<repo>/branches/<branch>` — answer from `branches`: the default
+ * branch, and the branches GitHub protects (every other is not found). They
+ * are recorded in `guardCalls`, apart from `calls`.
  */
 export const withFakeGh = (git: Exec, root: string) => {
   const calls: GhCall[] = [];
+  const guardCalls: string[][] = [];
   const prState = { value: 'OPEN' };
+  const branches = {
+    defaultBranch: 'main' as string | null,
+    protected: [] as string[],
+  };
   const exec: Exec = async (binary, args, options) => {
     if (
       binary === 'git' &&
@@ -50,23 +60,42 @@ export const withFakeGh = (git: Exec, root: string) => {
       };
     }
     if (binary !== 'gh') return git(binary, args, options);
-    const bodyAt = args.indexOf('--body-file');
-    const body =
-      bodyAt >= 0 ? await Bun.file(args[bodyAt + 1] ?? '').text() : null;
-    calls.push({ args: [...args], body });
-    const repo = args[args.indexOf('--repo') + 1];
     const ok = (stdout: string): ExecResult => ({
       code: 0,
       stdout,
       stderr: '',
     });
+    if (args[0] === 'repo' && args[1] === 'view') {
+      guardCalls.push([...args]);
+      if (branches.defaultBranch === null) {
+        return { code: 1, stdout: '', stderr: 'HTTP 502' };
+      }
+      return ok(
+        JSON.stringify({ defaultBranchRef: { name: branches.defaultBranch } }),
+      );
+    }
+    const branchPath = /^repos\/[^/]+\/[^/]+\/branches\/(.+)$/.exec(
+      args[0] === 'api' ? (args[1] ?? '') : '',
+    );
+    if (branchPath) {
+      guardCalls.push([...args]);
+      const branch = decodeURIComponent(branchPath[1] ?? '');
+      return branches.protected.includes(branch)
+        ? ok(JSON.stringify({ name: branch, protected: true }))
+        : { code: 1, stdout: '', stderr: 'gh: Branch not found (HTTP 404)' };
+    }
+    const bodyAt = args.indexOf('--body-file');
+    const body =
+      bodyAt >= 0 ? await Bun.file(args[bodyAt + 1] ?? '').text() : null;
+    calls.push({ args: [...args], body });
+    const repo = args[args.indexOf('--repo') + 1];
     if (args[0] === 'pr' && args[1] === 'create') {
       return ok(`https://github.com/${repo}/pull/7\n`);
     }
     if (args[0] === 'pr' && args[1] === 'view') return ok(`${prState.value}\n`);
     return { code: 1, stdout: '', stderr: 'unsupported' };
   };
-  return { exec, calls, prState };
+  return { exec, calls, guardCalls, prState, branches };
 };
 
 /**

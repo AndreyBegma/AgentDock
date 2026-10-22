@@ -86,7 +86,11 @@ import {
   prTargetNotice,
   prTargetText,
 } from '../../lib/board/pull-request';
-import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
+import {
+  ciBanner,
+  protectedPathsBanner,
+  pullRequestRows,
+} from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { safeHttpsUrl } from '../../lib/queue/format';
@@ -340,6 +344,26 @@ function CiStoppedBanner({ card }: { card: BoardCardDetail }) {
             })}
           </ul>
         ) : null}
+        <span>{banner.hint}</span>
+      </div>
+    </Banner>
+  );
+}
+
+/** C-148: the card's push changed protected paths — only a person merges it. */
+function ProtectedPathsBanner({ card }: { card: BoardCardDetail }) {
+  const banner = protectedPathsBanner(card);
+  if (!banner) return null;
+  return (
+    <Banner tone="warn" title={banner.title}>
+      <div className="flex flex-col gap-1">
+        <ul className="list-disc pl-4">
+          {banner.paths.map((path) => (
+            <li key={path} className="font-mono">
+              {path}
+            </li>
+          ))}
+        </ul>
         <span>{banner.hint}</span>
       </div>
     </Banner>
@@ -672,6 +696,7 @@ export function CardDetailBody({
       <Links card={card} />
       <PullRequestList card={card} />
       <CiStoppedBanner card={card} />
+      <ProtectedPathsBanner card={card} />
       {canCreatePr(card) ? (
         <div className="flex flex-col gap-2">
           <Banner tone={noPr.tone}>{noPr.text}</Banner>

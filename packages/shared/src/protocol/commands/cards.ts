@@ -7,6 +7,11 @@ import {
 import { cardPrefixSchema } from '../../prefix/contracts';
 import { techniqueFlagsSchema } from '../../token-economy/techniques';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
+import {
+  cardBranchSchema,
+  hasCardBranchPrefix,
+  protectedPathsSchema,
+} from '../branch-policy';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 import { headShaSchema } from './approvals';
@@ -219,7 +224,8 @@ export const cardRunArgsSchema = z
     root: absolutePathSchema,
     base: gitRefSchema,
     shortId: cardShortIdSchema,
-    branch: gitRefSchema,
+    /** C-148: `card/`, `feat/` or `fix/` — never the default branch by name. */
+    branch: cardBranchSchema,
     session: cardSessionSchema,
     prompt: cardPromptSchema,
     files: z.array(cardRunFileSchema).max(CARD_RUN_FILES_MAX).optional(),
@@ -302,6 +308,10 @@ export type CardStopResult = z.infer<typeof cardStopResultSchema>;
  * in the checkout that holds it, and only when that checkout is on `branch`
  * (else `invalid_args`). `branch` is never `base`: the base is not committed
  * to or pushed.
+ *
+ * C-148: a card worktree's `branch` has a card prefix (`cardBranchSchema`); a
+ * terminal card's is its session's own, so only the runner's push guard
+ * (never the default or a protected branch) applies to it.
  */
 export const cardCollectArgsSchema = z
   .strictObject({
@@ -318,6 +328,10 @@ export const cardCollectArgsSchema = z
   })
   .refine((a) => a.branch !== a.base, {
     message: 'must not be the base branch',
+    path: ['branch'],
+  })
+  .refine((a) => a.cwd !== undefined || hasCardBranchPrefix(a.branch), {
+    message: 'a card branch must start with card/, feat/ or fix/',
     path: ['branch'],
   });
 export type CardCollectArgs = z.infer<typeof cardCollectArgsSchema>;
@@ -348,6 +362,12 @@ export const cardCollectResultSchema = z
      * stages tracked changes only). Absent for a worktree collect.
      */
     staged: z.array(z.string()).optional(),
+    /**
+     * C-148 (D-12): the protected paths the pushed branch changes against
+     * `origin/<base>` (`isProtectedPath`); empty when none. Absent when
+     * nothing was pushed, or from a runner older than the field.
+     */
+    protectedPaths: protectedPathsSchema.optional(),
   })
   .refine((r) => (r.prNumber === undefined) === (r.prUrl === undefined), {
     message: 'prNumber and prUrl go together',

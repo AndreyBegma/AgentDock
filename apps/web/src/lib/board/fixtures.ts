@@ -47,6 +47,7 @@ export const card = (
   ciFixAttempts: 0,
   needsPerson: false,
   needsPersonReason: null,
+  protectedPaths: [],
   mergedAt: null,
   prTarget: null,
   round: null,

@@ -408,6 +408,9 @@ model Project {
   displayName                 String
   baseBranch                  String
   baseSource                  BaseSource
+  /// C-148: the repository's default branch from the last inspection (`gh`,
+  /// else `origin/HEAD`); null when unknown — auto-merge then stays off.
+  defaultBranch               String?
   baseOverride                String?
   readyLabelOverride          String?
   /// Must belong to `runnerId`; checked by the API.
@@ -3173,6 +3176,10 @@ model BoardCard {
   /// #542: why `needsPerson` is set (shared `CARD_NEEDS_PERSON_REASONS`);
   /// `null` while it is not, and for a card marked before #542.
   needsPersonReason       String?
+  /// C-148 (D-12): the protected paths (shared `PROTECTED_PATHS`) the card's
+  /// branch changes, from the runner's last push or collect. Not empty: the
+  /// PR is never auto-merged; a person reviews it.
+  protectedPaths          String[]              @default([])
   /// #359 D8: when the latest PR merged; the card stays in Finished as Merged.
   mergedAt                DateTime?
   /// Nullable so deleting a user keeps the card.

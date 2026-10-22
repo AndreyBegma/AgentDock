@@ -240,6 +240,10 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
               prState: data.prState ?? 'open',
             }
           : {}),
+        // C-148: the paths of the push that only a person may merge.
+        ...(data.protectedPaths !== undefined
+          ? { protectedPaths: data.protectedPaths }
+          : {}),
         ...(newHead
           ? {
               ciHeadSha: data.headSha,

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { pendingQuestionSchema } from '../../session-message/contracts';
+import { protectedPathsSchema } from '../branch-policy';
 import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
 import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
@@ -117,6 +118,8 @@ export const cardRunPushedDataSchema = z
     prUrl: z.url({ protocol: /^https$/ }).optional(),
     /** With a PR only; `draft` until collect marks it ready (D3). */
     prState: z.enum(['open', 'draft']).optional(),
+    /** C-148 (D-12): as `card.collect`'s — the protected paths the branch changes. */
+    protectedPaths: protectedPathsSchema.optional(),
   })
   .refine((d) => (d.prNumber === undefined) === (d.prUrl === undefined), {
     message: 'prNumber and prUrl go together',

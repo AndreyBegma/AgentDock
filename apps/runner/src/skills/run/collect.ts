@@ -9,11 +9,15 @@ import {
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type {
-  SkillRunChangedFile,
-  SkillRunTerminalPhase,
+import {
+  RUN_BRANCH_PREFIX,
+  type SkillRunChangedFile,
+  type SkillRunTerminalPhase,
 } from '@nautelle/shared/protocol';
+import { ghOf } from '../../cards/github';
+import { CommandFailure } from '../../commands/failure';
 import { resolveFleetProject } from '../../fleet/project';
+import { assertPushAllowed } from '../../git/branch-guard';
 import { redact, redactText } from '../../pane/redact';
 import {
   GH_TIMEOUT_MS,
@@ -146,7 +150,7 @@ const openPr = async (
     id: record.projectId,
     root: record.root,
   });
-  await pushBranch(deps, wt, record.branch);
+  await pushBranch(deps, github, wt, record.branch);
   const pr = await createPullRequest(deps, {
     github,
     base: record.base,
@@ -172,12 +176,24 @@ export const githubOf = async (
   return fleet.github;
 };
 
-/** Pushes the worktree's `HEAD` to `origin/<branch>`, without the project's hooks. */
+/**
+ * Pushes the worktree's `HEAD` to `origin/<branch>`, without the project's
+ * hooks. C-148: only a `run/` branch, and never the default or a protected
+ * branch of `github` (`branch_refused`).
+ */
 export const pushBranch = async (
   deps: Pick<SkillsDeps, 'exec'>,
+  github: string,
   worktree: string,
   branch: string,
 ): Promise<void> => {
+  if (!branch.startsWith(RUN_BRANCH_PREFIX)) {
+    throw new CommandFailure(
+      'branch_refused',
+      `${branch} is not a run branch (${RUN_BRANCH_PREFIX}…); the runner never pushes it`,
+    );
+  }
+  await assertPushAllowed(ghOf(deps.exec), github, branch);
   await gitOk(
     deps.exec,
     ['-C', worktree, 'push', '--quiet', 'origin', `HEAD:refs/heads/${branch}`],

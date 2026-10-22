@@ -215,6 +215,12 @@ export interface BoardCardView {
   needsPerson: boolean;
   /** #542: why `needsPerson` is set; `null` while it is not, or unknown. */
   needsPersonReason: CardNeedsPersonReason | null;
+  /**
+   * C-148 (ADR-0077): the protected paths (`PROTECTED_PATHS`) the card's
+   * latest push changed. Non-empty, the card is never auto-merged — only a
+   * person merges it, and the card says why.
+   */
+  protectedPaths: string[];
   /** #359 D8: the latest PR merged (ISO) — the Merged badge; `null` otherwise. */
   mergedAt: string | null;
   /**

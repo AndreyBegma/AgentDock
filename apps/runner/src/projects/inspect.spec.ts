@@ -58,6 +58,7 @@ describe('project.inspect', () => {
       },
       baseBranch: 'develop',
       baseSource: 'config',
+      defaultBranch: null,
       codeSentinelConfig: {
         orchestrator: { base: 'develop', checks: ['bun run test'] },
       },
@@ -79,6 +80,7 @@ describe('project.inspect', () => {
     expect(await inspect(root)).toMatchObject({
       baseBranch: 'main',
       baseSource: 'default',
+      defaultBranch: null,
     });
 
     const gh = gitWithFakeGh(ws.git, {
@@ -88,6 +90,7 @@ describe('project.inspect', () => {
     expect(await inspect(root, gh)).toMatchObject({
       baseBranch: 'trunk',
       baseSource: 'gh',
+      defaultBranch: 'trunk',
     });
 
     await ws.run(
@@ -99,6 +102,30 @@ describe('project.inspect', () => {
     expect(await inspect(root, gh)).toMatchObject({
       baseBranch: 'release',
       baseSource: 'origin_head',
+      defaultBranch: 'trunk',
+    });
+    expect(await inspect(root)).toMatchObject({
+      baseBranch: 'release',
+      defaultBranch: 'release',
+    });
+  });
+
+  it('reports the default branch next to a configured base (C-148)', async () => {
+    ws = workspace();
+    const root = await ws.repo('x', 'git@github.com:acme/x.git');
+    ws.files({
+      'x/.code-analyzer-config.json': JSON.stringify({
+        orchestrator: { base: 'develop' },
+      }),
+    });
+    const gh = gitWithFakeGh(ws.git, {
+      'repo view acme/x --json defaultBranchRef --jq .defaultBranchRef.name':
+        'main',
+    });
+    expect(await inspect(root, gh)).toMatchObject({
+      baseBranch: 'develop',
+      baseSource: 'config',
+      defaultBranch: 'main',
     });
   });
 

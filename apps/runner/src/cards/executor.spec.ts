@@ -77,6 +77,7 @@ describe('card.collect in a terminal session cwd (#282 D3)', () => {
       staged: ['src/pairing.ts'],
       ahead: 2,
       pushed: true,
+      protectedPaths: [],
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
       prState: 'open',
@@ -166,6 +167,7 @@ describe('card.collect of a card whose worktree card.close removed (#344)', () =
     expect(await executor.collect(fleet)).toEqual({
       ahead: 1,
       pushed: true,
+      protectedPaths: [],
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
       prState: 'open',

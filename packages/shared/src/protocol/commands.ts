@@ -106,6 +106,11 @@ export const commandErrorCodeSchema = z.enum([
    * command. `message` names the rule and the CLI line that lifts it.
    */
   'policy_refused',
+  /**
+   * C-148 (ADR-0077): the runner refuses to push to the branch — the
+   * repository's default branch, or one GitHub reports as protected.
+   */
+  'branch_refused',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 

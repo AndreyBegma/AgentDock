@@ -77,10 +77,9 @@ export interface BoardProject {
   repo: string;
   base: string;
   /**
-   * #359 D7: the repository's default branch, where the runner read it —
-   * `origin/HEAD` or `gh repo view` (`baseSource` `origin_head` / `gh`), so
-   * `baseBranch` is it. `null` when the base came from the project's config
-   * or the fallback: the shared name rule then decides.
+   * #359 D7, C-148: the repository's default branch as the last inspection
+   * read it (`Project.defaultBranch`). `null` when unknown — a card then
+   * never ships itself.
    */
   defaultBranch: string | null;
   defaultProfileId: string | null;
@@ -88,12 +87,6 @@ export interface BoardProject {
   /** #379: where a card's spec goes (`resolveSpecTarget`). */
   docsSource: SpecTargetProject['docsSource'];
 }
-
-/** #359: the base sources under which `baseBranch` is the repository's default branch. */
-const DEFAULT_BRANCH_SOURCES: ReadonlySet<string> = new Set([
-  'origin_head',
-  'gh',
-]);
 
 /**
  * #359 D6, D7: what a card that ships itself does after its round's collect.
@@ -305,8 +298,8 @@ export class BoardWork implements OnModuleInit {
         rootPath: true,
         repo: true,
         baseBranch: true,
-        baseSource: true,
         baseOverride: true,
+        defaultBranch: true,
         defaultProfileId: true,
         codeSentinelConfig: true,
         docsSource: {
@@ -321,9 +314,7 @@ export class BoardWork implements OnModuleInit {
       rootPath: row.rootPath,
       repo: row.repo,
       base: row.baseOverride ?? row.baseBranch,
-      defaultBranch: DEFAULT_BRANCH_SOURCES.has(row.baseSource)
-        ? row.baseBranch
-        : null,
+      defaultBranch: row.defaultBranch,
       defaultProfileId: row.defaultProfileId,
       codeSentinelConfig: row.codeSentinelConfig,
       docsSource: row.docsSource,
@@ -1878,6 +1869,10 @@ export class BoardWork implements OnModuleInit {
         outcome.state !== 'failed';
       await this.storeCollect(card, outcome, {
         ...(merged ? { needsPerson: false, needsPersonReason: null } : {}),
+        // C-148: an older runner reports none; the card keeps what it had.
+        ...(output.protectedPaths !== undefined
+          ? { protectedPaths: output.protectedPaths }
+          : {}),
         // An older runner reports no state: its PR is open (D6).
         ...(open ? { ...pr, prState: output.prState ?? 'open' } : {}),
         ...(cleared

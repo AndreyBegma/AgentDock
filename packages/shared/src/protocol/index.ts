@@ -1,4 +1,5 @@
 export * from './bounded';
+export * from './branch-policy';
 export * from './capabilities';
 export * from './commands';
 export * from './commands/approvals';

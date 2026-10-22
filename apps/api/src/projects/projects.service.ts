@@ -60,10 +60,28 @@ const remoteRepoData = (
       ? { repo: remote }
       : { repo: remote, githubRepoId: null };
 
+/**
+ * C-148: the default branch an inspection reports. A runner older than the
+ * field reports none; its base is the default branch only when it came from
+ * `origin/HEAD` or `gh` — a configured or guessed base leaves it unknown.
+ */
+export const inspectedDefaultBranch = (
+  inspection: Pick<
+    ProjectInspection,
+    'baseBranch' | 'baseSource' | 'defaultBranch'
+  >,
+): string | null =>
+  inspection.defaultBranch !== undefined
+    ? inspection.defaultBranch
+    : inspection.baseSource === 'origin_head' || inspection.baseSource === 'gh'
+      ? inspection.baseBranch
+      : null;
+
 /** The columns an inspection sets on a project, at connect and on refresh. */
 const inspectionData = (inspection: ProjectInspection) => ({
   baseBranch: inspection.baseBranch,
   baseSource: inspection.baseSource,
+  defaultBranch: inspectedDefaultBranch(inspection),
   codeSentinelConfig: inspection.codeSentinelConfig as Prisma.InputJsonValue,
   hasClaudeMd: inspection.hasClaudeMd,
   hasAgentsMd: inspection.hasAgentsMd,

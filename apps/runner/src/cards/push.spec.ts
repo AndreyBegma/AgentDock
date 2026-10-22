@@ -124,6 +124,7 @@ describe('push and draft PR (#359 D1)', () => {
     expect(step).toEqual({
       headSha: await head(),
       pushed: true,
+      protectedPaths: [],
       pr: {
         number: 7,
         url: 'https://github.com/acme/widget/pull/7',
@@ -238,6 +239,74 @@ describe('push and draft PR (#359 D1)', () => {
     });
     const retried = await pushCardHead(deps, record);
     expect(retried).toMatchObject({ pushed: false, pr: { number: 7 } });
+  });
+});
+
+describe('branch policy and protected paths (C-148)', () => {
+  const failureOf = (p: Promise<unknown>) =>
+    p.then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+  it('refuses to push to the default branch with branch_refused, pushing nothing', async () => {
+    const { f, record, deps, originHead } = await setup();
+    f.gh.branches.defaultBranch = BRANCH;
+    f.write(record.worktree, { 'src/a.ts': 'export const a = 1;\n' });
+    await f.commitAll(record.worktree, 'feat: a');
+    const error = await failureOf(pushCardHead(deps, record));
+    expect(error).toBeInstanceOf(CommandFailure);
+    expect((error as CommandFailure).code).toBe('branch_refused');
+    expect((error as CommandFailure).message).toContain('default branch');
+    expect(await originHead()).toBeNull();
+    expect(f.prCreates()).toHaveLength(0);
+  });
+
+  it('refuses a branch GitHub reports as protected, and collect refuses it too', async () => {
+    const { f, record, deps, collectArgs, originHead } = await setup();
+    f.gh.branches.protected = [BRANCH];
+    f.write(record.worktree, { 'src/a.ts': 'export const a = 1;\n' });
+    await f.commitAll(record.worktree, 'feat: a');
+    const pushed = await failureOf(pushCardHead(deps, record));
+    expect((pushed as CommandFailure).code).toBe('branch_refused');
+    const collected = await failureOf(collectCard(deps, record, collectArgs));
+    expect((collected as CommandFailure).code).toBe('branch_refused');
+    expect(await originHead()).toBeNull();
+    expect(f.gh.guardCalls).toContainEqual([
+      'api',
+      'repos/acme/widget/branches/card/c12-export-csv',
+    ]);
+  });
+
+  it('when GitHub cannot say the default branch, nothing is pushed and it is not branch_refused', async () => {
+    const { f, record, deps, originHead } = await setup();
+    f.gh.branches.defaultBranch = null;
+    f.write(record.worktree, { 'src/a.ts': 'export const a = 1;\n' });
+    await f.commitAll(record.worktree, 'feat: a');
+    const error = await failureOf(pushCardHead(deps, record));
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(CommandFailure);
+    expect(await originHead()).toBeNull();
+  });
+
+  it('a push changing .woodpecker/pipeline.yml still pushes and reports it as a protected path', async () => {
+    const { f, record, deps, collectArgs, originHead, head } = await setup();
+    f.write(record.worktree, {
+      '.woodpecker/pipeline.yml': 'steps: []\n',
+      'deploy/compose.yml': 'services: {}\n',
+      'src/a.ts': 'export const a = 1;\n',
+    });
+    await f.commitAll(record.worktree, 'feat: a');
+    const step = await pushCardHead(deps, record);
+    expect(step?.pushed).toBe(true);
+    expect(step?.protectedPaths).toEqual([
+      '.woodpecker/pipeline.yml',
+      'deploy/compose.yml',
+    ]);
+    expect(await originHead()).toBe(await head());
+
+    const result = await collectCard(deps, record, collectArgs);
+    expect(result.protectedPaths).toContain('.woodpecker/pipeline.yml');
   });
 });
 
