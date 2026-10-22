@@ -34,7 +34,12 @@ describe('protected paths (C-148, D-12)', () => {
   });
 
   it('lists every path the CODEOWNERS file names', () => {
-    for (const p of ['.woodpecker/', 'deploy/', 'plugins/', '.claude-plugin/']) {
+    for (const p of [
+      '.woodpecker/',
+      'deploy/',
+      'plugins/',
+      '.claude-plugin/',
+    ]) {
       expect(PROTECTED_PATHS).toContain(p);
     }
   });

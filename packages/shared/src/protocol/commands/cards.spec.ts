@@ -103,12 +103,24 @@ describe('card.run args', () => {
 
   // C-148 (L-31): a card branch may not name the default branch.
   it('refuses a branch without a card prefix', () => {
-    for (const branch of ['main', 'master', 'trunk', 'develop', 'card/', 'release/1.0', 'cards/x']) {
+    for (const branch of [
+      'main',
+      'master',
+      'trunk',
+      'develop',
+      'card/',
+      'release/1.0',
+      'cards/x',
+    ]) {
       expect(cardRunArgsSchema.safeParse({ ...runArgs, branch }).success).toBe(
         false,
       );
     }
-    for (const branch of ['card/c12-add-login', 'feat/34-login', 'fix/34-login']) {
+    for (const branch of [
+      'card/c12-add-login',
+      'feat/34-login',
+      'fix/34-login',
+    ]) {
       expect(cardRunArgsSchema.safeParse({ ...runArgs, branch }).success).toBe(
         true,
       );

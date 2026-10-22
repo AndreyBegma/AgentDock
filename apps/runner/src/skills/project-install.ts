@@ -7,9 +7,11 @@ import {
   type SkillProvenance,
   skillInstallBranch,
 } from '@nautelle/shared/protocol';
+import { ghOf } from '../cards/github';
 import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
 import { resolveFleetProject } from '../fleet/project';
+import { assertPushAllowed } from '../git/branch-guard';
 import {
   GH_TIMEOUT_MS,
   gitOk,
@@ -130,6 +132,8 @@ export const installProjectSkill = async (
   if (remote.stdout.trim().length > 0) {
     throw new CommandFailure('already_exists', `origin already has ${branch}`);
   }
+  // C-148: never the default or a protected branch, checked before any work.
+  await assertPushAllowed(ghOf(exec), fleet.github, branch);
 
   const worktree = installWorktreePath(root, (deps.shortId ?? randomShortId)());
   await gitOk(exec, [

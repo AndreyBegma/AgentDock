@@ -27,6 +27,8 @@ import type {
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { CommandFailure } from '../commands/failure';
+import { assertPushAllowed } from '../git/branch-guard';
+import { protectedPathsOf } from '../git/protected-paths';
 import {
   GH_TIMEOUT_MS,
   gitOk,
@@ -36,6 +38,7 @@ import {
   stderrLine,
 } from '../skills/deps';
 import { createPullRequest, githubOf } from '../skills/run/collect';
+import { ghOf } from './github';
 import type { CardRecord } from './record';
 import { commitsWithTrailer, TrailerHeld } from './trailer-guard';
 
@@ -124,14 +127,17 @@ const inReflog = async (
  * superseded: `git merge -s ours` records it, keeping HEAD's tree, and the
  * merge is pushed. Anything else on the remote is somebody else's work: it
  * throws `divergedBranchMessage`, and nothing is pushed. Returns the head
- * pushed — the merge, when there was one.
+ * pushed — the merge, when there was one. C-148: never to the default or a
+ * protected branch of `github` (`assertPushAllowed`, `branch_refused`).
  */
 export const pushCardBranch = async (
   deps: GitDeps,
+  github: string,
   wt: string,
   branch: string,
   pushedHead?: string,
 ): Promise<string> => {
+  await assertPushAllowed(ghOf(deps.exec), github, branch);
   const push = () =>
     deps.exec(
       'git',
@@ -634,7 +640,8 @@ export const collectCard = async (
     id: record.projectId,
     root: record.root,
   });
-  await pushCardBranch(deps, wt, record.branch, record.pushedHead);
+  const protectedPaths = await protectedPathsOf(deps.exec, wt, args.base);
+  await pushCardBranch(deps, github, wt, record.branch, record.pushedHead);
   // #359 D3: the worker's description is the body — of a new PR, and of an
   // open one, edited. Without it, a new PR gets the API's body with the spec
   // link, and an open one keeps its body.
@@ -681,6 +688,7 @@ export const collectCard = async (
     prNumber: pr.number,
     prUrl: pr.url,
     prState: pr.state,
+    protectedPaths,
     ...listed,
   };
 };

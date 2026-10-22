@@ -7,12 +7,12 @@ import {
 import { cardPrefixSchema } from '../../prefix/contracts';
 import { techniqueFlagsSchema } from '../../token-economy/techniques';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
-import type { CommandDefinition } from '../commands';
 import {
   cardBranchSchema,
   hasCardBranchPrefix,
   protectedPathsSchema,
 } from '../branch-policy';
+import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 import { headShaSchema } from './approvals';
 import {

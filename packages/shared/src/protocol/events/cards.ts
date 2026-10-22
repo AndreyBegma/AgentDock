@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { pendingQuestionSchema } from '../../session-message/contracts';
+import { protectedPathsSchema } from '../branch-policy';
 import { headShaSchema } from '../commands/approvals';
 import { cardIdSchema, cardTmuxSessionSchema } from '../commands/cards';
-import { protectedPathsSchema } from '../branch-policy';
 import { gitRefSchema, skillRunIdSchema } from '../commands/skills';
 import { localErrorCodeSchema } from '../local';
 import { paneDialogSchema, quotaLimitSchema } from './fleet';

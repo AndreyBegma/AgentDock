@@ -61,28 +61,31 @@ const readCodeSentinelConfig = (
   return { orchestrator: json.orchestrator };
 };
 
-/** D4: config → `origin/HEAD` → `gh` → `main`. */
+/**
+ * D4: the base is config → `origin/HEAD` → `gh` → `main`. C-148: the default
+ * branch is `gh` → `origin/HEAD` → unknown (null), whatever the base is —
+ * never the `main` guess, which would let auto-merge land on an unknown
+ * default branch.
+ */
 const resolveBase = async (
   exec: Exec,
   root: string,
   repo: string | null,
   orchestrator: Record<string, unknown> | undefined,
-): Promise<{ baseBranch: string; baseSource: BaseSource }> => {
-  const configured = orchestrator?.base;
-  if (typeof configured === 'string' && configured.trim()) {
-    return { baseBranch: configured.trim(), baseSource: 'config' };
-  }
-  const originHead = await git(exec, root, [
+): Promise<{
+  baseBranch: string;
+  baseSource: BaseSource;
+  defaultBranch: string | null;
+}> => {
+  const head = await git(exec, root, [
     'symbolic-ref',
     '--short',
     'refs/remotes/origin/HEAD',
   ]);
-  if (originHead?.startsWith('origin/')) {
-    return {
-      baseBranch: originHead.slice('origin/'.length),
-      baseSource: 'origin_head',
-    };
-  }
+  const originHead = head?.startsWith('origin/')
+    ? head.slice('origin/'.length) || null
+    : null;
+  let viewed: string | null = null;
   if (repo) {
     const view = await exec('gh', [
       'repo',
@@ -93,10 +96,26 @@ const resolveBase = async (
       '--jq',
       '.defaultBranchRef.name',
     ]);
-    const branch = view?.code === 0 ? view.stdout.trim() : '';
-    if (branch) return { baseBranch: branch, baseSource: 'gh' };
+    viewed = (view?.code === 0 ? view.stdout.trim() : '') || null;
   }
-  return { baseBranch: DEFAULT_BASE_BRANCH, baseSource: 'default' };
+  const defaultBranch = viewed ?? originHead;
+  const configured = orchestrator?.base;
+  if (typeof configured === 'string' && configured.trim()) {
+    return {
+      baseBranch: configured.trim(),
+      baseSource: 'config',
+      defaultBranch,
+    };
+  }
+  if (originHead) {
+    return { baseBranch: originHead, baseSource: 'origin_head', defaultBranch };
+  }
+  if (viewed) return { baseBranch: viewed, baseSource: 'gh', defaultBranch };
+  return {
+    baseBranch: DEFAULT_BASE_BRANCH,
+    baseSource: 'default',
+    defaultBranch,
+  };
 };
 
 /**

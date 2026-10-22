@@ -1222,6 +1222,7 @@ export class CardExecutor {
             prState: step.pr.state,
           }
         : {}),
+      ...(step.protectedPaths ? { protectedPaths: step.protectedPaths } : {}),
     });
     this.options.emit({
       v: 1,

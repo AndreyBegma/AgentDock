@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CardDraftPullRequest } from '@nautelle/shared/protocol';
+import { protectedPathsOf } from '../git/protected-paths';
 import { GH_TIMEOUT_MS, gitOk, parsePrUrl, stderrLine } from '../skills/deps';
 import { githubOf } from '../skills/run/collect';
 import {
@@ -27,6 +28,8 @@ export interface PushStep {
   pr: (OpenPr & { opened: boolean }) | null;
   prError?: string;
   held?: TrailerCommit[];
+  /** C-148 (D-12): the protected paths the branch changes; with a push only. */
+  protectedPaths?: string[];
 }
 
 type PushRecord = Pick<
@@ -159,15 +162,21 @@ export const pushCardHead = async (
     id: record.projectId,
     root: record.root,
   });
+  // C-148: the pre-push guard's diff; the push goes ahead either way.
+  const protectedPaths = pending.push
+    ? await protectedPathsOf(deps.exec, record.worktree, record.base)
+    : undefined;
   // #630: a reconciled push adds a merge, so the head pushed is its own.
   const headSha = pending.push
     ? await pushCardBranch(
         deps,
+        github,
         record.worktree,
         record.branch,
         record.pushedHead,
       )
     : pending.headSha;
+  const paths = protectedPaths ? { protectedPaths } : {};
   try {
     const open = await openPullRequest(deps, github, record.branch);
     const pr = open
@@ -191,13 +200,14 @@ export const pushCardHead = async (
           state: 'draft' as const,
           opened: true,
         };
-    return { headSha, pushed: pending.push, pr };
+    return { headSha, pushed: pending.push, pr, ...paths };
   } catch (error) {
     return {
       headSha,
       pushed: pending.push,
       pr: null,
       prError: oneLine(error),
+      ...paths,
     };
   }
 };

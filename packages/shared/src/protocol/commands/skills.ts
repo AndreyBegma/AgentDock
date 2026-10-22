@@ -247,9 +247,12 @@ export const skillRunSessionSchema = z
 export const skillRunSessionName = (shortId: string): string =>
   SKILL_RUN_SESSION_PREFIX + skillRunShortIdSchema.parse(shortId);
 
+/** C-148 (ADR-0077): the only branches a skill run pushes start with this. */
+export const RUN_BRANCH_PREFIX = 'run/';
+
 /** D7: `run/<shortid>-<skill>`; a plugin's `:` is not allowed in a ref, so it becomes `-`. */
 export const skillRunBranch = (shortId: string, invocation: string): string =>
-  `run/${skillRunShortIdSchema.parse(shortId)}-${skillInvocationSchema
+  `${RUN_BRANCH_PREFIX}${skillRunShortIdSchema.parse(shortId)}-${skillInvocationSchema
     .parse(invocation)
     .replace(':', '-')}`;
 
