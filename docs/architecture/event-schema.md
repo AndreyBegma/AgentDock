@@ -210,6 +210,17 @@ again. It is stored as `events.duplicate { pluginEventId, type }`, so its
 observes those itself. For the same field, a `code-sentinel` value is never
 overwritten by a `scraped` one (spec 16 D7).
 
+**Forged types (C-183).** An agent can append any line to `events.jsonl`. The
+runner drops a type outside `CODE_SENTINEL_EVENT_TYPES` as `events.unparsed`,
+and the API checks again: a `code-sentinel` event whose type
+`codeSentinelMayCarry` refuses (a runner-owned type such as `steward.acted`,
+`handoff.updated` or `filter.stats`) is stored as `events.forged { type }`,
+reaches no sink and never notifies; its `seq` still advances the ack. The
+Steward and handoff `data` schemas are strict, and the token-saver sink takes
+`filter.stats` only from `source: runner`, keeping a row only when its run is
+the envelope project's and storing it under an id scoped to that project and
+run.
+
 **Advisory sources (C-169).** `code-sentinel`, `scraped` and `hook` events are
 written by the agents themselves (`ADVISORY_EVENT_SOURCES`). They are stored
 and shown, and they may name a slot's pull request, but they never set its
