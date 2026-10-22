@@ -1,6 +1,6 @@
 # ADR-0016: Staging on the agent host behind a Cloudflare tunnel
 
-Status: accepted · Date: 2026-10-13
+Status: accepted · Date: 2026-10-13 · Amended by [ADR-0079](0079-the-api-image-ships-production-dependencies-only.md) (the API image ships production dependencies only)
 
 ## Context
 

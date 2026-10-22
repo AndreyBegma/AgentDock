@@ -49,7 +49,7 @@ export const CI_NOT_REPORTED =
   'ci_not_reported' satisfies CardNeedsPersonReason;
 
 /**
- * C-182 (ADR-0079): the reason auto-merge refuses a head whose checks are not
+ * C-182 (ADR-0080): the reason auto-merge refuses a head whose checks are not
  * all passed — none, a cancelled or a skipped one.
  */
 export const CI_NOT_GREEN = 'ci_not_green' satisfies CardNeedsPersonReason;
@@ -696,7 +696,7 @@ export class BoardShipping
    * the card gets `needsPerson` with the reason and stays in Finished.
    * C-148 (ADR-0077): nor is a card whose push changed a protected path
    * (`protectedPaths`) — only a person merges it, whatever the setting.
-   * C-182 (ADR-0079): nor a head whose checks are not all passed
+   * C-182 (ADR-0080): nor a head whose checks are not all passed
    * (`cardCiMergeable`) — none, a cancelled or a skipped one: `needsPerson`
    * with `ci_not_green`, as for #542.
    */

@@ -1,4 +1,4 @@
-# ADR-0079: Auto-merge needs every check passed, and `docker/` is a protected path
+# ADR-0080: Auto-merge needs every check passed, and `docker/` is a protected path
 
 Status: accepted · Date: 2026-10-22 ·
 Card: C-182 (security audit 2026-10-16, findings DA-03, L-31 and decision D-12) ·

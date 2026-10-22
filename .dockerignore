@@ -24,8 +24,16 @@ dist
 
 .env
 **/.env
-**/.env.local
+**/.env.*
+!**/.env.example
 docker/.env
+
+# Local state that must never ride into a layer: database dumps and runtime
+# data, browser-automation screenshots, and the runner's release artefacts.
+data
+**/data
+.playwright-mcp
+apps/runner/release
 
 **/*.log
 coverage
