@@ -64,13 +64,14 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
       ? readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\n')
       : [];
 
+  const TOKEN = 'd'.repeat(64);
   const run = (overrides: Partial<SetupClaudeOptions> = {}) =>
     setupClaude({
       profiles: profiles(),
       telemetry: true,
       dryRun: false,
       uninstall: false,
-      otlpPort: 4318,
+      otlp: { port: 4318, token: TOKEN },
       home: dir,
       env: { PATH: join(dir, 'bin'), HOME: dir },
       exec: (env) => createExec(env),
@@ -123,6 +124,7 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
       OTEL_METRICS_EXPORTER: 'otlp',
       OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
       OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
+      OTEL_EXPORTER_OTLP_HEADERS: `x-nautelle-otlp-token=${TOKEN}`,
     });
     const text = readFileSync(settingsPath(), 'utf8');
     expect(text).not.toContain('OTEL_RESOURCE_ATTRIBUTES');
@@ -158,6 +160,26 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
       `${configDir()} plugin uninstall nautelle@nautelle --scope user`,
       `${configDir()} plugin marketplace remove nautelle`,
     ]);
+  });
+
+  it('writes the receiver token next to the endpoint, and a new token replaces the old one (L-30)', async () => {
+    writeOriginal();
+    expect(await run()).toBe(0);
+    const env = () => JSON.parse(readFileSync(settingsPath(), 'utf8')).env;
+    expect(env().OTEL_EXPORTER_OTLP_ENDPOINT).toBe('http://127.0.0.1:4318');
+    expect(env().OTEL_EXPORTER_OTLP_HEADERS).toBe(
+      `x-nautelle-otlp-token=${TOKEN}`,
+    );
+
+    const rotated = 'e'.repeat(64);
+    expect(await run({ otlp: { port: 4318, token: rotated } })).toBe(0);
+    expect(env().OTEL_EXPORTER_OTLP_HEADERS).toBe(
+      `x-nautelle-otlp-token=${rotated}`,
+    );
+
+    // Uninstall recognises a token it wrote, whichever one it was.
+    expect(await run({ uninstall: true })).toBe(0);
+    expect(JSON.parse(readFileSync(settingsPath(), 'utf8'))).toEqual(original);
   });
 
   it('removes the plugin installed under its old name first (ADR-0073)', async () => {

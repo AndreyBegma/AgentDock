@@ -20,6 +20,7 @@ import {
   textCallTokenSaver,
 } from '../launch/token-saver';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import { redact } from '../pane/redact';
 import { cutBytes } from '../planner/result';
 import { profileOf, type SkillsDeps } from '../skills/deps';
@@ -86,7 +87,7 @@ export interface CaptureExecutorOptions extends TextCallLaunchOptions {
   env: Env;
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   spawn?: CaptureSpawn;
 }
 
@@ -193,10 +194,7 @@ export class CaptureExecutor {
     for (const [key, value] of Object.entries(this.options.env)) {
       if (value !== undefined) env[key] = value;
     }
-    Object.assign(
-      env,
-      runEnv(profile, args, this.options.otlpPort?.() ?? null),
-    );
+    Object.assign(env, runEnv(profile, args, this.options.otlp?.() ?? null));
     Object.assign(env, HOOKS_OFF_ENV);
     // #445: off or absent launches exactly as before.
     const tokenSaver = textCallTokenSaver(

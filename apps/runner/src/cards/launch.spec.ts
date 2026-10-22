@@ -108,7 +108,10 @@ describe('card worker launch (#242 D5)', () => {
   });
 
   it("is an interactive launch spec carrying the round's run id", () => {
-    const spec = cardLaunchSpec(profile, args(true), '/srv/dev/wt', 4318);
+    const spec = cardLaunchSpec(profile, args(true), '/srv/dev/wt', {
+      port: 4318,
+      token: 'a'.repeat(64),
+    });
     expect(spec.interactive).toBe(true);
     expect(spec.cwd).toBe('/srv/dev/wt');
     expect(spec.stdin).toBeUndefined();
@@ -117,6 +120,10 @@ describe('card worker launch (#242 D5)', () => {
       'agentdock.project=prj_1,agentdock.run=run_r2',
     );
     expect(spec.env.OTEL_EXPORTER_OTLP_ENDPOINT).toContain(':4318');
+    // L-30: the receiver refuses an export without its token.
+    expect(spec.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
+      `x-nautelle-otlp-token=${'a'.repeat(64)}`,
+    );
   });
 
   it('#113: carries the session token in the env when the runner minted one', () => {

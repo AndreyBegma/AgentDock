@@ -26,6 +26,7 @@ import { resolveFleetProject } from '../fleet/project';
 import { type RunNotes, runWorkKey } from '../handoff/runs';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import {
   readTail,
   STREAM_TAIL_BYTES,
@@ -80,7 +81,7 @@ export const uiProfileLaunchSpec = (
   build: Pick<UiProfileBuildArgs, 'model' | 'projectId' | 'runId'>,
   worktree: string,
   promptFile: string,
-  otlpPort: number | null,
+  otlp: OtlpEndpoint | null,
   tokenSaver?: TokenSaverLaunch | null,
 ): LaunchSpec => ({
   binary: profile.binary ?? profile.runtime,
@@ -96,7 +97,7 @@ export const uiProfileLaunchSpec = (
     'stream-json',
     '--verbose',
   ],
-  env: { ...runEnv(profile, build, otlpPort), ...(tokenSaver?.env ?? {}) },
+  env: { ...runEnv(profile, build, otlp), ...(tokenSaver?.env ?? {}) },
   cwd: worktree,
   stdin: promptFile,
 });
@@ -158,7 +159,7 @@ export interface UiProfileExecutorOptions {
   slots: RunSlots;
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   tickMs?: number;
   /**
    * #449: notes of interrupted builds. With Token saver on, a build of the
@@ -206,7 +207,7 @@ export class UiProfileBuildExecutor {
         options.learnDir ?? join(dirname(options.buildsDir), 'uiprofile-learn'),
       env: options.env ?? process.env,
       log: options.log,
-      otlpPort: options.otlpPort,
+      otlp: options.otlp,
       spawn: options.learnSpawn,
     });
   }
@@ -433,7 +434,7 @@ export class UiProfileBuildExecutor {
         build,
         build.worktree,
         join(this.dir(build.runId), PROMPT_FILE),
-        this.options.otlpPort?.() ?? null,
+        this.options.otlp?.() ?? null,
         uiProfileTokenSaver(
           profile,
           build,

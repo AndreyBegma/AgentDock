@@ -64,22 +64,24 @@ describe('issue.create', () => {
       });
       return create;
     };
-    const run = (args: Partial<Parameters<typeof issueCreate>[0]> = {}) =>
-      issueCreate(
-        issueCreateArgsSchema.parse({
-          projectId: 'prj_1',
-          title: 'A title',
-          body: AC,
-          labels: ['enhancement'],
-          queue: false,
-          ...args,
-        }),
-        {
-          exec,
-          watchedProjects: () => [{ id: 'prj_1', root }],
-          tempRoot: temp,
-        },
-      );
+    const run = ({
+      raw = false,
+      ...args
+    }: Partial<Parameters<typeof issueCreate>[0]> & { raw?: boolean } = {}) => {
+      const full = {
+        projectId: 'prj_1',
+        title: 'A title',
+        body: AC,
+        labels: ['enhancement'],
+        queue: false,
+        ...args,
+      };
+      return issueCreate(raw ? full : issueCreateArgsSchema.parse(full), {
+        exec,
+        watchedProjects: () => [{ id: 'prj_1', root }],
+        tempRoot: temp,
+      });
+    };
     return { calls, run };
   };
 
@@ -168,9 +170,19 @@ describe('issue.create', () => {
 
   it('never lets the caller set the ready label without queue', async () => {
     const { calls, run } = setup();
-    await run({ labels: ['CS:Ready', 'bug'], queue: false });
+    await run({ labels: ['CS:Ready', 'bug'], queue: false, raw: true });
     expect(calls[0].args).not.toContain('CS:Ready');
     expect(calls[0].args).toContain('bug');
+  });
+
+  it('drops a ready label hidden in a comma-joined label (L-27)', async () => {
+    const { calls, run } = setup();
+    // Past the schema, which refuses commas: the runner's own filter.
+    await run({ labels: ['x,cs:ready', 'bug, CS:Ready'], raw: true });
+    const labels = calls[0].args.filter(
+      (_, i) => calls[0].args[i - 1] === '--label',
+    );
+    expect(labels).toEqual(['x', 'bug']);
   });
 
   it('fails when gh fails, and cleans up the body file', async () => {

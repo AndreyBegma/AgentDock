@@ -1039,6 +1039,20 @@ describe('design stage (e2e)', () => {
     expect((await design(plan.id)).status).toBe('idle');
   });
 
+  it('two parallel rebuilds start one build; the other is 409 (L-28)', async () => {
+    await h.seedProfile();
+    const rebuild = () =>
+      h.author.send('post', `/projects/${h.projectId}/ui-profile/rebuild`);
+    const responses = await Promise.all([rebuild(), rebuild()]);
+    expect(responses.map((r) => r.status).sort((a, b) => a - b)).toEqual([
+      201, 409,
+    ]);
+    expect(
+      await h.ctx.prisma.run.count({ where: { kind: 'ui_profile' } }),
+    ).toBe(1);
+    expect(h.designSent('uiprofile.build')).toHaveLength(1);
+  });
+
   it('refuses a rebuild with runner_outdated when the runner does not serve uiprofile.build, creating no run (#233)', async () => {
     await h.seedProfile();
     h.advert = {

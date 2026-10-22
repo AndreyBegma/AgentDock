@@ -53,6 +53,13 @@ const BUILD_MODEL = 'opus';
 /** `runs.outcome`, as plan turns cut it. */
 const OUTCOME_MAX = 500;
 
+const buildBusy = () =>
+  designError(
+    409,
+    DESIGN_ERROR.designBusy,
+    'A profile build is already running',
+  );
+
 /** Where a design turn stands with the profile (D13). */
 export type ProfileReadiness =
   | { kind: 'ready'; profileId: string | null }
@@ -334,13 +341,7 @@ export class UiProfileService {
     caller: PlanCaller,
   ): Promise<UiProfileRebuildResult> {
     const running = await this.latestBuild(projectId);
-    if (running?.status === 'running') {
-      throw designError(
-        409,
-        DESIGN_ERROR.designBusy,
-        'A profile build is already running',
-      );
-    }
+    if (running?.status === 'running') throw buildBusy();
     const project = await this.store.project(projectId);
     return { runId: await this.startBuild(project, caller, 'rebuild', []) };
   }
@@ -503,25 +504,43 @@ export class UiProfileService {
       obligations,
       waiting,
     };
-    const now = new Date();
-    const run = await this.prisma.run.create({
-      data: {
-        kind: 'ui_profile',
-        projectId: project.id,
-        title: 'UI profile build',
-        runtime: profile.runtime,
-        model: BUILD_MODEL,
-        profileKey: profile.key,
-        args: args as Prisma.InputJsonValue,
-        tokenSaver: saver.on,
-        status: 'running',
-        triggeredByType: 'user',
-        triggeredById: caller.userId,
-        startedAt: now,
-        updatedAt: now,
-      },
-      select: { id: true },
+    // L-28: one running build per project — the check and the create hold
+    // the project row, so two starts at once make one build.
+    const claim = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM projects WHERE id = ${project.id} FOR UPDATE`;
+      const running = await tx.run.findFirst({
+        where: { projectId: project.id, kind: 'ui_profile', status: 'running' },
+        select: { id: true },
+      });
+      if (running) return { joined: true as const, runId: running.id };
+      const now = new Date();
+      const created = await tx.run.create({
+        data: {
+          kind: 'ui_profile',
+          projectId: project.id,
+          title: 'UI profile build',
+          runtime: profile.runtime,
+          model: BUILD_MODEL,
+          profileKey: profile.key,
+          args: args as Prisma.InputJsonValue,
+          tokenSaver: saver.on,
+          status: 'running',
+          triggeredByType: 'user',
+          triggeredById: caller.userId,
+          startedAt: now,
+          updatedAt: now,
+        },
+        select: { id: true },
+      });
+      return { joined: false as const, runId: created.id };
     });
+    if (claim.joined) {
+      if (waiting.length === 0) throw buildBusy();
+      // A design that raced another start joins the build that won.
+      for (const w of waiting) await this.join(claim.runId, w);
+      return claim.runId;
+    }
+    const run = { id: claim.runId };
     await this.store.publishRun(project.id, run.id);
     try {
       plannerOutput(

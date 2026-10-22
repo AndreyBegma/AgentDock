@@ -24,6 +24,7 @@ import { TmuxControl } from '../control/tmux';
 import { resolveFleetProject } from '../fleet/project';
 import { type RunNotes, runWorkKey } from '../handoff/runs';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import {
   gitOk,
   NETWORK_TIMEOUT_MS,
@@ -67,7 +68,7 @@ export interface PlanExecutorOptions {
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
   /** The OTLP receiver's bound port, null when it is off (#24 D9). */
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   /**
    * #337 D10: where `plan.turn` downloads attachments from — the API and the
    * runner token, as for `card.run`. Required, so a missing wiring is a
@@ -492,7 +493,7 @@ export class PlanTurnExecutor {
           turn,
           plan.worktree,
           this.store.promptFile(turn),
-          this.options.otlpPort?.() ?? null,
+          this.options.otlp?.() ?? null,
           planTurnTokenSaver(
             profile,
             turn,

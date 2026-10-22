@@ -78,6 +78,9 @@ const notSendable = (message: string) =>
  */
 @Injectable()
 export class PlanSendService {
+  /** Plans whose Send is filing issues in this process (L-28). */
+  private readonly inFlight = new Set<string>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly store: PlanStore,
@@ -86,52 +89,23 @@ export class PlanSendService {
     private readonly audit: AuditService,
   ) {}
 
-  async send(plan: Plan, actor: PlanActor): Promise<void> {
-    if (plan.status === 'sent') return;
-    this.store.assertOpen(plan);
-    if (plan.status !== 'reviewing' && plan.status !== 'sending') {
-      throw notSendable('The plan is not decomposed yet');
+  async send(row: Plan, actor: PlanActor): Promise<void> {
+    if (row.status === 'sent') return;
+    this.store.assertOpen(row);
+    // L-28: a second Send of the same plan while one is filing its issues.
+    if (this.inFlight.has(row.id)) {
+      throw notSendable('The plan is being sent');
     }
-    const active = await this.prisma.planTurn.count({
-      where: { planId: plan.id, phase: { in: ['queued', 'running'] } },
-    });
-    if (active > 0) {
-      throw plannerError(
-        409,
-        PLANNER_ERROR.turnInProgress,
-        'A turn of this plan is queued or running',
-      );
+    this.inFlight.add(row.id);
+    try {
+      await this.sendOnce(row, actor);
+    } finally {
+      this.inFlight.delete(row.id);
     }
-    const tasks = await this.store.currentTasks(this.prisma, plan);
-    const sending = tasks.filter(
-      (t) => t.status === 'approved' || t.status === 'issued',
-    );
-    const talking = tasks.filter((t) => t.status === 'needs_talk');
-    if (talking.length > 0) {
-      throw notSendable(
-        `Tasks still need a conversation: ${talking.map((t) => t.key).join(', ')}`,
-      );
-    }
-    if (sending.length === 0) throw notSendable('No task is approved');
-    const keys = new Set(sending.map((t) => t.key));
-    for (const t of sending) {
-      const missing = t.dependsOn.filter((d) => !keys.has(d));
-      if (missing.length > 0) {
-        throw notSendable(
-          `Task ${t.key} depends on ${missing.join(', ')}, which is not approved`,
-        );
-      }
-    }
-    const cycle = findCycle(sending);
-    if (cycle) {
-      throw plannerError(
-        409,
-        PLANNER_ERROR.dependencyCycle,
-        `dependsOn has a cycle: ${cycle.join(' → ')}`,
-      );
-    }
+  }
 
-    const project = await this.store.project(plan.projectId);
+  private async sendOnce(row: Plan, actor: PlanActor): Promise<void> {
+    const project = await this.store.project(row.projectId);
     const { specOutput, target } = await this.publication(project);
     // #379: the specs' directory — in the code repository, or relative to an
     // external docs repository; designs stay in the code repository.
@@ -141,30 +115,83 @@ export class PlanSendService {
         : null;
     const external = target.kind === 'docs_repo' ? target : null;
     const designDir = codeSpecDirOf(target);
-    const designs = await this.approvedDesigns(plan.id);
+    const designs = await this.approvedDesigns(row.id);
     // D10, and spec 223 D16: a task with an approved design always goes
     // through the docs pull request, whatever the project's specOutput.
     const viaDocs = (t: Pick<PlanTask, 'key' | 'kind'>) =>
       (specOutput === 'docs_pr' && t.kind === 'feature') || designs.has(t.key);
-    const publishes = sending.some(viaDocs);
-    this.commands.assertReady(project.runnerId, 'issue.create');
-    this.commands.assertReady(project.runnerId, 'plan.queue_issues');
-    if (publishes && external) {
-      // #379: specs into the docs repository, designs into this one.
-      this.commands.assertReady(project.runnerId, 'docs.publish_specs');
-      if (sending.some((t) => designs.has(t.key))) {
+
+    // L-28: the checks and the move to `sending` hold the plan row, so a
+    // parallel Create cards, archive or turn sees `sending` or waits.
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM plans WHERE id = ${row.id} FOR UPDATE`;
+      const plan = await tx.plan.findUniqueOrThrow({ where: { id: row.id } });
+      if (plan.status === 'sent') return null;
+      this.store.assertOpen(plan);
+      if (plan.status !== 'reviewing' && plan.status !== 'sending') {
+        throw notSendable('The plan is not decomposed yet');
+      }
+      const active = await tx.planTurn.count({
+        where: { planId: plan.id, phase: { in: ['queued', 'running'] } },
+      });
+      if (active > 0) {
+        throw plannerError(
+          409,
+          PLANNER_ERROR.turnInProgress,
+          'A turn of this plan is queued or running',
+        );
+      }
+      const tasks = await this.store.currentTasks(tx, plan);
+      const sending = tasks.filter(
+        (t) => t.status === 'approved' || t.status === 'issued',
+      );
+      const talking = tasks.filter((t) => t.status === 'needs_talk');
+      if (talking.length > 0) {
+        throw notSendable(
+          `Tasks still need a conversation: ${talking.map((t) => t.key).join(', ')}`,
+        );
+      }
+      if (sending.length === 0) throw notSendable('No task is approved');
+      const keys = new Set(sending.map((t) => t.key));
+      for (const t of sending) {
+        const missing = t.dependsOn.filter((d) => !keys.has(d));
+        if (missing.length > 0) {
+          throw notSendable(
+            `Task ${t.key} depends on ${missing.join(', ')}, which is not approved`,
+          );
+        }
+      }
+      const cycle = findCycle(sending);
+      if (cycle) {
+        throw plannerError(
+          409,
+          PLANNER_ERROR.dependencyCycle,
+          `dependsOn has a cycle: ${cycle.join(' → ')}`,
+        );
+      }
+      const publishes = sending.some(viaDocs);
+      this.commands.assertReady(project.runnerId, 'issue.create');
+      this.commands.assertReady(project.runnerId, 'plan.queue_issues');
+      if (publishes && external) {
+        // #379: specs into the docs repository, designs into this one.
+        this.commands.assertReady(project.runnerId, 'docs.publish_specs');
+        if (sending.some((t) => designs.has(t.key))) {
+          this.commands.assertReady(project.runnerId, 'plan.publish_specs');
+        }
+      } else if (publishes) {
         this.commands.assertReady(project.runnerId, 'plan.publish_specs');
       }
-    } else if (publishes) {
-      this.commands.assertReady(project.runnerId, 'plan.publish_specs');
-    }
-
-    // D12: issues are visible to everyone with access to the repository.
-    if (plan.visibility === 'private') {
-      await this.prisma.plan.update({
+      // D12: issues are visible to everyone with access to the repository.
+      await tx.plan.update({
         where: { id: plan.id },
-        data: { visibility: 'project' },
+        data: { status: 'sending', visibility: 'project' },
       });
+      return { plan, sending, publishes };
+    });
+    if (!claimed) return;
+    const { plan, sending, publishes } = claimed;
+
+    if (plan.visibility === 'private') {
       await this.audit.record({
         ...actor.ctx,
         action: 'plan.shared',
@@ -175,10 +202,6 @@ export class PlanSendService {
         result: 'ok',
       });
     }
-    await this.prisma.plan.update({
-      where: { id: plan.id },
-      data: { status: 'sending' },
-    });
     this.store.publish(plan.projectId, plan.id);
 
     const caller = callerOf(actor);
@@ -289,8 +312,9 @@ export class PlanSendService {
         );
       }
 
-      await this.prisma.plan.update({
-        where: { id: plan.id },
+      // L-28: a plan archived while its issues were filed stays archived.
+      await this.prisma.plan.updateMany({
+        where: { id: plan.id, status: 'sending' },
         data: { status: 'sent', sentAt: new Date() },
       });
       await this.plans.close(plan, caller);
