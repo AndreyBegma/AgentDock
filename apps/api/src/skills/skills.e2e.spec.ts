@@ -869,8 +869,10 @@ describe('skills (e2e)', () => {
       // A replayed batch changes nothing and audits once.
       await sinks.dispatch(runnerId, [finished]);
 
+      // A viewer reads the args, the report and the patch (ADR-0050).
       const done = await detail();
       expect(done).toMatchObject({
+        args: 'issue 24',
         phase: 'succeeded',
         status: 'succeeded',
         exitCode: 0,
@@ -885,6 +887,9 @@ describe('skills (e2e)', () => {
         outcome: 'Estimate: M',
       });
       expect(await auditOf('skill.run_finished')).toHaveLength(1);
+      expect(
+        (await outsider.get(`/projects/${a}/skill-runs/${runId}`)).status,
+      ).toBe(404);
 
       // A late phase never reopens a finished run.
       await sinks.dispatch(runnerId, [

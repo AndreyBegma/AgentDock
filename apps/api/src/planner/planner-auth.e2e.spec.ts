@@ -130,7 +130,16 @@ describe('planner authorization (e2e)', () => {
   it('lets a viewer read a shared plan and answers 403 to every write', async () => {
     expect((await h.viewer.get(h.base(plan.id))).status).toBe(404);
     await share();
-    expect((await h.viewer.get(h.base(plan.id))).status).toBe(200);
+    const seen = await h.viewer.get(h.base(plan.id));
+    expect(seen.status).toBe(200);
+    // A viewer reads each turn's input and result as the author does (ADR-0050).
+    const [first] = (seen.body as PlanDetail).turns;
+    expect(first.input).toEqual(plan.turns[0].input);
+    expect(first.input).not.toBeNull();
+    expect(first.resultText).toEqual(
+      (await h.detail(plan.id)).turns[0].resultText,
+    );
+    expect(first.resultText).toBeTruthy();
     const versions = `${h.base(plan.id)}/tasks/t1/versions`;
     expect((await h.viewer.get(versions)).status).toBe(200);
     expect(await items(h.viewer, '/tasks')).toHaveLength(2);

@@ -732,6 +732,15 @@ describe('schedules (e2e)', () => {
       expect(sent('skill.run')).toHaveLength(0);
     });
 
+    it("shows a viewer the target's args; a non-member gets 404 (ADR-0050)", async () => {
+      const view = await createOk();
+      const path = `/projects/${a}/schedules/${view.id}`;
+      const detail = await viewerOfA.get(path);
+      expect(detail.status).toBe(200);
+      expect((detail.body as ScheduleDetail).target).toMatchObject(skillTarget);
+      expect((await outsider.get(path)).status).toBe(404);
+    });
+
     it('admin lists schedules across projects and the system jobs', async () => {
       await createOk();
       const list = await admin.get(`/admin/schedules?enabled=true`);

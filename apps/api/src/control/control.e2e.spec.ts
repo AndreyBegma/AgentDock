@@ -962,5 +962,19 @@ describe('orchestrator and slot control (e2e)', () => {
         'invalid_args',
       ]);
     });
+
+    it("shows a viewer a run's message args; a non-member gets 404 (ADR-0050)", async () => {
+      await operatorOfA.send('post', `/projects/${a}/slots/i42/message`, {
+        text: SECRET_TEXT,
+      });
+      const path = `/projects/${a}/command-runs`;
+      const seen = await viewerOfA.get(path);
+      expect(seen.status).toBe(200);
+      expect((seen.body as CommandRunPage).items[0]).toMatchObject({
+        command: 'slot.message',
+        args: { text: SECRET_TEXT },
+      });
+      expect((await outsider.get(path)).status).toBe(404);
+    });
   });
 });
