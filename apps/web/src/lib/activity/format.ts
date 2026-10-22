@@ -425,6 +425,23 @@ export function activityHref(
 const TRAILING_PR_URL = /\s*(?:[—–:-]\s*)?https?:\/\/\S+?\/pull\/(\d+)\S*\s*$/;
 
 /**
+ * WI-61: the pattern is quadratic in what it runs over, so it sees only the
+ * title's tail, long enough for any pull request URL. `index` is the match's
+ * place in the whole title.
+ */
+const TRAILING_PR_URL_WINDOW = 300;
+
+const trailingPrUrl = (
+  title: string,
+): { index: number; text: string; number: number } | null => {
+  const from = Math.max(0, title.length - TRAILING_PR_URL_WINDOW);
+  const match = TRAILING_PR_URL.exec(title.slice(from));
+  return match
+    ? { index: from + match.index, text: match[0], number: Number(match[1]) }
+    : null;
+};
+
+/**
  * The title without a raw pull request URL, and the PR's number for a
  * `#205` chip (#213). A checkpoint heading such as "pull request open —
  * https://github.com/o/r/pull/205" reads "pull request open"; the number
@@ -434,8 +451,8 @@ export function itemTitle(item: Pick<ActivityItem, 'title' | 'prNumber'>): {
   title: string;
   prNumber: number | null;
 } {
-  const match = TRAILING_PR_URL.exec(item.title);
-  const fromUrl = match ? Number(match[1]) : null;
+  const match = trailingPrUrl(item.title);
+  const fromUrl = match ? match.number : null;
   const title = match ? item.title.slice(0, match.index).trim() : item.title;
   return {
     title: title || item.title,
@@ -454,8 +471,8 @@ export function prLink(
   const candidate =
     typeof fromData === 'string'
       ? fromData
-      : TRAILING_PR_URL.exec(item.title)?.[0]
-          .trim()
+      : trailingPrUrl(item.title)
+          ?.text.trim()
           .replace(/^[—–:-]\s*/, '');
   if (!candidate) return undefined;
   try {
