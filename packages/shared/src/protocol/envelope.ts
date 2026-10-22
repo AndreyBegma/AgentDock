@@ -25,6 +25,22 @@ export const eventSourceSchema = z.enum([
 export type EventSource = z.infer<typeof eventSourceSchema>;
 
 /**
+ * Sources whose events the agents themselves can write: Code Sentinel's
+ * `events.jsonl`, its markdown boards and replies, and the local socket's
+ * hooks (C-169). Their events are advisory — shown and stored, but never the
+ * word on a pull request's merge, approval or check state, which comes only
+ * from the runner's own `gh` observations, its commands and GitHub.
+ */
+export const ADVISORY_EVENT_SOURCES: ReadonlySet<EventSource> = new Set([
+  'code-sentinel',
+  'scraped',
+  'hook',
+]);
+
+export const isAdvisorySource = (source: EventSource): boolean =>
+  ADVISORY_EVENT_SOURCES.has(source);
+
+/**
  * `source` of an event the API records itself (ADR-0014). Deliberately not in
  * `eventSourceSchema`: a runner can never send it, so a row with this source
  * was written by the API.
