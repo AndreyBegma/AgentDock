@@ -8,13 +8,13 @@ import {
   openDependencies,
   type Role,
 } from '@nautelle/shared';
-import { roleAtLeast } from '@nautelle/shared/protocol';
 import { Injectable } from '@nestjs/common';
 import type { BoardColumn, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { boardError, cardNotFound } from './board-error';
 import { type BoardActor, BoardWork } from './board-work';
+import { hiddenFrom } from './inbox-access';
 
 type Tx = Prisma.TransactionClient;
 
@@ -109,7 +109,7 @@ export class BoardDependencies {
     role: Role,
   ): Promise<CardDependenciesView> {
     const card = await this.work.card(projectId, number);
-    if (card.column === 'inbox' && !roleAtLeast(role, 'operator')) {
+    if (hiddenFrom(card, role)) {
       throw cardNotFound();
     }
     return this.viewOf(card.id);

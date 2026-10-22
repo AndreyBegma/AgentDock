@@ -29,6 +29,7 @@ import {
 import type { Attachment, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
+import { hiddenFrom } from '../board/inbox-access';
 import { PrismaService } from '../database/prisma.service';
 import {
   bearerToken,
@@ -253,17 +254,24 @@ export class AttachmentsService {
 
   /**
    * `GET …/content` (D8): any member reads a claimed attachment; a pending
-   * one is its uploader's alone until a card claims it.
+   * one is its uploader's alone until a card claims it. An Inbox card's is
+   * only an operator's (#244 D8).
    */
   async content(
     projectId: string,
     id: string,
     userId: string,
+    role: Role,
   ): Promise<AttachmentContent> {
     const row = await this.prisma.attachment.findFirst({
       where: { id, projectId },
+      include: { card: { select: { column: true } } },
     });
-    if (!row || (row.cardId === null && row.uploaderId !== userId)) {
+    if (
+      !row ||
+      (row.cardId === null && row.uploaderId !== userId) ||
+      (row.card && hiddenFrom(row.card, role))
+    ) {
       throw attachmentNotFound();
     }
     return this.bytesOf(row);
