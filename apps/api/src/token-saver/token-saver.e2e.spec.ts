@@ -222,16 +222,43 @@ describe('token saver (e2e)', () => {
       expect(stored.map((s) => s.runId)).toEqual([runId, null]);
     });
 
-    it('drops a run of another project, and skips what it cannot place', async () => {
+    it('drops a row naming a run of another project, and skips what it cannot place', async () => {
       const runId = await ranCard();
-      // A's run named in B's envelope: B's row, without the run.
-      await stats([row({ runId, runKind: 'card' })], ROOT_B);
+      // C-183: A's run named in B's envelope stores nothing, not even for B.
+      await stats(
+        [row({ runId, runKind: 'card' }), row({ runKind: 'orchestrator' })],
+        ROOT_B,
+      );
       // An unknown root and malformed data store nothing.
       await stats([row()], '/srv/dev/unknown');
       await w.deliver('filter.stats', { rows: [{ id: 'x' }] });
       const stored = await w.ctx.prisma.tokenSaverStat.findMany();
       expect(stored).toHaveLength(1);
       expect(stored[0]).toMatchObject({ projectId: w.b, runId: null });
+    });
+
+    it('C-183: takes only the runner’s own rows', async () => {
+      await w.deliver(
+        'filter.stats',
+        { rows: [row()] },
+        { source: 'code-sentinel' },
+      );
+      expect(await w.ctx.prisma.tokenSaverStat.count()).toBe(0);
+    });
+
+    it('C-183: a row of another project or run never takes the id of a real one', async () => {
+      const runId = await ranCard();
+      const real = row({ runId, runKind: 'card' });
+      // The same runner id sent first for B's orchestrator, then for A's run.
+      await stats([{ ...real, runId: null, runKind: 'orchestrator' }], ROOT_B);
+      await stats([real]);
+      const stored = await w.ctx.prisma.tokenSaverStat.findMany();
+      expect(stored.map((s) => [s.projectId, s.runId]).sort()).toEqual(
+        [
+          [w.a, runId],
+          [w.b, null],
+        ].sort(),
+      );
     });
   });
 

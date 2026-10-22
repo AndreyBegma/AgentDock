@@ -601,6 +601,49 @@ describe('/runner gateway (e2e)', () => {
       }
     });
 
+    it('C-183: stores a runner-owned type from code-sentinel as events.forged, reaching no sink', async () => {
+      const { runnerId, token } = await pairedRunner(ctx, admin);
+      const socket = open(token);
+      await socket.connect();
+      socket.send({
+        type: 'events',
+        events: [
+          event(1, {
+            type: 'steward.acted',
+            data: {
+              projectId: 'prj_other',
+              at: '2026-10-07T18:36:02.335Z',
+              subject: { kind: 'run', runId: 'run_1' },
+              action: 'hold_push',
+              result: 'done',
+            },
+          }),
+          event(2, {
+            type: 'filter.stats',
+            data: { rows: [], pluginEventId: 'eid-forged' },
+          }),
+          event(3),
+        ],
+      });
+      expect(await socket.next('ack')).toEqual({ type: 'ack', seq: 3 });
+
+      const stored = await ctx.prisma.event.findMany({
+        where: { runnerId },
+        orderBy: { seq: 'asc' },
+      });
+      expect(stored.map((e) => [e.type, e.source, e.data])).toEqual([
+        ['events.forged', 'code-sentinel', { type: 'steward.acted' }],
+        ['events.forged', 'code-sentinel', { type: 'filter.stats' }],
+        [
+          'slot.checkpoint',
+          'code-sentinel',
+          { checkpoint: 'plan_ready', n: 3 },
+        ],
+      ]);
+      expect(await ctx.prisma.stewardIncident.count()).toBe(0);
+      expect(await ctx.prisma.tokenSaverStat.count()).toBe(0);
+    });
+
     it('drops an invalid message and keeps the socket', async () => {
       const { token } = await pairedRunner(ctx, admin);
       const socket = open(token);

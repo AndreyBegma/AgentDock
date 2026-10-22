@@ -16,6 +16,7 @@ import {
 import {
   API_EVENT_SOURCE,
   EVENTS_DUPLICATE_EVENT,
+  EVENTS_FORGED_EVENT,
   paneDialogSchema,
   parseFleetEvent,
   type RunnerEvent,
@@ -71,6 +72,7 @@ const PLUGIN_ECHOED_TYPES: ReadonlySet<string> = new Set([
 /** Never notify: bookkeeping rows of spec 16. */
 const NEVER: ReadonlySet<string> = new Set([
   EVENTS_DUPLICATE_EVENT,
+  EVENTS_FORGED_EVENT,
   'events.unparsed',
 ]);
 

@@ -519,6 +519,19 @@ export const eventsDuplicateDataSchema = z.object({
 });
 export type EventsDuplicateData = z.infer<typeof eventsDuplicateDataSchema>;
 
+/**
+ * C-183: stored in place of a `code-sentinel` event whose type the plugin
+ * never writes — an agent forging a runner-owned event through
+ * `events.jsonl`. No sink sees it; the ack still advances.
+ */
+export const EVENTS_FORGED_EVENT = 'events.forged';
+
+export const eventsForgedDataSchema = z.object({
+  /** The forged event's own `type`. */
+  type: name,
+});
+export type EventsForgedData = z.infer<typeof eventsForgedDataSchema>;
+
 type FleetDataOf<T extends FleetEventType> = z.output<
   (typeof fleetEventDataSchemas)[T]
 >;

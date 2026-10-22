@@ -16,14 +16,28 @@ import {
 } from '../runners/runner-event-sinks';
 
 /**
+ * The stored id of a row (C-183): the runner's id scoped to the project and
+ * the run — or, without a run, the `/cs-eco` session or the run kind — so a
+ * row of one project or run can never take the id of another's and have the
+ * real row skipped as a duplicate. A resent row maps to the same id.
+ */
+export const scopedStatId = (
+  projectId: string,
+  row: Pick<FilterStatRow, 'id' | 'runId' | 'runKind'>,
+  session?: string,
+): string =>
+  `${projectId}/${row.runId ?? (session ? `s:${session}` : row.runKind)}/${row.id}`;
+
+/**
  * Sink `token-saver`: `filter.stats` rows into `token_saver_stats` (#445 D12).
- * The project is the envelope's, by `(runner, root)`; a row's run is kept
- * only when it is a run of that project — else `null`, so another project's
- * run never shows a stranger's savings. The runner's row id makes a resent
- * batch insert nothing twice. #746 D4: each inserted `bypassed` row of a
- * known run is one of its `runs.retries`. #748: a `/cs-eco` batch's session is
- * kept as `sessionId` only when it is a session of this runner and project;
- * its external id is always kept, so a session learnt later still joins.
+ * Only `source: runner` counts (C-183). The project is the envelope's, by
+ * `(runner, root)`; a row that names a run is kept only when the run is that
+ * project's — else it is dropped, so a row never lands on another project or
+ * run. The scoped row id (`scopedStatId`) makes a resent batch insert nothing
+ * twice. #746 D4: each inserted `bypassed` row of a known run is one of its
+ * `runs.retries`. #748: a `/cs-eco` batch's session is kept as `sessionId`
+ * only when it is a session of this runner and project; its external id is
+ * always kept, so a session learnt later still joins.
  */
 @Injectable()
 export class TokenSaverSink implements RunnerEventSink, OnApplicationBootstrap {
@@ -42,6 +56,12 @@ export class TokenSaverSink implements RunnerEventSink, OnApplicationBootstrap {
   async handle(runnerId: string, events: RunnerEvent[]): Promise<void> {
     for (const event of events) {
       if (event.type !== FILTER_STATS_EVENT) continue;
+      if (event.source !== 'runner') {
+        this.logger.warn(
+          `runner ${runnerId}: ${event.type} from ${event.source} (seq ${event.seq}), skipped`,
+        );
+        continue;
+      }
       const parsed = filterStatsDataSchema.safeParse(event.data);
       const root = event.project?.root;
       if (!parsed.success || !root) {
@@ -113,13 +133,20 @@ export class TokenSaverSink implements RunnerEventSink, OnApplicationBootstrap {
             })
           ).map((r) => r.id),
     );
+    const own = rows.filter((r) => r.runId === null || known.has(r.runId));
+    if (own.length < rows.length) {
+      this.logger.warn(
+        `runner ${runnerId}: ${rows.length - own.length} filter.stats row(s) name a run not of project ${projectId}, skipped`,
+      );
+    }
+    if (own.length === 0) return;
     // Only the rows actually inserted come back, so a resent batch counts no
     // retry twice (#746 D4).
     const inserted = await this.prisma.tokenSaverStat.createManyAndReturn({
-      data: rows.map((r) => ({
-        id: r.id,
+      data: own.map((r) => ({
+        id: scopedStatId(projectId, r, session),
         projectId,
-        runId: r.runId !== null && known.has(r.runId) ? r.runId : null,
+        runId: r.runId,
         runKind: r.runKind,
         filter: r.filter,
         program: r.program ?? null,
