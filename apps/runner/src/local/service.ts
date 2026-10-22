@@ -15,6 +15,7 @@ import {
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { correlateCwd } from '../adapters/correlate';
+import { ARTIFACT_INCOMPLETE, FinishGuard } from '../cards/finish-guard';
 import type { CardRecord } from '../cards/record';
 import { errorMessage, type Logger } from '../log';
 import type { EnvelopeProject } from '../otlp/map';
@@ -86,6 +87,8 @@ export interface LocalServiceDeps {
    * checks), so the API's relaunch on Opus is never stopped.
    */
   stopRoundSoon?: (round: EscalatedRound) => void;
+  /** #445 D8: a worktree's pull request description; read from disk by default. */
+  readDescription?: (worktree: string) => string | null;
   now: () => string;
   log: Logger;
 }
@@ -142,6 +145,12 @@ const refused = (
  * `SessionStart` registers without a token — and is answered with one.
  */
 export class LocalService {
+  /** #445 D8, DR-10: each card's guard for its current round, by card id. */
+  private readonly finishGuards = new Map<
+    string,
+    { runId: string; guard: FinishGuard }
+  >();
+
   constructor(private readonly deps: LocalServiceDeps) {}
 
   async handle(
@@ -395,9 +404,15 @@ export class LocalService {
       input.method === 'card.escalate'
         ? this.escalatingRound(binding.cwd, binding.sessionId)
         : null;
+    let relayed = this.gate(input);
+    if (input.method === 'card.finish') {
+      const guarded = this.guardFinish(binding, relayed);
+      if (!guarded.ok) return guarded;
+      relayed = guarded.data;
+    }
     const result = await this.deps.relay({
       method: input.method,
-      args: this.gate(input),
+      args: relayed,
       ...(projectId ? { projectId } : {}),
       session: { runtime: 'claude', id: binding.sessionId },
       via: input.via,
@@ -413,6 +428,54 @@ export class LocalService {
       }
     }
     return result;
+  }
+
+  /**
+   * #445 D8 on the daemon's side of the socket (DR-10): a guarded round's
+   * incomplete finish is refused with what is missing, twice; the third goes
+   * on with `artifactIncomplete: true`. Whatever the caller claims about
+   * `artifactIncomplete` is dropped — only the guard sets it (DA-18).
+   */
+  private guardFinish(
+    binding: SessionBinding,
+    args: unknown,
+  ): LocalResult<unknown> {
+    if (typeof args !== 'object' || args === null)
+      return { ok: true, data: args };
+    const { artifactIncomplete: _claimed, ...rest } = args as Record<
+      string,
+      unknown
+    >;
+    const round = this.deps.liveRound?.(binding.cwd) ?? null;
+    if (!round?.finishGuard || round.sessionId !== binding.sessionId) {
+      return { ok: true, data: rest };
+    }
+    let guard = this.finishGuards.get(round.cardId);
+    if (guard?.runId !== round.runId) {
+      // A new round starts with no rejections.
+      guard = {
+        runId: round.runId,
+        guard: new FinishGuard({
+          ...round.finishGuard,
+          worktree: round.worktree,
+          ...(this.deps.readDescription
+            ? { read: this.deps.readDescription }
+            : {}),
+        }),
+      };
+      this.finishGuards.set(round.cardId, guard);
+    }
+    const summary = typeof rest.summary === 'string' ? rest.summary : '';
+    const decision = guard.guard.check(summary);
+    if (decision.kind === 'reject') {
+      return localFail(ARTIFACT_INCOMPLETE, decision.message);
+    }
+    return {
+      ok: true,
+      data: decision.artifactIncomplete
+        ? { ...rest, artifactIncomplete: true }
+        : rest,
+    };
   }
 
   /** #750 D8: the live round of the caller's worktree, if it is the caller's session. */

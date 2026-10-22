@@ -67,6 +67,11 @@ export const localErrorCodeSchema = z.enum([
   'not_escalatable',
   /** `card.track` from a session that is not a person's own `manual` one (issue #282 D1). */
   'not_a_manual_session',
+  /**
+   * `card.finish` refused by the runner's artifact guard (#445 D8): the pull
+   * request description or the summary is incomplete; `message` says what.
+   */
+  'artifact_incomplete',
 ]);
 export type LocalErrorCode = z.infer<typeof localErrorCodeSchema>;
 
@@ -234,7 +239,8 @@ export const localCardFinishArgsSchema = z.strictObject({
   /**
    * #445 D8: set by the runner's artifact guard when it accepts a finish after
    * 2 rejections in the round; stored as `runs.artifactIncomplete`. Absent is
-   * `false`. The worker never sets it — the guard does.
+   * `false`. The worker never sets it: the daemon drops it from every caller
+   * and only its guard adds it (DA-18).
    */
   artifactIncomplete: z.boolean().optional(),
 });

@@ -12,7 +12,6 @@ import { CARD_ESCALATE_ENV } from '../mcp/tools';
 import type { OtlpEndpoint } from '../otlp/token';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
-import { cardIssueNumber, finishGuardArgs } from './finish-guard';
 import {
   type CardWiring,
   type CardWiringFiles,
@@ -167,8 +166,8 @@ export const cardLaunchSpec = (
 
 /**
  * #445: the card round's Token saver — the filter hook over the injected
- * hooks (a plugin profile keeps its own), `nautelle` with the artifact
- * guard (D8), the scout, and the round dir for the filter's files. `null`
+ * hooks (a plugin profile keeps its own), `nautelle` (the daemon runs its
+ * artifact guard, D8), the scout, and the round dir for the filter's files. `null`
  * when it is off: the round launches as before. #751: the prefix is measured
  * in the card's worktree, and its frozen selection and overlays applied.
  */
@@ -193,7 +192,8 @@ export const cardTokenSaver = (
     runKind: 'card',
     projectId: args.projectId,
     runId: args.runId,
-    runnerMcp: finishGuardArgs(cardIssueNumber(args)),
+    // DR-10: the daemon guards `finish_card` (`CardRecord.finishGuard`).
+    runnerMcp: [],
     scout: true,
     techniques: args.tokenSaver?.techniques,
     cwd:

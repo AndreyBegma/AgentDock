@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { buildMcpServer } from '../mcp/server';
 import { tempDir } from '../testing/fixtures';
 import {
   cardIssueNumber,
   FinishGuard,
-  finishGuardArgs,
+  guardFinish,
   missingArtifacts,
-  parseFinishGuardArgs,
   readDescription,
 } from './finish-guard';
 
@@ -124,19 +120,13 @@ describe('FinishGuard (#445 D8)', () => {
   });
 });
 
-describe('the guard’s arguments', () => {
-  it('round-trips through `mcp`’s argv', () => {
-    expect(finishGuardArgs(12)).toEqual(['--finish-guard', '--issue', '12']);
-    expect(parseFinishGuardArgs(finishGuardArgs(12))).toEqual({
-      issueNumber: 12,
-    });
-    expect(parseFinishGuardArgs(finishGuardArgs(null))).toEqual({
-      issueNumber: null,
-    });
-    expect(parseFinishGuardArgs([])).toBeNull();
-    expect(parseFinishGuardArgs(['--finish-guard', '--issue', 'x'])).toEqual({
-      issueNumber: null,
-    });
+describe('the guard’s round facts', () => {
+  it('marks a round guarded only with Token saver on, with its issue', () => {
+    const record: { finishGuard?: { issueNumber: number | null } } = {};
+    guardFinish(record, { on: true }, { prompt: 'Card\nGitHub issue: #7\n' });
+    expect(record.finishGuard).toEqual({ issueNumber: 7 });
+    guardFinish(record, null, { prompt: 'continue' });
+    expect(record.finishGuard).toBeUndefined();
   });
 
   it('takes the issue from the draft PR body, else the round-1 prompt', () => {
@@ -148,52 +138,5 @@ describe('the guard’s arguments', () => {
     ).toBe(42);
     expect(cardIssueNumber({ prompt: 'Card\nGitHub issue: #7\nmore' })).toBe(7);
     expect(cardIssueNumber({ prompt: 'continue' })).toBeNull();
-  });
-});
-
-describe('a guarded finish_card over MCP (#445 D8)', () => {
-  const connect = async (description: string | null) => {
-    const calls: Record<string, unknown>[] = [];
-    const server = buildMcpServer(
-      async (_method, args) => {
-        calls.push(args);
-        return { ok: true, data: { number: 1, finished: true } };
-      },
-      {
-        finishGuard: new FinishGuard({
-          issueNumber: 12,
-          worktree: '/w',
-          read: () => description,
-        }),
-      },
-    );
-    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
-    const client = new Client({ name: 'test', version: '0' });
-    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
-    return { client, calls };
-  };
-
-  it('refuses without `## Acceptance criteria` and relays the third as incomplete', async () => {
-    const { client, calls } = await connect(
-      COMPLETE.replace('## Acceptance criteria', ''),
-    );
-    const call = () =>
-      client.callTool({ name: 'finish_card', arguments: { summary: SUMMARY } });
-    const first = await call();
-    expect(first.isError).toBe(true);
-    expect(JSON.stringify(first.content)).toContain('## Acceptance criteria');
-    expect((await call()).isError).toBe(true);
-    expect(calls).toEqual([]);
-    expect((await call()).isError).toBeFalsy();
-    expect(calls).toEqual([{ summary: SUMMARY, artifactIncomplete: true }]);
-  });
-
-  it('relays a complete finish unchanged', async () => {
-    const { client, calls } = await connect(COMPLETE);
-    await client.callTool({
-      name: 'finish_card',
-      arguments: { summary: SUMMARY },
-    });
-    expect(calls).toEqual([{ summary: SUMMARY }]);
   });
 });

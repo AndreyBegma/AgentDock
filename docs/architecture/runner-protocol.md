@@ -1543,7 +1543,12 @@ carry no `projectId`: the API resolves the project.
 **On `card.finish`.** The runner's artifact guard (D8) may send
 `artifactIncomplete: true` when it accepts a finish after 2 rejections in the
 round. The API stores it as `runs.artifactIncomplete`, and the card shows
-**Description incomplete**.
+**Description incomplete**. The guard runs in the daemon, on its side of the
+local socket (DR-10): a round launched with Token saver on is recorded as
+guarded, and every `card.finish` from its session meets the guard, whether it
+comes from the `nautelle` MCP server or straight from the socket. A refusal is
+the local error `artifact_incomplete`, with what is missing. The daemon drops
+an `artifactIncomplete` that a caller sends; only the guard sets it (DA-18).
 
 ### Steward
 
@@ -1649,7 +1654,7 @@ with its runner handler.
 |---|---|---|
 | `session.nudge` | `projectId`, `subject` (card round or run), `text` — exactly `STEWARD_NUDGE_TEXT` | `{ sent }`; `false` when the pane shows no idle prompt or the session is gone — nothing is typed |
 | `session.dismiss` | `projectId`, `subject`, `dialogId` from `STEWARD_DIALOG_IDS` | `{ dismissed }`; `false` when the pane no longer shows that dialog |
-| `card.resume` | `cardId`, `projectId`, `runId`, `root`, `base`, `shortId`, `branch`, `sessionId`, `profileKey`, `model`, `permissionMode`, `pullRequest?`, `tokenSaver?` — the round's `card.run` facts | `{ outcome: "resumed" \| "alive" \| "no_worktree", tmuxSession? }` |
+| `card.resume` | `cardId`, `projectId`, `runId`, `root`, `base`, `shortId`, `branch`, `sessionId`, `profileKey`, `model`, `permissionMode`, `pullRequest?`, `tokenSaver?` — the round's `card.run` facts. The runner launches in the mode it recorded at the round's `card.run` and refuses a `permissionMode` that differs (`invalid_args`), or a round with none recorded (`not_found`) (DA-15) | `{ outcome: "resumed" \| "alive" \| "no_worktree", tmuxSession? }` |
 | `digest.compose` | `runId` (the API's `steward` run), `projectId`, `sessionId`, `profileKey`, `model` — always `haiku`, `trigger`, `projectName`, `done` / `stuck` / `waiting` — each `{ total, items }` with at most `DIGEST_COMPOSE_ITEMS_MAX` (20) items of `{ label, title, reason }`, `spendUsd` | `{ prose }` — one line, at most `DIGEST_PROSE_MAX` (600) characters |
 
 - **Nudge (D9).** The text is "The previous response was cut off by an

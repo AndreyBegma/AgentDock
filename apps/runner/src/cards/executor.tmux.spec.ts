@@ -1128,6 +1128,36 @@ describe.skipIf(!tmuxInstalled)('Steward on card rounds (#447)', () => {
     ]);
   });
 
+  it('DA-15: a resume naming another mode than the round started in is refused', async () => {
+    const t = await setup({ steward: STEWARD });
+    await t.executor.run(t.args());
+    await t.argvOf('run_1');
+    await t.untilEnded(t.executor, 'run_1');
+    expect(t.executor.store.load('card_1')?.permissionMode).toBe('acceptEdits');
+
+    expect(
+      await failure(
+        t.executor.resume({
+          ...resumeArgs(t),
+          permissionMode: 'bypassPermissions',
+        }),
+      ),
+    ).toBe('invalid_args');
+    expect(await t.alive('nautelle-card-ab12cd34')).toBe(false);
+  });
+
+  it('DA-15: a round with no recorded mode is not resumed', async () => {
+    const t = await setup({ steward: STEWARD });
+    await t.executor.run(t.args());
+    await t.argvOf('run_1');
+    await t.untilEnded(t.executor, 'run_1');
+    const record = t.executor.store.load('card_1');
+    if (!record) throw new Error('expected the record');
+    delete record.permissionMode;
+    t.executor.store.save(record);
+    expect(await failure(t.executor.resume(resumeArgs(t)))).toBe('not_found');
+  });
+
   it('D10: an alive session is left alone; a missing worktree starts nothing; a stopped round is never resumed', async () => {
     const t = await setup({ steward: STEWARD });
     await t.executor.run(t.args({ profileKey: 'claude-slow' }));

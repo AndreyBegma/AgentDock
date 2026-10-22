@@ -59,6 +59,7 @@ import { emitActed, emitObserved } from '../steward/emit';
 import { readPane } from '../steward/pane-rules';
 import { type AttachmentSource, syncAttachments } from './attachments';
 import { answerDialog, KNOWN_DIALOGS, matchKnownDialog } from './dialogs';
+import { guardFinish } from './finish-guard';
 import {
   collectBranch,
   collectCard,
@@ -305,6 +306,8 @@ export class CardExecutor {
         phase: 'starting',
         sessionId: args.session.id,
         profileKey: args.profileKey,
+        // DA-15: `card.resume` launches in this mode, never in its own.
+        permissionMode: args.permissionMode,
         startedAt: isoNow(deps.clock),
         // #359 D3: the spec (and design) the PR links; only round 1 sends them.
         specFiles: args.files?.length
@@ -365,6 +368,7 @@ export class CardExecutor {
           this.options.selfCommand,
           wiring,
         );
+        guardFinish(record, tokenSaver, launch);
         writeJsonAtomic(
           `${roundDir}/${RUN_FILES.launch}`,
           cardLaunchSpec(
@@ -672,8 +676,25 @@ export class CardExecutor {
         return { outcome: 'alive', tmuxSession: record.tmuxSession };
       }
       if (!existsSync(record.worktree)) return { outcome: 'no_worktree' };
+      // DA-15: the mode the round started in, as this runner recorded it. A
+      // resume naming another is refused, so the runner policy's check of
+      // the named mode is a check of the one launched.
+      const { permissionMode } = record;
+      if (!permissionMode) {
+        throw new CommandFailure(
+          'not_found',
+          `round ${args.runId} has no recorded permission mode; only a round this runner started is resumed`,
+        );
+      }
+      if (args.permissionMode !== permissionMode) {
+        throw new CommandFailure(
+          'invalid_args',
+          `round ${args.runId} started in ${permissionMode}; a resume cannot launch it in ${args.permissionMode}`,
+        );
+      }
       const launch = {
         ...args,
+        permissionMode,
         session: { id: args.sessionId, resume: true },
         prompt: STEWARD_RESUME_TEXT,
       };
@@ -694,6 +715,7 @@ export class CardExecutor {
           this.options.selfCommand,
           wiring,
         );
+        guardFinish(record, tokenSaver, launch);
         writeJsonAtomic(
           `${roundDir}/${RUN_FILES.launch}`,
           cardLaunchSpec(

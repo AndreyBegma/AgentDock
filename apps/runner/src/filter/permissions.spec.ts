@@ -10,10 +10,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { LAUNCH_SETTINGS_ENV } from './env';
 import {
-  type PermissionRules,
-  parseBashRule,
   hasManagedPolicy,
   managedPolicyPaths,
+  type PermissionRules,
+  parseBashRule,
   permissionFor,
   readRules,
   settingsFiles,
