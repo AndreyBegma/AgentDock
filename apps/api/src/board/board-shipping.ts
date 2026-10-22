@@ -9,6 +9,7 @@ import {
   type CardCollectOutcome,
   type CardNeedsPersonReason,
   cardAutoMergeEnabled,
+  cardCiMergeable,
   cardCiStateOf,
   cardLabel,
   failedCardChecks,
@@ -46,6 +47,12 @@ export const CI_STILL_FAILING =
  */
 export const CI_NOT_REPORTED =
   'ci_not_reported' satisfies CardNeedsPersonReason;
+
+/**
+ * C-182 (ADR-0079): the reason auto-merge refuses a head whose checks are not
+ * all passed — none, a cancelled or a skipped one.
+ */
+export const CI_NOT_GREEN = 'ci_not_green' satisfies CardNeedsPersonReason;
 
 /**
  * #542: why auto-merge refuses the head the card's latest round left, or
@@ -402,12 +409,13 @@ export class BoardShipping
       if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))
         return;
     }
-    await this.autoMerge(project, card.number, result.headSha);
+    await this.autoMerge(project, card.number, result);
   }
 
   /**
    * #484 (ADR-0043): whether a head with no checks ships as one. In a project
-   * whose CI never reported on a card, it does, as before. Otherwise the
+   * whose CI never reported on a card, it goes to Finished, as before — but
+   * auto-merge refuses it (`ci_not_green`, C-182). Otherwise the
    * forge's event was probably lost — a CI that answered its webhook with an
    * error never gets it again — so after `CARD_CI_MISSING_MS` the PR's event
    * is sent again once per head (`card.ciRetrigger`), and a head still
@@ -688,12 +696,16 @@ export class BoardShipping
    * the card gets `needsPerson` with the reason and stays in Finished.
    * C-148 (ADR-0077): nor is a card whose push changed a protected path
    * (`protectedPaths`) — only a person merges it, whatever the setting.
+   * C-182 (ADR-0079): nor a head whose checks are not all passed
+   * (`cardCiMergeable`) — none, a cancelled or a skipped one: `needsPerson`
+   * with `ci_not_green`, as for #542.
    */
   private async autoMerge(
     project: BoardProject,
     number: number,
-    headSha: string,
+    result: CardChecksResult,
   ): Promise<void> {
+    const { headSha } = result;
     if (!(await this.autoMergeOn(project))) return;
     // `deleteBranch` needs a runner of `card.prClose`'s release (#329 D9).
     if (!this.commands.advertisesPrClose(project.runnerId)) return;
@@ -709,7 +721,9 @@ export class BoardShipping
     ) {
       return;
     }
-    const unshippable = roundUnshippable(card.rounds[0] ?? null, headSha);
+    const unshippable =
+      roundUnshippable(card.rounds[0] ?? null, headSha) ??
+      (cardCiMergeable(result.checks) ? null : CI_NOT_GREEN);
     if (unshippable !== null) {
       await this.refuseMerge(project, card, headSha, unshippable);
       return;
@@ -725,7 +739,10 @@ export class BoardShipping
     this.work.publish(project.id, card.id);
   }
 
-  /** #542: the head is not the round's work — `needsPerson`, audited. */
+  /**
+   * #542: the head is not the round's work — or, C-182, its CI did not pass
+   * every check — `needsPerson`, audited.
+   */
   private async refuseMerge(
     project: BoardProject,
     card: CardWithRounds,

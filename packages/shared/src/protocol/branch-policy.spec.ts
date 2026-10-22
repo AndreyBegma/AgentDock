@@ -24,6 +24,8 @@ describe('protected paths (C-148, D-12)', () => {
     expect(isProtectedPath('plugins/nautelle/plugin.json')).toBe(true);
     expect(isProtectedPath('.claude-plugin/marketplace.json')).toBe(true);
     expect(isProtectedPath('.github/CODEOWNERS')).toBe(true);
+    // C-182: the images CI builds and deploys run.
+    expect(isProtectedPath('docker/api.Dockerfile')).toBe(true);
   });
 
   it('leaves other paths alone', () => {
@@ -39,6 +41,7 @@ describe('protected paths (C-148, D-12)', () => {
       'deploy/',
       'plugins/',
       '.claude-plugin/',
+      'docker/',
     ]) {
       expect((PROTECTED_PATHS as readonly string[]).includes(p)).toBe(true);
     }

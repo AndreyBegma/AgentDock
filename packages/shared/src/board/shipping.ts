@@ -47,6 +47,15 @@ export const cardCiStateOf = (checks: readonly CardCheck[]): CardCiState => {
   return 'green';
 };
 
+/**
+ * C-182 (D-12, ADR-0079): whether the head's checks let auto-merge ship it —
+ * stricter than `cardCiStateOf`'s `green`. At least one check, and every one
+ * passed: no checks, a cancelled or a skipped check is not proof that CI ran
+ * on the head, so only a person merges it.
+ */
+export const cardCiMergeable = (checks: readonly CardCheck[]): boolean =>
+  checks.length > 0 && checks.every((c) => c.bucket === 'pass');
+
 /** #359 D5: the failed checks, in the order `gh` listed them, as `ciChecks` keeps them. */
 export const failedCardChecks = (checks: readonly CardCheck[]): CardCiCheck[] =>
   checks

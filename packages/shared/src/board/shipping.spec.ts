@@ -7,6 +7,7 @@ import {
   cardAutoMergeDefault,
   cardAutoMergeEnabled,
   cardCiChecksOf,
+  cardCiMergeable,
   cardCiStateOf,
   cardDraftPullRequest,
   cardFollowUpBranch,
@@ -58,6 +59,36 @@ describe('cardCiStateOf (#359 D5)', () => {
   it('is red only on a real failure, even while others run', () => {
     expect(cardCiStateOf([check('a', 'pending'), check('b', 'fail')])).toBe(
       'red',
+    );
+  });
+});
+
+describe('cardCiMergeable (C-182)', () => {
+  it('is false without checks', () => {
+    expect(cardCiMergeable([])).toBe(false);
+  });
+
+  it('is false with a cancelled or skipped check, though the state is green', () => {
+    const cancelled = [check('a', 'pass'), check('b', 'cancel')];
+    const skipped = [check('a', 'pass'), check('b', 'skipping')];
+    expect(cardCiStateOf(cancelled)).toBe('green');
+    expect(cardCiMergeable(cancelled)).toBe(false);
+    expect(cardCiStateOf(skipped)).toBe('green');
+    expect(cardCiMergeable(skipped)).toBe(false);
+  });
+
+  it('is false while a check runs or after one failed', () => {
+    expect(cardCiMergeable([check('a', 'pass'), check('b', 'pending')])).toBe(
+      false,
+    );
+    expect(cardCiMergeable([check('a', 'pass'), check('b', 'fail')])).toBe(
+      false,
+    );
+  });
+
+  it('is true when every check passed', () => {
+    expect(cardCiMergeable([check('a', 'pass'), check('b', 'pass')])).toBe(
+      true,
     );
   });
 });
