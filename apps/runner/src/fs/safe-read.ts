@@ -57,7 +57,9 @@ export const readRegularFileInside = (
 };
 
 /** A capped read: the text, or — for a file over the cap, never read — its size. */
-export type CappedRead = { ok: true; text: string } | { ok: false; size: number };
+export type CappedRead =
+  | { ok: true; text: string }
+  | { ok: false; size: number };
 
 /**
  * Reads `path` as text when it is a regular file of at most `maxBytes`. An

@@ -275,7 +275,10 @@ describe('EventsCollector', () => {
   });
 
   it('reports a state.json over the size cap once, without reading it (C-161)', async () => {
-    writeFileSync(join(board, STATE_FILE), ' '.repeat(STATE_FILE_MAX_BYTES + 1));
+    writeFileSync(
+      join(board, STATE_FILE),
+      ' '.repeat(STATE_FILE_MAX_BYTES + 1),
+    );
     await start();
     poll();
     poll();

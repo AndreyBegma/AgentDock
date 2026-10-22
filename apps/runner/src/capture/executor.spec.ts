@@ -329,7 +329,9 @@ describe('readTail (C-161)', () => {
   });
 
   it('keeps only the last bytes of a stream longer than the cap', async () => {
-    const chunks = Array.from({ length: 1000 }, (_, i) => `${i % 10}`.repeat(100));
+    const chunks = Array.from({ length: 1000 }, (_, i) =>
+      `${i % 10}`.repeat(100),
+    );
     chunks.push('{"type":"result"}');
     const tail = await readTail(streamOf(chunks), 64);
     expect(tail).toHaveLength(64);

@@ -5,8 +5,8 @@ import type {
   SlotDispatchedData,
 } from '@nautelle/shared/protocol';
 import type { FleetEmitter, FleetProject } from '../../fleet/project';
-import { readFileCapped } from '../../fs/safe-read';
 import type { SlotBook } from '../../fleet/slots';
+import { readFileCapped } from '../../fs/safe-read';
 import { parseBoard } from './parse-board';
 import { parseBrief } from './parse-brief';
 
