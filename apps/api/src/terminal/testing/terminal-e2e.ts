@@ -19,9 +19,14 @@ export class TestTerminalSocket {
 
   constructor(
     url: string,
-    { token, origin }: { token?: string; origin?: string },
+    {
+      token,
+      origin,
+      forwardedFor,
+    }: { token?: string; origin?: string; forwardedFor?: string },
   ) {
     const headers: Record<string, string> = {};
+    if (forwardedFor) headers['X-Forwarded-For'] = forwardedFor;
     if (token) headers.Cookie = `${SESSION_COOKIE}=${token}`;
     if (origin) headers.Origin = origin;
     this.socket = new WebSocket(url, { headers });

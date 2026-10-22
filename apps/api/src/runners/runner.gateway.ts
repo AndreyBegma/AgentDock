@@ -13,6 +13,7 @@ import {
 import { Inject, Logger } from '@nestjs/common';
 import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';
+import { clientIp } from '../common/client-ip';
 import { bearerToken } from './credentials';
 import { commandResultOf } from './runner-command-result';
 import { RunnerConnectHooks } from './runner-connect-hooks';
@@ -39,9 +40,9 @@ const byteLength = (data: RawData): number =>
     ? data.reduce((sum, chunk) => sum + chunk.byteLength, 0)
     : data.byteLength;
 
-/** As the terminal gateway reads it: the socket's peer and its user agent. */
+/** As the terminal gateway reads it: the client IP and its user agent. */
 const peerOf = (request: IncomingMessage): RunnerPeer => ({
-  ip: request.socket.remoteAddress ?? null,
+  ip: clientIp(request) ?? null,
   userAgent: request.headers['user-agent'] ?? null,
 });
 

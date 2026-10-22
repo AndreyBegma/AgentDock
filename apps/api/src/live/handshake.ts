@@ -1,3 +1,7 @@
+import type { IncomingMessage } from 'node:http';
+import type { RequestOrigin } from '../audit/audit.types';
+import { clientIp } from '../common/client-ip';
+
 /**
  * The value of cookie `name` in a raw `Cookie` header, or null. The upgrade
  * request does not pass through Express, so `cookie-parser` never sees it.
@@ -34,3 +38,12 @@ export const originAllowed = (
     return false;
   }
 };
+
+/**
+ * The audit origin of an upgrade: the client IP through trusted proxies, as
+ * `req.ip` reads it for HTTP (C-151), and the user agent.
+ */
+export const upgradeOrigin = (request: IncomingMessage): RequestOrigin => ({
+  ip: clientIp(request),
+  userAgent: request.headers['user-agent'],
+});
