@@ -38,6 +38,34 @@ describe('FrameStrip (#441)', () => {
     expect(html).toContain('Frame 1 of 1');
   });
 
+  test('#833: typed tabs show the kind label and the template is named once; legacy frames show neither', () => {
+    const typed = framesOf('r', ['Overview', 'Zones']).map((f, i) => ({
+      ...f,
+      kind: i === 0 ? ('screen' as const) : ('breakdown' as const),
+    }));
+    const html = renderToStaticMarkup(
+      <TabGroup value="0" onValueChange={() => {}}>
+        <FrameStrip
+          frames={typed}
+          frame={0}
+          variant={1}
+          comments={new Map()}
+          pinned={new Set()}
+          onFrame={() => {}}
+          templateName="Page"
+          compare={{ on: true, onToggle: () => {} }}
+        />
+      </TabGroup>,
+    );
+    expect(html).toContain('Template ·');
+    expect(html).toContain('Breakdown');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('Compare');
+    const legacy = render(['Mockup']);
+    expect(legacy).not.toContain('Template ·');
+    expect(legacy).not.toContain('Compare');
+  });
+
   test('[ and ] step through the frames, wrapping; one frame takes no step', () => {
     expect(frameKey({ key: ']' }, 0, 3)).toBe(1);
     expect(frameKey({ key: ']' }, 2, 3)).toBe(0);

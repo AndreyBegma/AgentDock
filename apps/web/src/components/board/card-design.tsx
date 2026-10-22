@@ -11,7 +11,11 @@ import {
 } from '@andrewbehma/glass-ui/menu';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { Toggle } from '@andrewbehma/glass-ui/toggle';
-import type { BoardCardView, UiProfileView } from '@nautelle/shared';
+import type {
+  BoardCardView,
+  UiProfileView,
+  UpdateBoardCardRequest,
+} from '@nautelle/shared';
 import { Ellipsis } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
@@ -36,8 +40,13 @@ import {
   cardDesignHref,
   uiProfileApi,
 } from '../../lib/design/href';
+import type {
+  CardTemplateFields,
+  CardTemplatePatch,
+} from '../../lib/design/templates';
 import { useErrorToast } from '../../lib/section/use-error-toast';
 import { useSection } from '../../lib/section/use-section';
+import { TemplateSelect } from '../design/template-select';
 
 /** A badge is a fact, not a status (style system): only approval is toned. */
 const CHIP_TONE: Record<CardDesignChipState, 'neutral' | 'ok'> = {
@@ -186,6 +195,20 @@ export function CardDesignSection({
       (error) => describeDesignError(error, projectId),
     );
 
+  // #833 D8: the template shows once the design is on; the person's pick sticks.
+  const withTemplate: BoardCardView & CardTemplateFields = card;
+  const templateEditable =
+    canOperate && state !== 'approved' && state !== 'generating';
+  const setTemplate = (key: string) => {
+    const body: UpdateBoardCardRequest & CardTemplatePatch = {
+      designTemplate: key,
+    };
+    return run(
+      () => updateCard(projectId, card.number, body),
+      (error) => describeBoardError(error),
+    );
+  };
+
   const setContinue = (next: boolean) =>
     run(
       () => updateCard(projectId, card.number, { continueAfterDesign: next }),
@@ -263,6 +286,16 @@ export function CardDesignSection({
           </Link>
         ) : null}
       </div>
+
+      {needed || state !== 'off' ? (
+        <TemplateSelect
+          projectId={projectId}
+          value={withTemplate.designTemplate ?? null}
+          source={withTemplate.designTemplateSource}
+          disabled={!templateEditable || busy}
+          onChange={(key) => void setTemplate(key)}
+        />
+      ) : null}
 
       {needed ? (
         <div className="flex items-center gap-2">

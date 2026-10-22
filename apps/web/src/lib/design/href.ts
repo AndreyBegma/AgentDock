@@ -43,6 +43,10 @@ export const cardDesignHref = (
 export const uiProfileApi = (projectId: string): string =>
   `/projects/${encodeURIComponent(projectId)}/ui-profile`;
 
+/** #833: `GET` the project's resolved design templates (built-ins with overrides, then custom). */
+export const designTemplatesApi = (projectId: string): string =>
+  `/projects/${encodeURIComponent(projectId)}/design/templates`;
+
 export const designSettingsApi = (projectId: string): string =>
   `/projects/${encodeURIComponent(projectId)}/design-settings`;
 
