@@ -6,9 +6,9 @@ import {
   textFieldsSchema,
   textFieldView,
 } from '@nautelle/shared';
-import { roleAtLeast } from '@nautelle/shared/protocol';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { hiddenFrom } from '../board/inbox-access';
 import { PrismaService } from '../database/prisma.service';
 import { readablePlan } from '../planner/plan-access';
 import { ownerOfRow } from './text-columns';
@@ -35,7 +35,7 @@ export class TextViews {
       where: { id: cardId, projectId },
       select: { id: true, column: true },
     });
-    if (!card || (card.column === 'inbox' && !roleAtLeast(role, 'operator'))) {
+    if (!card || hiddenFrom(card, role)) {
       throw notFound();
     }
     return this.views({

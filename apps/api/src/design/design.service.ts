@@ -5,6 +5,7 @@ import {
   DESIGN_ERROR,
   type DesignCommentRequest,
   PLANNER_ERROR,
+  type Role,
   type TaskDesignPatchRequest,
   type TaskDesignView,
 } from '@nautelle/shared';
@@ -22,6 +23,7 @@ import { AuditService } from '../audit/audit.service';
 import { autoRunFailureOf, cardNotFound } from '../board/board-error';
 import { BoardRoundsService } from '../board/board-rounds.service';
 import { BoardStacks } from '../board/board-stacks';
+import { hiddenFrom } from '../board/inbox-access';
 import { PrismaService } from '../database/prisma.service';
 import { CardDesignTurnService } from '../planner/card-design-turn.service';
 import { callerOf, type PlanActor } from '../planner/plan.service';
@@ -202,9 +204,18 @@ export class DesignService implements OnModuleInit {
 
   // ─── Board card (#243) ─────────────────────────────────────────────────────
 
-  /** `GET …/board/cards/:number/design`: any project viewer (D8). */
-  async cardView(projectId: string, number: number): Promise<TaskDesignView> {
+  /**
+   * `GET …/board/cards/:number/design`: any project viewer (D8), but an Inbox
+   * card's only for operators (#244 D8). A write answers its design with no
+   * role: the caller already holds operator.
+   */
+  async cardView(
+    projectId: string,
+    number: number,
+    role?: Role,
+  ): Promise<TaskDesignView> {
     const card = await this.card(projectId, number);
+    if (hiddenFrom(card, role)) throw cardNotFound();
     const project = await this.store.project(projectId);
     return loadDesignView(this.prisma, project, { cardId: card.id });
   }

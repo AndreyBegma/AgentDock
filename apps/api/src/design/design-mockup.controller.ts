@@ -2,6 +2,7 @@ import { DESIGN_ERROR } from '@nautelle/shared';
 import { Controller, Get, Param, ParseIntPipe, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { type AuthUser, CurrentUser } from '../auth';
+import { hiddenFrom } from '../board/inbox-access';
 import { PrismaService } from '../database/prisma.service';
 import { readablePlanWhere } from '../planner/plan-access';
 import { ProjectAccessService } from '../projects';
@@ -20,7 +21,8 @@ import { sendMockup } from './mockup-response';
  *
  * Read follows the design's owner (ADR-0025): for a plan task, a member of
  * the project who may read the revision's plan (D17); for a board card, any
- * member of its project (#243 D8). Anything else is 404, as if absent.
+ * member of its project (#243 D8), an Inbox card's only an operator (#244
+ * D8). Anything else is 404, as if absent.
  */
 @Controller('design-revisions')
 export class DesignMockupController {
@@ -52,7 +54,7 @@ export class DesignMockupController {
         design: {
           select: {
             plan: { select: { id: true, projectId: true } },
-            card: { select: { projectId: true } },
+            card: { select: { projectId: true, column: true } },
             stack: { select: { projectId: true } },
           },
         },
@@ -67,9 +69,10 @@ export class DesignMockupController {
           where: { id: owner.plan.id, ...readablePlanWhere(user.id) },
         })) > 0;
     } else if (owner?.card) {
-      // #243 D8: a card's design is the project's — every member reads it.
-      readable =
-        (await this.access.resolve(user, owner.card.projectId)) !== null;
+      // #243 D8: a card's design is the project's — every member reads it,
+      // but an Inbox card's only an operator (#244 D8).
+      const access = await this.access.resolve(user, owner.card.projectId);
+      readable = access !== null && !hiddenFrom(owner.card, access.role);
     } else if (owner?.stack) {
       // #480: a stack's design is the project's, like a card's.
       readable =

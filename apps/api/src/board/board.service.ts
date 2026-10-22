@@ -23,7 +23,6 @@ import {
   profileAgentdockOf,
   type Role,
 } from '@nautelle/shared';
-import { roleAtLeast } from '@nautelle/shared/protocol';
 import {
   BadRequestException,
   Injectable,
@@ -71,16 +70,10 @@ import type {
   UpdateBoardCardDto,
   UpdateBoardSettingsDto,
 } from './dto';
+import { hiddenFrom, seesInbox } from './inbox-access';
 import { type CardModelByTypeArm, MODEL_BY_TYPE } from './launch-choice';
 
 const USER_REF = { select: { id: true, email: true } } as const;
-
-/**
- * #244 D8: Inbox cards are content-derived, so only operators and above see
- * them (ADR-0021 §5). A role left out is the board's own read: everything.
- */
-const seesInbox = (role: Role | undefined): boolean =>
-  role === undefined || roleAtLeast(role, 'operator');
 
 /**
  * #282 D4: holds the fleet's `FleetCardEdits` port. The fleet module imports
@@ -292,7 +285,7 @@ export class BoardService implements OnModuleInit {
         pullRequests: true,
       },
     });
-    if (!card || (card.column === 'inbox' && !seesInbox(role))) {
+    if (!card || hiddenFrom(card, role)) {
       throw boardError(404, BOARD_ERROR.notFound, 'Card not found');
     }
     const [facts, attachments, byType] = await Promise.all([

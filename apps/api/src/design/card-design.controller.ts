@@ -58,7 +58,11 @@ export class CardDesignController {
     @ProjectAccess() access: ResolvedProjectAccess,
     @Param('number') number: string,
   ): Promise<TaskDesignView> {
-    return this.designs.cardView(access.projectId, cardNumber(number));
+    return this.designs.cardView(
+      access.projectId,
+      cardNumber(number),
+      access.role,
+    );
   }
 
   @Patch()
