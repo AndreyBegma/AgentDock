@@ -60,6 +60,8 @@ export class NotificationsService {
 
   /** The caller's rows of projects they can still see, and project-less ones. */
   private mineWhere(user: Caller): Prisma.NotificationWhereInput {
+    // An admin sees every project: no project filter at all, not an empty one.
+    if (user.role === 'admin') return { userId: user.id };
     return {
       userId: user.id,
       OR: [{ projectId: null }, { project: this.access.visibleWhere(user) }],
