@@ -5,6 +5,7 @@ import {
   HOOK_SESSION_STARTED_EVENT,
   type HookEventType,
   hookEventDataSchemas,
+  isHookEventType,
   isLocalMethodName,
   type LocalErrorCode,
   localMethods,
@@ -198,6 +199,15 @@ export class LocalService {
     args: unknown,
     caller: LocalCaller,
   ): Promise<LocalResult<LocalEventResult>> {
+    // Any process of a session can call: only the hook types go on (C-169).
+    const claimed = (args as { type?: unknown } | null)?.type;
+    if (typeof claimed === 'string' && !isHookEventType(claimed)) {
+      this.deps.log.warn('local: refused an event type outside the hooks', {
+        type: claimed.slice(0, 64),
+        peerPid: caller.peerPid,
+      });
+      return refused(`${claimed.slice(0, 64)} is not a hook event`);
+    }
     const parsed = localEventArgsSchema.safeParse(args);
     if (!parsed.success) {
       return localFail('invalid_args', z.prettifyError(parsed.error));

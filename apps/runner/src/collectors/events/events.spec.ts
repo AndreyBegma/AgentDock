@@ -78,6 +78,7 @@ describe('EventsCollector', () => {
   let clock: FakeClock;
   let emitted: UnsequencedEvent[];
   let started: EventsCollector[];
+  let logs: string[];
 
   beforeEach(() => {
     const temp = tempDir();
@@ -89,6 +90,7 @@ describe('EventsCollector', () => {
     clock = new FakeClock();
     emitted = [];
     started = [];
+    logs = [];
     forgetOffsetStores();
   });
   afterEach(() => {
@@ -98,12 +100,14 @@ describe('EventsCollector', () => {
   });
 
   const start = async (): Promise<EventsCollector> => {
+    const logger = memoryLogger();
+    logs = logger.lines;
     const collector = new EventsCollector(
       {
         // No git: the board directory falls back to `<root>/.git/cs-orchestrator`.
         exec: async () => null,
         clock,
-        log: memoryLogger().log,
+        log: logger.log,
         fleet: DEFAULT_FLEET_SETTINGS,
       },
       { offsetsFile, watchFiles: false },
@@ -238,6 +242,30 @@ describe('EventsCollector', () => {
       reason: expect.stringContaining('99'),
     });
     expect(emitted[2].source).toBe('code-sentinel');
+  });
+
+  it('drops a type the plugin never writes, such as approvals.*, with a warning', async () => {
+    await start();
+    append(
+      line('approvals.decided', { pr: 7, decision: 'approved' }),
+      line('card_run.phase_changed', { phase: 'ended' }),
+      dispatched('i42-api', 42),
+    );
+    poll();
+    expect(types()).toEqual([
+      'events.unparsed',
+      'events.unparsed',
+      'slot.dispatched',
+    ]);
+    expect(emitted[0]).toMatchObject({
+      source: 'runner',
+      data: {
+        reason: 'type approvals.decided is not one events.jsonl may carry',
+      },
+    });
+    expect(
+      logs.filter((l) => l.includes('dropped a type the plugin never writes')),
+    ).toHaveLength(2);
   });
 
   it('sends a snapshot of state.json on start and again only when it changes', async () => {
