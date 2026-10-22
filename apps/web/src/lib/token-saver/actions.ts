@@ -1,5 +1,10 @@
 import type {
   ProjectRuntimeProfile,
+  TokenEconomyReport,
+  TokenEconomySettingsBody,
+  TokenEconomySettingsView,
+  TokenEconomyTechniqueBody,
+  TokenEconomyTechniqueView,
   TokenSaverSettingsView,
   TokenSaverSummary,
   UpdateTokenSaverSettingsBody,
@@ -27,6 +32,40 @@ export const fetchTokenSaverSummary = (
       from: range.from,
       to: range.to,
     }).toString()}`,
+  );
+
+/** `/projects/:id/token-economy` (#746 "API"): members read, a project admin writes. */
+const economy = (projectId: string) =>
+  `/projects/${encodeURIComponent(projectId)}/token-economy`;
+
+export const fetchTokenEconomyReport = (
+  projectId: string,
+  range: { from: string; to: string },
+) =>
+  api<TokenEconomyReport>(
+    `${economy(projectId)}/report?${new URLSearchParams({
+      from: range.from,
+      to: range.to,
+    }).toString()}`,
+  );
+
+export const saveTokenEconomySettings = (
+  projectId: string,
+  body: TokenEconomySettingsBody,
+) =>
+  api<TokenEconomySettingsView>(`${economy(projectId)}/settings`, {
+    method: 'PUT',
+    body,
+  });
+
+export const setTechniqueMode = (
+  projectId: string,
+  technique: string,
+  body: TokenEconomyTechniqueBody,
+) =>
+  api<TokenEconomyTechniqueView>(
+    `${economy(projectId)}/techniques/${encodeURIComponent(technique)}`,
+    { method: 'PUT', body },
   );
 
 /** Operator+ only; the allowlist falls back to its stored names for a viewer. */

@@ -38,6 +38,11 @@ export const AUDIT_ACTIONS = [
   'project.docs_source_reset',
   /** A GitHub App delivery found the project's repository under a new name. */
   'project.repo_rename',
+  /**
+   * #751 B9, B12: a prefix overlay proposed, approved, rejected or turned into
+   * a pull-request card — `meta.change`, `meta.part`; never the content.
+   */
+  'project.prefix_overlay',
   'prices.version_create',
   'prices.recompute',
   'issue.create',
@@ -141,6 +146,8 @@ export const AUDIT_ACTIONS = [
   'card.run_started',
   'card.feedback',
   'card.finished',
+  // #750 D9: the worker's `escalate_card` (reason, model, relaunched).
+  'card.escalated',
   'card.accepted',
   'card.stopped',
   /** #243 D10: the card's Continue after design switch. */

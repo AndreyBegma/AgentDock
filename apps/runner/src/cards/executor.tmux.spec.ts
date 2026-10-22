@@ -76,6 +76,12 @@ if [ "$FAKE_MODE" = prompt ]; then
   printf '%s' "$line" > "$RECORD_DIR/typed-$round"
   sleep 60
 fi
+if [ "$FAKE_MODE" = quota ]; then
+  printf "  ⎿  You've hit your 5-hour limit · resets in 1 hour\\n\\n╭────────────────────────────╮\\n│ >                          │\\n╰────────────────────────────╯\\n"
+  IFS= read -r line
+  printf '%s' "$line" > "$RECORD_DIR/typed-$round"
+  sleep 60
+fi
 if [ "$FAKE_MODE" = question ]; then
   printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question.txt"
   IFS= read -r line
@@ -147,6 +153,7 @@ const setup = async (
     profile('claude-quoted', 'quoted'),
     profile('claude-question', 'question'),
     profile('claude-question-tall', 'question-tall'),
+    profile('claude-quota', 'quota'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
 
@@ -327,6 +334,46 @@ describe.skipIf(!tmuxInstalled)(
         existsSync(keyFile) ? readFileSync(keyFile, 'utf8').trim() : '',
       ).toBe('');
       await t.tmux('kill-session', '-t', '=nautelle-card-ab12cd34');
+    });
+
+    it('types continue into a round once, a minute after its limit resets (#741)', async () => {
+      const t = await setup();
+      await t.executor.run(
+        t.args({
+          cardId: 'card_l',
+          runId: 'run_l',
+          profileKey: 'claude-quota',
+        }),
+      );
+      const session = 'nautelle-card-ab12cd34';
+      const typedFile = join(t.f.ws, 'typed-run_l');
+      await t.paneShows(session, 'hit your 5-hour limit');
+      const literal = () =>
+        t.tmuxCalls.filter((c) => c.includes('send-keys') && c.includes('-l'));
+      await t.executor.poll();
+      t.clock.advance(3_600_000 + 60_000 - 1);
+      await Bun.sleep(100);
+      expect(literal()).toHaveLength(0);
+
+      t.clock.advance(1);
+      for (let i = 0; i < 200 && !existsSync(typedFile); i++) {
+        await Bun.sleep(25);
+      }
+      for (let i = 0; i < 3; i++) await t.executor.poll();
+      expect(readFileSync(typedFile, 'utf8')).toBe('continue');
+      expect(literal()).toHaveLength(1);
+      expect(
+        t.events.filter((e) => e.type === 'card_run.quota').map((e) => e.data),
+      ).toEqual([
+        expect.objectContaining({
+          cardId: 'card_l',
+          limit: 'session',
+          resetsAt: '2026-10-14T13:00:00.000Z',
+          resumed: false,
+        }),
+        expect.objectContaining({ cardId: 'card_l', resumed: true }),
+      ]);
+      await t.tmux('kill-session', '-t', `=${session}`);
     });
 
     it('reports a question on screen once, and the next question again (#473)', async () => {

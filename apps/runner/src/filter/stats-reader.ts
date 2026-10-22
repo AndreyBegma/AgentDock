@@ -8,7 +8,7 @@ import {
   readSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import {
   FILTER_STATS_EVENT,
   FILTER_STATS_MAX_ROWS,
@@ -17,12 +17,19 @@ import {
 } from '@nautelle/shared';
 import {
   EVENT_SCHEMA_VERSION,
+  PREFIX_MEASURED_EVENT,
+  PREFIX_OVERLAY_STALE_EVENT,
   type UnsequencedEvent,
   type WatchedProject,
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { correlateCwd } from '../adapters/correlate';
 import { errorMessage, type Logger } from '../log';
+import {
+  PREFIX_MEASURED_FILE,
+  PREFIX_MEASURED_SENT_FILE,
+  prefixRecordSchema,
+} from '../prefix/record';
 import { type EcoSessionFile, findEcoStatsFiles, parseEcoLines } from './eco';
 import { FILTER_RAW_DIR, FILTER_RUN_FILE, FILTER_STATS_FILE } from './env';
 
@@ -86,7 +93,14 @@ export interface FilterStatsReaderOptions {
 }
 
 /** Every `filter-stats.jsonl` under the roots, at most `MAX_DEPTH` levels down. */
-export const findStatsFiles = (roots: readonly string[]): string[] => {
+export const findStatsFiles = (roots: readonly string[]): string[] =>
+  findRunFiles(roots, [FILTER_STATS_FILE]);
+
+/** Every run-dir file named one of `names` under the roots, at most `MAX_DEPTH` levels down. */
+export const findRunFiles = (
+  roots: readonly string[],
+  names: readonly string[],
+): string[] => {
   const found: string[] = [];
   const walk = (dir: string, depth: number) => {
     let entries: import('node:fs').Dirent[];
@@ -96,7 +110,7 @@ export const findStatsFiles = (roots: readonly string[]): string[] => {
       return;
     }
     for (const entry of entries) {
-      if (entry.isFile() && entry.name === FILTER_STATS_FILE && depth > 0) {
+      if (entry.isFile() && names.includes(entry.name) && depth > 0) {
         found.push(join(dir, entry.name));
       } else if (
         entry.isDirectory() &&
@@ -241,9 +255,15 @@ export class FilterStatsReader {
 
   private async pass(): Promise<void> {
     const { log } = this.options;
-    for (const file of findStatsFiles(this.options.roots())) {
+    const files = findRunFiles(this.options.roots(), [
+      FILTER_STATS_FILE,
+      PREFIX_MEASURED_FILE,
+    ]);
+    for (const file of files) {
       try {
-        await this.drain(file);
+        if (basename(file) === PREFIX_MEASURED_FILE)
+          await this.sendPrefix(file);
+        else await this.drain(file);
       } catch (error) {
         log.warn('filter stats: cannot read', {
           file,
@@ -265,7 +285,12 @@ export class FilterStatsReader {
     }
   }
 
-  private emitRows(project: EnvelopeProject, rows: FilterStatRow[]): void {
+  /** `session`: a `/cs-eco` batch's Claude session id (#748 D5). */
+  private emitRows(
+    project: EnvelopeProject,
+    rows: FilterStatRow[],
+    session?: string,
+  ): void {
     for (let i = 0; i < rows.length; i += FILTER_STATS_MAX_ROWS) {
       this.options.emit({
         v: EVENT_SCHEMA_VERSION,
@@ -273,7 +298,10 @@ export class FilterStatsReader {
         type: FILTER_STATS_EVENT,
         source: 'runner',
         project,
-        data: { rows: rows.slice(i, i + FILTER_STATS_MAX_ROWS) },
+        data: {
+          rows: rows.slice(i, i + FILTER_STATS_MAX_ROWS),
+          ...(session ? { session } : {}),
+        },
       });
     }
   }
@@ -309,7 +337,7 @@ export class FilterStatsReader {
           { file, rejected },
         );
       }
-      this.emitRows(project, rows);
+      this.emitRows(project, rows, sessionId);
     }
     writeOffset(file, next);
   }
@@ -341,5 +369,56 @@ export class FilterStatsReader {
     }
     // Written only after the rows are in the spool (`emit` appends synchronously).
     writeOffset(file, next);
+  }
+
+  /**
+   * #751 B1, B10: a launch's prefix record, sent once as `prefix.measured`
+   * and one `prefix.overlay_stale` per stale overlay. A record that is not
+   * the run dir's own (its run or kind differs) is dropped, never sent.
+   */
+  private async sendPrefix(file: string): Promise<void> {
+    const sent = join(dirname(file), PREFIX_MEASURED_SENT_FILE);
+    if (existsSync(sent)) return;
+    const identity = readIdentity(file);
+    if (!identity) return;
+    const markSent = () => writeFileSync(sent, '', { mode: 0o600 });
+    let json: unknown;
+    try {
+      json = JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+      json = null;
+    }
+    const parsed = prefixRecordSchema.safeParse(json);
+    if (
+      !parsed.success ||
+      parsed.data.measured.runId !== identity.runId ||
+      parsed.data.measured.launchKind !== identity.runKind ||
+      parsed.data.stale.some((s) => s.runId !== identity.runId)
+    ) {
+      this.options.log.warn('filter stats: skipped a malformed prefix record', {
+        file,
+      });
+      markSent();
+      return;
+    }
+    const project = (await this.options.resolve([identity.projectId])).get(
+      identity.projectId,
+    );
+    if (project) {
+      const event = (type: string, data: unknown): UnsequencedEvent => ({
+        v: EVENT_SCHEMA_VERSION,
+        ts: this.options.now().toISOString(),
+        type,
+        source: 'runner',
+        project,
+        data,
+      });
+      this.options.emit(event(PREFIX_MEASURED_EVENT, parsed.data.measured));
+      for (const stale of parsed.data.stale) {
+        this.options.emit(event(PREFIX_OVERLAY_STALE_EVENT, stale));
+      }
+    }
+    // Written only after the events are in the spool, as the offset is.
+    markSent();
   }
 }

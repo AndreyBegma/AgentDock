@@ -24,6 +24,7 @@ const toView = (row: SettingsRow | null): DesignSettingsView =>
     ? {
         viewports: viewportsOf(row.viewports),
         defaultSkills: row.defaultSkills,
+        useMemory: row.useMemory,
         saved: true,
         updatedBy: row.updatedBy ? userRef(row.updatedBy) : null,
         updatedAt: row.updatedAt.toISOString(),
@@ -31,6 +32,7 @@ const toView = (row: SettingsRow | null): DesignSettingsView =>
     : {
         viewports: [...DEFAULT_VIEWPORTS],
         defaultSkills: [],
+        useMemory: true,
         saved: false,
         updatedBy: null,
         updatedAt: null,
@@ -38,8 +40,9 @@ const toView = (row: SettingsRow | null): DesignSettingsView =>
 
 /**
  * A project's design settings (docs/specs/223-design-stage.md D11, D15):
- * the viewer's viewport presets and the default design skills. No row reads
- * as the defaults; a project admin writes one.
+ * the viewer's viewport presets, the default design skills and (#752 A6)
+ * whether design prompts read the profile's memory. No row reads as the
+ * defaults; a project admin writes one.
  */
 @Injectable()
 export class DesignSettingsService {
@@ -73,9 +76,12 @@ export class DesignSettingsService {
     }
     const defaultSkills = [...new Set(request.defaultSkills)];
     const before = await this.view(projectId);
+    // #752 A6: left out, the switch keeps its state.
+    const useMemory = request.useMemory ?? before.useMemory;
     const data = {
       viewports: viewports.data as Prisma.InputJsonValue,
       defaultSkills,
+      useMemory,
       updatedById: userId,
     };
     const row = await this.prisma.designSettings.upsert({
@@ -92,8 +98,9 @@ export class DesignSettingsService {
       before: {
         viewports: before.viewports,
         defaultSkills: before.defaultSkills,
+        useMemory: before.useMemory,
       },
-      after: { viewports: viewports.data, defaultSkills },
+      after: { viewports: viewports.data, defaultSkills, useMemory },
       result: 'ok',
     });
     return toView(row);

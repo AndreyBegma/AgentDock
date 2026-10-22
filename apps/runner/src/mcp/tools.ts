@@ -1,5 +1,8 @@
 import {
   ACTION_REQUEST_SUMMARY_MAX,
+  CARD_ESCALATION_NOTE_MAX,
+  CARD_ESCALATION_REASONS,
+  ESCALATE_CARD_TOOL,
   requestableActionRequestKindSchema,
 } from '@nautelle/shared';
 import {
@@ -173,3 +176,37 @@ export const MCP_TOOLS = [
     input: { on: z.boolean() },
   },
 ] as const satisfies readonly McpToolDefinition[];
+
+/**
+ * #750 D8: set to `1` in the env of a card round launched with `escalate`
+ * (a non-Opus round in the B arm of `model-by-type`); the MCP server offers
+ * `escalate_card` only then.
+ */
+export const CARD_ESCALATE_ENV = 'NAUTELLE_CARD_ESCALATE';
+
+/**
+ * #750 D8: the card worker asks for Opus. Not in `MCP_TOOLS`: it is listed
+ * only on a round launched with `escalate`, and the runner stops the session
+ * once it answers.
+ */
+export const ESCALATE_CARD_MCP_TOOL = {
+  name: ESCALATE_CARD_TOOL,
+  description:
+    'Only for the worker of a Nautelle board card: stop and hand the card to a stronger model (Opus). Call it instead of making a decision the card did not settle, or when you cannot finish the card at this model. It ends this round; Nautelle starts the card again on Opus, which gets your note. Any other session is refused (not_a_card_session).',
+  method: 'card.escalate',
+  input: {
+    reason: z
+      .enum(CARD_ESCALATION_REASONS)
+      .describe(
+        'misclassified: the card needs decisions it did not show. gave_up: you cannot finish it at this model.',
+      ),
+    note: z
+      .string()
+      .trim()
+      .min(1)
+      .max(CARD_ESCALATION_NOTE_MAX)
+      .describe(
+        'What you found and why you stop: the decision that is open, what you tried, what the next worker needs.',
+      ),
+  },
+} as const satisfies McpToolDefinition;

@@ -9,7 +9,9 @@ import {
   importSummary,
   initialCandidateSelection,
   moveRule,
+  sameCardTypes,
   selectedCandidates,
+  toggleCardType,
   withRuleCount,
   workerPromptBlock,
 } from './format';
@@ -27,6 +29,7 @@ const rule = (
   enabled,
   position: 0,
   source: 'manual',
+  appliesTo: [],
   createdAt: '2026-10-01T00:00:00.000Z',
   updatedAt: '2026-10-01T00:00:00.000Z',
 });
@@ -116,6 +119,18 @@ describe('rule candidates (#584)', () => {
       },
     ]);
     expect(selectedCandidates(candidates, new Set())).toEqual([]);
+  });
+
+  test('toggles a card type, keeping CARD_TYPES order and each type once', () => {
+    expect(toggleCardType(['feature'], 'bug', true)).toEqual([
+      'bug',
+      'feature',
+    ]);
+    expect(toggleCardType(['bug', 'feature'], 'bug', false)).toEqual([
+      'feature',
+    ]);
+    expect(sameCardTypes(['bug', 'ui'], ['ui', 'bug'])).toBe(true);
+    expect(sameCardTypes([], ['ui'])).toBe(false);
   });
 
   test('counts only candidates that can be added', () => {

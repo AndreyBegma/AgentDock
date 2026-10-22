@@ -96,6 +96,9 @@ describe('token saver (e2e)', () => {
       expect(response.body).toEqual({
         enabled: true,
         mcpAllow: [],
+        prefixBudgetTokens: 25_000,
+        mcpByType: {},
+        skillsOffByType: {},
         updatedAt: null,
       });
     });
@@ -229,6 +232,165 @@ describe('token saver (e2e)', () => {
       const stored = await w.ctx.prisma.tokenSaverStat.findMany();
       expect(stored).toHaveLength(1);
       expect(stored[0]).toMatchObject({ projectId: w.b, runId: null });
+    });
+  });
+
+  describe('a /cs-eco session (#748)', () => {
+    /** A Claude session of `projectId`'s runner, as its hooks would leave it. */
+    const session = async (
+      externalId: string,
+      projectId: string | null = w.a,
+      model: string | null = 'claude-haiku-5-5',
+    ) => {
+      const created = await w.ctx.prisma.agentSession.create({
+        data: {
+          runnerId: w.runnerId,
+          runtime: 'claude',
+          externalId,
+          projectId,
+          cwd: '/srv/dev/widget',
+          origin: 'manual',
+          models: model === null ? [] : [model],
+          startedAt: new Date('2026-10-14T11:00:00Z'),
+          lastEventAt: new Date('2026-10-14T13:00:00Z'),
+        },
+      });
+      if (model !== null) {
+        await w.ctx.prisma.llmRequest.create({
+          data: {
+            sessionId: created.id,
+            requestId: `q_${externalId}`,
+            ts: new Date('2026-10-14T13:00:00Z'),
+            model,
+            querySource: 'main',
+          },
+        });
+      }
+      return created.id;
+    };
+
+    /** A terminal card of project A tracked to `sessionId`. */
+    const terminalCard = (sessionId: string) =>
+      w.ctx.prisma.boardCard.create({
+        data: {
+          projectId: w.a,
+          number: 1,
+          shortId: 'term0001',
+          title: 'Terminal work',
+          column: 'in_progress',
+          position: 1,
+          source: 'terminal',
+          trackedSessionId: sessionId,
+          issueOnRun: false,
+          specOnRun: false,
+          movedAt: new Date(),
+        },
+      });
+
+    const manual = (over: Partial<FilterStatRow> = {}) =>
+      row({ runKind: 'manual', ...over });
+
+    const eco = (rows: FilterStatRow[], session?: string, root?: string) =>
+      w.deliver(
+        'filter.stats',
+        { rows, ...(session === undefined ? {} : { session }) },
+        root ? { project: { repo: 'acme/gadget', root } } : {},
+      );
+
+    it('stores the session of the same runner and project on every row', async () => {
+      const id = await session('sess-a');
+      await eco([manual(), manual()], 'sess-a');
+      const stored = await w.ctx.prisma.tokenSaverStat.findMany();
+      expect(stored).toHaveLength(2);
+      for (const s of stored) {
+        expect(s).toMatchObject({
+          sessionId: id,
+          sessionExternalId: 'sess-a',
+        });
+      }
+    });
+
+    it('keeps no session of another project or an unknown one, only its external id', async () => {
+      await session('sess-b', w.b);
+      await eco([manual()], 'sess-b');
+      await eco([manual()], 'sess-unknown');
+      const stored = await w.ctx.prisma.tokenSaverStat.findMany();
+      expect(stored).toHaveLength(2);
+      expect(stored.every((s) => s.sessionId === null)).toBe(true);
+      expect(stored.map((s) => s.sessionExternalId).sort()).toEqual([
+        'sess-b',
+        'sess-unknown',
+      ]);
+    });
+
+    it('skips a batch with a session and a non-manual row, storing nothing', async () => {
+      await session('sess-a');
+      await w.deliver('filter.stats', {
+        rows: [manual(), row({ runKind: 'orchestrator' })],
+        session: 'sess-a',
+      });
+      expect(await w.ctx.prisma.tokenSaverStat.count()).toBe(0);
+    });
+
+    it('stores an older runner’s batch, without a session, as before', async () => {
+      await eco([manual()]);
+      const [stored] = await w.ctx.prisma.tokenSaverStat.findMany();
+      expect(stored).toMatchObject({
+        sessionId: null,
+        sessionExternalId: null,
+      });
+    });
+
+    it('counts on the card the session is tracked to, priced at the session model', async () => {
+      await price();
+      const id = await session('sess-a');
+      await terminalCard(id);
+      await eco(
+        [
+          manual({ rawBytes: 4_000, keptBytes: 400 }),
+          manual({ filter: 'ops/git', rawBytes: 2_000, keptBytes: 1_000 }),
+        ],
+        'sess-a',
+      );
+      const view = await detail();
+      expect(view.tokenSaved?.estimateTokens).toBe(900 + 250);
+      expect(view.tokenSaved?.estimateUsd).toBeGreaterThan(0);
+    });
+
+    it('counts a row stored before its session was known, once the session is', async () => {
+      await price();
+      await eco([manual()], 'sess-late');
+      const id = await session('sess-late');
+      await terminalCard(id);
+      expect((await detail()).tokenSaved?.estimateTokens).toBe(900);
+    });
+
+    it("never reaches a card of another project from that project's root", async () => {
+      await price();
+      const id = await session('sess-a');
+      await terminalCard(id);
+      // Q's root names P's session: the row is B's, with no session.
+      await eco([manual()], 'sess-a', ROOT_B);
+      const [stored] = await w.ctx.prisma.tokenSaverStat.findMany();
+      expect(stored).toMatchObject({ projectId: w.b, sessionId: null });
+      expect((await detail()).tokenSaved).toBeNull();
+    });
+
+    it('prices an untracked manual session on the summary, and not into another project', async () => {
+      await price();
+      await session('sess-a');
+      await eco([manual()], 'sess-a');
+      await eco([manual()], 'sess-a', ROOT_B);
+      const a = (await w.viewer.get(summary())).body as TokenSaverSummary;
+      const manualA = a.byRunKind.find((k) => k.runKind === 'manual');
+      expect(manualA?.estimateTokens).toBe(900);
+      expect(manualA?.estimateUsd).toBeGreaterThan(0);
+      // B's row names A's session, which is not B's: tokens only, no price.
+      const b = (await w.operatorOfB.get(summary(w.b)))
+        .body as TokenSaverSummary;
+      const manualB = b.byRunKind.find((k) => k.runKind === 'manual');
+      expect(manualB).toMatchObject({ estimateTokens: 900, estimateUsd: 0 });
+      expect((await w.operatorOfB.get(summary(w.a))).status).toBe(404);
     });
   });
 

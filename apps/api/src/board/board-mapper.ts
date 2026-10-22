@@ -7,13 +7,17 @@ import {
   type BoardUserRef,
   CAPTURE_MODEL_DEFAULT,
   CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
+  CARD_DECIDING_SIGNALS,
   CARD_HOOKS_GRACE_MS,
+  type CardDecidingSignal,
   type CardDependencyRef,
+  type CardEscalationView,
   type CardEvidenceView,
   type CardFleetView,
   type CardHooksCause,
   type CardPrTarget,
   type CardPullRequestRef,
+  type CardRecommendationView,
   type CardRoundBrief,
   type CardRoundView,
   type CardStackRef,
@@ -29,6 +33,7 @@ import {
   isCaptureModel,
   isCardAutoRunCode,
   isCardNeedsPersonReason,
+  modelByType,
   type PendingQuestion,
   pendingQuestionSchema,
   type RestartEstimate,
@@ -47,6 +52,7 @@ import {
   type PaneDialog,
   type ProfileAgentdock,
   paneDialogSchema,
+  quotaLimitSchema,
 } from '@nautelle/shared/protocol';
 import {
   type BoardCard,
@@ -56,6 +62,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import type { TokenSaverCardFacts } from '../token-saver/token-saver-facts';
+import type { CardModelByTypeArm } from './launch-choice';
 
 /** #243: what a card's face shows of its design — the Design chip. */
 export const cardDesignSelect = {
@@ -316,6 +323,17 @@ export const blockingDialogOf = (
   return dialog.success ? dialog.data : null;
 };
 
+/** #741: the usage limit an active round waits on, as the runner reported it. */
+export const quotaWaitOf = (
+  round: Pick<BoardCardRound, 'phase' | 'quotaLimit' | 'quotaResetsAt'>,
+): CardRoundBrief['quotaWait'] => {
+  if (!isActiveRoundPhase(round.phase)) return null;
+  const limit = quotaLimitSchema.safeParse(round.quotaLimit);
+  return limit.success
+    ? { limit: limit.data, resetsAt: iso(round.quotaResetsAt) }
+    : null;
+};
+
 const brief = (
   card: BoardCard,
   round: BoardCardRound | undefined,
@@ -336,6 +354,7 @@ const brief = (
         pendingQuestion: pendingQuestionOf(round),
         finishRefused: finishRefusedOf(round),
         blockingDialog: blockingDialogOf(round),
+        quotaWait: quotaWaitOf(round),
       }
     : null;
 
@@ -364,12 +383,23 @@ const cardCost = (
   return total?.toFixed(6) ?? null;
 };
 
-/** #445 D13: the rounds' estimates summed, as `cardCost`; `null` when none. */
+/**
+ * #445 D13: the rounds' estimates summed, as `cardCost`; `null` when none.
+ * #748 D2: plus the tracked session's, which a terminal card has instead of
+ * rounds.
+ */
 const cardTokenSaved = (
-  rounds: readonly BoardCardRound[],
-  saved: TokenSaverCardFacts['tokenSaved'],
+  card: CardWithRounds,
+  facts: TokenSaverCardFacts,
 ): TokenSavedView | null => {
-  const of = rounds.flatMap((round) => saved.get(round.runId) ?? []);
+  const session =
+    card.trackedSessionId === null
+      ? undefined
+      : facts.tokenSavedBySession.get(card.trackedSessionId);
+  const of = [
+    ...card.rounds.flatMap((round) => facts.tokenSaved.get(round.runId) ?? []),
+    ...(session === undefined ? [] : [session]),
+  ];
   if (of.length === 0) return null;
   return {
     estimateTokens: of.reduce((sum, s) => sum + s.estimateTokens, 0),
@@ -413,7 +443,7 @@ export const toCardView = (
   design: designOf(card.design),
   continueAfterDesign: card.continueAfterDesign,
   costUsd: cardCost(card.rounds, facts.costs),
-  tokenSaved: cardTokenSaved(card.rounds, facts.tokenSaver.tokenSaved),
+  tokenSaved: cardTokenSaved(card, facts.tokenSaver),
   // #445 D8: the latest round's finish.
   artifactIncomplete:
     card.rounds[0] !== undefined &&
@@ -447,6 +477,7 @@ export const toCardView = (
   planId: card.planId,
   steward: stewardChipOf(card, facts),
   ...restartOf(card, facts),
+  escalated: card.escalatedAt !== null,
 });
 
 const isEvidence = (value: Prisma.JsonValue): value is Prisma.JsonObject =>
@@ -490,6 +521,7 @@ const toRoundView = (
   ...hooksCauseOf(card, round, facts),
   ...wiringOf(round),
   autoRunAfter: round.autoRunAfter,
+  escalation: round.escalation,
   finishRefused: finishRefusedOf(round),
   blockingDialog: blockingDialogOf(round),
   costUsd: facts.costs.get(round.runId) ?? null,
@@ -508,11 +540,55 @@ const toRoundView = (
   warmupMs: round.warmupMs,
 });
 
+/**
+ * #322 D6, #750 D1–D3: the card's recommendation, with the stored class and
+ * signals on the work one. In the B arm of `model-by-type` (`byType`) the
+ * work model and effort are the class mapping — what Run defaults to — so
+ * a choice equal to it is no override (D5).
+ */
+export const recommendationOf = (
+  card: CardWithRounds,
+  byType: CardModelByTypeArm | null,
+): CardRecommendationView => {
+  const recommendation = cardRecommendationOf(card);
+  const work = recommendation.work;
+  if (!work) return recommendation;
+  const mapped = byType
+    ? modelByType(byType.workClass, work.effort, false)
+    : null;
+  return {
+    ...recommendation,
+    work: {
+      ...work,
+      ...(mapped ?? {}),
+      class: card.workClass,
+      signals: card.workSignals.filter(isDecidingSignal),
+    },
+  };
+};
+
+const isDecidingSignal = (signal: string): signal is CardDecidingSignal =>
+  (CARD_DECIDING_SIGNALS as readonly string[]).includes(signal);
+
+/** #750 D9: the card's one escalation; `null` while it never escalated. */
+export const escalationOf = (
+  card: Pick<BoardCard, 'escalatedAt' | 'escalationReason' | 'escalationNote'>,
+): CardEscalationView | null =>
+  card.escalatedAt !== null && card.escalationReason !== null
+    ? {
+        reason: card.escalationReason,
+        note: card.escalationNote ?? '',
+        at: card.escalatedAt.toISOString(),
+      }
+    : null;
+
 /** `attachments`: the card's and its rounds', oldest first (#309). */
 export const toCardDetail = (
   card: CardWithPeople,
   facts: CardFacts,
   attachments: AttachmentView[],
+  /** #750 D3: the card's B arm of `model-by-type`; `null` is arm A. */
+  byType: CardModelByTypeArm | null = null,
 ): BoardCardDetail => ({
   ...toCardView(card, facts),
   body: card.body,
@@ -522,7 +598,8 @@ export const toCardDetail = (
   effort: card.effort,
   profileKey: card.profileKey,
   designModel: card.designModel,
-  recommendation: cardRecommendationOf(card),
+  recommendation: recommendationOf(card, byType),
+  escalation: escalationOf(card),
   branch: card.branch,
   worktree: card.worktree,
   specPath: card.specPath,
@@ -537,6 +614,8 @@ export const toCardDetail = (
         }
       : null,
   sessionId: card.sessionId,
+  sessionModel: card.sessionModel,
+  sessionEffort: card.sessionEffort,
   createdBy: card.createdBy,
   movedBy: card.movedBy,
   completedBy: card.completedBy,

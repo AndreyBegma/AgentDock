@@ -74,14 +74,33 @@ export const TOKEN_SAVER_DEFAULT: TokenSaverConfig = {
   mcpAllow: [],
 };
 
+/**
+ * #751 B3, B5: the prefix settings beside the launch setting. Not part of
+ * `TokenSaverConfig`, which every launch command carries as it is.
+ */
+export interface TokenSaverPrefixSettings {
+  /** B3: a launch kind's median prefix over this is flagged; default 25,000. */
+  prefixBudgetTokens: number;
+  /** B5: `{ [cardType]: server[] }`, each a subset of `mcpAllow`. */
+  mcpByType: Partial<Record<string, string[]>>;
+  /** B5: `{ [cardType]: skill[] }` hidden in that type's sessions. */
+  skillsOffByType: Partial<Record<string, string[]>>;
+}
+
 /** `GET /projects/:id/token-saver`. */
-export interface TokenSaverSettingsView extends TokenSaverConfig {
+export interface TokenSaverSettingsView
+  extends TokenSaverConfig,
+    TokenSaverPrefixSettings {
   /** `null` when the project has no row (the default applies). */
   updatedAt: string | null;
 }
 
-/** `PUT /projects/:id/token-saver` (admin). */
-export type UpdateTokenSaverSettingsBody = TokenSaverConfig;
+/**
+ * `PUT /projects/:id/token-saver` (admin). #751: a prefix field left out
+ * keeps its value.
+ */
+export type UpdateTokenSaverSettingsBody = TokenSaverConfig &
+  Partial<TokenSaverPrefixSettings>;
 
 // The runner event (D12)
 
@@ -240,9 +259,27 @@ export const filterStatRowSchema = z
 export type FilterStatRow = z.infer<typeof filterStatRowSchema>;
 
 /** `data` of a `filter.stats` event. */
-export const filterStatsDataSchema = z.strictObject({
-  rows: z.array(filterStatRowSchema).min(1).max(FILTER_STATS_MAX_ROWS),
-});
+export const filterStatsDataSchema = z
+  .strictObject({
+    rows: z.array(filterStatRowSchema).min(1).max(FILTER_STATS_MAX_ROWS),
+    /**
+     * #748 D5: the Claude session the batch's rows were read from — the
+     * `/cs-eco` directory name. Valid only when every row is `manual`; the API
+     * keeps it only for a session of the same runner and project (D4).
+     */
+    session: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,128}$/)
+      .optional(),
+  })
+  .refine(
+    (d) =>
+      d.session === undefined || d.rows.every((r) => r.runKind === 'manual'),
+    {
+      message: 'a batch with a session holds manual rows only',
+      path: ['session'],
+    },
+  );
 export type FilterStatsData = z.infer<typeof filterStatsDataSchema>;
 
 // The views (D12, D13)

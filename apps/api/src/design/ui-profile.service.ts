@@ -1,12 +1,15 @@
 import {
   DESIGN_ERROR,
   UIPROFILE_BUILD_TIMEOUT_SEC,
+  type UiProfileDesignRef,
   type UiProfileRebuildResult,
   type UiProfileUpdateRequest,
   type UiProfileVersionsView,
   type UiProfileVersionView,
   type UiProfileView,
+  uiProfileScreensSchema,
   uiProfileSnippetSchema,
+  uiProfileStyleRulesSchema,
   validateProfileContent,
 } from '@nautelle/shared';
 import { uiProfileBuildArgsSchema } from '@nautelle/shared/protocol';
@@ -23,13 +26,20 @@ import { PlannerFailure } from '../planner/planner-error';
 import { TokenSaverService } from '../token-saver/token-saver.service';
 import { DesignCommands } from './design-commands';
 import { designError } from './design-error';
-import { currentProfile, type Db, snippetsOf } from './design-store';
+import {
+  currentProfile,
+  type Db,
+  snippetsOf,
+  styleRulesOf,
+} from './design-store';
 import { profilePreviewHtml } from './mockup-response';
 import {
   type BuildArgs,
   type BuildReason,
   buildArgsOf,
   buildPrompt,
+  memoryDesignIds,
+  memoryOf,
   obligationsOf,
   profileInclude,
   profileStatusOf,
@@ -121,8 +131,66 @@ export class UiProfileService {
     ]);
     return {
       ...profileStatusOf(current, build),
-      current: current ? toProfileVersionView(current) : null,
+      current: current
+        ? toProfileVersionView(
+            current,
+            await this.designRefs(projectId, current),
+          )
+        : null,
     };
+  }
+
+  /**
+   * #752: the designs a version's library and style rules came from — this
+   * project's only (A8), so an id never resolves to another project's design.
+   */
+  private async designRefs(
+    projectId: string,
+    row: { screens: Prisma.JsonValue; styleRules: Prisma.JsonValue },
+  ): Promise<Record<string, UiProfileDesignRef>> {
+    const ids = memoryDesignIds(row);
+    if (ids.length === 0) return {};
+    const designs = await this.prisma.taskDesign.findMany({
+      where: {
+        id: { in: ids },
+        OR: [
+          { card: { projectId } },
+          { stack: { projectId } },
+          { plan: { projectId } },
+        ],
+      },
+      select: {
+        id: true,
+        taskKey: true,
+        card: { select: { number: true, title: true } },
+        stack: { select: { number: true, title: true } },
+        plan: { select: { id: true, title: true } },
+      },
+    });
+    const refs: Record<string, UiProfileDesignRef> = {};
+    for (const d of designs) {
+      if (d.card) {
+        refs[d.id] = {
+          kind: 'card',
+          number: d.card.number,
+          title: d.card.title,
+        };
+      } else if (d.stack) {
+        refs[d.id] = {
+          kind: 'stack',
+          number: d.stack.number,
+          title: d.stack.title,
+        };
+      } else if (d.plan && d.taskKey) {
+        refs[d.id] = {
+          kind: 'task',
+          planId: d.plan.id,
+          taskKey: d.taskKey,
+          title: d.plan.title,
+        };
+      }
+    }
+    return refs;
   }
 
   async versions(projectId: string): Promise<UiProfileVersionsView> {
@@ -149,7 +217,7 @@ export class UiProfileService {
         'Profile version not found',
       );
     }
-    return toProfileVersionView(row);
+    return toProfileVersionView(row, await this.designRefs(projectId, row));
   }
 
   /**
@@ -206,9 +274,24 @@ export class UiProfileService {
     if (!content.ok) {
       throw designError(400, DESIGN_ERROR.invalidArgs, content.message);
     }
+    // #752 A5: an admin edits or deletes library entries and style rules.
+    const screens = uiProfileScreensSchema
+      .optional()
+      .safeParse(request.screens);
+    const styleRules = uiProfileStyleRulesSchema
+      .optional()
+      .safeParse(request.styleRules);
+    if (!screens.success || !styleRules.success) {
+      throw designError(
+        400,
+        DESIGN_ERROR.invalidArgs,
+        z.prettifyError((screens.error ?? styleRules.error) as z.ZodError),
+      );
+    }
     const created = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE`;
       const current = await currentProfile(tx, projectId);
+      const memory = memoryOf(current);
       return tx.uiProfile.create({
         data: {
           projectId,
@@ -220,6 +303,12 @@ export class UiProfileService {
           snippets: snippets.data as Prisma.InputJsonValue,
           fingerprintGlobs: current?.fingerprintGlobs ?? [],
           fingerprint: current?.fingerprint ?? '',
+          screens:
+            (screens.data as Prisma.InputJsonValue | undefined) ??
+            memory.screens,
+          styleRules:
+            (styleRules.data as Prisma.InputJsonValue | undefined) ??
+            memory.styleRules,
           authorId: caller.userId,
         },
         include: profileInclude,
@@ -233,7 +322,10 @@ export class UiProfileService {
       after: { version: created.version, hasUi: created.hasUi },
       result: 'ok',
     });
-    return toProfileVersionView(created);
+    return toProfileVersionView(
+      created,
+      await this.designRefs(projectId, created),
+    );
   }
 
   /** D13: **Rebuild** in settings — always a build, the fingerprint aside. */
@@ -378,6 +470,7 @@ export class UiProfileService {
         summary: v.summary,
         kit: v.kit,
         snippets: snippetsOf(v.snippets),
+        styleRules: styleRulesOf(v.styleRules),
       })),
     );
     const prompt = buildPrompt(obligations);

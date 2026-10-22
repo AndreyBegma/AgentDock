@@ -316,6 +316,8 @@ export const detectCapabilities = async (
     otlp: config.otlp,
     // #445 Amendment 4: this runner takes `tokenSaver` on launch commands.
     tokenSaver: true,
+    // #746: this runner takes `tokenSaver.techniques` on `card.run`.
+    tokenEconomy: true,
     // #447: this runner observes for Steward and takes its commands.
     steward: true,
     // #449: this runner keeps handoff notes and takes `card.handoff.set`.
@@ -324,5 +326,13 @@ export const detectCapabilities = async (
     sessionMessage: true,
     // #663: this runner takes `effort` on `card.run`.
     cardEffort: true,
+    // #750 D7: this runner starts a `session.fresh` round in a new session.
+    cardFreshStart: true,
+    // #750 D8: this runner offers `escalate_card` and stops the round after it.
+    cardEscalate: true,
+    // #751 B1: this runner sends `prefix.measured` for its launches.
+    prefixMeasure: true,
+    // #751: this runner takes `card.run` `tokenSaver.prefix`.
+    prefixOverlays: true,
   };
 };

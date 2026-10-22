@@ -158,10 +158,15 @@ describe('capability detection', () => {
       codeSentinel: null,
       otlp: null,
       tokenSaver: true,
+      tokenEconomy: true,
       steward: true,
       handoff: true,
       sessionMessage: true,
       cardEffort: true,
+      cardFreshStart: true,
+      cardEscalate: true,
+      prefixMeasure: true,
+      prefixOverlays: true,
     });
   });
 

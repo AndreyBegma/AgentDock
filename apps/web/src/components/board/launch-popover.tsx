@@ -10,6 +10,7 @@ import {
 import { type ReactNode, useState } from 'react';
 import {
   DEFAULT_VALUE,
+  FRESH_SESSION_TEXT,
   type LaunchCard,
   type LaunchForm,
   type LaunchKind,
@@ -19,6 +20,7 @@ import {
   launchRequest,
   profileKeysWith,
   recommendationNote,
+  startsFreshSession,
 } from '../../lib/board/launch';
 import { useLaunchProfiles } from '../../lib/board/use-launch-profiles';
 import {
@@ -185,6 +187,9 @@ export function LaunchSelects({
             ))}
           </Select>
         </Field>
+      ) : null}
+      {kind === 'work' && startsFreshSession(card, form) ? (
+        <p className="text-xs text-ink-3">{FRESH_SESSION_TEXT}</p>
       ) : null}
     </>
   );

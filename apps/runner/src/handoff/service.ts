@@ -37,8 +37,18 @@ import {
   readNote,
   readNoteFile,
 } from './note';
-import { decideRestart, type RestartDecision } from './restart';
-import { acceptanceChecklist, branchDiff, freshSeed, seedTokens } from './seed';
+import {
+  decideRestart,
+  type RestartDecision,
+  TECHNIQUE_RESUME_BY_SIZE,
+} from './restart';
+import {
+  acceptanceChecklist,
+  branchDiff,
+  freshSeed,
+  type SeedInput,
+  seedTokens,
+} from './seed';
 import {
   cardNumberOfPrompt,
   type HandoffStateStore,
@@ -125,11 +135,12 @@ export class HandoffService {
   /**
    * D3, before a round launches (Token saver on): round 1 keeps its prompt
    * for later fresh starts; a later round resumes or starts fresh by the
-   * cheaper first turn. The session it does not resume stays recorded.
+   * cheaper first turn — or, with `session.fresh` (#750 D7), always fresh.
+   * The session it does not resume stays recorded.
    */
   async prepareRound(
     card: HandoffCard,
-    args: Pick<CardRunArgs, 'session' | 'prompt' | 'profileKey'>,
+    args: Pick<CardRunArgs, 'session' | 'prompt' | 'profileKey' | 'tokenSaver'>,
     profile: ConfigProfile,
   ): Promise<PreparedRound> {
     const { state } = this.options;
@@ -145,7 +156,10 @@ export class HandoffService {
       return { launch: asAsked, restart: { mode: 'first' } };
     }
     const decision = await this.decide(card, args, profile);
-    if (decision.mode === 'resume' || decision.seed === null) {
+    // #750 D7 (ADR-0076): the model or effort changed — a fresh session,
+    // whatever resuming would cost; never `--resume` on another pair.
+    const forced = args.session.fresh === true;
+    if (!forced && (decision.mode === 'resume' || decision.seed === null)) {
       this.startRound(card, args.session.id, null);
       return {
         launch: asAsked,
@@ -154,14 +168,65 @@ export class HandoffService {
     }
     const sessionId = randomUUID();
     this.startRound(card, sessionId, null, args.session.id);
+    return this.freshLaunch(
+      args,
+      sessionId,
+      decision.seed ?? (await this.forcedSeed(card, args)),
+      decision.estimate,
+    );
+  }
+
+  /**
+   * #750 D7: before a round launches with Context handoff off. Round 1 keeps
+   * its prompt, so a later forced start has the card; a `session.fresh`
+   * round starts a new session from the seed — the reduced one without a
+   * note — never `--resume` on another model or effort. Nothing else of
+   * Context handoff runs for it. `null` launches as the API asked.
+   */
+  async prepareForcedOnly(
+    card: HandoffCard,
+    args: Pick<CardRunArgs, 'session' | 'prompt' | 'profileKey' | 'tokenSaver'>,
+    profile: ConfigProfile,
+  ): Promise<PreparedRound | null> {
+    const { state } = this.options;
+    if (!args.session.resume) {
+      try {
+        state.saveCardPrompt(card.cardId, args.prompt);
+      } catch (error) {
+        this.warn('saving the card prompt failed', card, error);
+      }
+      return null;
+    }
+    if (args.session.fresh !== true) return null;
+    const decision = await this.decide(card, args, profile);
+    const sessionId = randomUUID();
+    try {
+      state.update(card.cardId, (s) => {
+        keepSession(s, args.session.id);
+        keepSession(s, sessionId);
+      });
+    } catch (error) {
+      this.warn('recording the round failed', card, error);
+    }
+    return this.freshLaunch(
+      args,
+      sessionId,
+      decision.seed ?? (await this.forcedSeed(card, args)),
+      decision.estimate,
+    );
+  }
+
+  private freshLaunch(
+    args: Pick<CardRunArgs, 'session'>,
+    sessionId: string,
+    seed: string,
+    estimate: RestartDecision['estimate'],
+  ): PreparedRound {
     return {
-      launch: {
-        session: { id: sessionId, resume: false },
-        prompt: decision.seed,
-      },
+      launch: { session: { id: sessionId, resume: false }, prompt: seed },
       restart: {
         mode: 'fresh',
-        estimate: decision.estimate,
+        estimate,
         previousSessionId: args.session.id,
       },
     };
@@ -260,7 +325,7 @@ export class HandoffService {
 
   private async decide(
     card: HandoffCard,
-    args: Pick<CardRunArgs, 'session' | 'prompt'>,
+    args: Pick<CardRunArgs, 'session' | 'prompt' | 'tokenSaver'>,
     profile: ConfigProfile,
   ): Promise<RestartDecision & { seed: string | null }> {
     const jsonl = this.transcriptOf(profile, args.session.id);
@@ -271,6 +336,10 @@ export class HandoffService {
         : { historyTokens: 0, lastTurnAt: null, cache1h: false },
       seed === null ? null : seedTokens(seed),
       this.options.deps.clock.now(),
+      {
+        resumeBySize:
+          args.tokenSaver?.techniques?.[TECHNIQUE_RESUME_BY_SIZE] === true,
+      },
     );
     return { ...decision, seed };
   }
@@ -280,12 +349,50 @@ export class HandoffService {
     card: HandoffCard,
     args: Pick<CardRunArgs, 'session' | 'prompt'>,
   ): Promise<string | null> {
-    const { state, deps } = this.options;
-    const cardPrompt = state.cardPrompt(card.cardId);
+    const cardPrompt = this.options.state.cardPrompt(card.cardId);
     if (!cardPrompt) return null;
     const stored = this.currentNote(card);
     if (!stored) return null;
-    const diff = await branchDiff(deps.exec, card.worktree, card.base);
+    return freshSeed(
+      await this.seedInput(card, args, cardPrompt, noteFileText(stored)),
+    );
+  }
+
+  /**
+   * #750 D7: a forced start's seed when the full one is not possible — no
+   * kept card prompt, no note, or too long with them. Drops the note, then
+   * the card prompt; at worst the round's own prompt, which always fits.
+   */
+  private async forcedSeed(
+    card: HandoffCard,
+    args: Pick<CardRunArgs, 'session' | 'prompt'>,
+  ): Promise<string> {
+    const stored = this.currentNote(card);
+    const input = await this.seedInput(
+      card,
+      args,
+      this.options.state.cardPrompt(card.cardId),
+      stored ? noteFileText(stored) : null,
+    );
+    return (
+      freshSeed(input) ??
+      freshSeed({ ...input, note: null }) ??
+      freshSeed({ ...input, cardPrompt: null, note: null }) ??
+      args.prompt
+    );
+  }
+
+  private async seedInput(
+    card: HandoffCard,
+    args: Pick<CardRunArgs, 'session' | 'prompt'>,
+    cardPrompt: string | null,
+    note: string | null,
+  ): Promise<SeedInput> {
+    const diff = await branchDiff(
+      this.options.deps.exec,
+      card.worktree,
+      card.base,
+    );
     let description: string | null = null;
     try {
       description = readFileSync(
@@ -295,14 +402,15 @@ export class HandoffService {
     } catch {
       description = null;
     }
-    return freshSeed({
+    return {
       cardPrompt,
-      note: noteFileText(stored),
+      note,
       diff,
       checklist: acceptanceChecklist(description),
       roundPrompt: args.prompt,
       previousSessionId: args.session.id,
-    });
+      reason: args.session.fresh === true ? 'changed' : 'cost',
+    };
   }
 
   /** The stored note after taking in a valid one the agent left on disk. */

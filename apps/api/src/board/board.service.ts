@@ -1,5 +1,6 @@
 import {
   type AcceptBoardCardResponse,
+  armForMode,
   BOARD_COLUMNS,
   BOARD_COMPLETED_PAGE_SIZE,
   BOARD_ERROR,
@@ -41,6 +42,7 @@ import { assertIssueLinkable } from '../steward/issue-link';
 import { stewardChipsFor } from '../steward/steward-chips';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
+import { TokenEconomyService } from '../token-economy/token-economy.service';
 import { tokenSaverFactsOf } from '../token-saver/token-saver-facts';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
@@ -69,6 +71,7 @@ import type {
   UpdateBoardCardDto,
   UpdateBoardSettingsDto,
 } from './dto';
+import { type CardModelByTypeArm, MODEL_BY_TYPE } from './launch-choice';
 
 const USER_REF = { select: { id: true, email: true } } as const;
 
@@ -123,6 +126,7 @@ export class BoardService implements OnModuleInit {
     private readonly profiles: RuntimeProfileResolver,
     private readonly dependencies: BoardDependencies,
     private readonly stacks: BoardStacks,
+    private readonly economy: TokenEconomyService,
   ) {}
 
   /**
@@ -291,11 +295,53 @@ export class BoardService implements OnModuleInit {
     if (!card || (card.column === 'inbox' && !seesInbox(role))) {
       throw boardError(404, BOARD_ERROR.notFound, 'Card not found');
     }
-    const [facts, attachments] = await Promise.all([
+    const [facts, attachments, byType] = await Promise.all([
       this.facts([card]),
       this.attachments.views(card.id),
+      this.modelByTypeOf(card),
     ]);
-    return toCardDetail(card, facts, attachments);
+    return toCardDetail(card, facts, attachments, byType);
+  }
+
+  /**
+   * #750 D3, D5: the card's B arm of `model-by-type` with the class a launch
+   * maps — so the popover preselects what Run defaults to. The arm is the
+   * drawn one; before the first round, the one the launch will draw
+   * (`armForMode`). A card that ran before the technique existed follows its
+   * current mode, as `TokenEconomyService.cardFlags` does. `null` is arm A.
+   */
+  private async modelByTypeOf(
+    card: CardWithRounds,
+  ): Promise<CardModelByTypeArm | null> {
+    const drawn = await this.prisma.cardTechniqueArm.findUnique({
+      where: {
+        cardId_technique: { cardId: card.id, technique: MODEL_BY_TYPE },
+      },
+      select: { arm: true },
+    });
+    let arm = drawn?.arm;
+    if (arm === undefined) {
+      const def = this.economy.techniques.find((t) => t.key === MODEL_BY_TYPE);
+      if (!def) return null;
+      const mode =
+        (await this.economy.modes(card.projectId)).find(
+          (m) => m.technique === MODEL_BY_TYPE,
+        )?.mode ?? def.defaultMode;
+      arm =
+        card.rounds.length > 0
+          ? mode === 'on'
+            ? 'b'
+            : 'a'
+          : armForMode(
+              mode,
+              card.id,
+              MODEL_BY_TYPE,
+              (await this.economy.settings(card.projectId)).bSharePercent,
+            );
+    }
+    return arm === 'b'
+      ? { workClass: await this.assessor.currentWorkClass(card.id) }
+      : null;
   }
 
   /** Active rounds of the project now (D13). */
@@ -390,7 +436,8 @@ export class BoardService implements OnModuleInit {
       dependencies: deps,
       stacks,
       // #445: each round run's savings and artifact-guard flag.
-      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds),
+      // #748 D1: and the figure of each card's tracked session.
+      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds, trackedIds),
       // #447 D15: the live Steward incident of each card's latest round.
       steward: await stewardChipsFor(
         this.prisma,

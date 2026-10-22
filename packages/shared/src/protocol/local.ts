@@ -4,6 +4,10 @@ import {
   actionRequestSummarySchema,
   requestableActionRequestKindSchema,
 } from '../action-requests/contracts';
+import {
+  CARD_ESCALATION_NOTE_MAX,
+  CARD_ESCALATION_REASONS,
+} from '../assess/limits';
 import type { Role } from './commands';
 import { httpsGithubUrl } from './github-url';
 
@@ -55,6 +59,11 @@ export const localErrorCodeSchema = z.enum([
   'internal',
   /** `card.finish` from a session that is not a board card's worker (issue #242). */
   'not_a_card_session',
+  /**
+   * `card.escalate` (#750 D9) on an Opus round, on a card that already
+   * escalated, or in the A arm of `model-by-type`.
+   */
+  'not_escalatable',
   /** `card.track` from a session that is not a person's own `manual` one (issue #282 D1). */
   'not_a_manual_session',
 ]);
@@ -235,6 +244,29 @@ export const localCardFinishResultSchema = z.object({
 });
 
 /**
+ * `card.escalate` (#750 D8, D9): the card worker's `escalate_card` tool. Like
+ * `card.finish`, the card is resolved from the request's `session.id`, never
+ * from an argument; any other session is answered `not_a_card_session`. It
+ * ends the round and — unless the card's model is a person's override —
+ * relaunches the card on Opus in a fresh session; else `not_escalatable`.
+ */
+export const localCardEscalateArgsSchema = z.strictObject({
+  reason: z.enum(CARD_ESCALATION_REASONS),
+  /** What the worker found and why; added to the next round's prompt. */
+  note: z.string().trim().min(1).max(CARD_ESCALATION_NOTE_MAX),
+});
+export const localCardEscalateResultSchema = z.object({
+  /** The card's per-project number (`C-<number>`). */
+  number: z.number().int().positive(),
+  escalated: z.literal(true),
+  /**
+   * D9: an Opus round was started. `false` is D10 — the model is a person's
+   * override, and the card waits in Finished with **Run on Opus**.
+   */
+  relaunched: z.boolean(),
+});
+
+/**
  * A card's title and body limits and its kinds; `BOARD_CARD_TITLE_MAX`,
  * `BOARD_CARD_BODY_MAX` and `BOARD_CARD_KINDS` in the board module. Defined
  * here because the board module imports this one.
@@ -352,6 +384,12 @@ export const localMethods = {
   'card.finish': {
     args: localCardFinishArgsSchema,
     result: localCardFinishResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.escalate': {
+    args: localCardEscalateArgsSchema,
+    result: localCardEscalateResultSchema,
     minRole: 'operator',
     needsProject: true,
   },

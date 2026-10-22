@@ -41,6 +41,13 @@ import {
   localRequestArgsSchema,
 } from './types';
 
+/** #750 D8: the round whose worker called `escalate_card`, as it was then. */
+export interface EscalatedRound {
+  cardId: string;
+  runId: string;
+  sessionId: string;
+}
+
 export interface LocalServiceDeps {
   projects: () => readonly WatchedProject[];
   awayMode: () => boolean;
@@ -72,6 +79,12 @@ export interface LocalServiceDeps {
    * store on disk — it outlives a daemon restart, the hook sessions do not.
    */
   liveRound?: (cwd: string) => CardRecord | null;
+  /**
+   * #750 D8: stop this round once `escalate_card` has answered its worker —
+   * only while it is still the card's round in that session (the executor
+   * checks), so the API's relaunch on Opus is never stopped.
+   */
+  stopRoundSoon?: (round: EscalatedRound) => void;
   now: () => string;
   log: Logger;
 }
@@ -366,6 +379,12 @@ export class LocalService {
     const { binding } = auth.data;
     const projects = this.deps.projects();
     const projectId = correlateCwd(binding.cwd, projects).projectId;
+    // #750 D8: the asking round is fixed before the call — the API may start
+    // the relaunch on Opus before it answers.
+    const asking =
+      input.method === 'card.escalate'
+        ? this.escalatingRound(binding.cwd, binding.sessionId)
+        : null;
     const result = await this.deps.relay({
       method: input.method,
       args: this.gate(input),
@@ -373,6 +392,9 @@ export class LocalService {
       session: { runtime: 'claude', id: binding.sessionId },
       via: input.via,
     });
+    if (input.method === 'card.escalate' && result.ok && asking) {
+      this.deps.stopRoundSoon?.(asking);
+    }
     if (input.method === 'card.finish' && !result.ok) {
       // #482: the round of the session's worktree, from the card store.
       const round = this.deps.liveRound?.(binding.cwd) ?? null;
@@ -381,6 +403,16 @@ export class LocalService {
       }
     }
     return result;
+  }
+
+  /** #750 D8: the live round of the caller's worktree, if it is the caller's session. */
+  private escalatingRound(
+    cwd: string,
+    sessionId: string,
+  ): EscalatedRound | null {
+    const round = this.deps.liveRound?.(cwd) ?? null;
+    if (!round || round.sessionId !== sessionId) return null;
+    return { cardId: round.cardId, runId: round.runId, sessionId };
   }
 
   /**

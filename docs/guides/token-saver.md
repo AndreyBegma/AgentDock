@@ -29,7 +29,9 @@ For every Claude launch the runner makes, with the project's setting on:
   with `Grep`, or ask the `scout` agent), and a repeated read of an unchanged
   range is refused once with a reminder. Repeating the same call reads the
   file. The launch sets `CS_ECO=off`, so the code-sentinel plugin's `/cs-eco`
-  hooks never guard the same read a second time.
+  hooks never guard the same read a second time. On a card under test with
+  `read-guard-400` (see [techniques under test](#techniques-under-test)) the
+  limit is 400 lines, and the refusal carries an outline of the file.
 - **Broad searches go to a cheaper helper**, and the worker prompt is ordered
   so the model's cache hits. Claude Code's built-in `Explore` agent runs on
   `haiku` too, instead of the session's own model.
@@ -40,6 +42,39 @@ For every Claude launch the runner makes, with the project's setting on:
 The setting is per project, **on by default**, and an administrator of the
 project can switch it off under **Settings › Token saver**. Off launches every
 agent exactly as it was launched before the feature.
+
+## Techniques under test
+
+Card and CI-fix rounds carry one flag per saving technique, drawn per card
+and kept for all its rounds ([#746](https://github.com/AndreyBegma/Nautelle/issues/746),
+[ADR-0074](../adr/0074-a-token-saving-is-judged-by-billed-cost-per-successful-card.md)).
+An administrator tests each one on a share of the cards, then enables it for
+all or stops it, under **Settings › Token saver**. These come from
+[#747](../specs/747-cut-large-mcp-grep-and-webfetch-results.md):
+
+| Flag | On | Off |
+|---|---|---|
+| `mcp-cut` | An MCP result over 16,000 characters keeps its first 6,000 and last 2,000; the middle becomes a marker naming the file with the full text. Images in the result are kept. The runner's own `nautelle` server is never cut. | The result reaches the agent whole. |
+| `grep-cut` | The same cut on a `Grep` result. | Whole. |
+| `webfetch-cut` | The same cut on a `WebFetch` result. | Whole. |
+| `read-guard-400` | A whole read over 400 lines (or 64 KB) is refused once, with an outline of the file: Markdown headings, or a code file's top-level declarations. | The 1,500-line guard, no outline. |
+| `terse-register` | The worker prompt's terse working register. | The earlier two-register lines: terse for what only the worker reads, full sentences for what a person reads. |
+
+The cut marker reads
+`[… Nautelle token saver: <cut> of <total> characters cut from the middle. Full output: <path> — Read it with offset/limit or Grep it for the part you need …]`.
+The full text is under the run's `raw/` directory, like a filtered command's
+([reading the raw output](#reading-the-raw-output)). Each cut writes a
+`tool/mcp-cut`, `tool/grep-cut` or `tool/webfetch-cut` row to
+[the savings](#where-the-savings-show).
+
+A launch without flags (an older API, a planner, design or assistant launch)
+behaves as before: no cuts, the 1,500-line guard and the terse register. Only
+`terse-register` changes the prompt, so cards of one arm share a cached
+prefix; the other flags explain themselves in the tool output.
+
+Internally, the runner passes the flags that are on to its hooks as
+`NAUTELLE_TECHNIQUES=<comma-separated keys>`, and runs the `tool-hook`
+subcommand only after the tools whose cut is on.
 
 ## The launch prefix
 

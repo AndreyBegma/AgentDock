@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { CardRunArgs } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
+import { PREFIX_MEASURED_FILE } from '../prefix/record';
+import { tempDir } from '../testing/fixtures';
 import {
   CARD_PORT_BASE,
   CARD_PORT_SPAN,
@@ -8,6 +12,7 @@ import {
   cardEnv,
   cardLaunchSpec,
   cardPort,
+  cardTokenSaver,
   cardWorktreePath,
 } from './launch';
 
@@ -168,6 +173,45 @@ describe('card worker launch (#242 D5)', () => {
     }
   });
 
+  // #750 D6, checked against Claude Code 2.1.306 (the session's
+  // `CLAUDE_EFFORT` as its Bash tool sees it): `--effort low` over a
+  // settings `effortLevel: high` gives low, but `CLAUDE_CODE_EFFORT_LEVEL=high`
+  // over `--effort low` gives high — so the env is set to the same value.
+  it('#750 D6: a round with an effort also sets CLAUDE_CODE_EFFORT_LEVEL, over the profile', () => {
+    const withEffort = cardLaunchSpec(
+      {
+        ...profile,
+        env: { ...profile.env, CLAUDE_CODE_EFFORT_LEVEL: 'max' },
+      },
+      { ...args(true), effort: 'low' },
+      '/wt',
+      null,
+    );
+    expect(withEffort.env.CLAUDE_CODE_EFFORT_LEVEL).toBe('low');
+    const at = withEffort.args.indexOf('--model');
+    expect(withEffort.args.slice(at, at + 4)).toEqual([
+      '--model',
+      'opus',
+      '--effort',
+      'low',
+    ]);
+    expect(
+      cardLaunchSpec(profile, args(true), '/wt', null).env
+        .CLAUDE_CODE_EFFORT_LEVEL,
+    ).toBeUndefined();
+  });
+
+  it('#750 D8: offers escalate_card through the env only when the round may escalate', () => {
+    expect(
+      cardLaunchSpec(profile, { ...args(false), escalate: true }, '/wt', null)
+        .env.NAUTELLE_CARD_ESCALATE,
+    ).toBe('1');
+    expect(
+      cardLaunchSpec(profile, args(false), '/wt', null).env
+        .NAUTELLE_CARD_ESCALATE,
+    ).toBeUndefined();
+  });
+
   it("#389: the card's env wins over a profile that sets the same names", () => {
     const spec = cardLaunchSpec(
       { ...profile, env: { ...profile.env, NAUTELLE_CARD: 'other' } },
@@ -194,6 +238,84 @@ describe('card worker launch (#242 D5)', () => {
       AGENTDOCK_CARD: 'h74ymwpx',
       AGENTDOCK_CARD_PORT: String(cardPort('h74ymwpx')),
     });
+  });
+
+  it('passes the technique flags of tokenSaver into the launch (#746)', () => {
+    const { dir, cleanup } = tempDir();
+    try {
+      const launch = (tokenSaver: CardRunArgs['tokenSaver']) =>
+        cardTokenSaver(
+          profile,
+          { ...args(false), tokenSaver, pullRequest: undefined },
+          dir,
+          dir,
+          ['/opt/nautelle/bin/nautelle-runner'],
+          { wiring: 'plugin' },
+        );
+      expect(
+        launch({ enabled: true, mcpAllow: [], techniques: { filter: false } })
+          ?.techniques,
+      ).toEqual({ filter: false });
+      // a command from an API without `tokenEconomy` carries none
+      expect(launch({ enabled: true, mcpAllow: [] })?.techniques).toEqual({});
+      expect(launch({ enabled: false, mcpAllow: [] })).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('applies the card prefix in the card worktree, which it never writes (#751)', () => {
+    const { dir, cleanup } = tempDir();
+    try {
+      const root = join(dir, 'app');
+      const worktree = cardWorktreePath(root, 'ab12cd34');
+      mkdirSync(worktree, { recursive: true });
+      writeFileSync(join(worktree, 'CLAUDE.md'), '# changed\n');
+      const roundDir = join(dir, 'round');
+      mkdirSync(roundDir);
+      const launch = cardTokenSaver(
+        profile,
+        {
+          ...args(false),
+          root,
+          pullRequest: undefined,
+          tokenSaver: {
+            enabled: true,
+            mcpAllow: [],
+            prefix: {
+              cardType: 'bug',
+              skillsOff: [],
+              overlays: [
+                {
+                  id: 'ov_1',
+                  part: 'claude_md',
+                  originalSha256: 'a'.repeat(64),
+                  content: '# P',
+                },
+              ],
+            },
+          },
+        },
+        dir,
+        roundDir,
+        ['/opt/nautelle/bin/nautelle-runner'],
+        { wiring: 'plugin' },
+      );
+      expect(launch?.prefix?.stale.map((s) => s.overlayId)).toEqual(['ov_1']);
+      const record = JSON.parse(
+        readFileSync(join(roundDir, PREFIX_MEASURED_FILE), 'utf8'),
+      );
+      expect(
+        record.measured.parts.some(
+          (p: { name: string }) => p.name === 'CLAUDE.md',
+        ),
+      ).toBe(true);
+      expect(readFileSync(join(worktree, 'CLAUDE.md'), 'utf8')).toBe(
+        '# changed\n',
+      );
+    } finally {
+      cleanup();
+    }
   });
 
   it('maps every permission mode to the CLI value', () => {

@@ -4,6 +4,8 @@ import {
   ATTACHMENTS_PER_CARD_MAX,
   attachmentRefSchema,
 } from '../../attachments';
+import { cardPrefixSchema } from '../../prefix/contracts';
+import { techniqueFlagsSchema } from '../../token-economy/techniques';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
@@ -100,6 +102,14 @@ export const cardSessionSchema = z.strictObject({
   id: z.uuid(),
   /** `claude --resume <id>` when true, `claude --session-id <id>` when false. */
   resume: z.boolean(),
+  /**
+   * #750 D7 (ADR-0076): a later round whose model or effort differs from the
+   * pair this session was started with — the runner starts a fresh session
+   * seeded from the handoff (ADR-0042 `fresh`), never `--resume` with another
+   * `--model` or `--effort`. Needs `resume: true`. Sent only to a runner that
+   * advertises `cardFreshStart`.
+   */
+  fresh: z.boolean().optional(),
 });
 export type CardSession = z.infer<typeof cardSessionSchema>;
 
@@ -189,6 +199,19 @@ export type CardDraftPullRequest = z.infer<typeof cardDraftPullRequestSchema>;
  * release); an older one refuses them as `invalid_args`, so the API sends
  * them only to a runner that advertises it.
  */
+/**
+ * #746 D11: a card launch's Token saver — the project's setting plus the
+ * technique flags of the card's arms, `{ [technique]: on }`. `techniques` is
+ * sent only to a runner that advertises `tokenEconomy`; it is strict over the
+ * registered techniques, so an unknown key is refused.
+ */
+export const cardTokenSaverSchema = tokenSaverConfigSchema.extend({
+  techniques: techniqueFlagsSchema.optional(),
+  /** #751: the session's frozen prefix; only to a runner with `prefixOverlays`. */
+  prefix: cardPrefixSchema.optional(),
+});
+export type CardTokenSaver = z.infer<typeof cardTokenSaverSchema>;
+
 export const cardRunArgsSchema = z
   .strictObject({
     ...cardTarget,
@@ -218,7 +241,13 @@ export const cardRunArgsSchema = z
     /** #359 D8: create `branch` from the updated `origin/<base>` first. */
     newBranch: z.boolean().optional(),
     /** #445 D11: the project's Token saver; absent is off (a runner without the `tokenSaver` capability refuses it). */
-    tokenSaver: tokenSaverConfigSchema.optional(),
+    tokenSaver: cardTokenSaverSchema.optional(),
+    /**
+     * #750 D8: offer the worker `escalate_card` — a non-Opus round in the B
+     * arm of `model-by-type` on a card that has not escalated yet. Sent only
+     * to a runner that advertises `cardEscalate`.
+     */
+    escalate: z.literal(true).optional(),
   })
   .refine(
     (a) =>
@@ -229,6 +258,10 @@ export const cardRunArgsSchema = z
   .refine((a) => a.newBranch !== true || a.session.resume, {
     message: 'newBranch needs a resumed session',
     path: ['newBranch'],
+  })
+  .refine((a) => a.session.fresh !== true || a.session.resume, {
+    message: 'a fresh start needs a later round',
+    path: ['session', 'fresh'],
   })
   .refine((a) => a.pullRequest === undefined || a.branch !== a.base, {
     message: 'a pushed branch must not be the base branch',

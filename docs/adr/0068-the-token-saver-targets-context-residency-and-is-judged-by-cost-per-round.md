@@ -1,6 +1,6 @@
 # ADR-0068: The token saver targets context residency, and is judged by cost per round
 
-Status: accepted · Date: 2026-10-19 ·
+Status: accepted, §2 amended by [ADR-0074](0074-a-token-saving-is-judged-by-billed-cost-per-successful-card.md) · Date: 2026-10-19 ·
 Issue: [#663](https://github.com/AndreyBegma/AgentDock/issues/663) ·
 Spec: [`docs/specs/663-token-saver-v2.md`](../specs/663-token-saver-v2.md) ·
 Amends: [ADR-0039](0039-token-saver.md), [ADR-0032](0032-a-cards-model-is-recommended-by-a-runner-side-assessment.md)

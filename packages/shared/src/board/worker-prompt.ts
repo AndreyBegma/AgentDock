@@ -34,8 +34,11 @@ import type { BoardCardKind } from './types';
  * commit Nautelle pushed. Version 19 (#663 D2, D3): the working register is
  * the shared terse register. Version 20 (C-295): the product is named
  * Nautelle. Version 21 (C-297, ADR-0073): the `NAUTELLE_*` variables.
+ * Version 22 (#747 D10): the terse register behind `terse-register`; its
+ * control arm gets the #445 D7 two-register lines. Version 23 (#750 D8):
+ * with `escalate`, when to call `escalate_card`.
  */
-export const CARD_WORKER_PROMPT_VERSION = 21;
+export const CARD_WORKER_PROMPT_VERSION = 23;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'NAUTELLE_CARD';
@@ -79,6 +82,9 @@ const PUSHED_HISTORY_LINE =
 
 /** The MCP tool the worker calls when done (D6). */
 export const FINISH_CARD_TOOL = 'finish_card';
+
+/** #750 D8: the runner MCP tool a non-Opus round in the B arm asks for Opus with. */
+export const ESCALATE_CARD_TOOL = 'escalate_card';
 
 /**
  * #359 D3: the PR description the worker writes, worktree-relative. Under
@@ -162,10 +168,21 @@ export interface CardWorkerPromptInput {
    */
   tokenSaver?: boolean;
   /**
+   * #747 D10: the card's `terse-register` arm. `false` gives the #445 D7
+   * two-register lines; absent or `true` the shared terse register (D3).
+   */
+  terseRegister?: boolean;
+  /**
    * C-227: the project's `## Project coding rules` section, from
    * `projectRulesBlock`; absent or `null` is none.
    */
   projectRules?: string | null;
+  /**
+   * #750 D8: the round is launched with `escalate` (a non-Opus round in the B
+   * arm of `model-by-type`); the prompt then says when to call
+   * `escalate_card`. Absent is off.
+   */
+  escalate?: boolean;
 }
 
 const utf8Bytes = (text: string): number =>
@@ -426,9 +443,21 @@ const pullRequestSection = (card: CardWorkerPromptInput): string[] => {
 
 /**
  * #445 D7: two registers. What only the worker reads is terse; what a person
- * reads is complete.
+ * reads is complete. #663 D2: the working register is the shared terse one.
  */
 const REGISTER_LINES = ['## How to write', '', ...TERSE_REGISTER_LINES];
+
+/**
+ * #747 D10: the control arm of `terse-register` — the #445 D7 lines #663
+ * replaced, kept word for word, so the audience-prose rule (ADR-0039 §4)
+ * stays.
+ */
+const TWO_REGISTER_LINES = [
+  '## How to write',
+  '',
+  '- Working register — what only you read: do not narrate, do not restate the plan, keep status lines short.',
+  `- Audience register — what a person reads (a question, the PR description, the \`${FINISH_CARD_TOOL}\` summary, a spec, a design file): full sentences, with every required section, and leave nothing out.`,
+];
 
 /**
  * #445 amendment 11: 629 of 634 card Bash calls were chains the hook may not
@@ -468,6 +497,17 @@ const HANDOFF_LINES = [
 ];
 
 /**
+ * #750 D8: when a non-Opus round hands the card to Opus instead of deciding.
+ * The signals are D2's list. "If it is listed": a later fresh session seeded
+ * from this prompt may run on Opus, which never gets the tool.
+ */
+const ESCALATE_LINES = [
+  '## When the card is beyond this round',
+  '',
+  `If the \`${ESCALATE_CARD_TOOL}\` tool is listed, call it instead of guessing when the card needs a decision it does not settle — a database schema, migration or stored format; authentication, authorization or roles; data isolation between projects, organizations or users; billing, prices or budgets; deleting stored data or a destructive git operation; a bug whose cause the card does not show; or no existing pattern in the project to follow — with \`reason: "misclassified"\`. Call it with \`reason: "gave_up"\` when you cannot finish the card at this model. The \`note\` says what you found and why you stop, in full sentences. It ends this round; Nautelle starts the card again on Opus, which reads your note. Commit what is worth keeping first.`,
+];
+
+/**
  * #445 D10: the stable sections — the same for every card — come first, so
  * the prompt cache hits; the card's own sections come last.
  */
@@ -493,13 +533,14 @@ const assemblePrompt = (
     PUSHED_HISTORY_LINE,
     '- If anything is unclear, ask and wait.',
     '',
-    ...REGISTER_LINES,
+    ...(card.terseRegister === false ? TWO_REGISTER_LINES : REGISTER_LINES),
     '',
     ...READING_LINES,
     ...(card.tokenSaver ? TOKEN_SAVER_LINES : []),
     '',
     ...(card.tokenSaver ? [...HANDOFF_LINES, ''] : []),
     ...(card.projectRules ? [card.projectRules, ''] : []),
+    ...(card.escalate ? [...ESCALATE_LINES, ''] : []),
     '## When you are done',
     '',
     `Write the pull request description the last section of this prompt asks for. Then call the \`${FINISH_CARD_TOOL}\` tool with a summary of what you changed and how you checked it, in at least two full sentences; if it says what is missing, write that and call it again. Without the tool, reply with the summary and the word DONE, then stop.`,

@@ -14,6 +14,8 @@ import {
   FILTER_RUN_ENV,
   FILTER_RUN_KIND_ENV,
   FILTER_STATS_ENV,
+  TECHNIQUE_READ_GUARD_400,
+  TECHNIQUES_ENV,
 } from './env';
 import { runFilterCommand } from './main';
 import {
@@ -23,6 +25,7 @@ import {
   READ_GUARD_DIR,
   READ_GUARD_ID,
   READ_GUARD_LINES,
+  READ_GUARD_LINES_TIGHT,
   runReadHook,
 } from './read-guard';
 import type { StatsLine } from './stats';
@@ -143,6 +146,95 @@ describe('read-hook: the whole-read guard (#616)', () => {
     for (const { row } of rows) {
       expect(filterStatRowSchema.safeParse(row).success).toBe(true);
     }
+  });
+});
+
+describe('read-hook: the 400-line guard with an outline (#747)', () => {
+  const tightDeps = () => ({
+    env: { ...env(), [TECHNIQUES_ENV]: TECHNIQUE_READ_GUARD_400 },
+    now: () => now,
+  });
+  const tightRead = (input: Record<string, unknown>): DenyOutput | null => {
+    const out = runReadHook(payload('PreToolUse', input), tightDeps());
+    if (out) return JSON.parse(out) as DenyOutput;
+    runReadHook(payload('PostToolUse', input), tightDeps());
+    return null;
+  };
+  const lines = (count: number): string =>
+    Array.from(
+      { length: count },
+      (_, i) => `export const v${i} = ${i};\n`,
+    ).join('');
+
+  it('reads a 400-line file and refuses a 401-line one once, with the outline', () => {
+    const ok = join(dir, 'ok.ts');
+    writeFileSync(ok, lines(READ_GUARD_LINES_TIGHT));
+    expect(tightRead({ file_path: ok })).toBeNull();
+
+    const big = join(dir, 'big.ts');
+    writeFileSync(big, lines(READ_GUARD_LINES_TIGHT + 1));
+    const reason =
+      tightRead({ file_path: big })?.hookSpecificOutput
+        .permissionDecisionReason ?? '';
+    expect(reason).toContain('401 lines');
+    expect(reason).toContain('Outline:');
+    expect(reason).toContain('  1: export const v0 = 0;');
+    expect(reason).toContain('(361 more, sampled)');
+    expect(reason).toContain('offset/limit');
+    // The immediate retry runs.
+    expect(tightRead({ file_path: big })).toBeNull();
+  });
+
+  it('says when a file has no outline', () => {
+    const path = join(dir, 'notes.txt');
+    writeFileSync(path, 'prose\n'.repeat(500));
+    const reason =
+      tightRead({ file_path: path })?.hookSpecificOutput
+        .permissionDecisionReason ?? '';
+    expect(reason).toContain(
+      'No outline (no headings or top-level declarations found).',
+    );
+  });
+
+  it('outlines Markdown by its headings', () => {
+    const path = join(dir, 'doc.md');
+    writeFileSync(path, `# Top\n${'text\n'.repeat(500)}## Later\n`);
+    const reason =
+      tightRead({ file_path: path })?.hookSpecificOutput
+        .permissionDecisionReason ?? '';
+    expect(reason).toContain('  1: # Top');
+    expect(reason).toContain('  502: ## Later');
+  });
+
+  it('keeps the byte threshold and the ranged read', () => {
+    const wide = join(dir, 'wide.json');
+    writeFileSync(wide, `${'x'.repeat(READ_GUARD_BYTES + 1)}\n`);
+    expect(tightRead({ file_path: wide })).not.toBeNull();
+    const big = join(dir, 'big.ts');
+    writeFileSync(big, lines(READ_GUARD_LINES_TIGHT + 1));
+    expect(tightRead({ file_path: big, offset: 1, limit: 100 })).toBeNull();
+  });
+
+  it('is unchanged without the flag: 1,500 lines, no outline', () => {
+    const path = join(dir, 'mid.ts');
+    writeFileSync(path, lines(READ_GUARD_LINES_TIGHT + 1));
+    expect(read({ file_path: path })).toBeNull();
+    const reason =
+      read({ file_path: bigFile() })?.hookSpecificOutput
+        .permissionDecisionReason ?? '';
+    expect(reason).not.toContain('Outline');
+    expect(reason).toContain('1,501 lines');
+  });
+
+  it('writes the same stats ids as the 1,500-line guard', () => {
+    const big = join(dir, 'big.ts');
+    writeFileSync(big, lines(READ_GUARD_LINES_TIGHT + 1));
+    tightRead({ file_path: big });
+    tightRead({ file_path: big });
+    expect(stats().map((r) => r.row.filter)).toEqual([
+      READ_GUARD_ID,
+      READ_GUARD_ID,
+    ]);
   });
 });
 

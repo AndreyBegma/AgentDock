@@ -15,7 +15,10 @@ import {
   FILTER_RUN_KIND_ENV,
   FILTER_STATS_ENV,
   LAUNCH_SETTINGS_ENV,
+  TECHNIQUES_ENV,
 } from '../filter/env';
+import { sha256Hex } from '../prefix/measure';
+import { PREFIX_MEASURED_FILE, type PrefixRecord } from '../prefix/record';
 import { tempDir } from '../testing/fixtures';
 import firstTurn from './fixtures/first-turn.json';
 import { profileClaudeJson, profileMcpServerNames } from './profile-mcp';
@@ -34,6 +37,7 @@ import {
   PROMPT_CACHE_TTL_ENV,
   type TokenSaverLaunchInput,
   tokenSaverLaunch,
+  toolCutMatcher,
 } from './token-saver';
 
 const SELF = ['/opt/nautelle/bin/nautelle-runner'];
@@ -97,6 +101,13 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(existsSync(join(dir, 'token-saver-settings.json'))).toBe(false);
   });
 
+  it('carries the technique flags it was given, and none by default (#746)', () => {
+    expect(tokenSaverLaunch(input())?.techniques).toEqual({});
+    expect(
+      tokenSaverLaunch(input({ techniques: { filter: false } }))?.techniques,
+    ).toEqual({ filter: false });
+  });
+
   it('passes the settings, a strict MCP list and the agents, in that order', () => {
     const launch = tokenSaverLaunch(input({ runKind: 'skill' }));
     expect(launch).not.toBeNull();
@@ -138,6 +149,21 @@ describe('tokenSaverLaunch (#445)', () => {
     const launch = tokenSaverLaunch(input({ runKind: 'card' }));
     expect(launch?.env[PROMPT_CACHE_TTL_ENV]).toBe('1h');
     expect(launch?.args.at(-1)).toBe(EXCLUDE_DYNAMIC_SECTIONS_FLAG);
+  });
+
+  it('keeps the one-hour TTL when cache-ttl-1h is true or absent (#749)', () => {
+    for (const techniques of [undefined, {}, { 'cache-ttl-1h': true }]) {
+      const launch = tokenSaverLaunch(input({ runKind: 'card', techniques }));
+      expect(launch?.env[PROMPT_CACHE_TTL_ENV]).toBe('1h');
+    }
+  });
+
+  it('pins 5m for the control arm of cache-ttl-1h, card rounds only (#749)', () => {
+    const techniques = { 'cache-ttl-1h': false };
+    const card = tokenSaverLaunch(input({ runKind: 'card', techniques }));
+    expect(card?.env[PROMPT_CACHE_TTL_ENV]).toBe('5m');
+    const plan = tokenSaverLaunch(input({ runKind: 'plan', techniques }));
+    expect(plan?.env[PROMPT_CACHE_TTL_ENV]).toBeUndefined();
   });
 
   it('leaves every other kind on the default TTL and the full prefix (#663)', () => {
@@ -271,6 +297,176 @@ describe('tokenSaverLaunch (#445)', () => {
     expect(settings.hooks.PostToolUse[0].hooks[0].command).toBe(read);
   });
 
+  describe('the launch prefix (#751)', () => {
+    const recordOf = (): PrefixRecord =>
+      JSON.parse(readFileSync(join(dir, PREFIX_MEASURED_FILE), 'utf8'));
+    const CLAUDE_MD = '# Project\n';
+    const worktree = () => {
+      const cwd = join(home, 'wt');
+      mkdirSync(cwd, { recursive: true });
+      writeFileSync(join(cwd, 'CLAUDE.md'), CLAUDE_MD);
+      return cwd;
+    };
+
+    it('records the parts of every launch with a run, for the daemon to send', () => {
+      const cwd = worktree();
+      tokenSaverLaunch(
+        input({
+          config: { enabled: true, mcpAllow: ['playwright'] },
+          cwd,
+          prompt: '# Card\n\n## Project coding rules\n\n1. Bun',
+        }),
+      );
+      const { measured, stale } = recordOf();
+      expect(measured.runId).toBe('run-1');
+      expect(measured.launchKind).toBe('card');
+      expect(stale).toEqual([]);
+      const names = measured.parts.map((p) => `${p.kind}:${p.name}`);
+      expect(names).toContain('claude_md:CLAUDE.md');
+      expect(names).toContain('rules:rules');
+      expect(names).toContain('nautelle:prompt');
+      expect(names).toContain('mcp:nautelle');
+      expect(names).toContain('mcp:playwright');
+      expect(names).toContain('agents:agents');
+      expect(measured.parts.find((p) => p.kind === 'claude_md')?.sha256).toBe(
+        sha256Hex(CLAUDE_MD),
+      );
+    });
+
+    it('records nothing for a launch without a run', () => {
+      tokenSaverLaunch(input({ runId: null }));
+      expect(existsSync(join(dir, PREFIX_MEASURED_FILE))).toBe(false);
+    });
+
+    it('applies the card prefix: MCP subset, hidden skills, overlays', () => {
+      const cwd = worktree();
+      const launch = tokenSaverLaunch(
+        input({
+          config: { enabled: true, mcpAllow: ['playwright', 'woodpecker'] },
+          cwd,
+          prefix: {
+            cardType: 'bug',
+            mcpAllow: ['woodpecker'],
+            skillsOff: ['cs-seo'],
+            overlays: [
+              {
+                id: 'ov_1',
+                part: 'claude_md',
+                originalSha256: sha256Hex(CLAUDE_MD),
+                content: '# P\n',
+              },
+            ],
+          },
+        }),
+      );
+      expect(Object.keys(mcpOf(launch?.mcpFile ?? '')).sort()).toEqual([
+        'nautelle',
+        'woodpecker',
+      ]);
+      const settings = JSON.parse(
+        readFileSync(launch?.settingsFile ?? '', 'utf8'),
+      );
+      expect(settings.skillOverrides).toEqual({ 'cs-seo': 'off' });
+      expect(settings.claudeMdExcludes).toEqual([join(cwd, 'CLAUDE.md')]);
+      expect(settings.hooks.PreToolUse).toBeDefined();
+      expect(launch?.args.slice(-2)).toEqual([
+        '--append-system-prompt-file',
+        join(dir, 'prefix-claude-md.md'),
+      ]);
+      expect(launch?.prefix?.stale).toEqual([]);
+    });
+
+    it('records a stale overlay and launches with the original', () => {
+      const cwd = worktree();
+      const launch = tokenSaverLaunch(
+        input({
+          cwd,
+          prefix: {
+            cardType: 'feature',
+            skillsOff: [],
+            overlays: [
+              {
+                id: 'ov_1',
+                part: 'claude_md',
+                originalSha256: 'a'.repeat(64),
+                content: '# P\n',
+              },
+            ],
+          },
+        }),
+      );
+      expect(launch?.args).not.toContain('--append-system-prompt-file');
+      expect(recordOf().stale).toEqual([
+        { runId: 'run-1', overlayId: 'ov_1', sha256: sha256Hex(CLAUDE_MD) },
+      ]);
+    });
+  });
+
+  describe('technique flags (#747 D3, D4)', () => {
+    const launched = (techniques?: TokenSaverLaunchInput['techniques']) => {
+      const launch = tokenSaverLaunch(input({ techniques }));
+      return {
+        env: launch?.env,
+        settings: readFileSync(launch?.settingsFile ?? '', 'utf8'),
+      };
+    };
+
+    it('without flags, writes the same settings and env as with none on', () => {
+      const before = launched();
+      expect(before.env?.[TECHNIQUES_ENV]).toBeUndefined();
+      expect(before.settings).not.toContain('tool-hook');
+      for (const off of [
+        {},
+        { 'mcp-cut': false, 'grep-cut': false, 'webfetch-cut': false },
+      ]) {
+        const after = launched(off);
+        expect(after.env).toEqual(before.env);
+        expect(after.settings).toBe(before.settings);
+      }
+    });
+
+    it('runs tool-hook after the cut tools and names the keys that are on', () => {
+      const { env, settings } = launched({
+        'mcp-cut': true,
+        'grep-cut': true,
+        'webfetch-cut': true,
+      });
+      expect(env?.[TECHNIQUES_ENV]).toBe('mcp-cut,grep-cut,webfetch-cut');
+      expect(JSON.parse(settings).hooks.PostToolUse).toContainEqual({
+        matcher: 'mcp__.*|Grep|WebFetch',
+        hooks: [
+          {
+            type: 'command',
+            command: `${SELF[0]} tool-hook || true`,
+            timeout: 10,
+          },
+        ],
+      });
+    });
+
+    it('leaves a cut that is off out of the matcher', () => {
+      const { env, settings } = launched({
+        'mcp-cut': true,
+        'grep-cut': false,
+        'webfetch-cut': true,
+      });
+      expect(env?.[TECHNIQUES_ENV]).toBe('mcp-cut,webfetch-cut');
+      const matchers = JSON.parse(settings).hooks.PostToolUse.map(
+        (entry: { matcher?: string }) => entry.matcher,
+      );
+      expect(matchers).toEqual(['Read', 'mcp__.*|WebFetch']);
+    });
+
+    it('adds no tool-hook for the techniques that are not cuts', () => {
+      const { env, settings } = launched({
+        'read-guard-400': true,
+        'terse-register': true,
+      });
+      expect(env?.[TECHNIQUES_ENV]).toBe('read-guard-400,terse-register');
+      expect(settings).not.toContain('tool-hook');
+    });
+  });
+
   describe('early compaction (amendment 12)', () => {
     const env = (): Record<string, string> =>
       tokenSaverLaunch(input())?.env ?? {};
@@ -375,6 +571,17 @@ describe('filterHookSettings (#445 D3)', () => {
     const settings = filterHookSettings(SELF, base);
     expect(settings.hooks.Stop).toEqual(base.hooks.Stop);
     expect(settings.hooks.PreToolUse?.[0]?.matcher).toBe('Bash');
+  });
+});
+
+describe('toolCutMatcher (#747 D4)', () => {
+  it('is built from the cut techniques that are on, in a fixed order', () => {
+    expect(toolCutMatcher(undefined)).toBeNull();
+    expect(toolCutMatcher({ 'read-guard-400': true })).toBeNull();
+    expect(toolCutMatcher({ 'webfetch-cut': true, 'mcp-cut': true })).toBe(
+      'mcp__.*|WebFetch',
+    );
+    expect(toolCutMatcher({ 'grep-cut': true })).toBe('Grep');
   });
 });
 

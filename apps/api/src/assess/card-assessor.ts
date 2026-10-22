@@ -6,7 +6,9 @@ import {
   CARD_ASSESS_MAX_RUNNING_PER_PROJECT,
   CARD_ASSESS_MODEL,
   CARD_ASSESS_TIMEOUT_SEC,
+  type CardWorkClass,
   cardLabel,
+  effectiveWorkClass,
   isActiveRoundPhase,
   RUN_UPDATED_LIVE_EVENT,
   type RunLiveChange,
@@ -62,6 +64,7 @@ const CARD_SELECT = {
   column: true,
   assessmentHash: true,
   assessRunId: true,
+  workClass: true,
 } as const;
 
 interface AssessedCard {
@@ -243,6 +246,17 @@ export class CardAssessor {
   }
 
   /**
+   * #750 D1: the card's class for a launch — the stored one while the card
+   * still hashes to what was assessed; `null` (`unsure`) without one, or
+   * when the card moved since (a stale assessment).
+   */
+  async currentWorkClass(cardId: string): Promise<CardWorkClass | null> {
+    const found = await this.read(this.prisma, cardId);
+    if (!found || found.card.assessmentHash !== found.hash) return null;
+    return found.card.workClass;
+  }
+
+  /**
    * `card_assess.finished` from `runnerId` (D6, D7). Applied once: only a
    * running `card_assess` run of that runner's project is touched.
    */
@@ -313,6 +327,9 @@ export class CardAssessor {
             recommendedModel: work.model,
             recommendedEffort: work.effort,
             recommendedReason: work.reason,
+            // #750 D1, D2: in both arms; a signal makes the class `deciding`.
+            workClass: effectiveWorkClass(work.class, work.signals),
+            workSignals: work.signals,
             recommendedDesignModel: design.model,
             recommendedDesignReason: design.reason,
             assessmentHash: hash,

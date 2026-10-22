@@ -17,7 +17,13 @@ export const assessAnswer = (
   effort = 'medium',
 ): string =>
   JSON.stringify({
-    work: { model: work, effort, reason: `Work fits ${work}.` },
+    work: {
+      model: work,
+      effort,
+      class: 'mechanical',
+      signals: [],
+      reason: `Work fits ${work}.`,
+    },
     design: { model: design, reason: `Design fits ${design}.` },
     ...extra,
   });

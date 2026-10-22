@@ -84,6 +84,42 @@ describe('CardFace pull request link (#329 D6)', () => {
   });
 });
 
+describe('CardFace usage limit (#741)', () => {
+  test('says the round waits for the limit, and nothing without one', () => {
+    const waiting = render('in_progress', {
+      round: round('running', {
+        quotaWait: { limit: 'session', resetsAt: '2026-10-21T15:00:00.000Z' },
+      }),
+    });
+    expect(waiting).toContain('Waiting for the limit until');
+    expect(render('in_progress', { round: round('running') })).not.toContain(
+      'the limit',
+    );
+  });
+});
+
+describe('CardFace escalation tag (#750)', () => {
+  const face = (card: BoardCardView) =>
+    renderToStaticMarkup(
+      <CardFace
+        projectId="p1"
+        canOperate
+        onOpen={() => undefined}
+        card={card}
+      />,
+    );
+
+  test('an escalated card wears → Opus; any other, or a view from before #750, does not', () => {
+    // `escalated` lands on the view with i750-api; set as the API will.
+    const escalated = Object.assign(fixtureCard(7, 'in_progress'), {
+      escalated: true,
+    });
+    expect(face(escalated)).toContain('→ Opus');
+    expect(face(escalated)).toContain('title="The worker asked for Opus"');
+    expect(face(fixtureCard(7, 'in_progress'))).not.toContain('→ Opus');
+  });
+});
+
 describe('CardFace shipping state (#359)', () => {
   test('red CI shows the dot and Fixing CI (n/3)', () => {
     const html = render('in_progress', { ciState: 'red', ciFixAttempts: 2 });

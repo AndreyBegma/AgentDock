@@ -16,6 +16,10 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { BoardService } from '../board/board.service';
 import {
+  BoardRoundsService,
+  CardNotEscalatable,
+} from '../board/board-rounds.service';
+import {
   BoardTerminalService,
   NotAManualSession,
 } from '../board/board-terminal.service';
@@ -91,6 +95,7 @@ export class LocalHandlers {
     private readonly board: BoardService,
     private readonly terminal: BoardTerminalService,
     private readonly tokenSaver: TokenSaverService,
+    private readonly rounds: BoardRoundsService,
   ) {}
 
   readonly table: LocalHandlerTable = {
@@ -110,6 +115,7 @@ export class LocalHandlers {
     'away.set': (args, call) => this.awaySet(args.on, call),
     'card.finish': (args, call) =>
       this.cardFinish(args.summary, args.artifactIncomplete === true, call),
+    'card.escalate': (args, call) => this.cardEscalate(args, call),
     'card.track': (args, call) => this.cardTrack(args, call),
   };
 
@@ -140,6 +146,44 @@ export class LocalHandlers {
       throw new LocalError('not_a_card_session', 'not a board card session');
     }
     return { number: finished.number, finished: true };
+  }
+
+  /**
+   * #750 D8–D10: the card worker's `escalate_card`. The card is the one whose
+   * Claude session asks, like `card.finish`; a person's tracked session is
+   * no card worker and is answered `not_a_card_session`.
+   */
+  private async cardEscalate(
+    args: LocalMethodArgs<'card.escalate'>,
+    call: LocalCall,
+  ): Promise<LocalMethodResult<'card.escalate'>> {
+    const project = projectOf(call);
+    const session = call.session;
+    let escalated: Awaited<ReturnType<BoardRoundsService['escalateByWorker']>>;
+    try {
+      escalated =
+        session && session.runtime === 'claude'
+          ? await this.rounds.escalateByWorker(
+              { id: project.id, runnerId: call.runnerId },
+              session.id,
+              args.reason,
+              args.note,
+            )
+          : null;
+    } catch (error) {
+      if (error instanceof CardNotEscalatable) {
+        throw new LocalError('not_escalatable', error.message);
+      }
+      throw error;
+    }
+    if (!escalated) {
+      throw new LocalError('not_a_card_session', 'not a board card session');
+    }
+    return {
+      number: escalated.number,
+      escalated: true,
+      relaunched: escalated.relaunched,
+    };
   }
 
   /**

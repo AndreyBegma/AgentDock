@@ -49,6 +49,7 @@ import {
   followsDefaultSkills,
 } from './design-store';
 import { loadDesignView } from './design-view';
+import { UiProfileLearner } from './learn/ui-profile-learner';
 import { type ProfileReadiness, UiProfileService } from './ui-profile.service';
 import type { WaitingDesign } from './ui-profile-mapper';
 
@@ -98,6 +99,7 @@ export class DesignService implements OnModuleInit {
     private readonly text: TextNormalizer,
     private readonly textOwners: TextOwners,
     private readonly assessor: CardAssessor,
+    private readonly learner: UiProfileLearner,
   ) {}
 
   /** #271: a comment's English body lands as its design's live event. */
@@ -612,6 +614,9 @@ export class DesignService implements OnModuleInit {
       },
       result: 'ok',
     });
+    // #752 A1: the profile learns from it in the background; queuing never
+    // fails the approval, and the approval never waits on the learn.
+    await this.learner.request(design.id, revision.id);
     owner.publish();
     await owner.onApproved(approved, actor);
   }

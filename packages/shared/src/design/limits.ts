@@ -33,6 +33,35 @@ export const UIPROFILE_GLOB_MAX = 256;
 /** "Configuration": a profile build's timeout is 20 min. */
 export const UIPROFILE_BUILD_TIMEOUT_SEC = 1200;
 
+/**
+ * #752 A3: the profile's memory — the approved-screen library, newest first,
+ * and the style rules taken from design comments.
+ */
+export const UI_PROFILE_SCREENS_MAX = 30;
+export const UI_PROFILE_SCREEN_SUMMARY_MAX = 1500;
+export const UI_PROFILE_SCREEN_NAME_MAX = 200;
+export const UI_PROFILE_STYLE_RULES_MAX = 50;
+export const UI_PROFILE_STYLE_RULE_MAX = 300;
+/** Comment ids one style rule cites. */
+export const UI_PROFILE_RULE_COMMENTS_MAX = 50;
+/** `learnNotes`: what a learn dropped. */
+export const UI_PROFILE_LEARN_NOTES_MAX = 4000;
+
+/** #752 A2: the learn call — `sonnet` (Q1), no tools, 3 min. */
+export const UIPROFILE_LEARN_MODEL = 'sonnet';
+export const UIPROFILE_LEARN_TIMEOUT_SEC = 180;
+export const UIPROFILE_LEARN_MIN_TIMEOUT_SEC = 30;
+export const UIPROFILE_LEARN_MAX_TIMEOUT_SEC = 600;
+/** The learn prompt: the approved frames, the snippet names, the comments. */
+export const UIPROFILE_LEARN_PROMPT_MAX_BYTES = 512 * 1024;
+/** The learn answer the runner returns; more is cut and fails the learn. */
+export const UIPROFILE_LEARN_RESULT_MAX_BYTES = 256 * 1024;
+/** The BullMQ queue of learn jobs (#752 A1). */
+export const UI_PROFILE_LEARN_QUEUE = 'ui-profile-learn';
+/** One job per approved revision: a repeated approval is never learned twice. */
+export const uiProfileLearnJobId = (revisionId: string): string =>
+  `learn-${revisionId}`;
+
 /** A design revision's title and rationale (contract v2). */
 export const DESIGN_TITLE_MAX = 200;
 export const DESIGN_RATIONALE_MAX = 4000;

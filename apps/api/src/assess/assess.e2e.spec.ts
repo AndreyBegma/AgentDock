@@ -89,7 +89,13 @@ describe('card model assessment (e2e, #322 D5–D8)', () => {
       outcome: 'work sonnet low · design opus',
     });
     expect((await detail(number)).recommendation).toEqual({
-      work: { model: 'sonnet', effort: 'low', reason: 'Work fits sonnet.' },
+      work: {
+        model: 'sonnet',
+        effort: 'low',
+        reason: 'Work fits sonnet.',
+        class: 'mechanical',
+        signals: [],
+      },
       design: { model: 'opus', reason: 'Design fits opus.' },
       assessedAt: expect.any(String),
     });
@@ -97,6 +103,61 @@ describe('card model assessment (e2e, #322 D5–D8)', () => {
     // The same input is never asked again.
     await w.assessor.request(id);
     expect(await w.waiting()).toEqual([]);
+  });
+
+  it('stores the class, and a deciding signal makes it deciding (#750 D1, D2)', async () => {
+    const { number } = await w.createCard({ kind: 'feature' });
+    const answer = (signals: string[]) =>
+      JSON.stringify({
+        work: {
+          model: 'sonnet',
+          effort: 'low',
+          class: 'mechanical',
+          signals,
+          reason: 'Work fits sonnet.',
+        },
+        design: { model: 'opus', reason: 'Design fits opus.' },
+      });
+    await w.finishAssess(await startOne(), answer(['auth']));
+    expect(await w.card(number)).toMatchObject({
+      workClass: 'deciding',
+      workSignals: ['auth'],
+    });
+
+    // In the B arm the card shows the mapping: deciding is opus at high.
+    await w.modelByType('on');
+    expect((await detail(number)).recommendation.work).toMatchObject({
+      model: 'opus',
+      effort: 'high',
+      class: 'deciding',
+      signals: ['auth'],
+    });
+
+    await w.operator.send('patch', `${w.path()}/board/cards/${number}`, {
+      body: 'Users sign in with a passkey.',
+    });
+    await w.finishAssess(await startOne(), answer([]));
+    expect(await w.card(number)).toMatchObject({
+      workClass: 'mechanical',
+      workSignals: [],
+    });
+  });
+
+  it('an answer without class or signals is out of contract and stores no class (#750 D1)', async () => {
+    const { number } = await w.createCard({ kind: 'feature' });
+    const runId = await startOne();
+    await w.finishAssess(
+      runId,
+      JSON.stringify({
+        work: { model: 'sonnet', effort: 'low', reason: 'Fits.' },
+        design: { model: 'opus', reason: 'Fits.' },
+      }),
+    );
+    expect((await w.card(number)).workClass).toBeNull();
+    expect(
+      (await w.ctx.prisma.run.findUniqueOrThrow({ where: { id: runId } }))
+        .status,
+    ).toBe('failed');
   });
 
   it('an edited body makes exactly one card_assess run, after its normalization settles', async () => {

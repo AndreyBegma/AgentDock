@@ -1,4 +1,5 @@
 import {
+  isCardType,
   PROJECT_RULE_ERROR,
   type ProjectRuleCandidateInput,
   type ProjectRuleCreateRequest,
@@ -9,11 +10,12 @@ import {
   ruleTitleKey,
   textFieldsSchema,
 } from '@nautelle/shared';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type { ProjectRule } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
+import { RulesCompressor } from '../prefix/rules-compressor';
 import { projectRuleError, projectRuleNotFound } from './project-rule-error';
 
 export const ruleView = (row: ProjectRule): ProjectRuleView => ({
@@ -24,6 +26,7 @@ export const ruleView = (row: ProjectRule): ProjectRuleView => ({
   enabled: row.enabled,
   position: row.position,
   source: row.source,
+  appliesTo: row.appliesTo.filter(isCardType),
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
@@ -34,6 +37,7 @@ const audited = (row: ProjectRule) => ({
   title: row.title,
   enabled: row.enabled,
   position: row.position,
+  appliesTo: row.appliesTo,
 });
 
 const ORDER = [{ position: 'asc' }, { createdAt: 'asc' }] as const;
@@ -49,6 +53,7 @@ export class ProjectRulesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly compressor?: RulesCompressor,
   ) {}
 
   async list(projectId: string): Promise<ProjectRuleView[]> {
@@ -92,6 +97,9 @@ export class ProjectRulesService {
           ? { description: input.description }
           : {}),
         ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+        ...(input.appliesTo !== undefined
+          ? { appliesTo: input.appliesTo }
+          : {}),
       },
     });
     await this.record(
@@ -332,6 +340,8 @@ export class ProjectRulesService {
     change: string,
     meta: object = {},
   ): Promise<void> {
+    // #751 B6: every rules write may change the rules version.
+    this.compressor?.request(projectId);
     return this.audit.record({
       ...ctx,
       action: 'project.update',

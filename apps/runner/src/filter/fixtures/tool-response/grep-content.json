@@ -1,0 +1,18 @@
+{
+  "claudeCode": "2.1.306",
+  "tool_name": "Grep",
+  "tool_input": {
+    "pattern": "writeStat",
+    "path": "apps/runner/src",
+    "output_mode": "content",
+    "-n": true
+  },
+  "tool_response": {
+    "mode": "content",
+    "numFiles": 0,
+    "filenames": [],
+    "content": "apps/runner/src/filter/stats.ts:79:export const writeStat = (\napps/runner/src/filter/hook.ts:29:import { statsTarget, writeStat } from './stats';\napps/runner/src/filter/hook.ts:305:      writeStat(\napps/runner/src/filter/hook.ts:320:    writeStat(\napps/runner/src/filter/read-guard.ts:13:import { type StatsTarget, statsTarget, writeStat } from './stats';\napps/runner/src/filter/read-guard.ts:206:    writeStat(\napps/runner/src/filter/read-guard.ts:217:    writeStat(\napps/runner/src/filter/engine.ts:12:  writeStat,\napps/runner/src/filter/engine.ts:291:  writeStat(target, counts, deps.now(), deps.random);\napps/runner/src/filter/families/lang/corpus/rg-no-line-numbers.out:8:apps/runner/src/filter/stats.ts:export const writeStat = (",
+    "numLines": 10,
+    "totalLines": 10
+  }
+}

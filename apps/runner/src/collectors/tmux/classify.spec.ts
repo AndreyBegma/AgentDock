@@ -31,6 +31,10 @@ const asWatchSh = (reading: PaneReading, idle: number): string => {
   return `${count === 3 ? 'IDLE' : 'NONE'} ${count} 0`;
 };
 
+/** Wed 2026-10-21 12:00 UTC, read in UTC: the banner's Monday is 2026-10-26. */
+const CONTEXT = { now: new Date('2026-10-21T12:00:00Z'), zone: 'UTC' };
+const MONDAY_9AM = '2026-10-26T09:00:00.000Z';
+
 describe('classifyPane', () => {
   it.each(
     Object.entries(WATCH_SH),
@@ -38,7 +42,7 @@ describe('classifyPane', () => {
     const reading = classifyPane(fixture(name));
     expect(asWatchSh(reading, 0)).toBe(expected.first);
     expect(asWatchSh(reading, 2)).toBe(expected.third);
-    expect(reading.quota).toBe(expected.quota);
+    expect(reading.quota !== null).toBe(expected.quota);
   });
 
   it.each([
@@ -54,7 +58,7 @@ describe('classifyPane', () => {
 
 describe('PaneTracker', () => {
   const feed = (tracker: PaneTracker, ...names: string[]) =>
-    names.flatMap((n) => tracker.next(classifyPane(fixture(n))));
+    names.flatMap((n) => tracker.next(classifyPane(fixture(n), CONTEXT)));
 
   it('reports busy once, then idle on the third empty poll, once', () => {
     const tracker = new PaneTracker();
@@ -81,7 +85,9 @@ describe('PaneTracker', () => {
 
   it('holds quota while the banner stays, and leaves it on busy', () => {
     const tracker = new PaneTracker();
-    expect(feed(tracker, 'quota')).toEqual([{ type: 'pane.quota_hit' }]);
+    expect(feed(tracker, 'quota')).toEqual([
+      { type: 'pane.quota_hit', limit: 'weekly', resetsAt: MONDAY_9AM },
+    ]);
     expect(feed(tracker, 'quota', 'quota', 'quota')).toEqual([]);
     expect(feed(tracker, 'busy')).toEqual([{ type: 'pane.busy' }]);
   });

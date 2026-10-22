@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import {
   AGENTDOCK_WORKTREE_DIR,
@@ -25,12 +26,17 @@ import {
   cardRunPhaseChangedDataSchema,
   cardRunPushedDataSchema,
   cardRunQuestionDataSchema,
+  cardRunQuotaDataSchema,
   cardSessionName,
   type PaneDialog,
   type UnsequencedEvent,
 } from '@nautelle/shared/protocol';
 import { type Cancel, isoNow } from '../clock';
-import { DIALOG_PATTERNS } from '../collectors/tmux/classify';
+import {
+  DIALOG_PATTERNS,
+  detectQuota,
+  type QuotaReading,
+} from '../collectors/tmux/classify';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { projectCheckout, watchedProject } from '../control/target';
@@ -43,6 +49,7 @@ import {
 } from '../handoff/service';
 import type { SessionBinding } from '../local/session-tokens';
 import { errorMessage, type Logger } from '../log';
+import { QuotaResumer } from '../quota/resume';
 import { type DeliveryTmux, deliverText } from '../session/deliver';
 import { profileOf, type SkillsDeps } from '../skills/deps';
 import { RUN_FILES, writeJsonAtomic } from '../skills/run/record';
@@ -165,6 +172,26 @@ const eventError = (error: unknown): string =>
   );
 
 /**
+ * #750 D7: a forced start whose seed could not be made — a new session with
+ * the round's own prompt; `null` for any other round, which launches as
+ * asked.
+ */
+const forcedWithoutSeed = (args: CardRunArgs): PreparedRound | null =>
+  args.session.fresh === true
+    ? {
+        launch: {
+          session: { id: randomUUID(), resume: false },
+          prompt: args.prompt,
+        },
+        restart: {
+          mode: 'fresh',
+          estimate: { resumeTokens: 0, freshTokens: 0, cacheWarm: false },
+          previousSessionId: args.session.id,
+        },
+      }
+    : null;
+
+/**
  * Board card workers (issue #242 D5–D10, ADR-0024). Each card has its own
  * worktree and tmux session `nautelle-card-<shortId>`, where `exec-run`
  * starts an interactive Claude Code session — a person can attach and type.
@@ -177,6 +204,10 @@ const eventError = (error: unknown): string =>
 export class CardExecutor {
   readonly store: CardStore;
   private readonly tmux: TmuxControl;
+  /** #741: types `continue` into a round once its usage limit has reset. */
+  private readonly quota: QuotaResumer;
+  /** #741: the run whose usage-limit banner was last reported, per card. */
+  private readonly quotaShown = new Map<string, string>();
   /** One operation per card at a time; `poll` skips a card that is busy. */
   private readonly chains = new Map<string, Promise<unknown>>();
   private polling: Promise<void> | null = null;
@@ -200,6 +231,7 @@ export class CardExecutor {
   constructor(private readonly options: CardExecutorOptions) {
     this.store = new CardStore(options.cardsDir);
     this.tmux = new TmuxControl(options.deps.exec, options.tmuxServer ?? []);
+    this.quota = new QuotaResumer(options.deps.clock, options.log);
   }
 
   /** Settles rounds a previous runner left mid-start, then starts polling. */
@@ -318,7 +350,8 @@ export class CardExecutor {
             reason: wiring.wiringReason,
           });
         }
-        // #449 D3: with Token saver on, resume or a fresh seeded session.
+        // #449 D3: with Token saver on, resume or a fresh seeded session;
+        // #750 D7: a changed model or effort always starts fresh.
         prepared = await this.prepareHandoff(record, args, profile);
         const launch = prepared ? { ...args, ...prepared.launch } : args;
         record.sessionId = launch.session.id;
@@ -375,8 +408,11 @@ export class CardExecutor {
   }
 
   /**
-   * #449 D3: how a round with Context handoff on launches. Never fails the
-   * round: a decision that cannot be made launches as the API asked.
+   * #449 D3: how a round with Context handoff on launches; #750 D7: with it
+   * off, only round 1's prompt is kept and a `session.fresh` round is seeded.
+   * Never fails the round: a decision that cannot be made launches as the
+   * API asked — except a forced start, which still gets a new session with
+   * the round's own prompt, never `--resume` on another model or effort.
    */
   private async prepareHandoff(
     record: CardRecord,
@@ -384,16 +420,18 @@ export class CardExecutor {
     profile: ConfigProfile,
   ): Promise<PreparedRound | null> {
     const { handoff } = this.options;
-    if (!handoff || !handoffOn(args)) return null;
     try {
-      return await handoff.prepareRound(record, args, profile);
+      if (!handoff) return forcedWithoutSeed(args);
+      return handoffOn(args)
+        ? await handoff.prepareRound(record, args, profile)
+        : await handoff.prepareForcedOnly(record, args, profile);
     } catch (error) {
       this.options.log.warn('cards: the handoff restart decision failed', {
         cardId: record.cardId,
         runId: record.runId,
         error: errorMessage(error),
       });
-      return null;
+      return forcedWithoutSeed(args);
     }
   }
 
@@ -405,6 +443,39 @@ export class CardExecutor {
       if (!record) return { stopped: false };
       const alive = (await this.tmux.find(record.tmuxSession)) !== null;
       if (record.phase !== 'stopped') this.setPhase(record, 'stopped');
+      if (alive) await this.kill(record.tmuxSession);
+      return { stopped: alive };
+    });
+  }
+
+  /**
+   * #750 D8: stops one round — after its worker's `escalate_card` — and only
+   * while it is still the card's round in the same session. A later round
+   * (the API's relaunch on Opus) has another run id and session, and is
+   * never stopped; checked in the card's serial queue, after any `card.run`
+   * that came first.
+   */
+  async stopRound(round: {
+    cardId: string;
+    runId: string;
+    sessionId: string;
+  }): Promise<{ stopped: boolean }> {
+    return this.serial(round.cardId, async () => {
+      const record = this.store.load(round.cardId);
+      if (
+        !record ||
+        record.runId !== round.runId ||
+        record.sessionId !== round.sessionId ||
+        (record.phase !== 'starting' && record.phase !== 'running')
+      ) {
+        return { stopped: false };
+      }
+      // tmux that cannot be read has no session to kill; the round still stops.
+      const alive = await this.tmux
+        .find(record.tmuxSession)
+        .then((session) => session !== null)
+        .catch(() => false);
+      this.setPhase(record, 'stopped');
       if (alive) await this.kill(record.tmuxSession);
       return { stopped: alive };
     });
@@ -528,9 +599,12 @@ export class CardExecutor {
         }
         this.noticePendingQuestion(record, pane);
         this.noticeQuestion(record, pane);
+        this.resumeAtReset(record, pane);
         this.queuePush(record);
         continue;
       }
+      this.quota.forget(record.cardId);
+      this.quotaShown.delete(record.cardId);
       // Re-read: an operation may have started while tmux answered, and a
       // push step may have finished since the list was read.
       if (this.chains.has(record.cardId)) continue;
@@ -883,6 +957,72 @@ export class CardExecutor {
     } catch (error) {
       shown.reported = false;
       this.options.log.warn('cards: reporting a blocking dialog failed', {
+        cardId: record.cardId,
+        error: errorMessage(error),
+      });
+    }
+  }
+
+  /**
+   * #741 D4: a round that stopped on a usage limit gets `continue` a minute
+   * after the banner's reset time, if the banner is still on screen. A pane
+   * that could not be read says nothing either way.
+   */
+  private resumeAtReset(record: CardRecord, pane: string | null): void {
+    if (pane === null) return;
+    const { clock } = this.options.deps;
+    const reading = detectQuota(pane, { now: new Date(clock.now()) });
+    if (reading === null) {
+      this.quotaShown.delete(record.cardId);
+    } else if (this.quotaShown.get(record.cardId) !== record.runId) {
+      this.quotaShown.set(record.cardId, record.runId);
+      this.emitQuota(record, reading, false);
+    }
+    this.quota.observe(
+      record.cardId,
+      reading,
+      {
+        capture: () => this.tmux.capture(record.tmuxSession),
+        type: async (text) => {
+          await this.tmux.sendLiteral(record.tmuxSession, text);
+          await this.tmux.sendSubmit(record.tmuxSession);
+        },
+      },
+      () => {
+        this.options.log.info('cards: resumed a round after its limit reset', {
+          cardId: record.cardId,
+        });
+        if (reading) this.emitQuota(record, reading, true);
+      },
+    );
+  }
+
+  /** `card_run.quota`: the limit on a round's pane, or its resume (#741). */
+  private emitQuota(
+    record: CardRecord,
+    reading: QuotaReading,
+    resumed: boolean,
+  ): void {
+    const at = isoNow(this.options.deps.clock);
+    try {
+      this.options.emit({
+        v: 1,
+        ts: at,
+        type: 'card_run.quota',
+        source: 'runner',
+        project: { repo: record.repo, root: record.root },
+        data: cardRunQuotaDataSchema.parse({
+          cardId: record.cardId,
+          runId: record.runId,
+          projectId: record.projectId,
+          at,
+          limit: reading.limit,
+          resetsAt: reading.resetsAt,
+          resumed,
+        }),
+      });
+    } catch (error) {
+      this.options.log.warn('cards: reporting a usage limit failed', {
         cardId: record.cardId,
         error: errorMessage(error),
       });

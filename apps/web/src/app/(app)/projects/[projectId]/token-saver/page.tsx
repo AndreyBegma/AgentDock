@@ -19,6 +19,7 @@ import {
   CostPerRoundWeeksTable,
   UnmeasuredKindsNote,
 } from '../../../../../components/token-saver/cost-per-round';
+import { PrefixSection } from '../../../../../components/token-saver/prefix-section';
 import { SavingsChart } from '../../../../../components/token-saver/savings-chart';
 import {
   FilterTable,
@@ -31,6 +32,7 @@ import {
   PromptCacheTile,
   SummaryTiles,
 } from '../../../../../components/token-saver/summary-tiles';
+import { TechniquesSection } from '../../../../../components/token-saver/techniques-section';
 import { describeTokenSaverError } from '../../../../../lib/token-saver/format';
 import {
   mostPassedThrough,
@@ -39,6 +41,7 @@ import {
 import { useTokenSaverSummary } from '../../../../../lib/token-saver/use-token-saver-summary';
 import { presetRange } from '../../../../../lib/usage/format';
 import { Segment } from '../../../workflows/segment';
+import { useProjectDetail } from '../use-project-detail';
 
 const PRESETS = ['7d', '30d'] as const;
 type Preset = (typeof PRESETS)[number];
@@ -51,6 +54,7 @@ const TOP = 10;
  * #648: why commands went unfiltered, which programs, and the prompt cache
  * as usage measured it. #663 D5: led by cost per round by session kind —
  * the fact the token saver is judged by (ADR-0068); saved bytes follow.
+ * #746: above it all, each saving technique's A/B report (ADR-0074).
  */
 export default function TokenSaverPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -59,6 +63,7 @@ export default function TokenSaverPage() {
   const range = useMemo(() => presetRange(preset), [preset]);
   const ids = useMemo(() => [projectId], [projectId]);
   const section = useTokenSaverSummary(ids, range);
+  const project = useProjectDetail(projectId).data;
 
   const settingsHref = `/projects/${encodeURIComponent(projectId)}/settings?tab=token-saver`;
   const empty = (
@@ -78,7 +83,7 @@ export default function TokenSaverPage() {
     <>
       <PageHeader
         title="Token saver"
-        description="What this project's rounds cost, measured from usage, and what the runner's filter kept out of what its agents read. Figures marked ≈ are estimates (bytes ÷ 4, priced at the model's input price)."
+        description="Whether each saving technique pays for itself, what this project's rounds cost, measured from usage, and what the runner's filter kept out of what its agents read. Figures marked ≈ are estimates (bytes ÷ 4, priced as one cache write plus a cache read on each turn left in the session)."
         link={Link}
         primaryAction={{
           label: 'Settings',
@@ -101,6 +106,20 @@ export default function TokenSaverPage() {
           </SegmentedControl>
         }
       />
+      <div className="mb-6">
+        <TechniquesSection
+          projectId={projectId}
+          range={range}
+          isAdmin={project?.role === 'admin'}
+        />
+      </div>
+      <div className="mb-6">
+        <PrefixSection
+          projectId={projectId}
+          range={range}
+          isAdmin={project?.role === 'admin'}
+        />
+      </div>
       <AsyncSection
         section={section}
         isEmpty={(data) =>

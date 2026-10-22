@@ -65,7 +65,7 @@ Every decision below is the person's answer from the interview of 2026-10-19 unl
     - Deferred MCP tools.
     - Only the skills a launch kind needs.
     - `CLAUDE.md` shrinks to the never-traded rules; details move to `docs/` and skills.
-12. **Cache.** Card and CI-fix rounds use the one-hour prompt-cache TTL and exclude dynamic system-prompt sections, so the prefix is shared across rounds and runners.
+12. **Cache.** Card and CI-fix rounds use the one-hour prompt-cache TTL and exclude dynamic system-prompt sections, so the prefix is shared across rounds and runners. Since #749 the one-hour TTL sits behind technique `cache-ttl-1h`: absent or on keeps `1h`, off pins `CLAUDE_CODE_PROMPT_CACHE_TTL=5m` (an unset TTL becomes 1h on a subscription).
 
 ## Data / Schema
 
@@ -155,3 +155,10 @@ Follow-up, in AndreyBegma/code-sentinel-skills (one issue, after the 0.14.0 runn
 - **Design and Planner effort.** Default: `medium`.
 
 Depends on #662 (runner 0.13.0 release)
+
+## Amendments
+
+- **#747 (2026-10-21), D2-D3.** In the card worker prompt the terse register is
+  behind the `terse-register` technique flag. A card without the flag keeps it;
+  its control arm gets the #445 D7 two-register lines instead. See
+  [747](747-cut-large-mcp-grep-and-webfetch-results.md).

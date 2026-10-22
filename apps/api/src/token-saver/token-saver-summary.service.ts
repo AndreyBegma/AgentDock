@@ -12,7 +12,7 @@ import { runCostsByKind, runPromptCacheByKind } from '../history/run-usage';
 import { costPerRoundOfProject } from './cost-per-round';
 import {
   byFilterOf,
-  inputPricesOfRuns,
+  cachePricesOfGroups,
   type StatGroup,
   savedOf,
   statGroupsOfProject,
@@ -77,10 +77,8 @@ export class TokenSaverSummaryService {
         }),
         costPerRoundOfProject(this.prisma, projectId, from, to),
       ]);
-    const runIds = [
-      ...new Set(groups.flatMap((g) => (g.runId === null ? [] : [g.runId]))),
-    ];
-    const prices = await inputPricesOfRuns(this.prisma, runIds);
+    // #748: a manual row is priced at its session's model and turns.
+    const prices = await cachePricesOfGroups(this.prisma, groups);
     const commands = sum(groups, 'commands');
     const rate = (n: number) => (commands === 0 ? 0 : n / commands);
 

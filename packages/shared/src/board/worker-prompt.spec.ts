@@ -33,6 +33,7 @@ import {
   cardFeedbackPrompt,
   cardNextRoundPrompt,
   cardWorkerPrompt,
+  ESCALATE_CARD_TOOL,
   HANDOFF_NOTE_PATH,
 } from './worker-prompt';
 
@@ -199,6 +200,21 @@ describe('worker prompt v9 — Token saver (#445 D7, D9, D10, D14)', () => {
     // #663 D3: the working register is the one shared text, verbatim.
     expect(prompt).toContain(TERSE_REGISTER);
     expect(prompt).toContain('Full sentences, every required section');
+  });
+
+  it('keeps the terse register on unless its arm is off (#747 D10)', () => {
+    expect(cardWorkerPrompt({ ...plain, terseRegister: true })).toBe(
+      cardWorkerPrompt(plain),
+    );
+    const off = cardWorkerPrompt({ ...plain, terseRegister: false });
+    expect(off).not.toContain(TERSE_REGISTER);
+    expect(off).toContain('## How to write');
+    expect(off).toContain(
+      '- Working register — what only you read: do not narrate, do not restate the plan, keep status lines short.',
+    );
+    expect(off).toContain(
+      '- Audience register — what a person reads (a question, the PR description, the `finish_card` summary, a spec, a design file): full sentences, with every required section, and leave nothing out.',
+    );
   });
 
   it('asks for offset/limit on big files and Grep/Glob first', () => {
@@ -373,8 +389,8 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
     kind: 'feature',
   };
 
-  it('is version 20', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(21);
+  it('is version 23', () => {
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(23);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -733,6 +749,42 @@ describe('worker prompt v13 — only the e2e suites the card touched (#487)', ()
         'only the e2e suites you touched (`--testPathPatterns`); CI runs the rest.',
       );
     }
+  });
+});
+
+describe('worker prompt v23 — escalate_card (#750 D8)', () => {
+  const plain = { ...card, design: null };
+
+  it('tells the worker when to escalate only when the round may', () => {
+    for (const escalate of [undefined, false]) {
+      const prompt = cardWorkerPrompt({ ...plain, escalate });
+      expect(prompt).not.toContain(ESCALATE_CARD_TOOL);
+    }
+    const prompt = cardWorkerPrompt({ ...plain, escalate: true });
+    const section = prompt.slice(
+      prompt.indexOf('## When the card is beyond this round'),
+      prompt.indexOf('## When you are done'),
+    );
+    expect(section).toContain(
+      `If the \`${ESCALATE_CARD_TOOL}\` tool is listed`,
+    );
+    for (const signal of [
+      'schema',
+      'authorization',
+      'data isolation',
+      'billing',
+      'destructive git',
+      'a bug whose cause',
+      'no existing pattern',
+    ]) {
+      expect(section).toContain(signal);
+    }
+    expect(section).toContain('reason: "misclassified"');
+    expect(section).toContain('reason: "gave_up"');
+    // In the stable part, before the card.
+    expect(prompt.indexOf(ESCALATE_CARD_TOOL)).toBeLessThan(
+      prompt.indexOf('## Card C-12'),
+    );
   });
 });
 

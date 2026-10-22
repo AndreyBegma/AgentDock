@@ -7,6 +7,7 @@ import { Input, Select } from '@andrewbehma/glass-ui/field';
 import { NumberInput } from '@andrewbehma/glass-ui/number-input';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { toast } from '@andrewbehma/glass-ui/toast';
+import { Toggle } from '@andrewbehma/glass-ui/toggle';
 import {
   DEFAULT_VIEWPORTS,
   DESIGN_SKILLS_MAX,
@@ -44,9 +45,9 @@ const THEME_OPTION: Record<DesignTheme | '', string> = {
 };
 
 /**
- * Settings → Design → viewport presets and default design skills (spec 223
- * D11, D15). Every member reads them; a project admin saves both at once,
- * as the API takes them.
+ * Settings → Design → viewport presets, default design skills (spec 223
+ * D11, D15) and the design memory switch (#752 A6). Every member reads
+ * them; a project admin saves them at once, as the API takes them.
  */
 export function DesignSettingsSection({
   projectId,
@@ -93,6 +94,7 @@ function SettingsForm({
 }) {
   const [rows, setRows] = useState<ViewportRow[]>(() => toRows(data.viewports));
   const [skills, setSkills] = useState<string[]>(data.defaultSkills);
+  const [useMemory, setUseMemory] = useState(data.useMemory);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [listError, setListError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,6 +103,7 @@ function SettingsForm({
   useEffect(() => {
     setRows(toRows(data.viewports));
     setSkills(data.defaultSkills);
+    setUseMemory(data.useMemory);
   }, [data]);
 
   const installed = useSection(
@@ -139,7 +142,7 @@ function SettingsForm({
     try {
       await api(designSettingsApi(projectId), {
         method: 'PUT',
-        body: { viewports: result.presets, defaultSkills: skills },
+        body: { viewports: result.presets, defaultSkills: skills, useMemory },
       });
       toast.success('Design settings saved');
       onSaved();
@@ -325,6 +328,31 @@ function SettingsForm({
             removed here.
           </Banner>
         ) : null}
+      </section>
+
+      <section aria-labelledby="design-memory" className="flex flex-col gap-3">
+        <SectionHeader
+          headingId="design-memory"
+          title="Design memory"
+          description="After each approval the UI profile learns the approved screen, the style rules its comments settled and any new snippets — whether this is on or off. On, every new design starts from them."
+        />
+        <div className="flex items-center gap-3 text-sm">
+          {isAdmin ? (
+            <Toggle
+              labelledBy="design-memory-switch"
+              checked={useMemory}
+              onChange={setUseMemory}
+            />
+          ) : null}
+          <span id="design-memory-switch">
+            Use approved screens and style rules in new designs
+            {isAdmin ? null : (
+              <span className="text-ink-3">
+                {` — ${useMemory ? 'on' : 'off'}. Only a project admin can change it.`}
+              </span>
+            )}
+          </span>
+        </div>
       </section>
 
       {isAdmin ? (
