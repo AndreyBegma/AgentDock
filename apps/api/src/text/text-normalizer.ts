@@ -53,6 +53,7 @@ import {
   ownerWhere,
   readOwnerText,
   type TextOwnerRef,
+  textFieldMax,
   writeOwnerText,
 } from './text-columns';
 import { TextCommands } from './text-commands';
@@ -665,6 +666,11 @@ export class TextNormalizer {
         }
         // D8: the person edited it meanwhile; their edit wins.
         if (moved) return { ...field, outcome: 'superseded' };
+        if (
+          result.english.length > textFieldMax(owner.ownerType, field.field)
+        ) {
+          return { ...field, outcome: 'too_long' };
+        }
         writes.set(field.field, result.english);
         applied.push({
           field: field.field,
