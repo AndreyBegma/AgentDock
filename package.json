@@ -20,6 +20,7 @@
     "db:setup": "sh scripts/db-start-docker.sh",
     "admin:create": "bun run --cwd apps/api admin:create",
     "format": "biome format --write .",
+    "check:secrets": "sh scripts/check-secrets.sh",
     "check": "biome check . && bun scripts/check-ci.ts && bun scripts/check-images.ts && bun scripts/check-brand.ts && bun scripts/check-pins.ts && bun test ./scripts"
   },
   "devDependencies": {

@@ -418,6 +418,15 @@ export function sendBlock(plan: PlanDetail): SendBlock | null {
 export const tasksToSend = (plan: PlanDetail): PlanTaskView[] =>
   plan.tasks.filter((t) => t.status === 'approved');
 
+/**
+ * C-177: what a task sends as its issue body — its written document, else its
+ * summary (the API then adds the defaults taken). Send may add a pointer to
+ * the specification or the design; the text the person wrote is this.
+ */
+export const sendBodyOf = (
+  task: Pick<PlanTaskView, 'document' | 'summary'>,
+): string => task.document ?? task.summary;
+
 /** The issue label a task's kind gets on send (D8). */
 export const ISSUE_LABEL: Record<PlanTaskKind, string> = {
   bug: 'bug',

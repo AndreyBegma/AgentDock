@@ -1,4 +1,5 @@
 import type { ProfileAgentdock, Runtime } from '../protocol';
+import { shellWord } from '../text/shell';
 
 /**
  * The "Terminal → Board" checklist (issue #281 D4): what a project needs before
@@ -177,12 +178,7 @@ export const terminalSetupProfileKeys = (
   return { used, other };
 };
 
-const SAFE_SHELL_WORD = /^[A-Za-z0-9._-]+$/;
-
-/** A profile key as one shell word; runner keys never need the quotes. */
-const shellWord = (value: string): string =>
-  SAFE_SHELL_WORD.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
-
+/** Runner profile keys never need the quotes `shellWord` adds. */
 const setupCommand = (key: string): string =>
   `nautelle-runner setup claude --profile ${shellWord(key)}`;
 

@@ -206,8 +206,9 @@ export interface TextCallLaunchOptions {
 
 /**
  * #445: a headless text call's Token saver. These run `--tools ""`, so
- * neither `nautelle` nor the scout could be called: only the strict MCP
- * list (the allowlist), the hook and compaction. `null` when off.
+ * neither `nautelle` nor the scout could be called: only the hook,
+ * compaction and a strict MCP list that is empty (C-179) — the allowlist is
+ * not loaded, since no MCP tool could be called. `null` when off.
  */
 export const textCallTokenSaver = (
   options: TextCallLaunchOptions,
@@ -217,7 +218,10 @@ export const textCallTokenSaver = (
   runKind: TokenSaverRunKind,
 ): TokenSaverLaunch | null =>
   tokenSaverLaunch({
-    config: args.tokenSaver,
+    config:
+      args.tokenSaver === undefined
+        ? undefined
+        : { ...args.tokenSaver, mcpAllow: [] },
     profile,
     home: options.home ?? homedir(),
     dir,
@@ -228,6 +232,28 @@ export const textCallTokenSaver = (
     runnerMcp: false,
     scout: false,
   });
+
+/** C-179: an MCP config that defines no server, as an inline JSON string. */
+export const EMPTY_MCP_CONFIG = JSON.stringify({ mcpServers: {} });
+
+/**
+ * C-179: the args that load no MCP server — neither the profile's own nor
+ * the project's. `--mcp-config` takes one value here: the caller's next
+ * argument is a flag.
+ */
+export const NO_MCP_ARGS: readonly string[] = [
+  '--strict-mcp-config',
+  '--mcp-config',
+  EMPTY_MCP_CONFIG,
+];
+
+/**
+ * C-179: a headless text call's args before its own flags. Token saver on
+ * carries the strict, empty MCP list in its own file; off, the call still
+ * loads no MCP server: its startup would run code the call never uses.
+ */
+export const textCallArgs = (tokenSaver: TokenSaverLaunch | null): string[] =>
+  tokenSaver?.args ?? [...NO_MCP_ARGS];
 
 export interface LaunchHookCommand {
   type: 'command';

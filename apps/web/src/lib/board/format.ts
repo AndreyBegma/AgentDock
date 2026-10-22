@@ -33,6 +33,7 @@ import {
   isWorktreeGoneError,
   MOVE_REFUSAL_TEXT,
   ownsWorker,
+  shellWord,
 } from '@nautelle/shared';
 import type {
   CardRunWiringReason,
@@ -545,13 +546,22 @@ const WIRING_REASON_TEXT: Record<CardRunWiringReason, string> = {
 /** The profile placeholder of `SETUP_CLAUDE_COMMAND`. */
 const PROFILE_PLACEHOLDER = '<key>';
 
+/**
+ * C-177: the setup command for one profile, its key as one shell word. A
+ * replacer function, so a `$&` in the key is not read as a pattern.
+ */
+const setupCommandFor = (profileKey: string): string =>
+  SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, () =>
+    shellWord(profileKey),
+  );
+
 /** The setup commands of a terminal or fleet card, naming its profile if known. */
 const setupCommands = (profileKey: string | null) =>
   profileKey
     ? ([
         {
           label: `Set up profile ${profileKey}, then restart its sessions`,
-          code: SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, profileKey),
+          code: setupCommandFor(profileKey),
         },
       ] as const)
     : ([
@@ -600,7 +610,7 @@ export const hooksNotice = (
         commands: [
           {
             label: 'Set up the profile, then restart its sessions',
-            code: SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, profile),
+            code: setupCommandFor(profile),
           },
         ],
         guide: true,

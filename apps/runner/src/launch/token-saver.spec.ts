@@ -29,6 +29,7 @@ import {
   COMPACT_AT_TOKENS,
   CS_ECO_ENV,
   compactThreshold,
+  EMPTY_MCP_CONFIG,
   EXCLUDE_DYNAMIC_SECTIONS_FLAG,
   EXPLORE_AGENT,
   filterHookSettings,
@@ -36,6 +37,8 @@ import {
   PREFIX_SETTINGS,
   PROMPT_CACHE_TTL_ENV,
   type TokenSaverLaunchInput,
+  textCallArgs,
+  textCallTokenSaver,
   tokenSaverLaunch,
   toolCutMatcher,
 } from './token-saver';
@@ -208,6 +211,43 @@ describe('tokenSaverLaunch (#445)', () => {
       }),
     );
     expect(Object.keys(mcpOf(launch?.mcpFile ?? ''))).toEqual(['woodpecker']);
+  });
+
+  it('gives a headless text call no MCP server, whatever the allowlist (C-179)', () => {
+    const launch = textCallTokenSaver(
+      { home, selfCommand: SELF },
+      profile,
+      {
+        tokenSaver: { enabled: true, mcpAllow: ['playwright', 'woodpecker'] },
+        runId: 'run-1',
+        projectId: 'prj_a',
+      },
+      dir,
+      'card_capture',
+    );
+    expect(textCallArgs(launch)).toEqual(launch?.args ?? []);
+    expect(launch?.args).toContain('--strict-mcp-config');
+    expect(mcpOf(launch?.mcpFile ?? '')).toEqual({});
+    expect(launch?.missing).toEqual([]);
+  });
+
+  it('gives a headless text call with Token saver off a strict, empty MCP config (C-179)', () => {
+    for (const tokenSaver of [undefined, { enabled: false, mcpAllow: [] }]) {
+      const launch = textCallTokenSaver(
+        { home, selfCommand: SELF },
+        profile,
+        { tokenSaver, runId: 'run-1', projectId: 'prj_a' },
+        dir,
+        'card_assess',
+      );
+      expect(launch).toBeNull();
+      expect(textCallArgs(launch)).toEqual([
+        '--strict-mcp-config',
+        '--mcp-config',
+        EMPTY_MCP_CONFIG,
+      ]);
+    }
+    expect(JSON.parse(EMPTY_MCP_CONFIG)).toEqual({ mcpServers: {} });
   });
 
   it('starts nautelle with the given arguments after `mcp`', () => {

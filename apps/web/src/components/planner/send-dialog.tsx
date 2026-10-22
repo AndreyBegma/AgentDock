@@ -3,20 +3,75 @@
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
+import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
-import type { PlanDetail, PlannerSpecOutput } from '@nautelle/shared';
+import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
+import type {
+  PlanDetail,
+  PlannerSpecOutput,
+  PlanTaskView,
+} from '@nautelle/shared';
+import { useState } from 'react';
 import { pluralize } from '../../lib/format';
 import {
   ISSUE_LABEL,
   KIND_HUE,
   KIND_LABEL,
   SPEC_OUTPUT_LABEL,
+  sendBodyOf,
   tasksToSend,
 } from '../../lib/planner/format';
 
 /**
+ * One issue Send will create (C-177): its title row, and its body collapsed
+ * underneath, so the person can read exactly what goes to GitHub.
+ */
+export function SendTaskItem({
+  task,
+  open,
+  onOpenChange,
+}: {
+  task: PlanTaskView;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <li>
+      <Disclosure
+        open={open}
+        onOpenChange={onOpenChange}
+        triggerClassName="px-3 py-2 font-normal"
+        trigger={
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm">
+            <Badge hue={KIND_HUE[task.kind]} label={KIND_LABEL[task.kind]} />
+            <span className="min-w-0 flex-1 break-words text-ink">
+              <span className="text-ink-3">{task.key}</span> {task.title}
+            </span>
+            <span className="text-xs text-ink-3">
+              label {ISSUE_LABEL[task.kind]}
+              {task.dependsOn.length > 0
+                ? ` · after ${task.dependsOn.join(', ')}`
+                : ''}
+              {open ? ' · hide body' : ' · show body'}
+            </span>
+          </span>
+        }
+      >
+        <CodeBlock
+          language="markdown"
+          code={sendBodyOf(task)}
+          wrap
+          maxHeight={240}
+          copy={false}
+        />
+      </Disclosure>
+    </li>
+  );
+}
+
+/**
  * The confirmation before **Send to fleet** (D8, D10, D12): the issues it
- * will create, how specifications are published, and — for a private plan —
+ * will create, each body one click away (C-177), how specifications are published, and — for a private plan —
  * that sending shares it with the project first, and why.
  */
 export function SendDialog({
@@ -39,6 +94,14 @@ export function SendDialog({
 }) {
   const tasks = tasksToSend(plan);
   const rejected = plan.tasks.filter((t) => t.status === 'rejected').length;
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (key: string, open: boolean) =>
+    setExpanded((now) => {
+      const next = new Set(now);
+      if (open) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   return (
     <DialogRoot open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent
@@ -71,21 +134,12 @@ export function SendDialog({
           ) : null}
           <ul className="flex flex-col gap-2" aria-label="Issues to create">
             {tasks.map((t) => (
-              <li
+              <SendTaskItem
                 key={t.key}
-                className="flex min-w-0 flex-wrap items-center gap-2 text-sm"
-              >
-                <Badge hue={KIND_HUE[t.kind]} label={KIND_LABEL[t.kind]} />
-                <span className="min-w-0 flex-1 break-words text-ink">
-                  <span className="text-ink-3">{t.key}</span> {t.title}
-                </span>
-                <span className="text-xs text-ink-3">
-                  label {ISSUE_LABEL[t.kind]}
-                  {t.dependsOn.length > 0
-                    ? ` · after ${t.dependsOn.join(', ')}`
-                    : ''}
-                </span>
-              </li>
+                task={t}
+                open={expanded.has(t.key)}
+                onOpenChange={(next) => toggle(t.key, next)}
+              />
             ))}
           </ul>
           {rejected > 0 ? (
