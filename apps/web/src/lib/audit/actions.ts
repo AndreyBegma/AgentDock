@@ -124,6 +124,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'stack.run_stopped': 'Stopped a card stack run',
   'card.updated': 'Edited a board card',
   'card.deleted': 'Deleted a board card',
+  'card.fleet_removed': 'Removed a fleet card whose issue left the queue',
   'card.moved': 'Moved a board card',
   'card.run_started': 'Started a card worker',
   'card.feedback': 'Sent feedback on a card',
