@@ -8,6 +8,7 @@ import { design } from './fixtures';
 import {
   failureSentence,
   formatClock,
+  isDesignBusy,
   isStalled,
   isStarting,
   lastOutputOf,
@@ -160,6 +161,21 @@ describe('a busy design with nothing running (#606)', () => {
     expect(isStarting(design({ status: 'revising', progress: null }))).toBe(
       true,
     );
+  });
+
+  // #840: the turn is finishing while the status already rests.
+  test('an active turn with no progress reads as starting, not as Generate', () => {
+    for (const status of ['idle', 'reviewing'] as const) {
+      const finishing = design({ status, progress: null, activeTurnId: 't' });
+      expect(isDesignBusy(finishing)).toBe(true);
+      expect(isStarting(finishing)).toBe(true);
+    }
+  });
+
+  test('a design at rest with no active turn is not busy', () => {
+    expect(isDesignBusy(design({ status: 'idle' }))).toBe(false);
+    expect(isDesignBusy(design({ status: 'reviewing' }))).toBe(false);
+    expect(isDesignBusy(design({ status: 'generating' }))).toBe(true);
   });
 
   test('a running turn, or a design at rest, is not starting', () => {

@@ -4,6 +4,7 @@ import {
   designFrameSlugs,
 } from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
+import { designTurnWhere } from './design-progress';
 import {
   type DesignTurnPlan,
   nextOfBatch,
@@ -82,7 +83,9 @@ export const applyDesignOutput = async (
 /**
  * A design whose turn failed, was cancelled, or never started: back to
  * reviewing what it has, or idle with nothing drawn, its job's clock
- * stopped (#275 D2). An approved design is left alone.
+ * stopped (#275 D2). An approved design is left alone. #840: so is a design
+ * with a turn still queued or running — a start the runner did not answer in
+ * time may still run it — and the turn's end settles the design.
  */
 export const settleDesign = async (db: Db, owner: DesignKey): Promise<void> => {
   const design = await db.taskDesign.findUnique({
@@ -90,6 +93,11 @@ export const settleDesign = async (db: Db, owner: DesignKey): Promise<void> => {
     select: { id: true, status: true, _count: { select: { revisions: true } } },
   });
   if (!design || design.status === 'approved') return;
+  const active = await db.planTurn.findFirst({
+    where: { ...designTurnWhere(owner), phase: { in: ['queued', 'running'] } },
+    select: { id: true },
+  });
+  if (active) return;
   await db.taskDesign.update({
     where: { id: design.id },
     data: {
