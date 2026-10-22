@@ -264,7 +264,7 @@ describe('a card ships itself (e2e, #359)', () => {
     it("the repository's real default branch decides, not the name", async () => {
       await w.ctx.prisma.project.update({
         where: { id: w.a },
-        data: { baseBranch: 'develop', baseSource: 'origin_head' },
+        data: { baseBranch: 'develop', defaultBranch: 'develop' },
       });
       const settings = await w.admin.get(`${w.path()}/board-settings`);
       expect(settings.body).toMatchObject({
@@ -274,6 +274,62 @@ describe('a card ships itself (e2e, #359)', () => {
       await started();
       await ended();
       expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('C-148: an unknown default branch keeps auto-merge off', async () => {
+      await w.ctx.prisma.project.update({
+        where: { id: w.a },
+        data: { defaultBranch: null },
+      });
+      const settings = await w.admin.get(`${w.path()}/board-settings`);
+      expect(settings.body).toMatchObject({ autoMergeCardsDefault: false });
+      await started();
+      await ended();
+      expect((await w.card(1)).column).toBe('finished');
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+
+    it('C-148: a push that changed a protected path is never auto-merged, even with auto-merge on, and the card says why', async () => {
+      const settings = await w.admin.send('put', `${w.path()}/board-settings`, {
+        issueOnRun: false,
+        specOnRun: true,
+        maxRunning: 3,
+        autoMergeCards: true,
+      });
+      expect(settings.status).toBe(200);
+      await started();
+      await pushed({
+        prNumber: 77,
+        prUrl: PR_URL,
+        protectedPaths: ['.woodpecker/pipeline.yml'],
+      });
+      await ended();
+      await shipping.poll();
+      await w.work.settled();
+      expect(w.sent('card.merge')).toEqual([]);
+      const card = await detail();
+      expect(card).toMatchObject({
+        column: 'finished',
+        mergedAt: null,
+        protectedPaths: ['.woodpecker/pipeline.yml'],
+      });
+    });
+
+    it('C-148: protected paths the collect reports hold the merge too, and a clean push clears them', async () => {
+      w.handlers['card.collect'] = () =>
+        ok({
+          prNumber: 77,
+          prUrl: PR_URL,
+          ahead: 1,
+          protectedPaths: ['deploy/compose.yml'],
+        });
+      await started();
+      await ended();
+      expect(w.sent('card.merge')).toEqual([]);
+      expect((await detail()).protectedPaths).toEqual(['deploy/compose.yml']);
+
+      await pushed({ protectedPaths: [] });
+      expect((await detail()).protectedPaths).toEqual([]);
     });
 
     it('pending checks keep the card In progress until the poller reads green', async () => {

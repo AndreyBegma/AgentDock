@@ -20,6 +20,8 @@ export const seedProject = async (
       displayName: root.slice(root.lastIndexOf('/') + 1),
       baseBranch: 'develop',
       baseSource: 'config',
+      // C-148: the repository's default branch, so a `develop` base ships.
+      defaultBranch: 'main',
       hasClaudeMd: true,
       hasAgentsMd: false,
       lastInspectedAt: new Date('2026-10-01T00:00:00Z'),

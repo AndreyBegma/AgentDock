@@ -437,6 +437,7 @@ export const toCardView = (
     isCardNeedsPersonReason(card.needsPersonReason)
       ? card.needsPersonReason
       : null,
+  protectedPaths: card.protectedPaths,
   mergedAt: iso(card.mergedAt),
   prTarget: facts.prTargets?.get(card.id) ?? null,
   round: brief(card, card.rounds[0], facts),

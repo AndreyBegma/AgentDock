@@ -322,7 +322,9 @@ export class BoardShipping
     // forward PR, is still read — for a merge on GitHub, or a conflict.
     const mergeOnly =
       card.column === 'finished' &&
-      (card.needsPerson || !(await this.autoMergeOn(project)));
+      (card.needsPerson ||
+        card.protectedPaths.length > 0 ||
+        !(await this.autoMergeOn(project)));
     const forward = await this.work.forwarded(card.id, prNumber);
     if (mergeOnly && card.prBase === null && !forward) return;
 
@@ -684,6 +686,8 @@ export class BoardShipping
    * (D4). A refusal is audited and the card waits for Accept. #542: a head
    * the latest round did not work on (`roundUnshippable`) is never merged —
    * the card gets `needsPerson` with the reason and stays in Finished.
+   * C-148 (ADR-0077): nor is a card whose push changed a protected path
+   * (`protectedPaths`) — only a person merges it, whatever the setting.
    */
   private async autoMerge(
     project: BoardProject,
@@ -700,6 +704,7 @@ export class BoardShipping
       card.column !== 'finished' ||
       card.mergedAt !== null ||
       card.needsPerson ||
+      card.protectedPaths.length > 0 ||
       card.prBase !== null
     ) {
       return;
