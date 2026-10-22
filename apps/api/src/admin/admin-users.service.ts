@@ -4,6 +4,7 @@ import type { Prisma, User, UserStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { type AuditContext, SYSTEM_ACTOR } from '../audit/audit.types';
 import { authError } from '../auth/auth-error';
+import { TwoFactorService } from '../auth/two-factor.service';
 import { toAdminUser } from '../auth/user-mapper';
 import { PrismaService } from '../database/prisma.service';
 import type { UpdateUserDto } from './dto';
@@ -23,6 +24,7 @@ export class AdminUsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   async list(status?: UserStatus): Promise<AdminUser[]> {
@@ -155,6 +157,44 @@ export class AdminUsersService {
       },
       result: 'ok',
     });
+  }
+
+  /**
+   * C-189: turns off another account's two-factor sign-in, for a person who
+   * lost both the authenticator and the recovery codes. Never one's own: that
+   * takes the password and a code (`POST /auth/me/two-factor/disable`).
+   */
+  async resetTwoFactor(
+    id: string,
+    adminId: string,
+    ctx: AuditContext,
+  ): Promise<AdminUser> {
+    if (id === adminId) {
+      throw authError(
+        403,
+        AUTH_ERROR.forbidden,
+        'Turn off your own two-factor sign-in under Account, with a code',
+      );
+    }
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw notFound();
+    if (!user.totpEnabledAt) {
+      throw authError(
+        409,
+        AUTH_ERROR.twoFactorNotEnabled,
+        'Two-factor sign-in is already off for this user',
+      );
+    }
+    await this.twoFactor.disable(id);
+    await this.audit.record({
+      ...ctx,
+      action: 'user.two_factor_reset',
+      target: { type: 'user', id },
+      before: { twoFactorEnabled: true },
+      after: { twoFactorEnabled: false },
+      result: 'ok',
+    });
+    return toAdminUser({ ...user, totpEnabledAt: null });
   }
 
   private async lockUser(tx: Tx, id: string): Promise<User> {

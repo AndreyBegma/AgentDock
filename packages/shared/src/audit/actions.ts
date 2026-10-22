@@ -8,12 +8,20 @@ export const AUDIT_ACTIONS = [
   'auth.register',
   'auth.password_change',
   'auth.session_revoke',
+  /** C-189: two-factor sign-in turned on, off, or given new recovery codes. */
+  'auth.two_factor_enable',
+  'auth.two_factor_disable',
+  'auth.two_factor_recovery_codes',
   'user.create',
   'user.approve',
   'user.reject',
   'user.update',
   'user.delete',
+  /** C-189: an admin turned off another account's two-factor sign-in. */
+  'user.two_factor_reset',
   'settings.registration',
+  /** C-189: an admin changed whether admins must use two-factor sign-in. */
+  'settings.two_factor',
   'runner.create',
   'runner.pairing_code',
   'runner.pair',
@@ -256,13 +264,15 @@ export type AuditResult = (typeof AUDIT_RESULTS)[number];
  * `throttled`: the source must wait after its own failures (C-109). `locked`
  * only appears in records written before C-109 removed the account lock.
  * `telegram_*`: a Mini App sign-in (#580) with unsigned or stale `initData`,
- * or from a Telegram user no account is linked to.
+ * or from a Telegram user no account is linked to. `two_factor_invalid`: the
+ * password was right and the code was not (C-189).
  */
 export const LOGIN_DENIED_REASONS = [
   'invalid_credentials',
   'throttled',
   'locked',
   'pending_approval',
+  'two_factor_invalid',
   'telegram_invalid',
   'telegram_not_linked',
 ] as const;

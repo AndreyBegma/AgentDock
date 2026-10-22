@@ -43,3 +43,15 @@ describe('Approve a pending user (C-166)', () => {
     expect(gate.calls()).toBe(0);
   });
 });
+
+describe("Reset a user's two-factor sign-in (C-189)", () => {
+  test('asks first, names the account and runs only after Turn off', () => {
+    const pending: Confirmation = { user, action: 'reset_two_factor' };
+    const gate = probeGate<Confirmation>(confirmationCopy, pending);
+    expect(gate.dialog.title).toBe('Turn off two-factor sign-in?');
+    expect(gate.dialog.verb).toBe('Turn off');
+    expect(gate.dialog.consequence).toContain('ann@example.com');
+    gate.confirm();
+    expect(gate.confirmed).toEqual([pending]);
+  });
+});

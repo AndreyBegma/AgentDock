@@ -20,18 +20,29 @@ enum UserStatus {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  name         String?
-  passwordHash String
-  role         Role       @default(viewer)
-  status       UserStatus @default(pending)
-  approvedById String?
-  approvedAt   DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  email             String     @unique
+  name              String?
+  passwordHash      String
+  role              Role       @default(viewer)
+  status            UserStatus @default(pending)
+  approvedById      String?
+  approvedAt        DateTime?
+  /// C-189: the TOTP secret (RFC 6238), sealed with `APP_ENCRYPTION_KEY`; null
+  /// while two-factor sign-in is off.
+  totpSecret        String?
+  /// C-189: a secret offered by setup and not yet confirmed with a code.
+  totpPendingSecret String?
+  /// C-189: when two-factor sign-in was turned on; null: off.
+  totpEnabledAt     DateTime?
+  /// C-189: the last 30-second step a code was accepted for; a code is never
+  /// accepted twice.
+  totpLastStep      Int?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  recoveryCodes               UserRecoveryCode[]
   approvedUsers               User[]                        @relation("UserApprovals")
   sessions                    UserSession[]
   settingsUpdated             Setting[]
@@ -130,6 +141,22 @@ model LoginThrottle {
   @@id([email, ip])
   @@index([lastFailureAt])
   @@map("login_throttles")
+}
+
+/// C-189: a single-use recovery code for two-factor sign-in. Only the SHA-256
+/// of the code is stored; a code carries 80 random bits, so the hash cannot be
+/// reversed by trying every code.
+model UserRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@map("user_recovery_codes")
 }
 
 /// A login session. Named `UserSession` because `Session` is reserved for agent

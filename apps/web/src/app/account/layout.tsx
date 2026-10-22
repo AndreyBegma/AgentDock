@@ -10,5 +10,9 @@ export default async function AccountLayout({
 }: {
   children: ReactNode;
 }) {
-  return <AppShell user={await requireUser()}>{children}</AppShell>;
+  return (
+    <AppShell user={await requireUser({ allowTwoFactorSetup: true })}>
+      {children}
+    </AppShell>
+  );
 }

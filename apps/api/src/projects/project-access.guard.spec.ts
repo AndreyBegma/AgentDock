@@ -17,6 +17,7 @@ const user = (id: string, role: Role): AuthUser => ({
   name: null,
   role,
   status: 'active',
+  twoFactorEnabled: false,
 });
 
 /**
