@@ -607,6 +607,37 @@ describe('terminal attach (e2e)', () => {
       ]);
     });
 
+    describe('the audited client IP (C-151)', () => {
+      const trustProxy = process.env.TRUST_PROXY;
+      afterEach(() => {
+        process.env.TRUST_PROXY = trustProxy;
+      });
+
+      const attachedIp = async (): Promise<unknown> => {
+        const value = await issued();
+        const socket = new TestTerminalSocket(`${wsBase}?ticket=${value}`, {
+          token: admin.token,
+          origin: allowedLiveOrigin(),
+          forwardedFor: '203.0.113.7',
+        });
+        sockets.push(socket);
+        await socket.frame('attached');
+        await eventually(async () => (await terminalAudit()).length === 1);
+        const [record] = await terminalAudit();
+        return (record.meta as { ip?: string }).ip;
+      };
+
+      it('is the X-Forwarded-For client behind a trusted proxy', async () => {
+        process.env.TRUST_PROXY = 'loopback';
+        expect(await attachedIp()).toBe('203.0.113.7');
+      });
+
+      it('is the socket peer when the peer is not a trusted proxy', async () => {
+        process.env.TRUST_PROXY = 'false';
+        expect(await attachedIp()).toBe('127.0.0.1');
+      });
+    });
+
     it('passes a runner policy refusal on with its reason (ADR-0047)', async () => {
       const message =
         "refused by this runner's policy (terminal.write): a write attach is off on this runner. On the runner's machine: `nautelle-runner policy set terminal.write true`";
