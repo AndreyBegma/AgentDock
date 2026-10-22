@@ -28,8 +28,13 @@ import type {
 } from '@nautelle/shared';
 import { api } from '../api';
 
-/** The Board's routes (issue #242 "API"); a card is addressed by its number. */
-const base = (projectId: string) => `/projects/${projectId}/board`;
+/**
+ * The Board's routes (issue #242 "API"); a card is addressed by its number.
+ * The project id is encoded: it comes from the URL (C-165).
+ */
+const project = (projectId: string) =>
+  `/projects/${encodeURIComponent(projectId)}`;
+const base = (projectId: string) => `${project(projectId)}/board`;
 const cardPath = (projectId: string, number: number) =>
   `${base(projectId)}/cards/${number}`;
 
@@ -171,13 +176,13 @@ export const fetchCaptures = (projectId: string, cursor?: string) =>
   );
 
 export const fetchBoardSettings = (projectId: string) =>
-  api<BoardSettingsView>(`/projects/${projectId}/board-settings`);
+  api<BoardSettingsView>(`${project(projectId)}/board-settings`);
 
 export const saveBoardSettings = (
   projectId: string,
   body: UpdateBoardSettingsRequest,
 ) =>
-  api<BoardSettingsView>(`/projects/${projectId}/board-settings`, {
+  api<BoardSettingsView>(`${project(projectId)}/board-settings`, {
     method: 'PUT',
     body,
   });

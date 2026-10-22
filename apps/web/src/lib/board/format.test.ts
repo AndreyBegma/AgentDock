@@ -23,6 +23,7 @@ import {
   isWorktreeGoneError,
   noPrBanner,
   parseCardParam,
+  parseLinkedPlans,
   parseMaxRunning,
   roundPill,
   toItem,
@@ -514,5 +515,36 @@ describe('describeBoardError for dependencies (#638, #636)', () => {
     expect(describeBoardError(refused('dependency_open'))).toBe(
       'A card it depends on has no ready pull request yet.',
     );
+  });
+});
+
+describe('parseLinkedPlans (C-165)', () => {
+  test('a traversal in ?planPanel= opens no panel', () => {
+    // `URLSearchParams` decodes it to `../../Q`, the path it would have hit.
+    const linked = parseLinkedPlans(
+      new URLSearchParams('planPanel=..%2F..%2FQ'),
+    );
+    expect(linked.planPanelId).toBeUndefined();
+  });
+
+  test('only ids pass, for the intake, the panel and the discussion', () => {
+    expect(
+      parseLinkedPlans(
+        new URLSearchParams(
+          'intake=cmvb25vkn01i501o68v2unmem&planPanel=c2&discussion=a.b',
+        ),
+      ),
+    ).toEqual({
+      intakeId: 'cmvb25vkn01i501o68v2unmem',
+      planPanelId: 'c2',
+      discussionId: undefined,
+    });
+    expect(
+      parseLinkedPlans(new URLSearchParams('intake=..&planPanel=')),
+    ).toEqual({
+      intakeId: undefined,
+      planPanelId: undefined,
+      discussionId: undefined,
+    });
   });
 });
