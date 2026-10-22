@@ -1795,6 +1795,8 @@ model Run {
   tokenSaverStats   TokenSaverStat[]
   usageFact         RunUsageFact?
   prefixParts       RunPrefixPart[]
+  /// #449 DA-11: the run's handoff note, deleted with the run.
+  handoffNotes      HandoffNote[]
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
@@ -3290,6 +3292,8 @@ model BoardCard {
   stackRunsPaused      BoardStackRun[]        @relation("BoardStackRunPausedCard")
   /// #746: the card's A/B arm per technique, drawn at its first launch.
   techniqueArms        CardTechniqueArm[]
+  /// #449 DA-11: the card's handoff note, deleted with the card.
+  handoffNotes         HandoffNote[]
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -4238,6 +4242,11 @@ model HandoffNote {
   subjectKind HandoffSubjectKind
   /// `board_cards.id` or `runs.id`.
   subjectId   String
+  /// DA-11: `subjectId` of a card note, so the note goes with its card. A
+  /// CHECK keeps exactly one of `cardId` / `runId` equal to `subjectId`.
+  cardId      String?
+  /// DA-11: `subjectId` of a run note, so the note goes with its run.
+  runId       String?
   /// The note's markdown (shared `validateHandoffNote`).
   content     String
   /// `HandoffLineRange[]`: the lines a person wrote (D7), `[{ from, to }]`.
@@ -4245,10 +4254,14 @@ model HandoffNote {
   updatedBy   HandoffUpdatedBy
   updatedAt   DateTime           @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  card    BoardCard? @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  run     Run?       @relation(fields: [runId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectKind, subjectId])
-  @@index([projectId])
+  /// DA-11: a subject is unique within its project, never across projects.
+  @@unique([projectId, subjectKind, subjectId])
+  @@index([cardId])
+  @@index([runId])
   @@map("handoff_notes")
 }
 

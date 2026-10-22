@@ -26,6 +26,7 @@ import {
   type RunnerEventSink,
   RunnerEventSinks,
 } from '../runners/runner-event-sinks';
+import { stripStewardContent } from './steward-content';
 import { StewardDecider } from './steward-decider';
 import {
   actionsOf,
@@ -61,20 +62,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
-
-/**
- * DA-12, D12: no pane text ever reaches `events.data` — the tail is removed
- * from every `steward.*` event in place, valid or not, before the batch is
- * stored (the `stripHookContent` pattern). The API keeps no copy: the kind,
- * the reason and the actions are what it stores.
- */
-export const stripStewardContent = (event: RunnerEvent): void => {
-  if (!isStewardEventType(event.type)) return;
-  const data = asRecord(event.data);
-  if (!data || !('paneTail' in data)) return;
-  const { paneTail: _tail, ...kept } = data;
-  event.data = kept;
-};
 
 /**
  * Sink `steward` (#447 D2, D13): the runner's `steward.observed` /

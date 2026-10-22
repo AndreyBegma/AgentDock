@@ -15,6 +15,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { stripHandoffContent } from '../handoff/handoff-content';
 import { stripHookContent } from '../sessions/session-hook-content';
+import { stripStewardContent } from '../steward/steward-content';
 import { advanceCursor, type SeqRange } from './ack-cursor';
 import { tokenPrefix, verifyRunnerToken } from './credentials';
 import { stripCommandResult } from './runner-command-result';
@@ -215,10 +216,12 @@ export class RunnerIngestService {
     );
     if (fresh.length > 0) await this.sinks.dispatch(runnerId, fresh);
     // ADR-0021: the sinks read hook content; `events.data` never holds it.
-    // #449 DA-12: nor a handoff note's text. #740 D1: nor a command's output.
+    // #449 DA-12: nor a handoff note's text, nor a pane's tail (C-186).
+    // #740 D1: nor a command's output.
     for (const event of fresh) {
       stripHookContent(event);
       stripHandoffContent(event);
+      stripStewardContent(event);
       stripCommandResult(event);
     }
     const row = (event: RunnerEvent) => ({
