@@ -49,6 +49,16 @@ describe('isBlockedAddress (D15)', () => {
     ['fd00::1'],
     ['fe80::1'],
     ['64:ff9b::a00:5'],
+    // C-178: site-local, local NAT64, Teredo, discard and the TEST-NETs.
+    ['fec0::1'],
+    ['feff::1'],
+    ['64:ff9b:1::a00:5'],
+    ['2001::1'],
+    ['2001:0:ffff::1'],
+    ['100::1'],
+    ['192.0.2.10'],
+    ['198.51.100.10'],
+    ['203.0.113.10'],
   ])('blocks %s', (address) => {
     expect(isBlockedAddress(address)).toBe(true);
   });
@@ -58,6 +68,9 @@ describe('isBlockedAddress (D15)', () => {
     ['1.1.1.1'],
     ['2606:4700:4700::1111'],
     ['172.32.0.1'],
+    ['2001:4860:4860::8888'],
+    ['192.0.3.1'],
+    ['203.0.114.1'],
   ])('lets %s through', (address) => {
     expect(isBlockedAddress(address)).toBe(false);
   });
