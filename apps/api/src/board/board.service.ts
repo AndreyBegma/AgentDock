@@ -34,6 +34,7 @@ import { CardAssessor } from '../assess/card-assessor';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { projectDesignTemplateKeys } from '../design/design-store';
 import { usageByRun } from '../history/run-usage';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
@@ -178,6 +179,7 @@ export class BoardService implements OnModuleInit {
         text === undefined ? [] : [{ field, text }],
       ),
       {
+        // #833 D8: the template is classified in the same step as the kind.
         classifyKind:
           card.kindSource === 'auto' &&
           card.branch === null &&
@@ -660,6 +662,19 @@ export class BoardService implements OnModuleInit {
           boardError(422, BOARD_ERROR.noProfile, message, details),
       );
     }
+    // #833 D8: one of the project's templates, else 422 before anything is written.
+    if (
+      fields.designTemplate !== undefined &&
+      !(await projectDesignTemplateKeys(this.prisma, projectId)).includes(
+        fields.designTemplate,
+      )
+    ) {
+      throw boardError(
+        400,
+        BOARD_ERROR.invalidDesignTemplate,
+        'designTemplate is not a design template of this project',
+      );
+    }
     // #447 D8: only an open issue of the project's repository; null unlinks.
     const issueLink =
       fields.issueNumber === undefined
@@ -699,6 +714,13 @@ export class BoardService implements OnModuleInit {
       ...(fields.kind !== undefined ? { kind: fields.kind } : {}),
       // #271 D9: a kind the person sets is theirs from now on.
       ...(fields.kind !== undefined ? { kindSource: 'person' as const } : {}),
+      // #833 D8: a template the person sets is theirs from now on.
+      ...(fields.designTemplate !== undefined
+        ? {
+            designTemplate: fields.designTemplate,
+            designTemplateSource: 'person' as const,
+          }
+        : {}),
       // #359 D4: the issue follows the kind, unless the person sets it too.
       ...(fields.issueOnRun !== undefined
         ? { issueOnRun: fields.issueOnRun }

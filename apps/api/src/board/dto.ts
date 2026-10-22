@@ -25,6 +25,8 @@ import {
   type CardFeedbackRequest,
   type CreateBoardCardRequest,
   type CreateBoardStackRequest,
+  DESIGN_TEMPLATE_KEY_MAX,
+  DESIGN_TEMPLATE_KEY_PATTERN,
   INTAKE_SPLIT_MAX,
   MANUAL_STACK_CARDS_MIN,
   type MoveBoardCardRequest,
@@ -124,6 +126,15 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @IsOptional()
   @IsIn(BOARD_CARD_KINDS)
   kind?: BoardCardKind;
+
+  /** #833 D8: checked against the project's templates by the service. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(DESIGN_TEMPLATE_KEY_MAX)
+  @Matches(DESIGN_TEMPLATE_KEY_PATTERN, {
+    message: 'designTemplate is not a template key',
+  })
+  designTemplate?: string;
 
   @IsOptional()
   @IsBoolean()
