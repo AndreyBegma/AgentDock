@@ -100,7 +100,10 @@ export interface ClaimAttachmentsRequest {
   attachmentIds: string[];
 }
 
-/** Why an upload or a claim is refused — the `code` of a 422 `attachment_error`. */
+/**
+ * Why an upload or a claim is refused — the `code` of a 422 `attachment_error`
+ * (413 for `pending_exceeded`).
+ */
 export const ATTACHMENT_REFUSAL = {
   /** Over `ATTACHMENT_MAX_BYTES`. */
   tooLarge: 'too_large',
@@ -110,6 +113,11 @@ export const ATTACHMENT_REFUSAL = {
   tooMany: 'too_many',
   /** The project would store more than `ATTACHMENTS_PROJECT_QUOTA_BYTES`. */
   quotaExceeded: 'quota_exceeded',
+  /**
+   * #156: the uploader's unclaimed uploads would hold more than
+   * `ATTACHMENTS_USER_PENDING_BYTES` — sent with 413, not 422.
+   */
+  pendingExceeded: 'pending_exceeded',
   /** Not pending, from another project, or uploaded by someone else (D3). */
   notClaimable: 'not_claimable',
 } as const;

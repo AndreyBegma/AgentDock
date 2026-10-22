@@ -15,6 +15,13 @@ export const ATTACHMENTS_PER_CARD_MAX = 20;
  */
 export const ATTACHMENTS_PROJECT_QUOTA_DEFAULT_BYTES = 1024 * 1024 * 1024;
 
+/**
+ * #156: the default of `ATTACHMENTS_USER_PENDING_BYTES`, the bytes of unclaimed,
+ * unexpired uploads one user may hold (`pending_exceeded`) — so one member's
+ * uploads no card claims cannot fill the project's quota.
+ */
+export const ATTACHMENTS_USER_PENDING_DEFAULT_BYTES = 256 * 1024 * 1024;
+
 /** D6: the display name — the original name — is cut to this many characters. */
 export const ATTACHMENT_NAME_MAX = 200;
 
