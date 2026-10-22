@@ -46,7 +46,7 @@ export default function PlannerPage() {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const plans = useSection(
-    () => api<PlanListView>(`/projects/${projectId}/plans`),
+    () => api<PlanListView>(`/projects/${encodeURIComponent(projectId)}/plans`),
     [projectId, version],
   );
 

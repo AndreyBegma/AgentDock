@@ -539,8 +539,12 @@ describe('parseLinkedPlans (C-165)', () => {
       planPanelId: 'c2',
       discussionId: undefined,
     });
-    expect(parseLinkedPlans(new URLSearchParams('intake=..&planPanel='))).toEqual(
-      { intakeId: undefined, planPanelId: undefined, discussionId: undefined },
-    );
+    expect(
+      parseLinkedPlans(new URLSearchParams('intake=..&planPanel=')),
+    ).toEqual({
+      intakeId: undefined,
+      planPanelId: undefined,
+      discussionId: undefined,
+    });
   });
 });

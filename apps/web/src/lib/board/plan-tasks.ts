@@ -18,7 +18,9 @@ import { type BoardItem, columnsOf, toItem } from './format';
 
 /** `GET /projects/:projectId/work/plan-tasks` (#270 D8). */
 export const fetchPlanTasks = (projectId: string) =>
-  api<BoardPlanTasksView>(`/projects/${encodeURIComponent(projectId)}/work/plan-tasks`);
+  api<BoardPlanTasksView>(
+    `/projects/${encodeURIComponent(projectId)}/work/plan-tasks`,
+  );
 
 /** The id prefix that keeps a plan task apart from a card id in glass-ui's `Board`. */
 const PLAN_ITEM_PREFIX = 'plan:';

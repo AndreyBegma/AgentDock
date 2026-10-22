@@ -36,7 +36,8 @@ export const cardDesignHref = (
   projectId: string,
   number: number,
   search = '',
-): string => `/projects/${encodeURIComponent(projectId)}/board/cards/${number}/design${search}`;
+): string =>
+  `/projects/${encodeURIComponent(projectId)}/board/cards/${number}/design${search}`;
 
 /** The project's UI profile: GET / PUT, and `/versions`, `/rebuild`. */
 export const uiProfileApi = (projectId: string): string =>
@@ -73,4 +74,5 @@ export const stackDesignHref = (
   projectId: string,
   number: number,
   search = '',
-): string => `/projects/${encodeURIComponent(projectId)}/board/stacks/${number}/design${search}`;
+): string =>
+  `/projects/${encodeURIComponent(projectId)}/board/stacks/${number}/design${search}`;
