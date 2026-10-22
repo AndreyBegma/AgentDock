@@ -1,5 +1,5 @@
 import type { CreatePlanCardsResponse, PlanDetail } from '@nautelle/shared';
-import { decomposed, PlannerHarness, task } from './testing/planner-e2e';
+import { block, decomposed, PlannerHarness, task } from './testing/planner-e2e';
 
 /** #337 D7, D11, D12: Create cards, and plans from before the Board planner. */
 describe('Create cards (e2e, #337)', () => {
@@ -146,6 +146,60 @@ describe('Create cards (e2e, #337)', () => {
     expect((response.body as PlanDetail).status).toBe('sent');
     expect(h.sentOf('issue.create')).toHaveLength(1);
     expect((await createCards(plan.id)).status).toBe(409);
+  });
+
+  it('Send and Create cards in parallel: one succeeds, the other is 409 (L-28)', async () => {
+    const plan = await decomposed(h, [task('t1'), task('t2')]);
+    await approve(plan, 't1', 't2');
+    const [sent, carded] = await Promise.all([
+      h.author.send('post', `${h.base(plan.id)}/send`, {}),
+      createCards(plan.id),
+    ]);
+    expect([sent.status, carded.status].sort((a, b) => a - b)).toEqual(
+      sent.status === 200 ? [200, 409] : [201, 409],
+    );
+    const issues = h.sentOf('issue.create').length;
+    const cards = await h.ctx.prisma.boardCard.count();
+    if (sent.status === 200) {
+      expect([issues, cards]).toEqual([2, 0]);
+      expect((await h.detail(plan.id)).status).toBe('sent');
+    } else {
+      expect([issues, cards]).toEqual([0, 2]);
+      expect((await h.detail(plan.id)).status).toBe('done');
+    }
+  });
+
+  it('two parallel Sends file each issue once (L-28)', async () => {
+    const plan = await decomposed(h, [task('t1'), task('t2')]);
+    await approve(plan, 't1', 't2');
+    const responses = await Promise.all([
+      h.author.send('post', `${h.base(plan.id)}/send`, {}),
+      h.author.send('post', `${h.base(plan.id)}/send`, {}),
+    ]);
+    expect(responses.map((r) => r.status)).toContain(200);
+    for (const r of responses) expect([200, 409]).toContain(r.status);
+    expect(h.sentOf('issue.create')).toHaveLength(2);
+    expect((await h.detail(plan.id)).status).toBe('sent');
+  });
+
+  it('a decompose turn that lands after archive leaves the plan archived (L-28)', async () => {
+    const plan = await h.createPlan('batch');
+    // The archive won the race with the running turn.
+    await h.ctx.prisma.plan.update({
+      where: { id: plan.id },
+      data: { status: 'archived' },
+    });
+    await h.finish(
+      plan.id,
+      block({ action: 'decompose', title: 'Exporter', tasks: [task('t1')] }),
+    );
+    const row = await h.ctx.prisma.plan.findUniqueOrThrow({
+      where: { id: plan.id },
+    });
+    expect(row.status).toBe('archived');
+    expect(
+      await h.ctx.prisma.planTask.count({ where: { planId: plan.id } }),
+    ).toBe(0);
   });
 
   it('a viewer gets 403, an operator who cannot read the plan 404', async () => {

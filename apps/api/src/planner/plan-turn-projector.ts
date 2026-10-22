@@ -93,6 +93,14 @@ type Chain =
   | { action: 'write' | 'decompose'; taskId: string | null }
   | { action: 'design'; taskId: string; design: DesignTurnPlan };
 
+/** A plan a late turn's output no longer changes (L-28). */
+const CLOSED_STATUSES: ReadonlySet<string> = new Set([
+  'sending',
+  'sent',
+  'archived',
+  'done',
+]);
+
 const taskData = (planId: string, version: number, draft: TaskDraft) => ({
   planId,
   planVersion: version,
@@ -744,8 +752,12 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     ) {
       return null;
     }
-    // The turn may have been started on an older row; read the plan now.
+    // The turn may have been started on an older row; read the plan now,
+    // holding it (L-28) so a late turn cannot reopen a plan that was sent,
+    // archived or made its cards meanwhile, nor rewrite one being sent.
+    await tx.$queryRaw`SELECT id FROM plans WHERE id = ${planRow.id} FOR UPDATE`;
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planRow.id } });
+    if (CLOSED_STATUSES.has(plan.status)) return null;
     switch (output.action) {
       case 'clarify':
         return output.done ? { action: 'decompose', taskId: null } : null;

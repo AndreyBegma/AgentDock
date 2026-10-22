@@ -629,21 +629,33 @@ export class PlanService implements OnModuleInit {
       );
     }
     if (plan.status === 'archived') return;
-    const active = await this.prisma.planTurn.count({
-      where: { planId: plan.id, phase: { in: ['queued', 'running'] } },
+    // L-28: re-checked under the plan row, so a Send, Create cards or turn
+    // start of the same plan cannot slip in between the check and the write.
+    const archived = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM plans WHERE id = ${plan.id} FOR UPDATE`;
+      const { status } = await tx.plan.findUniqueOrThrow({
+        where: { id: plan.id },
+        select: { status: true },
+      });
+      if (status === 'archived') return false;
+      const active = await tx.planTurn.count({
+        where: { planId: plan.id, phase: { in: ['queued', 'running'] } },
+      });
+      if (active > 0) {
+        throw plannerError(
+          409,
+          PLANNER_ERROR.turnInProgress,
+          'Cancel the running turn first',
+        );
+      }
+      await tx.plan.update({
+        where: { id: plan.id },
+        data: { status: 'archived' },
+      });
+      return true;
     });
-    if (active > 0) {
-      throw plannerError(
-        409,
-        PLANNER_ERROR.turnInProgress,
-        'Cancel the running turn first',
-      );
-    }
+    if (!archived) return;
     await this.close(plan, callerOf(actor));
-    await this.prisma.plan.update({
-      where: { id: plan.id },
-      data: { status: 'archived' },
-    });
     // #337 D2: a discarded intake made no card; its files go to the sweep.
     await this.attachments.releasePlan(plan.id);
     this.store.publish(plan.projectId, plan.id);
