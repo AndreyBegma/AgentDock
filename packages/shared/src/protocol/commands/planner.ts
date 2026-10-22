@@ -211,9 +211,11 @@ export type PlanTurnResult = z.infer<typeof planTurnResultSchema>;
 
 // plan.cancel
 
+/** `projectId` lets the runner refuse a turn of another project (`not_found`). */
 export const planCancelArgsSchema = z.strictObject({
   planId: planIdSchema,
   turnId: planIdSchema,
+  projectId: z.string().min(1),
 });
 export type PlanCancelArgs = z.infer<typeof planCancelArgsSchema>;
 

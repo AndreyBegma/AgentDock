@@ -17,6 +17,7 @@ import {
   EventsCollector,
   forgetOffsetStores,
   STATE_FILE,
+  STATE_FILE_MAX_BYTES,
 } from './events';
 import { readNewLines } from './tail';
 
@@ -271,6 +272,21 @@ describe('EventsCollector', () => {
     append(dispatched('i42-api', 42));
     poll();
     expect(types()).toEqual(['events.unparsed', 'slot.dispatched']);
+  });
+
+  it('reports a state.json over the size cap once, without reading it (C-161)', async () => {
+    writeFileSync(
+      join(board, STATE_FILE),
+      ' '.repeat(STATE_FILE_MAX_BYTES + 1),
+    );
+    await start();
+    poll();
+    poll();
+    expect(types()).toEqual(['events.unparsed']);
+    expect(emitted[0].data).toMatchObject({
+      file: join(board, STATE_FILE),
+      reason: expect.stringContaining('at most'),
+    });
   });
 
   it('survives the file disappearing', async () => {

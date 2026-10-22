@@ -143,7 +143,7 @@ describe('discoverSkills', () => {
 });
 
 describe('copySkillFiles', () => {
-  it('copies only the listed files and keeps the executable bit', () => {
+  it('copies only the listed files, owner-only, keeping the executable bit', () => {
     const repo = tree({
       'skills/x/SKILL.md': 'a',
       'skills/x/run.sh': 'b',
@@ -160,8 +160,9 @@ describe('copySkillFiles', () => {
       dest,
     );
     expect(readFileSync(join(dest, 'SKILL.md'), 'utf8')).toBe('a');
-    expect(statSync(join(dest, 'run.sh')).mode & 0o777).toBe(0o755);
-    expect(statSync(join(dest, 'SKILL.md')).mode & 0o777).toBe(0o644);
+    expect(statSync(join(dest, 'run.sh')).mode & 0o777).toBe(0o700);
+    expect(statSync(join(dest, 'SKILL.md')).mode & 0o777).toBe(0o600);
+    expect(statSync(dest).mode & 0o777).toBe(0o700);
     expect(existsSync(join(dest, 'unlisted.txt'))).toBe(false);
   });
 });

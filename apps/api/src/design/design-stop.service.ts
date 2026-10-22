@@ -151,7 +151,7 @@ export class DesignStopService {
         await this.planner.send(
           project.runnerId,
           'plan.cancel',
-          { planId: owner.hostId, turnId: turn.id },
+          { planId: owner.hostId, turnId: turn.id, projectId: project.id },
           caller,
         ),
       );
@@ -208,7 +208,9 @@ export class DesignStopService {
       await settleDesign(tx, owner.key);
       return cancels;
     });
-    if (cancel) await this.cancelBuild(project.runnerId, build.id, caller);
+    if (cancel) {
+      await this.cancelBuild(project.runnerId, project.id, build.id, caller);
+    }
     await this.stopped(owner, actor, { stage: 'profile', runId: build.id });
   }
 
@@ -224,13 +226,14 @@ export class DesignStopService {
    */
   private async cancelBuild(
     runnerId: string,
+    projectId: string,
     runId: string,
     caller: Pick<PlanActor, 'role' | 'ctx'>,
   ): Promise<void> {
     const result = await this.commands.send(
       runnerId,
       'uiprofile.cancel',
-      { runId },
+      { runId, projectId },
       caller,
     );
     if (result.status === 'error') {

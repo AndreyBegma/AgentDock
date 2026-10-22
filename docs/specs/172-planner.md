@@ -159,7 +159,7 @@ registration line in `commands.ts` and one export line in `index.ts`.
 | Command | Args | Min role | Result |
 |---|---|---|---|
 | `plan.turn` | `{ planId, turnId, runId, projectId, root, base, session: { id, resume: boolean, forkFrom?: uuid }, prompt (≤ 256 KiB), profileKey, model, timeoutSec }` | operator | `{ phase: "queued" \| "running" }`; progress as events `plan_turn.phase_changed`, `plan_turn.finished { resultText, sessionId, exitCode }` |
-| `plan.cancel` | `{ planId, turnId }` | operator | `{ cancelled }` |
+| `plan.cancel` | `{ planId, turnId, projectId }` (`projectId` since C-161: a turn of another project is `not_found`) | operator | `{ cancelled }` |
 | `plan.close` | `{ planId, projectId }` | operator | `{ removed }` |
 | `plan.publish_specs` | `{ planId, projectId, root, base, branch, files: [{ path, content }], title, body }` (each `path` under the project's `specDir`; no `..`) | operator | `{ prNumber, prUrl }` — commit without trailers, push, `gh pr create` into base |
 | `plan.queue_issues` | `{ projectId, numbers: int[] }` (≤ 50) | operator | `{ labelled: int[] }` — `gh issue edit --add-label <readyLabel>` |

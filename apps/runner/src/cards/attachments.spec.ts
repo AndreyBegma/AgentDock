@@ -5,6 +5,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -128,6 +129,20 @@ describe('syncAttachments', () => {
     expect(
       s.requests.every((r) => r.authorization === 'Bearer runner-token'),
     ).toBe(true);
+  });
+
+  it('writes the files 0600 in a 0700 directory (C-161)', async () => {
+    const s = await setup();
+    const shot = text('png-ish bytes');
+    s.bodies.set('a1', shot);
+    await syncAttachments(
+      s.deps,
+      s.worktree,
+      [refOf('a1', 'shot.png', shot)],
+      s.source(),
+    );
+    expect(statSync(join(s.dir, 'a1-shot.png')).mode & 0o777).toBe(0o600);
+    expect(statSync(s.dir).mode & 0o777).toBe(0o700);
   });
 
   it('keeps .agentdock/ out of git status', async () => {

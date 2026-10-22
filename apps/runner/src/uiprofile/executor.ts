@@ -326,10 +326,14 @@ export class UiProfileBuildExecutor {
   /**
    * `uiprofile.cancel` (#275 D5): a queued build leaves the queue, a preparing
    * one is flagged, a running one loses its session; each ends `cancelled`.
+   * A build of another project is `not_found` and keeps going.
    */
   async cancel(args: UiProfileCancelArgs): Promise<UiProfileCancelResult> {
-    if (!this.record(args.runId)) {
-      throw new CommandFailure('not_found', `no build ${args.runId}`);
+    if (this.record(args.runId)?.projectId !== args.projectId) {
+      throw new CommandFailure(
+        'not_found',
+        `no build ${args.runId} in ${args.projectId}`,
+      );
     }
     const live = this.active.get(args.runId);
     if (!live || this.busy.has(args.runId)) return { cancelled: false };

@@ -8,7 +8,7 @@ import {
 import { CommandFailure } from '../commands/failure';
 import { skillsWorkspace } from '../skills/testing';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
-import { fingerprint, globToRegExp } from './fingerprint';
+import { compileGlob, fingerprint } from './fingerprint';
 
 setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS * 2);
 
@@ -54,8 +54,8 @@ const codeOf = async (work: Promise<unknown>) => {
   return (error as CommandFailure).code;
 };
 
-describe('globToRegExp', () => {
-  const matches = (glob: string, path: string) => globToRegExp(glob).test(path);
+describe('compileGlob', () => {
+  const matches = (glob: string, path: string) => compileGlob(glob).test(path);
 
   it('keeps * inside a segment and lets ** cross directories', () => {
     expect(matches('src/*.ts', 'src/a.ts')).toBe(true);
@@ -74,6 +74,28 @@ describe('globToRegExp', () => {
     expect(matches('a.b', 'axb')).toBe(false);
     expect(matches('(x)+.ts', '(x)+.ts')).toBe(true);
     expect(matches('{unclosed', '{unclosed')).toBe(true);
+    expect(matches('a}b,c', 'a}b,c')).toBe(true);
+    expect(matches('{a,{b,c}d}.ts', 'cd.ts')).toBe(true);
+    expect(matches('{a,{b,c}d}.ts', 'c.ts')).toBe(false);
+    expect(matches('src/**/x', 'src/x')).toBe(true);
+    expect(matches('src/**/x', 'srcx')).toBe(false);
+  });
+
+  it('matches an adversarial glob against a long path in under 50 ms (C-161)', () => {
+    // Globs as long as the schema allows (256); a regex of the first would
+    // backtrack for longer than the age of the universe.
+    const cases: [string, string][] = [
+      [`${'*a'.repeat(127)}b`, 'a'.repeat(1024)],
+      [`${'**/'.repeat(85)}b`, 'a/'.repeat(512)],
+      [`${'{a,a}'.repeat(51)}b`, 'a'.repeat(1024)],
+      [`${'**a'.repeat(85)}b`, `${'a/'.repeat(256)}${'a'.repeat(512)}`],
+    ];
+    for (const [glob, path] of cases) {
+      const matcher = compileGlob(glob);
+      const started = performance.now();
+      expect(matcher.test(path)).toBe(false);
+      expect(performance.now() - started).toBeLessThan(50);
+    }
   });
 });
 

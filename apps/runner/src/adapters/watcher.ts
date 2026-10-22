@@ -214,6 +214,7 @@ export class SessionWatcher {
       const held: UnsequencedEvent[] = [];
       for await (const chunk of adapter.tail(source, freshState(), {
         projects: this.projects,
+        log: this.options.log,
       })) {
         if (wanted === null && chunk.state.observed) {
           wanted = chunk.state.observed.projectId === scope.projectId;
@@ -238,6 +239,7 @@ export class SessionWatcher {
     const adapter = this.options.adapters[source.runtime];
     for await (const chunk of adapter.tail(source, state, {
       projects: this.projects,
+      log: this.options.log,
     })) {
       this.send(chunk.events);
       // Saved after the events are spooled: a crash in between re-sends,

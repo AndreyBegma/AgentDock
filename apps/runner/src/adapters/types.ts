@@ -5,6 +5,7 @@ import type {
   WatchedProject,
 } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
+import type { Logger } from '../log';
 
 /** One transcript file of one runtime session (D2). */
 export interface TranscriptSource {
@@ -55,6 +56,8 @@ export interface TailChunk {
 export interface TailOptions {
   /** The watch list, for the correlation of `session.observed`. */
   projects: readonly WatchedProject[];
+  /** Warned when a transcript line is too long to keep. */
+  log?: Logger;
 }
 
 /**

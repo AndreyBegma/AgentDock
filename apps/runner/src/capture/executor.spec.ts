@@ -16,6 +16,7 @@ import {
   CaptureExecutor,
   type CaptureProcess,
   type CaptureSpawn,
+  readTail,
 } from './executor';
 
 const SESSION = '11111111-1111-4111-8111-111111111111';
@@ -311,5 +312,29 @@ describe('CaptureExecutor (#244 D4)', () => {
       },
     });
     expect(await codeOf(inside.run(t.args()))).toBe('path_not_allowed');
+  });
+});
+
+describe('readTail (C-161)', () => {
+  const streamOf = (chunks: string[]) =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(Buffer.from(chunk));
+        controller.close();
+      },
+    });
+
+  it('keeps everything under the cap', async () => {
+    expect(await readTail(streamOf(['ab', 'cd']), 10)).toBe('abcd');
+  });
+
+  it('keeps only the last bytes of a stream longer than the cap', async () => {
+    const chunks = Array.from({ length: 1000 }, (_, i) =>
+      `${i % 10}`.repeat(100),
+    );
+    chunks.push('{"type":"result"}');
+    const tail = await readTail(streamOf(chunks), 64);
+    expect(tail).toHaveLength(64);
+    expect(tail.endsWith('{"type":"result"}')).toBe(true);
   });
 });

@@ -126,11 +126,13 @@ export type UiProfileFingerprintResult = z.infer<
  * #275 D5, mirroring `plan.cancel`: a queued build leaves the queue, a
  * preparing one is flagged, a running one has its session killed; each ends
  * with `uiprofile_build.finished` phase `cancelled`. An unknown run is
- * `not_found`. Not in `RUNNER_FEATURE_COMMANDS.design`: an older runner still
- * generates, it just cannot stop a build.
+ * `not_found`, and so is a run of another project (`projectId`). Not in
+ * `RUNNER_FEATURE_COMMANDS.design`: an older runner still generates, it just
+ * cannot stop a build.
  */
 export const uiProfileCancelArgsSchema = z.strictObject({
   runId: skillRunIdSchema,
+  projectId: z.string().min(1),
 });
 export type UiProfileCancelArgs = z.infer<typeof uiProfileCancelArgsSchema>;
 

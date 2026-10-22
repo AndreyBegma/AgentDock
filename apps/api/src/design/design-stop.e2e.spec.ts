@@ -36,7 +36,7 @@ describe('design stop (e2e)', () => {
     const stopped = await h.author.send('post', `${base}/stop`);
     expect(stopped.status).toBe(200);
     expect(h.sentOf('plan.cancel')).toEqual([
-      { planId: plan.id, turnId: turn.id },
+      { planId: plan.id, turnId: turn.id, projectId: h.projectId },
     ]);
     const [record] = await h.auditOf('design.stopped');
     expect(record.after).toMatchObject({
@@ -64,7 +64,7 @@ describe('design stop (e2e)', () => {
 
     expect((await cardStop(card.number)).status).toBe(200);
     expect(h.sentOf('plan.cancel')).toEqual([
-      { planId: card.id, turnId: turn.id },
+      { planId: card.id, turnId: turn.id, projectId: h.projectId },
     ]);
     expect((await h.auditOf('design.stopped')).length).toBe(1);
   });
@@ -78,7 +78,9 @@ describe('design stop (e2e)', () => {
     expect(stopped.status).toBe(200);
     expect((stopped.body as TaskDesignView).status).toBe('idle');
     expect((stopped.body as TaskDesignView).progress).toBeNull();
-    expect(h.designSent('uiprofile.cancel')).toEqual([{ runId: build.id }]);
+    expect(h.designSent('uiprofile.cancel')).toEqual([
+      { runId: build.id, projectId: h.projectId },
+    ]);
     const run = await h.ctx.prisma.run.findUniqueOrThrow({
       where: { id: build.id },
     });
