@@ -131,6 +131,8 @@ export const NOTIFICATION_ERROR_CODES = [
   'telegram_not_linked',
   'telegram_token_invalid',
   'telegram_unavailable',
+  'telegram_link_request_not_found',
+  'telegram_chat_taken',
 ] as const;
 export type NotificationErrorCode = (typeof NOTIFICATION_ERROR_CODES)[number];
 
@@ -148,6 +150,28 @@ export interface TelegramLinkStatus {
   linkedAt: string | null;
   /** An admin has configured the bot: linking is possible. */
   botConfigured: boolean;
+  /**
+   * C-147 (D-16): a chat redeemed the caller's link code and waits for the
+   * caller to confirm it; null when none is waiting. Until confirmed the chat
+   * receives nothing and its buttons are refused.
+   */
+  pending: TelegramLinkRequest | null;
+}
+
+/** A chat waiting for confirmation (C-147). */
+export interface TelegramLinkRequest {
+  /** Sent back with the confirmation, so it confirms exactly this chat. */
+  id: string;
+  /** The Telegram username of the chat that redeemed the code, when it has one. */
+  username: string | null;
+  createdAt: string;
+  /** It is removed unconfirmed at this time — the link code's lifetime. */
+  expiresAt: string;
+}
+
+/** `POST /notifications/telegram/link/confirm` — activates the pending link. */
+export interface TelegramLinkConfirmBody {
+  id: string;
 }
 
 /** `POST /notifications/telegram/link` — open `url` in Telegram within 10 minutes. */

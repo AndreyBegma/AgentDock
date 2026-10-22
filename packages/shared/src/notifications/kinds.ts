@@ -22,6 +22,9 @@ import type { Role } from '../auth';
  * token, so it goes to admins on both channels.
  * `account.throttled` comes from sign-in throttling (C-109): an account's
  * failed password checks from one source crossed the threshold.
+ * `telegram.link_pending` comes from a chat redeeming the user's link code
+ * (C-147): only the user it is about receives it, in the app only — the chat
+ * is not linked until they confirm it.
  */
 export const NOTIFICATION_KINDS = [
   'person.needed',
@@ -43,6 +46,7 @@ export const NOTIFICATION_KINDS = [
   'cards.suggested',
   'steward.incident',
   'account.throttled',
+  'telegram.link_pending',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -54,9 +58,10 @@ export type ChannelSwitches = Record<NotificationChannel, boolean>;
 
 /**
  * - `project`: goes to every member of the project, admins included (D2);
- * - `admin`: goes to every active admin, whatever the project.
+ * - `admin`: goes to every active admin, whatever the project;
+ * - `account`: goes only to the user the event is about, whatever their role.
  */
-export type NotificationScope = 'project' | 'admin';
+export type NotificationScope = 'project' | 'admin' | 'account';
 
 export interface NotificationKindSpec {
   scope: NotificationScope;
@@ -210,6 +215,12 @@ export const NOTIFICATION_KIND_SPECS: Record<
     channels: BOTH,
     defaults: ON_ON,
   },
+  'telegram.link_pending': {
+    scope: 'account',
+    source: 'Telegram link code redeemed (C-147)',
+    channels: ['inApp'],
+    defaults: ON_OFF,
+  },
 };
 
 export const isNotificationKind = (value: string): value is NotificationKind =>
@@ -241,5 +252,5 @@ export const kindsFor = (role: Role): NotificationKind[] =>
   NOTIFICATION_KINDS.filter(
     (kind) =>
       !NOTIFICATION_KIND_SPECS[kind].reserved &&
-      (NOTIFICATION_KIND_SPECS[kind].scope === 'project' || role === 'admin'),
+      (NOTIFICATION_KIND_SPECS[kind].scope !== 'admin' || role === 'admin'),
   );

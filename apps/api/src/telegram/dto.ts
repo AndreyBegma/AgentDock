@@ -1,5 +1,6 @@
 import type {
   TelegramBotTokenUpdate,
+  TelegramLinkConfirmBody,
   TelegramSignInRequest,
 } from '@nautelle/shared';
 import { IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator';
@@ -16,6 +17,14 @@ export class TelegramBotTokenDto implements TelegramBotTokenUpdate {
     message: 'token must be a Telegram bot token (<bot id>:<secret>)',
   })
   token!: string;
+}
+
+/** `POST /notifications/telegram/link/confirm` (C-147): the pending link's id. */
+export class TelegramLinkConfirmDto implements TelegramLinkConfirmBody {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  id!: string;
 }
 
 /** `POST /auth/telegram` (#580): the Mini App's `initData`, checked by its HMAC. */

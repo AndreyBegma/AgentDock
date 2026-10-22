@@ -11,8 +11,10 @@ import type { useTelegramLink } from '../../../lib/notifications/use-telegram-li
 type Link = ReturnType<typeof useTelegramLink>;
 
 export function TelegramCard({ link }: { link: Link }) {
-  const { view, busy, start, unlink, reload } = link;
+  const { view, busy, start, confirm, decline, unlink, reload } = link;
   const [pending, setPending] = useState<{ url: string; expiresAt: string }>();
+  // C-147: the chat that redeemed the code waits here until the user says so.
+  const request = view.status === 'ready' ? view.state.pending : null;
 
   const begin = async () => {
     const started = await start();
@@ -28,6 +30,40 @@ export function TelegramCard({ link }: { link: Link }) {
         title="Telegram"
         description="Get the notifications you pick below in a private chat with the bot."
       />
+      {request ? (
+        <Banner
+          className="mb-4"
+          tone="warn"
+          title={`Link ${request.username ? `@${request.username}` : 'a Telegram chat without a username'}?`}
+          action={
+            <div className="flex gap-2">
+              <Button
+                variant="solid"
+                size="sm"
+                disabled={busy}
+                onClick={() => {
+                  setPending(undefined);
+                  void confirm(request.id);
+                }}
+              >
+                Confirm
+              </Button>
+              <Button
+                variant="glass"
+                size="sm"
+                disabled={busy}
+                onClick={() => void decline()}
+              >
+                Not me
+              </Button>
+            </div>
+          }
+        >
+          This chat used your link code. Confirm it only if it is yours — until
+          then it gets nothing and its buttons do nothing. The request expires
+          at {formatDate(request.expiresAt, 'time')}.
+        </Banner>
+      ) : null}
       {view.status === 'loading' ? (
         <p className="text-ink-2 text-sm">Loading…</p>
       ) : view.status === 'error' ? (
@@ -94,8 +130,8 @@ export function TelegramCard({ link }: { link: Link }) {
                 onClick={() => void reload()}
               >
                 check again
-              </button>
-              .
+              </button>{' '}
+              and confirm the chat here.
             </p>
           ) : null}
         </div>
