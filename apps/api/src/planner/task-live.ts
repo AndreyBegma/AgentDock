@@ -15,21 +15,21 @@ const strings = (value: unknown): string[] =>
     ? value.filter((v): v is string => typeof v === 'string')
     : [];
 
-/**
- * The GitHub side of one project's issued tasks (spec "Data / Schema"):
- * joined from #19's issue cache and queue states, and the open pull requests
- * that close them. Returns a lookup by issue number.
- */
-export const loadIssueViews = async (
+export type IssueViews = (task: IssuedTask) => PlanTaskIssueView | null;
+
+/** What every read of one project's issue views shares. */
+interface ProjectFacts {
+  repo: string;
+  readyLabel: string;
+  /** Issue → the first open pull request whose body closes it. */
+  prBy: Map<number, { number: number; url: string }>;
+}
+
+const loadProjectFacts = async (
   prisma: PrismaService,
   projectId: string,
-  tasks: readonly IssuedTask[],
-): Promise<(task: IssuedTask) => PlanTaskIssueView | null> => {
-  const numbers = tasks
-    .map((t) => t.issueNumber)
-    .filter((n): n is number => n !== null);
-  if (numbers.length === 0) return () => null;
-  const [project, issues, states, openPrs] = await Promise.all([
+): Promise<ProjectFacts> => {
+  const [project, openPrs] = await Promise.all([
     prisma.project.findUniqueOrThrow({
       where: { id: projectId },
       select: {
@@ -38,6 +38,59 @@ export const loadIssueViews = async (
         codeSentinelConfig: true,
       },
     }),
+    prisma.issueCache.findMany({
+      where: { projectId, kind: 'pull_request', state: 'open' },
+      select: { number: true, url: true, body: true },
+    }),
+  ]);
+  const prBy = new Map<number, { number: number; url: string }>();
+  for (const pr of openPrs) {
+    for (const n of parseClosingRefs(pr.body)) {
+      if (!prBy.has(n)) prBy.set(n, { number: pr.number, url: pr.url });
+    }
+  }
+  return { repo: project.repo, readyLabel: readyLabelOf(project), prBy };
+};
+
+/**
+ * The GitHub side of one project's issued tasks (spec "Data / Schema"):
+ * joined from #19's issue cache and queue states, and the open pull requests
+ * that close them. Returns a lookup by issue number.
+ */
+export const loadIssueViews = (
+  prisma: PrismaService,
+  projectId: string,
+  tasks: readonly IssuedTask[],
+): Promise<IssueViews> => issueViewLoader(prisma, projectId)(tasks);
+
+/**
+ * `loadIssueViews` for a reader that pages one project's tasks in several
+ * reads (L-25): the project and its open pull requests are read once, on the
+ * first read with an issued task; each read joins only its own issues.
+ */
+export const issueViewLoader = (
+  prisma: PrismaService,
+  projectId: string,
+): ((tasks: readonly IssuedTask[]) => Promise<IssueViews>) => {
+  let facts: Promise<ProjectFacts> | null = null;
+  return (tasks) => {
+    const numbers = tasks
+      .map((t) => t.issueNumber)
+      .filter((n): n is number => n !== null);
+    if (numbers.length === 0) return Promise.resolve(() => null);
+    facts ??= loadProjectFacts(prisma, projectId);
+    return joinIssueViews(prisma, projectId, numbers, facts);
+  };
+};
+
+const joinIssueViews = async (
+  prisma: PrismaService,
+  projectId: string,
+  numbers: number[],
+  facts: Promise<ProjectFacts>,
+): Promise<IssueViews> => {
+  const [{ repo, readyLabel, prBy }, issues, states] = await Promise.all([
+    facts,
     prisma.issueCache.findMany({
       where: { projectId, kind: 'issue', number: { in: numbers } },
       select: {
@@ -52,21 +105,10 @@ export const loadIssueViews = async (
       where: { projectId, issueNumber: { in: numbers } },
       select: { issueNumber: true, state: true },
     }),
-    prisma.issueCache.findMany({
-      where: { projectId, kind: 'pull_request', state: 'open' },
-      select: { number: true, url: true, body: true },
-    }),
   ]);
-  const readyLabel = readyLabelOf(project);
   const issueBy = new Map(issues.map((i) => [i.number, i]));
   const stateBy = new Map(states.map((s) => [s.issueNumber, s.state]));
-  const prBy = new Map<number, { number: number; url: string }>();
-  for (const pr of openPrs) {
-    for (const n of parseClosingRefs(pr.body)) {
-      if (!prBy.has(n)) prBy.set(n, { number: pr.number, url: pr.url });
-    }
-  }
-  const prUrl = (n: number) => `https://github.com/${project.repo}/pull/${n}`;
+  const prUrl = (n: number) => `https://github.com/${repo}/pull/${n}`;
 
   return (task) => {
     if (task.issueNumber === null || task.issueUrl === null) return null;

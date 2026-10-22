@@ -256,6 +256,43 @@ export class WorkWorld {
     });
   }
 
+  /**
+   * L-25: `count` draft tasks in one plan and `count` cards in `project`, a
+   * minute apart, written in bulk — a project too large to read whole.
+   */
+  async bulk(project: string, count: number): Promise<void> {
+    const { prisma } = this.ctx;
+    const planId = await this.plan({ project, author: this.authorId }, []);
+    const minutes = Array.from({ length: count }, (_, i) => i);
+    await prisma.planTask.createMany({
+      data: minutes.map((i) => ({
+        planId,
+        key: `t${i + 1}`,
+        planVersion: 1,
+        kind: 'feature' as const,
+        title: `Task t${i + 1}`,
+        summary: '',
+        updatedAt: at(i),
+      })),
+    });
+    await prisma.boardCard.createMany({
+      data: minutes.map((i) => ({
+        projectId: project,
+        number: i + 1,
+        shortId: `bulk${String(i).padStart(5, '0')}`,
+        title: `Card ${i + 1}`,
+        kind: 'feature' as const,
+        column: 'todo' as const,
+        source: 'manual',
+        position: i + 1,
+        issueOnRun: false,
+        specOnRun: false,
+        movedAt: at(i),
+        updatedAt: at(i),
+      })),
+    });
+  }
+
   async card(seed: CardSeed): Promise<string> {
     this.shortId += 1;
     const card = await this.ctx.prisma.boardCard.create({

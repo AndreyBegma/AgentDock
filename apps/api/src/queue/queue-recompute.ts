@@ -42,9 +42,9 @@ const same = (
 export class QueueRecompute {
   /** True when any row was added, changed or removed. */
   async run(tx: Tx, projectId: string): Promise<boolean> {
-    const loaded = await loadQueueInputs(tx, projectId);
-    if (!loaded) return false;
-    const items = computeQueue(loaded.inputs);
+    const inputs = await loadQueueInputs(tx, projectId);
+    if (!inputs) return false;
+    const items = computeQueue(inputs);
     const existing = new Map(
       (await tx.queueStateRow.findMany({ where: { projectId } })).map((r) => [
         r.issueNumber,
