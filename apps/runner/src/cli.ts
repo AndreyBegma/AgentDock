@@ -58,6 +58,11 @@ export interface CliDeps {
   stderr: (text: string) => void;
   /** The command a service manager runs to start the daemon, `run` included. */
   execStart: readonly string[];
+  /**
+   * C-162: the absolute path of this runner's compiled binary, which `setup
+   * claude` hands to the plugin; null when it runs from source under Bun.
+   */
+  runnerBinary?: string | null;
   exec?: Exec;
   createSocket?: SocketFactory;
   random?: () => number;
@@ -578,6 +583,7 @@ const setupCommand = async ({
     telemetry: !values['no-telemetry'],
     dryRun: values['dry-run'] === true,
     uninstall: values.uninstall === true,
+    runnerBinary: deps.runnerBinary ?? null,
     // L-30: the token the daemon asks for, from the same file it reads.
     otlp: otlp.enabled
       ? {

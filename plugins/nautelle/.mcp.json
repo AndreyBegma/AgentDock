@@ -1,8 +1,11 @@
 {
   "mcpServers": {
     "nautelle": {
-      "command": "nautelle-runner",
-      "args": ["mcp"]
+      "command": "/bin/sh",
+      "args": [
+        "-c",
+        "r=$NAUTELLE_RUNNER_BIN; case $r in /*) [ -x \"$r\" ] ;; *) false ;; esac || r=nautelle-runner; exec \"$r\" mcp"
+      ]
     }
   }
 }

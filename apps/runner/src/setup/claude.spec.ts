@@ -5,13 +5,21 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import type { ConfigProfile } from '../config';
 import { createExec } from '../detect/exec';
 import { tempDir } from '../testing/fixtures';
-import { EXPORTER_KEYS, type SetupClaudeOptions, setupClaude } from './claude';
+import { RUNNER_VERSION } from '../version';
+import {
+  EXPORTER_KEYS,
+  PINNED_MARKETPLACE_SOURCE,
+  RUNNER_BIN_ENV,
+  type SetupClaudeOptions,
+  setupClaude,
+} from './claude';
 
 describe('nautelle-runner setup claude (spec 201 D21)', () => {
   let dir = '';
@@ -86,7 +94,7 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
     expect(await run({ dryRun: true })).toBe(0);
     const text = stdout.join('');
     expect(text).toContain(
-      'claude plugin marketplace add AndreyBegma/Nautelle',
+      `claude plugin marketplace add ${PINNED_MARKETPLACE_SOURCE}`,
     );
     expect(text).toContain(
       'claude plugin install nautelle@nautelle --scope user',
@@ -104,7 +112,7 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
     writeOriginal();
     expect(await run()).toBe(0);
     expect(calls()).toEqual([
-      `${configDir()} plugin marketplace add AndreyBegma/Nautelle`,
+      `${configDir()} plugin marketplace add ${PINNED_MARKETPLACE_SOURCE}`,
       `${configDir()} plugin install nautelle@nautelle --scope user`,
     ]);
     const settings = JSON.parse(readFileSync(settingsPath(), 'utf8'));
@@ -192,7 +200,7 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
     expect(calls()).toEqual([
       `${configDir()} plugin uninstall agentdock@agentdock --scope user`,
       `${configDir()} plugin marketplace remove agentdock`,
-      `${configDir()} plugin marketplace add AndreyBegma/Nautelle`,
+      `${configDir()} plugin marketplace add ${PINNED_MARKETPLACE_SOURCE}`,
       `${configDir()} plugin install nautelle@nautelle --scope user`,
     ]);
   });
@@ -276,5 +284,97 @@ describe('nautelle-runner setup claude (spec 201 D21)', () => {
   it('--profile picks one profile; an unknown one is an error', async () => {
     expect(await run({ profile: 'nope', dryRun: true })).toBe(1);
     expect(await run({ profile: 'claude-work', dryRun: true })).toBe(0);
+  });
+
+  describe('C-162: pinned marketplace and absolute runner path', () => {
+    const knownMarketplaces = (source: Record<string, string>) => {
+      mkdirSync(join(configDir(), 'plugins'), { recursive: true });
+      writeFileSync(
+        join(configDir(), 'plugins', 'known_marketplaces.json'),
+        JSON.stringify({ nautelle: { source } }),
+      );
+    };
+    /** A fake compiled runner binary at an absolute path. */
+    const runnerBinary = (): string => {
+      mkdirSync(join(dir, 'opt'), { recursive: true });
+      const path = join(dir, 'opt', 'nautelle-runner');
+      writeFileSync(path, '#!/bin/sh\nexit 0\n');
+      chmodSync(path, 0o755);
+      return path;
+    };
+
+    it('adds the marketplace at the runner-v<RUNNER_VERSION> tag', async () => {
+      expect(await run()).toBe(0);
+      const add = calls().find((c) => c.includes('marketplace add')) ?? '';
+      const source = add.split(' ').at(-1) ?? '';
+      expect(source.split('#')[1]).toBe(`runner-v${RUNNER_VERSION}`);
+      expect(source.split('#')[0]).toBe('AndreyBegma/Nautelle');
+    });
+
+    it('removes a marketplace added from the default branch before pinning it', async () => {
+      knownMarketplaces({ source: 'github', repo: 'AndreyBegma/Nautelle' });
+      expect(await run({ telemetry: false })).toBe(0);
+      expect(calls()).toEqual([
+        `${configDir()} plugin marketplace remove nautelle`,
+        `${configDir()} plugin marketplace add ${PINNED_MARKETPLACE_SOURCE}`,
+        `${configDir()} plugin install nautelle@nautelle --scope user`,
+      ]);
+    });
+
+    it('leaves a marketplace already pinned to this tag alone', async () => {
+      knownMarketplaces({
+        source: 'github',
+        repo: 'AndreyBegma/Nautelle',
+        ref: `runner-v${RUNNER_VERSION}`,
+      });
+      expect(await run({ telemetry: false })).toBe(0);
+      expect(calls()).toHaveLength(2);
+    });
+
+    it('writes the absolute runner path the hooks and MCP server run', async () => {
+      writeOriginal();
+      const binary = runnerBinary();
+      expect(await run({ telemetry: false, runnerBinary: binary })).toBe(0);
+      const env = JSON.parse(readFileSync(settingsPath(), 'utf8')).env;
+      expect(env[RUNNER_BIN_ENV]).toBe(binary);
+      expect(env[RUNNER_BIN_ENV].startsWith('/')).toBe(true);
+      expect(env.FOO).toBe('bar');
+      expect(env.OTEL_METRICS_EXPORTER).toBe('console');
+    });
+
+    it('prefers the nautelle-runner on PATH that links to the same binary', async () => {
+      const binary = runnerBinary();
+      symlinkSync(binary, join(dir, 'bin', 'nautelle-runner'));
+      expect(await run({ runnerBinary: binary })).toBe(0);
+      const env = JSON.parse(readFileSync(settingsPath(), 'utf8')).env;
+      expect(env[RUNNER_BIN_ENV]).toBe(join(dir, 'bin', 'nautelle-runner'));
+    });
+
+    it('ignores a nautelle-runner on PATH that is another binary', async () => {
+      const binary = runnerBinary();
+      writeFileSync(join(dir, 'bin', 'nautelle-runner'), '#!/bin/sh\n');
+      chmodSync(join(dir, 'bin', 'nautelle-runner'), 0o755);
+      expect(await run({ runnerBinary: binary })).toBe(0);
+      const env = JSON.parse(readFileSync(settingsPath(), 'utf8')).env;
+      expect(env[RUNNER_BIN_ENV]).toBe(binary);
+    });
+
+    it('without a compiled binary keeps the plugin on PATH and says so', async () => {
+      writeOriginal();
+      expect(await run({ telemetry: false, runnerBinary: null })).toBe(0);
+      expect(JSON.parse(readFileSync(settingsPath(), 'utf8'))).toEqual(
+        original,
+      );
+      expect(stderr.join('')).toContain('finds nautelle-runner on PATH');
+    });
+
+    it('--uninstall removes the runner path again', async () => {
+      writeOriginal();
+      await run({ runnerBinary: runnerBinary() });
+      expect(await run({ uninstall: true })).toBe(0);
+      expect(JSON.parse(readFileSync(settingsPath(), 'utf8'))).toEqual(
+        original,
+      );
+    });
   });
 });

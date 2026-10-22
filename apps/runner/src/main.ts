@@ -103,6 +103,7 @@ const code =
           execStart: compiled
             ? [process.execPath, 'run']
             : [process.execPath, Bun.main, 'run'],
+          runnerBinary: compiled ? process.execPath : null,
           signal: controller.signal,
           // ADR-0073: the `agentdock` directories move before any command
           // reads them; the commands that read none leave them alone.
