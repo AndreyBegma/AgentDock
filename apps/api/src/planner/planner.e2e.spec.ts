@@ -254,7 +254,7 @@ describe('planner (e2e)', () => {
       expect((await h.auditOf('plan.created'))[0].targetId).toBe(created.id);
       expect(
         (await h.auditOf('plan.task_reviewed')).map((a) => [
-          (a.after as { key: string }).key,
+          (a.after as { task: string }).task,
           a.result,
         ]),
       ).toEqual([

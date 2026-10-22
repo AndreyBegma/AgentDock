@@ -26,7 +26,7 @@ import { AuditService } from './audit.service';
 import { type AuditEntry, systemActorFor } from './audit.types';
 import { AuditVerificationJob } from './audit-verification.job';
 import { AuditVerificationService } from './audit-verification.service';
-import { GENESIS_HASH } from './canonical';
+import { computeHash, GENESIS_HASH, type JsonValue } from './canonical';
 
 const NEW_PASSWORD = 'a different horse battery staple';
 
@@ -537,6 +537,27 @@ describe('audit log (e2e)', () => {
     });
   });
 
+  it('stores secrets under any token, secret, password, key, authorization or cookie name redacted (C-174)', async () => {
+    const [row] = await recordsOf(() =>
+      audit.record({
+        actor: { type: 'system' },
+        action: 'user.update',
+        target: { type: 'redaction' },
+        before: { apiToken: 'x', clientSecret: 'y' },
+        after: { headers: { Authorization: 'Bearer z' }, name: 'kept' },
+        result: 'ok',
+      }),
+    );
+    expect(row.before).toEqual({
+      apiToken: '[redacted]',
+      clientSecret: '[redacted]',
+    });
+    expect(row.after).toEqual({
+      headers: { Authorization: '[redacted]' },
+      name: 'kept',
+    });
+  });
+
   it('the database refuses UPDATE, DELETE and TRUNCATE', async () => {
     await audit.record({
       actor: { type: 'system' },
@@ -639,6 +660,74 @@ describe('audit log (e2e)', () => {
       expect(logger.lines.join('\n')).toContain(
         `audit chain broken at seq ${target.seq}`,
       );
+    });
+
+    it('rewriting a record and every later hash without the key fails verification (C-174)', async () => {
+      for (const type of ['rekey', 'rekey-after', 'rekey-last']) {
+        await audit.record({
+          actor: { type: 'system' },
+          action: 'user.create',
+          target: { type },
+          after: { name: type },
+          result: 'ok',
+        });
+      }
+      const target = await ctx.prisma.auditRecord.findFirstOrThrow({
+        where: { targetType: 'rekey' },
+        orderBy: { seq: 'desc' },
+      });
+      const originals = await ctx.prisma.auditRecord.findMany({
+        where: { seq: { gte: target.seq } },
+        orderBy: { seq: 'asc' },
+      });
+      expect(
+        (await admin.send('post', '/admin/audit/verification')).body,
+      ).toMatchObject({ ok: true });
+
+      await ctx.prisma.$executeRawUnsafe(
+        'DROP TRIGGER audit_records_no_update_delete ON audit_records',
+      );
+      try {
+        // The attacker's rewrite: forge the record, then recompute its hash
+        // and every later one the only way open without the key.
+        let prevHash = target.prevHash;
+        for (const row of originals) {
+          const after: JsonValue =
+            row.seq === target.seq
+              ? { name: 'forged' }
+              : (row.after as JsonValue);
+          const hash = computeHash(prevHash, {
+            ...row,
+            before: row.before as JsonValue | null,
+            after,
+            meta: row.meta as JsonValue | null,
+          });
+          await ctx.prisma.$executeRaw`
+            UPDATE audit_records
+            SET after = ${JSON.stringify(after)}::jsonb,
+                "prevHash" = ${prevHash}, hash = ${hash}
+            WHERE seq = ${row.seq}`;
+          prevHash = hash;
+        }
+        expect(
+          (await admin.send('post', '/admin/audit/verification')).body,
+        ).toMatchObject({ ok: false, firstBrokenSeq: target.seq.toString() });
+      } finally {
+        for (const row of originals) {
+          await ctx.prisma.$executeRaw`
+            UPDATE audit_records
+            SET after = ${JSON.stringify(row.after)}::jsonb,
+                "prevHash" = ${row.prevHash}, hash = ${row.hash}
+            WHERE seq = ${row.seq}`;
+        }
+        await ctx.prisma.$executeRawUnsafe(`
+          CREATE TRIGGER audit_records_no_update_delete
+            BEFORE UPDATE OR DELETE ON audit_records
+            FOR EACH ROW EXECUTE FUNCTION audit_records_immutable()`);
+      }
+      expect(
+        (await admin.send('post', '/admin/audit/verification')).body,
+      ).toMatchObject({ ok: true });
     });
 
     it('onBehalfOf is stored and hashed; records with and without it verify; forging it breaks the chain (#102)', async () => {

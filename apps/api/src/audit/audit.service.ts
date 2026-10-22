@@ -1,10 +1,12 @@
 import type { AuditAction, AuditResult } from '@nautelle/shared';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import type { AuditActor, AuditEntry } from './audit.types';
 import {
-  computeHash,
+  AUDIT_HMAC_KEY_ENV,
+  auditHmacKey,
+  chainHash,
   GENESIS_HASH,
   type HashedFields,
   type JsonValue,
@@ -44,11 +46,19 @@ interface FoldRow {
 
 /** Writes the append-only, hash-chained audit log (docs/specs/8). */
 @Injectable()
-export class AuditService {
+export class AuditService implements OnModuleInit {
   private readonly logger = new Logger(AuditService.name);
   private tail: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly prisma: PrismaService) {}
+
+  onModuleInit(): void {
+    if (auditHmacKey() === null) {
+      this.logger.warn(
+        `${AUDIT_HMAC_KEY_ENV} is not set: audit records are hashed without a key, so anyone who can write the database can rewrite the chain`,
+      );
+    }
+  }
 
   /**
    * Appends one record. Never throws (spec D8): the action it describes has
@@ -192,7 +202,7 @@ export class AuditService {
           result: entry.result,
           meta: toDbJson(row.meta),
           prevHash,
-          hash: computeHash(prevHash, row),
+          hash: chainHash(auditHmacKey(), prevHash, row),
         },
       });
     }, TX_OPTIONS);
