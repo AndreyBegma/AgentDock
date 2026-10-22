@@ -2,14 +2,22 @@ import type { PrInspection } from '@nautelle/shared/protocol';
 import { ApprovalCommands } from '../approvals';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BotTokenStore } from '../notifications';
+import { NotificationWriter } from '../notifications/notification-writer';
 import {
   insertEvent,
   seedRunnerProject,
   seedUser,
 } from '../notifications/testing/notifications-e2e';
-import { decodeCallback, encodeCallback, notePrompt } from './approval-actions';
+import { login } from '../test/e2e-app';
+import {
+  decodeCallback,
+  encodeCallback,
+  notePrompt,
+  refusalText,
+} from './approval-actions';
 import type { InlineKeyboardButton } from './telegram-client';
 import { TelegramDeliveryService } from './telegram-delivery.service';
+import { LINK_REPLIES } from './telegram-linking.service';
 import { TelegramPoller } from './telegram-poller';
 import {
   BOT_TOKEN,
@@ -268,6 +276,84 @@ describe('Telegram approval buttons (e2e, spec 22 D12, #82)', () => {
       const [call] = ctx.fake.sent();
       expect(call.body.reply_markup).toBeUndefined();
       expect(call.body.text).not.toContain('Head');
+    });
+  });
+
+  describe('a chat that only redeemed the link code (C-147, L-18)', () => {
+    /** A new `pr.awaiting_approval` for the operator, through the writer. */
+    const writeForOperator = async () => {
+      const eventId = await insertEvent(ctx.prisma, runnerId, {
+        type: 'pr.awaiting_approval',
+        data: { pr: PR },
+      });
+      await ctx.prisma.$transaction((tx) =>
+        ctx.app.get(NotificationWriter).write(
+          tx,
+          {
+            kind: 'pr.awaiting_approval',
+            projectId,
+            runnerId,
+            slot: 'i42-api',
+            issue: 42,
+            title: `PR #${PR} is waiting for approval`,
+            body: 'The orchestrator will merge it once a person approves.',
+            link: `/projects/${projectId}/fleet`,
+            eventId,
+            at: new Date(),
+            fold: false,
+          },
+          [{ userId: operatorId, role: 'operator' }],
+        ),
+      );
+    };
+    const sentToOperator = () =>
+      ctx.fake.sent().filter((c) => c.body.chat_id === OPERATOR_CHAT);
+
+    it('gets nothing and its presses are refused until the app confirms it', async () => {
+      // The operator's chat becomes a pending link only: the code was redeemed.
+      await ctx.prisma.telegramLink.delete({ where: { userId: operatorId } });
+      const session = await login(ctx, 'op@example.com');
+      const created = await session.send('post', '/notifications/telegram/link');
+      const code = new URL(created.body.url).searchParams.get('start');
+      await poll(privateMessage(nextUpdate++, OPERATOR_CHAT, `/start ${code}`));
+      expect(lastTextTo(OPERATOR_CHAT)).toBe(LINK_REPLIES.pending);
+      ctx.fake.reset();
+
+      await writeForOperator();
+      await delivery.deliverOnce();
+      expect(sentToOperator()).toHaveLength(0);
+      // No Telegram delivery is even queued for it.
+      expect(
+        await ctx.prisma.notificationDelivery.count({
+          where: { userId: operatorId, channel: 'telegram', status: 'pending' },
+        }),
+      ).toBe(0);
+
+      await press(OPERATOR_CHAT, approveButton);
+      expect(commands.approve).not.toHaveBeenCalled();
+      expect(lastTextTo(OPERATOR_CHAT)).toBe(refusalText('not_linked'));
+      expect((await approvalRow()).status).toBe('waiting');
+
+      // The confirmation in the app makes it the operator's chat.
+      const status = await session.get('/notifications/telegram/link');
+      const confirmed = await session.send(
+        'post',
+        '/notifications/telegram/link/confirm',
+        { id: status.body.pending.id },
+      );
+      expect(confirmed.status).toBe(200);
+      ctx.fake.reset();
+
+      await writeForOperator();
+      await delivery.deliverOnce();
+      expect(sentToOperator().map((c) => c.body.text)).toEqual([
+        expect.stringContaining('waiting for approval'),
+      ]);
+
+      await press(OPERATOR_CHAT, approveButton);
+      expect(commands.approve).toHaveBeenCalledTimes(1);
+      expect(lastTextTo(OPERATOR_CHAT)).toBe('Approved PR #51 at 1111111.');
+      expect((await approvalRow()).status).toBe('approved');
     });
   });
 

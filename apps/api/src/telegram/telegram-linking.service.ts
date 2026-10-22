@@ -311,11 +311,11 @@ export class TelegramLinkingService {
       if (holder && holder.userId !== user.id) return { reply: 'chatTaken' };
       // This very chat is the user's link already: nothing to confirm.
       if (holder) return { reply: 'linked' };
-      // The pending link lives as long as the code would have.
-      await tx.telegramPendingLink.upsert({
-        where: { userId: user.id },
-        create: { userId: user.id, chatId, username, expiresAt },
-        update: { chatId, username, createdAt: now, expiresAt },
+      // A new request gets a new id, so a page that showed the one it
+      // replaces cannot confirm it. It lives as long as the code would have.
+      await tx.telegramPendingLink.deleteMany({ where: { userId: user.id } });
+      await tx.telegramPendingLink.create({
+        data: { userId: user.id, chatId, username, createdAt: now, expiresAt },
       });
       return { reply: 'pending', userId: user.id, role: user.role };
     });
