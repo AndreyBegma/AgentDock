@@ -114,6 +114,8 @@ export const AUDIT_ACTIONS = [
   'plan.revised',
   'plan.sent',
   'plan.task_reviewed',
+  /** #409, DA-16: a New work split confirmed, by the person who confirmed it. */
+  'plan.split_confirmed',
   /** #592 (ADR-0058): a New work candidate edited by hand (`meta.candidateId`). */
   'plan.candidate_edited',
   /** #592: a New work candidate rejected; no card was made. */

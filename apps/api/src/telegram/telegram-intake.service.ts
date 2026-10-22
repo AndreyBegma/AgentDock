@@ -780,7 +780,11 @@ export class TelegramIntakeService implements OnModuleInit, OnModuleDestroy {
         return 'Keeping one card.';
       case 'create_all': {
         if (phase.kind !== 'split') return null;
-        await this.planCards.confirmSplit(plan, confirmAll(phase.split));
+        await this.planCards.confirmSplit(
+          plan,
+          confirmAll(phase.split),
+          ready.actor,
+        );
         return 'Sending the cards to Drafts.';
       }
       case 'retry':

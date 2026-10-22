@@ -290,11 +290,12 @@ export class PlansController {
   async split(
     @ProjectAccess() access: ResolvedProjectAccess,
     @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
     @Param('planId') planId: string,
     @Body() body: ConfirmSplitDto,
   ): Promise<ConfirmSplitResponse> {
     const plan = await this.writable(user.id, access.projectId, planId);
-    return this.planCards.confirmSplit(plan, body);
+    return this.planCards.confirmSplit(plan, body, actorOf(access, user, ctx));
   }
 
   /** #592 (ADR-0058): the person edits a candidate by hand. */
