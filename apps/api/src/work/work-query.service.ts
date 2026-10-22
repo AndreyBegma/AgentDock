@@ -22,13 +22,18 @@ import { decodeKeyset, encodeKeyset, type Keyset } from '../activity/keyset';
 import type { AuthUser } from '../auth';
 import { PrismaService } from '../database/prisma.service';
 import { ProjectAccessService } from '../projects';
+import {
+  afterKeyset,
+  KEYSET_ORDER,
+  mergeKeysetPage,
+  type SourceSlice,
+} from './keyset-page';
 import { unknownCursor } from './work-error';
-import { loadWorkTasks } from './work-tasks';
+import { pageWorkTasks, type WorkTask } from './work-tasks';
 
-interface Row {
-  key: Keyset;
-  item: WorkItem;
-}
+type Slice = SourceSlice<WorkItem>;
+
+const NONE: Slice = { rows: [], horizon: null };
 
 const isFleetStage = (value: string): value is FleetStage =>
   (FLEET_STAGES as readonly string[]).includes(value);
@@ -44,18 +49,13 @@ export const workSourceOfCard = (card: {
       ? 'inbox'
       : 'card';
 
-/** `(updatedAt, id)` descending: newer first, then the larger id. */
-const before = (a: Keyset, b: Keyset): boolean =>
-  a.at.getTime() < b.at.getTime() ||
-  (a.at.getTime() === b.at.getTime() && a.id < b.id);
-
 /**
  * `GET /work` (issue #270 D10, D11): board cards, plan tasks and — for the
  * projects the caller operates — Inbox suggestions, across the projects they
- * can see, in one keyset `(updatedAt, id)` descending. A plan task's status
- * is derived after the join (as `GET /tasks`), so both sources are merged and
- * paged here rather than in SQL; the SQL bound `updatedAt <= cursor` only
- * trims what cannot be on the page.
+ * can see, in one keyset `(updatedAt, id)` descending. Each source reads a
+ * page plus one in that order (L-25) and the two are merged by cursor here; a
+ * plan task's status is derived after the join (as `GET /tasks`), so a status
+ * filter reads the tasks on in bounded batches (`pageWorkTasks`).
  */
 @Injectable()
 export class WorkQueryService {
@@ -74,18 +74,8 @@ export class WorkQueryService {
       this.cards(user, query, search, after),
       this.tasks(user, query, search, after),
     ]);
-    const rows = [...cards, ...tasks]
-      .filter((r) => !after || before(r.key, after))
-      .sort((a, b) =>
-        before(a.key, b.key) ? 1 : before(b.key, a.key) ? -1 : 0,
-      );
-    const page = rows.slice(0, WORK_PAGE_SIZE);
-    const last = page.at(-1);
-    return {
-      items: page.map((r) => r.item),
-      nextCursor:
-        rows.length > WORK_PAGE_SIZE && last ? encodeKeyset(last.key) : null,
-    };
+    const { items, next } = mergeKeysetPage([cards, tasks], WORK_PAGE_SIZE);
+    return { items, nextCursor: next ? encodeKeyset(next) : null };
   }
 
   /**
@@ -113,14 +103,14 @@ export class WorkQueryService {
     query: WorkQuery,
     search: WorkSearch | null,
     after: Keyset | null,
-  ): Promise<Row[]> {
+  ): Promise<Slice> {
     // A plan filter or `rejected` names plan tasks only (D10).
     if (
       query.source === 'plan' ||
       query.planId ||
       query.status === 'rejected'
     ) {
-      return [];
+      return NONE;
     }
     const wanted = BOARD_COLUMNS.filter(
       (c: BoardColumn) =>
@@ -130,7 +120,7 @@ export class WorkQueryService {
             c !== 'inbox') &&
         (!query.status || query.status === c),
     );
-    if (wanted.length === 0) return [];
+    if (wanted.length === 0) return NONE;
     const open = wanted.filter((c) => c !== 'inbox');
     const columns: Prisma.BoardCardWhereInput[] = [];
     if (open.length > 0) columns.push({ column: { in: open } });
@@ -141,7 +131,7 @@ export class WorkQueryService {
         columns.push({ column: 'inbox', projectId: { in: inbox } });
       }
     }
-    if (columns.length === 0) return [];
+    if (columns.length === 0) return NONE;
 
     const and: Prisma.BoardCardWhereInput[] = [
       { project: this.access.visibleWhere(user) },
@@ -152,7 +142,7 @@ export class WorkQueryService {
     // #388: `fleet` is its own source; `card` and `inbox` no longer include it.
     if (query.source === 'fleet') and.push({ source: 'fleet' });
     else if (query.source) and.push({ source: { not: 'fleet' } });
-    if (after) and.push({ updatedAt: { lte: after.at } });
+    if (after) and.push(afterKeyset(after));
     if (search) {
       const or: Prisma.BoardCardWhereInput[] = [
         { title: { contains: search.text, mode: 'insensitive' } },
@@ -165,6 +155,8 @@ export class WorkQueryService {
     }
     const cards = await this.prisma.boardCard.findMany({
       where: { AND: and },
+      orderBy: KEYSET_ORDER,
+      take: WORK_PAGE_SIZE + 1,
       include: {
         project: { select: { displayName: true } },
         rounds: {
@@ -174,7 +166,8 @@ export class WorkQueryService {
         },
       },
     });
-    return cards.map((card) => ({
+    const last = cards.at(-1);
+    const rows = cards.map((card) => ({
       key: { at: card.updatedAt, id: card.id },
       item: {
         source: workSourceOfCard(card),
@@ -208,6 +201,13 @@ export class WorkQueryService {
           : {}),
       },
     }));
+    return {
+      rows,
+      horizon:
+        cards.length > WORK_PAGE_SIZE && last
+          ? { at: last.updatedAt, id: last.id }
+          : null,
+    };
   }
 
   private async tasks(
@@ -215,13 +215,12 @@ export class WorkQueryService {
     query: WorkQuery,
     search: WorkSearch | null,
     after: Keyset | null,
-  ): Promise<Row[]> {
-    if (query.source && query.source !== 'plan') return [];
+  ): Promise<Slice> {
+    if (query.source && query.source !== 'plan') return NONE;
     // Plan tasks never enter the Inbox (D2).
-    if (query.status === 'inbox') return [];
+    if (query.status === 'inbox') return NONE;
     const tasks: Prisma.PlanTaskWhereInput[] = [];
     if (query.kind) tasks.push({ kind: query.kind });
-    if (after) tasks.push({ updatedAt: { lte: after.at } });
     if (search) {
       const or: Prisma.PlanTaskWhereInput[] = [
         { title: { contains: search.text, mode: 'insensitive' } },
@@ -232,23 +231,27 @@ export class WorkQueryService {
       }
       tasks.push({ OR: or });
     }
-    const rows = await loadWorkTasks(this.prisma, user.id, {
+    const statusOf = ({ task, issue }: WorkTask) =>
+      workStatusOfPlanTask(task.status, issue?.liveStatus ?? null);
+    const slice = await pageWorkTasks(this.prisma, user.id, {
       plans: {
         project: this.access.visibleWhere(user),
         ...(query.projectId ? { projectId: query.projectId } : {}),
         ...(query.planId ? { id: query.planId } : {}),
       },
       tasks,
+      after,
+      size: WORK_PAGE_SIZE,
+      ...(query.status
+        ? { keep: (r: WorkTask) => statusOf(r) === query.status }
+        : {}),
     });
-    return rows.flatMap(({ plan, task, issue }) => {
-      const status = workStatusOfPlanTask(
-        task.status,
-        issue?.liveStatus ?? null,
-      );
-      if (query.status && query.status !== status) return [];
-      return [
-        {
-          key: { at: task.updatedAt, id: task.id },
+    return {
+      horizon: slice.horizon,
+      rows: slice.rows.map(({ key, item: row }) => {
+        const { plan, task, issue } = row;
+        return {
+          key,
           item: {
             source: 'plan',
             projectId: plan.projectId,
@@ -259,14 +262,14 @@ export class WorkQueryService {
             key: task.key,
             title: task.title,
             kind: task.kind,
-            status,
+            status: statusOf(row),
             nativeStatus: issue?.liveStatus ?? task.status,
             issue,
             updatedAt: task.updatedAt.toISOString(),
             href: workPlanTaskHref(plan.projectId, plan.id, task.key),
           },
-        },
-      ];
-    });
+        };
+      }),
+    };
   }
 }
