@@ -97,10 +97,10 @@ describe('failedCardChecks and cardCiChecksOf (#359 D5)', () => {
 });
 
 describe('auto-merge default (#359 D7)', () => {
-  it('is on for develop and off for main or master', () => {
-    expect(cardAutoMergeDefault('develop')).toBe(true);
-    expect(cardAutoMergeDefault('main')).toBe(false);
-    expect(cardAutoMergeDefault('master')).toBe(false);
+  it('is on for an integration base and off for the default branch', () => {
+    expect(cardAutoMergeDefault('develop', 'main')).toBe(true);
+    expect(cardAutoMergeDefault('main', 'main')).toBe(false);
+    expect(cardAutoMergeDefault('master', 'master')).toBe(false);
   });
 
   it('follows the repository default branch when it is known', () => {
@@ -108,8 +108,19 @@ describe('auto-merge default (#359 D7)', () => {
     expect(cardAutoMergeDefault('main', 'trunk')).toBe(true);
   });
 
+  // C-148: a default branch not named main is no longer missed by name.
+  it('is off for a trunk default with base trunk', () => {
+    expect(cardAutoMergeDefault('trunk', 'trunk')).toBe(false);
+  });
+
+  it('is off while the default branch is unknown', () => {
+    expect(cardAutoMergeDefault('develop')).toBe(false);
+    expect(cardAutoMergeDefault('develop', null)).toBe(false);
+    expect(cardAutoMergeEnabled(null, 'develop', null)).toBe(false);
+  });
+
   it('the stored switch wins over the default', () => {
-    expect(cardAutoMergeEnabled(null, 'develop')).toBe(true);
+    expect(cardAutoMergeEnabled(null, 'develop', 'main')).toBe(true);
     expect(cardAutoMergeEnabled(false, 'develop')).toBe(false);
     expect(cardAutoMergeEnabled(true, 'main')).toBe(true);
   });

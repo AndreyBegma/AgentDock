@@ -64,23 +64,14 @@ export const cardCiChecksOf = (json: unknown): CardCiCheck[] =>
     : [];
 
 /**
- * Branches that are a repository's default by convention. The API stores no
- * repository default branch, so D7 reads a base by its name.
- */
-const DEFAULT_BRANCH_NAMES: ReadonlySet<string> = new Set(['main', 'master']);
-
-/**
  * #359 D7: auto-merge is on by default for an integration base (develop),
- * off for the default branch. With `defaultBranch` known, it decides;
- * otherwise `main` and `master` are the default branch.
+ * off for the repository's default branch. C-148 (ADR-0077): an unknown
+ * default branch is off too — a name like `trunk` is no proof of anything.
  */
 export const cardAutoMergeDefault = (
   base: string,
   defaultBranch: string | null = null,
-): boolean =>
-  defaultBranch !== null
-    ? base !== defaultBranch
-    : !DEFAULT_BRANCH_NAMES.has(base);
+): boolean => defaultBranch !== null && base !== defaultBranch;
 
 /** #359 D7: the project's switch, `null` following `cardAutoMergeDefault`. */
 export const cardAutoMergeEnabled = (

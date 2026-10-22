@@ -163,6 +163,12 @@ export const projectInspectionSchema = z.object({
   }),
   baseBranch: z.string().min(1),
   baseSource: baseSourceSchema,
+  /**
+   * C-148: the repository's default branch — `gh repo view`, else
+   * `origin/HEAD` — whatever the base is; null when neither answered. Absent
+   * from a runner older than the field.
+   */
+  defaultBranch: z.string().min(1).nullable().optional(),
   codeSentinelConfig: z.object({
     /** The `orchestrator` block of `.code-analyzer-config.json`, verbatim. */
     orchestrator: z.record(z.string(), z.unknown()).optional(),
