@@ -203,6 +203,7 @@ export class ConfirmSplitCardDto implements ConfirmSplitCard {
   @IsString()
   @IsNotEmpty()
   @MaxLength(CARD_DRAFT_TITLE_MAX)
+  @Matches(/^[^\r\n]*$/, { message: 'title must be one line' })
   title!: string;
 
   @IsIn(PLAN_TASK_KINDS)
@@ -213,6 +214,7 @@ export class ConfirmSplitCardDto implements ConfirmSplitCard {
 export class ConfirmStackStageDto {
   @IsString()
   @MaxLength(STACK_STAGE_TITLE_MAX)
+  @Matches(/^[^\r\n]*$/, { message: 'title must be one line' })
   title!: string;
 
   @IsArray()
@@ -229,6 +231,7 @@ export class ConfirmStackDto implements ConfirmStackRequest {
   @IsString()
   @IsNotEmpty()
   @MaxLength(STACK_TITLE_MAX)
+  @Matches(/^[^\r\n]*$/, { message: 'title must be one line' })
   title!: string;
 
   @IsString()
@@ -276,6 +279,7 @@ export class UpdatePlanCandidateDto implements UpdatePlanCandidateRequest {
   @IsOptional()
   @IsString()
   @MaxLength(CARD_DRAFT_TITLE_MAX)
+  @Matches(/^[^\r\n]*$/, { message: 'title must be one line' })
   title?: string;
 
   @IsOptional()

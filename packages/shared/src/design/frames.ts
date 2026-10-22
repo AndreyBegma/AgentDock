@@ -5,8 +5,15 @@
  * them in; a frame is addressed by its position (0-based).
  */
 
-/** A frame's name, as the design turn writes it. */
+/** A frame's name, as the design turn writes it: one line (DA-08). */
 export const DESIGN_FRAME_NAME_MAX = 60;
+
+/**
+ * DA-07: the frames of one revision. Every frame is a file of the card's
+ * first run and of the plan's spec publication, so the count is bounded —
+ * not only the HTML's bytes.
+ */
+export const DESIGN_FRAMES_MAX = 32;
 
 /**
  * The one frame of a revision stored before #441, which kept a single mockup;
@@ -35,10 +42,18 @@ export const designFrameSlug = (name: string): string => {
  */
 export const designFrameSlugs = (names: readonly string[]): string[] => {
   const taken = new Set<string>();
+  // DA-17: the next suffix to try per base, so n frames of one name cost
+  // O(n), not O(n²) probes.
+  const next = new Map<string, number>();
   return names.map((name) => {
     const base = designFrameSlug(name);
     let slug = base;
-    for (let n = 2; taken.has(slug); n += 1) slug = `${base}-${n}`;
+    let n = next.get(base) ?? 2;
+    while (taken.has(slug)) {
+      slug = `${base}-${n}`;
+      n += 1;
+    }
+    next.set(base, n);
     taken.add(slug);
     return slug;
   });

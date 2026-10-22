@@ -6,6 +6,7 @@ import {
 } from '../design/cdn';
 import {
   DESIGN_FRAME_NAME_MAX,
+  DESIGN_FRAMES_MAX,
   DESIGN_LEGACY_FRAME_NAME,
   type DesignFrameDraft,
 } from '../design/frames';
@@ -98,6 +99,10 @@ export const PLANNER_VIOLATION_REASONS = [
    * are design blocks, or names one frame twice.
    */
   'frame_mismatch',
+  /** Design (DA-07): `frames` or `kept` names more than `DESIGN_FRAMES_MAX`. */
+  'too_many_frames',
+  /** Design (DA-07): a design block with no HTML in it. */
+  'empty_design_block',
   /**
    * Design: one frame's HTML is over `DESIGN_HTML_MAX_BYTES`, or every frame's
    * together over `DESIGN_TOTAL_MAX_BYTES`.
@@ -328,6 +333,15 @@ const shapeViolation = (issues: readonly Issue[]) => {
       `a round has at most ${PLANNER_MAX_QUESTIONS} questions (${formatPath(questions.path)})`,
     );
   }
+  const frames = tooBig.find(
+    (i) => lastKey(i) === 'frames' || lastKey(i) === 'kept',
+  );
+  if (frames) {
+    return violation(
+      'too_many_frames',
+      `a design has at most ${DESIGN_FRAMES_MAX} frames (${formatPath(frames.path)})`,
+    );
+  }
   const first = all.find((i) => i.code !== 'invalid_union') ?? all[0];
   return violation(
     'invalid_shape',
@@ -529,6 +543,14 @@ const parseDesignBlocks = (
       : undefined;
     // A kept frame was validated when its revision was drawn.
     const html = copy ? copy.html : (blocks[block++] as string);
+    if (!copy && html.trim() === '') {
+      return violation(
+        'empty_design_block',
+        frameNames.length > 1
+          ? `frame "${name}": the ${PLANNER_DESIGN_BLOCK_TAG} block is empty`
+          : `the ${PLANNER_DESIGN_BLOCK_TAG} block is empty`,
+      );
+    }
     if (!copy) {
       const check = validateMockup(html);
       if (!check.ok) {
@@ -822,7 +844,7 @@ backticks, each holding one self-contained HTML document:
 Frames:
 
 - Draw one frame, unless the task touches several pages or standalone components: then one per page, plus one per component that matters on its own (states side by side).
-- \`"frames"\` lists a short name per frame (max ${DESIGN_FRAME_NAME_MAX} characters, distinct), in block order: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out (named "${DESIGN_LEGACY_FRAME_NAME}").
+- \`"frames"\` lists a short one-line name per frame (max ${DESIGN_FRAME_NAME_MAX} characters, distinct; at most ${DESIGN_FRAMES_MAX} frames), in block order: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out (named "${DESIGN_LEGACY_FRAME_NAME}").
 - On a revision, \`"kept"\` names the frames you leave exactly as the previous revision drew them. A kept frame has no design block — Nautelle copies it; every other frame has one, in order.
 
 The mockup's rules — a frame that breaks one fails the turn:
