@@ -36,7 +36,7 @@ const render = (
   );
 
 /** The markup of one `data-card-row`, up to the next row or the end. */
-const row = (html: string, name: 'header' | 'saved' | 'status' | 'footer') => {
+const row = (html: string, name: 'header' | 'status' | 'footer') => {
   const start = html.indexOf(`data-card-row="${name}"`);
   if (start < 0) return null;
   const next = html.indexOf('data-card-row="', start + 1);
@@ -160,26 +160,92 @@ describe('CardFace shipping state (#359)', () => {
   });
 });
 
-describe('CardFace rows (C-35, #423)', () => {
+describe('CardFace rows (C-35, #423, #778)', () => {
   const busy = {
     kind: 'bug' as const,
     attachmentCount: 2,
     dependsOn: [{ number: 3, label: 'C-3', column: 'todo' as const }],
     costUsd: '4.81',
+    stack: {
+      number: 12,
+      label: 'S-12',
+      title: 'Rate limiting',
+      stage: 0,
+      stageTitle: 'Stage 1',
+      gate: null,
+    },
+    readiness: {
+      state: 'waiting' as const,
+      satisfied: 0,
+      total: 1,
+      open: [{ number: 3, label: 'C-3', column: 'todo' as const }],
+    },
+    autoRunWhenReady: true,
   };
+  const face = (extra: Partial<BoardCardView>, hints?: number) =>
+    renderToStaticMarkup(
+      <CardFace
+        projectId="p1"
+        canOperate
+        menu={MENU}
+        hints={hints}
+        onOpen={() => undefined}
+        card={fixtureCard(7, 'todo', {
+          prNumber: 7,
+          prUrl: 'https://github.com/o/r/pull/7',
+          prState: 'open',
+          ...extra,
+        })}
+      />,
+    );
 
-  test('the header holds label, Bug, attachments, dependency, then the cost and the menu at its end', () => {
-    const header = row(render('todo', busy), 'header') ?? '';
-    const order = [
-      'C-7',
-      'Bug',
-      '2 attachments',
-      'after C-3',
-      '$4.81',
-      'data-menu-trigger',
-    ].map((text) => header.indexOf(text));
+  test('the header holds only label, Bug and the menu at its end', () => {
+    const html = face(busy, 2);
+    const header = row(html, 'header') ?? '';
+    const order = ['C-7', 'Bug', 'data-menu-trigger'].map((text) =>
+      header.indexOf(text),
+    );
     for (const at of order) expect(at).toBeGreaterThan(-1);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+    for (const moved of ['S-12', 'hint', 'attachment', 'after C-3', '$4.81'])
+      expect(header).not.toContain(moved);
+  });
+
+  test('the status row leads with readiness, then the dependency, Auto-run, stack and hints', () => {
+    const status = row(face(busy, 2), 'status') ?? '';
+    const order = [
+      'Waiting · 0 of 1',
+      'after C-3',
+      '>Waits for C-3<',
+      'Auto-run',
+      'title="Part of S-12 Rate limiting"',
+      'title="Triage hints: open the card to apply or dismiss them"',
+    ].map((text) => status.indexOf(text));
+    for (const at of order) expect(at).toBeGreaterThan(-1);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  test('the footer holds PR on the left and attachments then cost at its right end', () => {
+    const footer = row(face(busy), 'footer') ?? '';
+    const order = [
+      'PR #7 · Open',
+      'ms-auto',
+      'aria-label="2 attachments"',
+      '$4.81',
+    ].map((text) => footer.indexOf(text));
+    for (const at of order) expect(at).toBeGreaterThan(-1);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  test('a cost or attachments alone still draw the footer; nothing at all draws none', () => {
+    const bare = { prNumber: null, prUrl: null, prState: null };
+    expect(row(face({ ...bare, costUsd: '0.12' }), 'footer')).toContain(
+      '$0.12',
+    );
+    expect(row(face({ ...bare, attachmentCount: 1 }), 'footer')).toContain(
+      '1 attachment',
+    );
+    expect(row(face(bare), 'footer')).toBeNull();
   });
 
   test('the menu is placed once, in the header, and nowhere else', () => {
@@ -188,7 +254,7 @@ describe('CardFace rows (C-35, #423)', () => {
     expect(row(html, 'status') ?? '').not.toContain('data-menu-trigger');
   });
 
-  test('without a menu or a cost the header has no end group', () => {
+  test('without a menu the header has no end group', () => {
     const header = row(render('todo', {}, { menu: false }), 'header') ?? '';
     expect(header).not.toContain('ms-auto');
   });
@@ -338,10 +404,10 @@ describe('CardFace readiness and Auto-run (#443)', () => {
   });
 
   test('the dependency chip reads a Finished dependency as satisfied (#638)', () => {
-    const header = (column: BoardColumn) =>
-      row(render('todo', { dependsOn: [dep(3, column)] }), 'header') ?? '';
-    expect(header('finished')).toContain('Runs after C-3, all ready.');
-    expect(header('in_progress')).toContain('No ready pull request yet: C-3.');
+    const status = (column: BoardColumn) =>
+      row(render('todo', { dependsOn: [dep(3, column)] }), 'status') ?? '';
+    expect(status('finished')).toContain('Runs after C-3, all ready.');
+    expect(status('in_progress')).toContain('No ready pull request yet: C-3.');
   });
 
   test('the Auto-run marker shows only with the switch on', () => {
@@ -383,28 +449,26 @@ describe('CardFace touch targets (#497)', () => {
   });
 });
 
-describe('CardFace token-saver badge on a narrow card (#738)', () => {
+describe('CardFace without the token-saver badge (#778)', () => {
   const tokenSaved = { estimateUsd: 0.004, estimateTokens: 1_000 };
 
-  test('the header badge gives way below 15rem and the right group still holds cost and menu', () => {
+  test('a card that saved tokens shows no saving and no saved line on its face', () => {
     const html = render('completed', { costUsd: '0.3', tokenSaved });
-    const header = row(html, 'header') ?? '';
-    expect(header).toContain('@max-[15rem]:hidden');
-    expect(header).toContain('data-menu-trigger');
-    expect(header).toContain('$0.30');
+    expect(html).not.toContain('saved ≈');
+    expect(html).not.toContain('Token saver kept');
+    expect(html).not.toContain('data-card-row="saved"');
+    expect(row(html, 'footer')).toContain('$0.30');
   });
 
-  test('the same badge shows on its own truncating line, title intact', () => {
-    const html = render('completed', { costUsd: '0.3', tokenSaved });
-    const saved = row(html, 'saved') ?? '';
-    expect(html).toContain('@container');
-    expect(saved).toContain('@max-[15rem]:flex');
-    expect(saved).toContain('min-w-0 truncate');
-    expect(saved).toContain('title="Token saver kept');
-  });
-
-  test('a card that saved nothing has no saved line', () => {
-    expect(row(render('completed'), 'saved')).toBeNull();
+  test('a narrow card keeps the label whole: nothing in the header shrinks', () => {
+    const header =
+      row(
+        render('todo', { kind: 'bug', costUsd: '0.3', tokenSaved }),
+        'header',
+      ) ?? '';
+    expect(render('todo')).toContain('@container');
+    expect(header).not.toContain('truncate');
+    expect(header).not.toContain('@max-[15rem]');
   });
 });
 

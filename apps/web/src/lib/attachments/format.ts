@@ -10,6 +10,7 @@ import {
   CSRF_HEADER,
   isAttachmentMime,
 } from '@nautelle/shared';
+import { readCookieFrom } from '../cookies';
 
 /** Spec "Copy": under every dropzone. */
 export const ATTACHMENT_NOTE =
@@ -85,13 +86,8 @@ export const uploadUrl = (projectId: string): string =>
 
 /** The CSRF header every non-GET call carries (see `api()`). */
 export function csrfHeaders(cookie: string): Record<string, string> {
-  for (const part of cookie.split('; ')) {
-    const eq = part.indexOf('=');
-    if (part.slice(0, eq) === CSRF_COOKIE) {
-      return { [CSRF_HEADER]: decodeURIComponent(part.slice(eq + 1)) };
-    }
-  }
-  return {};
+  const csrf = readCookieFrom(cookie, CSRF_COOKIE);
+  return csrf ? { [CSRF_HEADER]: csrf } : {};
 }
 
 /** The `AttachmentView` in a finished upload's response, or `undefined`. */

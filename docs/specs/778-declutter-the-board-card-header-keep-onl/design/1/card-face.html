@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C-315 · Board card face</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / .96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / .62);--color-ink-3:rgb(242 242 246 / .53);--color-line:rgb(255 255 255 / .1);--color-line-strong:rgb(255 255 255 / .18);--color-hover:rgb(255 255 255 / .06);--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246 / .2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246 / .18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / .18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90 / .18);--color-hue-3-ink:#ade58f;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / .06);--glass-scrim-strong:rgb(9 9 12 / .64);--glass-edge:rgb(255 255 255 / .14);--glass-spec:rgb(255 255 255 / .2);--glass-brightness-strong:.7;--glass-shadow-strong:rgb(0 0 0 / .45);--glass-shadow-clear:rgb(0 0 0 / .15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#fff;--color-content:rgb(255 255 255 / .96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / .72);--color-ink-3:rgb(24 24 27 / .64);--color-line:rgb(0 0 0 / .1);--color-line-strong:rgb(0 0 0 / .23);--color-hover:rgb(0 0 0 / .06);--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229 / .12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214 / .12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / .12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28 / .12);--color-hue-3-ink:#2f6617;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / .06);--glass-scrim-strong:rgb(255 255 255 / .64);--glass-edge:rgb(0 0 0 / .18);--glass-spec:rgb(0 0 0 / .2);--glass-brightness-strong:1.3;--glass-shadow-strong:rgb(0 0 0 / .16);--glass-shadow-clear:rgb(0 0 0 / .08);--canvas-glow:10%}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);--color-status-done:var(--color-hue-3);--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-tap:44px;--focus-width:3px;--focus-offset:4px;--dur-fast:100ms;--font-sans:'SF Pro Text',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:16px;background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;padding:24px}
+h1,h2,h3,p,ul{margin:0}
+:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+svg.i{width:12px;height:12px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mono{font-family:var(--font-mono)}.num{font-variant-numeric:tabular-nums}
+.btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.btn[aria-pressed=true]{background:var(--color-accent-soft)}
+
+/* page */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600}
+.desc{max-width:65ch;color:var(--color-ink-2);margin-top:4px}
+.tools{display:flex;gap:8px}
+.layout{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.board{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface);border:1px solid var(--color-line);background:color-mix(in oklab,var(--color-surface) 55%,transparent)}
+.col--wide{width:20rem}.col--narrow{width:15rem}
+.col__head{display:flex;align-items:center;justify-content:space-between;padding:2px 4px;font-size:12px;font-weight:600;color:var(--color-ink-2)}
+.col__head span:last-child{font-weight:500;color:var(--color-ink-3)}
+.case{font-size:11px;font-weight:500;color:var(--color-ink-3);padding:4px 4px 0;text-transform:uppercase;letter-spacing:.06em}
+
+/* card face */
+.bcard{padding:10px;border-radius:var(--radius-surface)}
+.face{display:flex;flex-direction:column;gap:6px;min-width:0}
+.r-head{display:flex;align-items:center;gap:6px;height:16px;min-width:0;white-space:nowrap;font-size:12px;line-height:16px;color:var(--color-ink-2)}
+.coarse .r-head{height:var(--size-tap)}
+.label{font-family:var(--font-mono);flex-shrink:0}
+.box{width:14px;height:14px;flex-shrink:0;border-radius:4px;border:1px solid var(--color-line-strong);background:var(--color-surface)}
+.trigger{margin-inline-start:auto;display:inline-grid;place-items:center;width:20px;height:16px;padding:0;border:0;border-radius:4px;background:none;color:var(--color-ink-3);cursor:pointer;flex-shrink:0}
+.trigger:hover{background:var(--color-hover);color:var(--color-ink)}
+.coarse .trigger{width:var(--size-tap);height:var(--size-tap);margin-inline-end:-12px}
+.trigger svg{width:14px;height:14px}
+.title{display:block;padding:0;border:0;background:none;font:inherit;font-weight:500;color:var(--color-ink);text-align:left;overflow-wrap:anywhere;cursor:pointer}
+.title:hover{text-decoration:underline;text-underline-offset:2px}
+.r-status{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
+.chip{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 8px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-2);font-size:11px;font-weight:500;line-height:1;white-space:nowrap;max-width:100%}
+.chip--head{height:16px;padding:0 6px;flex-shrink:0}
+.chip--danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.chip--warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.chip--ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.chip .t{overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;background:var(--color-status-running-soft);color:var(--color-status-running-ink)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--color-status-running);display:inline-block}
+.badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:999px;font-size:10px;font-weight:600;background:var(--color-hover);color:var(--color-ink-2)}
+.waits{font-size:12px;color:var(--color-ink-3)}
+.note{font-size:12px;color:var(--color-ink-2);overflow-wrap:anywhere}
+.flink{font-size:12px;color:var(--color-accent-ink);text-decoration:none}
+.flink:hover{text-decoration:underline}
+.r-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:2px;padding-top:6px;border-top:1px solid var(--color-line);font-size:12px}
+.lpill{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 8px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-2);text-decoration:none;font-variant-numeric:tabular-nums}
+.lpill:hover{color:var(--color-ink);text-decoration:underline}
+.ci{width:8px;height:8px;border-radius:50%}
+.ci--ok{background:var(--color-ok)}.ci--warn{background:var(--color-warn)}
+.meta{margin-inline-start:auto;display:inline-flex;align-items:center;gap:8px;color:var(--color-ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.attach{display:inline-flex;align-items:center;gap:2px}
+.saved{color:var(--color-ok);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* before */
+.before .r-head{overflow:hidden}
+.before .t{min-width:0}
+/* outline rows */
+.outline [data-card-row]{outline:1px dashed color-mix(in oklab,var(--color-accent) 70%,transparent);outline-offset:1px}
+/* notes */
+.notes{flex:1;min-width:18rem;max-width:26rem;padding:16px;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:12px}
+.notes h2{font-size:15px;line-height:22px;font-weight:600}
+.notes dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;margin:0;font-size:13px}
+.notes dt{font-family:var(--font-mono);font-size:12px;color:var(--color-ink-3)}
+.notes dd{margin:0;color:var(--color-ink-2)}
+.notes ul{padding-left:18px;color:var(--color-ink-2);font-size:13px;display:flex;flex-direction:column;gap:4px}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 17v4M17 19h4"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+  <symbol id="i-merge" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+</svg>
+
+<div class="top">
+  <div>
+    <div class="eyebrow">C-315 · Board card face · variant 1</div>
+    <h1>Header: selection, label, Bug, menu</h1>
+    <p class="desc">Same cards at a wide (20rem) and a narrow (15rem) column. The stack, hints and dependency chips moved to the status row. Attachments and cost moved to the right end of the footer. The token-saver badge is no longer on the face.</p>
+  </div>
+  <div class="tools">
+    <button class="btn" type="button" id="t-rows" aria-pressed="false">Outline rows</button>
+    <button class="btn" type="button" id="t-coarse" aria-pressed="false">Touch (44 px)</button>
+    <button class="btn" type="button" id="t-theme">Light theme</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="board" id="board">
+    <!-- WIDE -->
+    <section class="col col--wide" aria-label="Wide column">
+      <div class="col__head"><span>To Do · wide</span><span>20rem</span></div>
+
+      <div class="case">Every optional item</div>
+      <article class="bcard surface-content"><div class="face">
+        <div class="r-head" data-card-row="header">
+          <span class="box" role="checkbox" aria-checked="false" aria-label="Select C-304" tabindex="0"></span>
+          <span class="label">C-304</span>
+          <span class="chip chip--danger chip--head">Bug</span>
+          <button class="trigger" type="button" aria-label="Card menu"><svg class="i"><use href="#i-more"/></svg></button>
+        </div>
+        <button class="title" type="button">Rate-limit /v1/runs per API key and return Retry-After</button>
+        <div class="r-status" data-card-row="status">
+          <span class="chip" title="Waits for C-301"><svg class="i"><use href="#i-clock"/></svg>Waiting · 1 of 2</span>
+          <span class="chip chip--warn" title="Runs after C-298, C-301. No ready pull request yet: C-301"><span class="t">after C-298, C-301</span></span>
+          <span class="waits">Waits for C-301</span>
+          <span class="chip" title="Auto-run when ready is on"><svg class="i"><use href="#i-zap"/></svg>Auto-run</span>
+          <span class="chip mono" title="Part of S-12 Rate limiting"><svg class="i"><use href="#i-layers"/></svg>S-12</span>
+          <span class="chip" title="Triage hints: open the card to apply or dismiss them"><svg class="i"><use href="#i-sparkles"/></svg>2 hints</span>
+        </div>
+        <p class="note">part of Rate limiting</p>
+        <div class="r-foot" data-card-row="footer">
+          <a class="lpill" href="#">PR #512</a>
+          <span class="ci ci--ok" role="img" aria-label="Checks passed" title="Checks passed"></span>
+          <a class="lpill" href="#">Issue #498</a>
+          <span class="meta">
+            <span class="attach" role="img" aria-label="3 attachments" title="3 attachments"><svg class="i"><use href="#i-clip"/></svg>3</span>
+            <span>$0.31</span>
+          </span>
+        </div>
+      </div></article>
+
+      <div class="case">In progress, with a PR</div>
+      <article class="bcard surface-content"><div class="face">
+        <div class="r-head" data-card-row="header">
+          <span class="box" role="checkbox" aria-checked="false" aria-label="Select C-311" tabindex="0"></span>
+          <span class="label">C-311</span>
+          <button class="trigger" type="button" aria-label="Card menu"><svg class="i"><use href="#i-more"/></svg></button>
+        </div>
+        <button class="title" type="button">Return 429 with a JSON problem body</button>
+        <div class="r-status" data-card-row="status">
+          <span class="chip chip" title="Runs after C-304, all ready."><span class="t">after C-304</span></span>
+          <span class="chip mono" title="Part of S-12 Rate limiting"><svg class="i"><use href="#i-layers"/></svg>S-12</span>
+          <span class="pill"><span class="dot"></span>Running</span>
+          <span class="badge">Fleet</span>
+        </div>
+        <div class="r-foot" data-card-row="footer">
+          <a class="lpill" href="#"><svg class="i" style="color:var(--color-status-done)"><use href="#i-merge"/></svg>PR #520 · merged</a>
+          <a class="lpill" href="#">Issue #503</a>
+          <span class="meta"><span>$1.84</span></span>
+        </div>
+      </div></article>
+
+      <div class="case">Cost, no PR or Issue</div>
+      <article class="bcard surface-content"><div class="face">
+        <div class="r-head" data-card-row="header">
+          <span class="box" role="checkbox" aria-checked="false" aria-label="Select C-309" tabindex="0"></span>
+          <span class="label">C-309</span>
+          <button class="trigger" type="button" aria-label="Card menu"><svg class="i"><use href="#i-more"/></svg></button>
+        </div>
+        <button class="title" type="button">Spike: token bucket vs sliding window</button>
+        <div class="r-status" data-card-row="status">
+          <span class="badge">Terminal</span>
+          <span class="pill"><span class="dot"></span>Session running</span>
+        </div>
+        <div><a class="flink" href="#">Session</a></div>
+        <div class="r-foot" data-card-row="footer">
+          <span class="meta">
+            <span class="attach" role="img" aria-label="1 attachment" title="1 attachment"><svg class="i"><use href="#i-clip"/></svg>1</span>
+            <span>$0.12</span>
+          </span>
+        </div>
+      </div></article>
+
+      <div class="case">Minimal</div>
+      <article class="bcard surface-content"><div class="face">
+        <div class="r-head" data-card-row="header">
+          <span class="box" role="checkbox" aria-checked="false" aria-label="Select C-317" tabindex="0"></span>
+          <span class="label">C-317</span>
+          <button class="trigger" type="button" aria-label="Card menu"><svg class="i"><use href="#i-more"/></svg></button>
+        </div>
+        <button class="title" type="button">Document rate limits in the API guide</button>
+      </div></article>
+    </section>
+
+    <!-- NARROW -->
+    <section class="col col--narrow" aria-label="Narrow column">
+      <div class="col__head"><span>To Do · narrow</span><span>15rem</span></div>
+
+      <div class="case">Before (today)</div>
+      <article class="bcard surface-content before" style="opacity:.85"><div class="face">
+        <div class="r-head">
+          <span class="box"></span>
+          <span class="label">C-304</span>
+          <span class="chip chip--head mono"><svg class="i"><use href="#i-layers"/></svg>S-12</span>
+          <span class="chip chip--danger chip--head">Bug</span>
+          <span class="chip chip--head"><svg class="i"><use href="#i-sparkles"/></svg>2 hints</span>
+          <span class="attach"><svg class="i"><use href="#i-clip"/></svg>3</span>
+          <span class="chip chip--warn chip--head" style="flex-shrink:1;min-width:0"><span class="t">after C-298, C-301</span></span>
+          <span style="margin-inline-start:auto;display:inline-flex;gap:4px;flex-shrink:0"><span class="num">$0.31</span><span class="trigger" style="margin:0"><svg class="i"><use href="#i-more"/></svg></span></span>
+        </div>
+        <div style="display:flex;justify-content:flex-end;font-size:12px"><span class="saved">saved ≈ $0.41</span></div>
+        <span class="title">Rate-limit /v1/runs per API key…</span>
+      </div></article>
+
+      <div class="case">After · every optional item</div>
+      <article class="bcard surface-content"><div class="face">
+        <div class="r-head" data-card-row="header">
+          <span class="box" role="checkbox" aria-checked="false" aria-label="Select C-304" tabindex="0"></span>
+          <span class="label">C-304</span>
+          <span class="chip chip--danger chip--head">Bug</span>
+          <button class="trigger" type="button" aria-label="Card menu"><svg class="i"><use href="#i-more"/></svg></button>
+        </div>
+        <button class="title" type="button">Rate-limit /v1/runs per API key and return Retry-After</button>
+        <div class="r-status" data-card-row="status">
+          <span class="chip" title="Waits for C-301"><svg class="i"><use href="#i-clock"/></svg>Waiting · 1 of 2</span>
+          <span class="chip chip--warn" title="Runs after C-298, C-301. No ready pull request yet: C-301"><span class="t">after C-298, C-301</span></span>
+          <span class="waits">Waits for C-301</span>
+          <span class="chip" title="Auto-run when ready is on"><svg class="i"><use href="#i-zap"/></svg>Auto-run</span>
+          <span class="chip mono" title="Part of S-12 Rate limiting"><svg class="i"><use href="#i-layers"/></svg>S-12</span>
+          <span class="chip" title="Triage hints: open the card to apply or dismiss them"><svg class="i"><use href="#i-sparkles"/></svg>2 hints</span>
+        </div>
+        <p class="note">part of Rate limiting</p>
+        <div class="r-foot" data-card-row="footer">
+          <a class="lpill" href="#">PR #512</a>
+          <span class="ci ci--ok" role="img" aria-label="Checks passed" title="Checks passed"></span>
+          <a class="lpill" href="#">Issue #498</a>
+          <span class="meta">
+            <span class="attach" role="img" aria-label="3 attachments" title="3 attachments"><svg class="i"><use href="#i-clip"/></svg>3</span>
+            <span>$0.31</span>
+          </span>
+        </div>
+      </div></article>
+
+      <div class="case">Ready, cost only</div>
+      <article class="bcard surface-content"><div class="face">
+        <div class="r-head" data-card-row="header">
+          <span class="box" role="checkbox" aria-checked="false" aria-label="Select C-312" tabindex="0"></span>
+          <span class="label">C-312</span>
+          <span class="chip chip--danger chip--head">Bug</span>
+          <button class="trigger" type="button" aria-label="Card menu"><svg class="i"><use href="#i-more"/></svg></button>
+        </div>
+        <button class="title" type="button">Limiter ignores X-Forwarded-For behind the proxy</button>
+        <div class="r-status" data-card-row="status">
+          <span class="chip chip--ok" title="Every dependency has a ready pull request"><svg class="i"><use href="#i-check"/></svg>Ready</span>
+          <span class="chip" title="Runs after C-304, all ready."><span class="t">after C-304</span></span>
+        </div>
+        <div class="r-foot" data-card-row="footer">
+          <span class="meta"><span>$0.07</span></span>
+        </div>
+      </div></article>
+
+      <div class="case">Minimal</div>
+      <article class="bcard surface-content"><div class="face">
+        <div class="r-head" data-card-row="header">
+          <span class="box" role="checkbox" aria-checked="false" aria-label="Select C-317" tabindex="0"></span>
+          <span class="label">C-317</span>
+          <button class="trigger" type="button" aria-label="Card menu"><svg class="i"><use href="#i-more"/></svg></button>
+        </div>
+        <button class="title" type="button">Document rate limits in the API guide</button>
+      </div></article>
+    </section>
+  </div>
+
+  <aside class="notes surface-content" aria-label="Row contents">
+    <h2>Row contents</h2>
+    <dl>
+      <dt>header</dt><dd>Selection box (or the unselectable mark on a suggestion), label, Bug chip, then the menu trigger at the end. Nothing else, so it never truncates.</dd>
+      <dt>title</dt><dd>Unchanged.</dd>
+      <dt>status</dt><dd>Readiness → <strong>after C-…</strong> → "Waits for …" → Auto-run → stack <span class="mono">S-…</span> → triage hints → process state (pills, badges, steward, restart …) as today.</dd>
+      <dt>footer</dt><dd>PR · CI dot · Issue on the left; paperclip count and cost pushed to the right end. Renders for a PR, an Issue, a cost or attachments.</dd>
+      <dt>saved</dt><dd>Removed, along with every SavedBadge on the face. The saving moves to the Run section of the sheet and the page.</dd>
+    </dl>
+    <ul>
+      <li>Titles and aria-labels stay as they are: "3 attachments", the dependency title, "Part of S-12 …", the triage-hints text.</li>
+      <li>The dependency chip keeps its warn/neutral tone and still truncates. In the status row it can take the full card width.</li>
+      <li>On a narrow card the footer's meta group wraps as one unit and stays right-aligned.</li>
+      <li>Touch: the header row grows to 44 px only when there is a menu (#497). Use the toggle to see it.</li>
+    </ul>
+  </aside>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var board = document.getElementById('board');
+  var rows = document.getElementById('t-rows');
+  var coarse = document.getElementById('t-coarse');
+  var theme = document.getElementById('t-theme');
+  rows.addEventListener('click', function () {
+    var on = board.classList.toggle('outline');
+    rows.setAttribute('aria-pressed', String(on));
+  });
+  coarse.addEventListener('click', function () {
+    var on = board.classList.toggle('coarse');
+    coarse.setAttribute('aria-pressed', String(on));
+  });
+  theme.addEventListener('click', function () {
+    var dark = root.getAttribute('data-theme') !== 'light';
+    root.setAttribute('data-theme', dark ? 'light' : 'dark');
+    theme.textContent = dark ? 'Dark theme' : 'Light theme';
+  });
+})();
+</script>
+</body>
+</html>

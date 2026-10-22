@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C-315 · Run section saving</title>
+<style>
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71 / .96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / .62);--color-ink-3:rgb(242 242 246 / .53);--color-line:rgb(255 255 255 / .1);--color-line-strong:rgb(255 255 255 / .18);--color-hover:rgb(255 255 255 / .06);--color-accent:#5b5bf6;--color-accent-soft:rgb(91 91 246 / .2);--color-accent-ink:#b4b2ff;--color-focus:#b4b2ff;--color-ok:#5fd3a0;--color-hue-1:#5b9cf6;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / .18);--color-hue-2-ink:#7ee0c0;--color-hue-7:#a68bfa;--glass-sheen:rgb(255 255 255 / .06);--glass-scrim-strong:rgb(9 9 12 / .64);--glass-edge:rgb(255 255 255 / .14);--glass-spec:rgb(255 255 255 / .2);--glass-brightness-strong:.7;--glass-shadow-strong:rgb(0 0 0 / .45);--glass-shadow-clear:rgb(0 0 0 / .15);--canvas-glow:18%}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255 / .96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / .72);--color-ink-3:rgb(24 24 27 / .64);--color-line:rgb(0 0 0 / .1);--color-line-strong:rgb(0 0 0 / .23);--color-hover:rgb(0 0 0 / .06);--color-accent:#4f46e5;--color-accent-soft:rgb(79 70 229 / .12);--color-accent-ink:#4338ca;--color-focus:#4f46e5;--color-ok:#0a8156;--color-hue-1:#1f64d6;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / .12);--color-hue-2-ink:#006a4e;--color-hue-7:#7244e0;--glass-sheen:rgb(0 0 0 / .06);--glass-scrim-strong:rgb(255 255 255 / .64);--glass-edge:rgb(0 0 0 / .18);--glass-spec:rgb(0 0 0 / .2);--glass-brightness-strong:1.3;--glass-shadow-strong:rgb(0 0 0 / .16);--glass-shadow-clear:rgb(0 0 0 / .08);--canvas-glow:10%}
+:root{--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--focus-width:3px;--focus-offset:4px;--glass-filter-strong:blur(40px) saturate(180%) brightness(var(--glass-brightness-strong));--font-sans:'SF Pro Text',Inter,system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:16px;background:var(--color-ground);color:var(--color-ink)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;padding:24px}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:var(--glass-filter-strong);-webkit-backdrop-filter:var(--glass-filter-strong);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 20px 48px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.mono{font-family:var(--font-mono)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:var(--radius-control);border:1px solid var(--color-line-strong);background:var(--color-raised);color:var(--color-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.btn--ghost{border-color:transparent;background:transparent;color:var(--color-ink-2);padding:0;width:28px;justify-content:center}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
+.eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+h1{font-size:28px;line-height:32px;letter-spacing:-.02em;font-weight:600}
+.desc{max-width:65ch;color:var(--color-ink-2);margin-top:4px}
+.layout{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.cap{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--color-ink-3);margin-bottom:8px}
+
+.sheet{width:420px;border-radius:var(--radius-sheet);overflow:hidden;display:flex;flex-direction:column}
+.sheet__header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--color-line)}
+.sheet__body{padding:16px;display:flex;flex-direction:column;gap:16px}
+.page-panel{width:560px;border-radius:var(--radius-surface);padding:16px;display:flex;flex-direction:column;gap:16px}
+.sec-h{font-size:16px;line-height:24px;font-weight:600}
+.run-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px}
+.col-name{font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;background:var(--color-hue-2-soft);color:var(--color-hue-2-ink)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--color-hue-2)}
+.money{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+.cost{color:var(--color-ink-2)}
+.saved{color:var(--color-ok);white-space:nowrap}
+.mark{outline:1px dashed color-mix(in oklab,var(--color-accent) 70%,transparent);outline-offset:3px;border-radius:4px}
+.links{display:flex;flex-wrap:wrap;gap:6px;font-size:12px}
+.lpill{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-2);text-decoration:none}
+.kv{display:grid;grid-template-columns:minmax(96px,max-content) 1fr;gap:8px 24px;margin:0;font-size:14px}
+.kv dt{color:var(--color-ink-3)}.kv dd{margin:0}
+.states{width:420px;border-radius:var(--radius-surface);padding:16px;display:flex;flex-direction:column;gap:12px}
+.state{display:flex;flex-direction:column;gap:6px;padding-bottom:12px;border-bottom:1px solid var(--color-line)}
+.state:last-child{border-bottom:0;padding-bottom:0}
+.state p{font-size:12px;color:var(--color-ink-3)}
+.hint{font-size:12px;color:var(--color-ink-3);max-width:420px}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="top">
+  <div>
+    <div class="eyebrow">C-315 · Card sheet and card page</div>
+    <h1>The saving moves next to the cost</h1>
+    <p class="desc">The sheet and the card page share one Run section (<span class="mono">CardDetailBody</span>). <span class="mono">SavedBadge</span> goes right after the total cost, at the end of the Run row. It uses the same badge, the same "≈" label, the same ok tone and the same tokens tooltip as today.</p>
+  </div>
+  <button class="btn" type="button" id="t-theme">Light theme</button>
+</div>
+
+<div class="layout">
+  <div>
+    <div class="cap">Card sheet</div>
+    <aside class="sheet glass-strong" role="dialog" aria-label="Card C-304">
+      <div class="sheet__header">
+        <div>
+          <div class="mono" style="font-size:12px;color:var(--color-ink-3)">C-304 · Bug</div>
+          <h2 style="font-size:15px;line-height:22px;font-weight:600">Rate-limit /v1/runs per API key and return Retry-After</h2>
+        </div>
+        <button class="btn btn--ghost" type="button" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="sheet__body">
+        <section aria-label="Run" style="display:flex;flex-direction:column;gap:16px">
+          <h3 class="sec-h">Run</h3>
+          <div class="run-row">
+            <span class="col-name">In Progress</span>
+            <span class="pill"><span class="dot"></span>Running</span>
+            <span class="money mark">
+              <span class="cost">$3.18</span>
+              <span class="saved" title="Token saver kept ≈ 103.2k tokens out of what the agent read (an estimate, bytes ÷ 4)">saved ≈ $0.41</span>
+            </span>
+          </div>
+          <div class="links"><a class="lpill" href="#">PR #512</a><a class="lpill" href="#">Issue #498</a></div>
+        </section>
+        <dl class="kv">
+          <dt>Branch</dt><dd class="mono">feat/rate-limit</dd>
+          <dt>Slot</dt><dd>slot-a</dd>
+          <dt>Model</dt><dd>Claude Opus</dd>
+        </dl>
+      </div>
+    </aside>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div>
+      <div class="cap">Card page · Run panel</div>
+      <section class="page-panel surface-content" aria-label="Run">
+        <h3 class="sec-h">Run</h3>
+        <div class="run-row">
+          <span class="col-name">In Progress</span>
+          <span class="pill"><span class="dot"></span>Running</span>
+          <span class="money mark">
+            <span class="cost">$3.18</span>
+            <span class="saved" title="Token saver kept ≈ 103.2k tokens out of what the agent read (an estimate, bytes ÷ 4)">saved ≈ $0.41</span>
+          </span>
+        </div>
+        <div class="links"><a class="lpill" href="#">PR #512</a><a class="lpill" href="#">Issue #498</a></div>
+      </section>
+    </div>
+
+    <div>
+      <div class="cap">States of the Run row</div>
+      <div class="states surface-content">
+        <div class="state">
+          <p>Cost and saving</p>
+          <div class="run-row"><span class="col-name">Done</span><span class="money"><span class="cost">$3.18</span><span class="saved">saved ≈ $0.41</span></span></div>
+        </div>
+        <div class="state">
+          <p>No <span class="mono">tokenSaved</span>: nothing is drawn for it</p>
+          <div class="run-row"><span class="col-name">Done</span><span class="money"><span class="cost">$3.18</span></span></div>
+        </div>
+        <div class="state">
+          <p>Saving, no cost yet: the badge takes the cost's place</p>
+          <div class="run-row"><span class="col-name">In Progress</span><span class="pill"><span class="dot"></span>Running</span><span class="money"><span class="saved">saved ≈ $0.02</span></span></div>
+        </div>
+      </div>
+    </div>
+    <p class="hint">The group is rendered when there is a cost or a saving. When <span class="mono">estimateTokens</span> is 0, <span class="mono">savedLabel</span> returns null, so SavedBadge draws nothing, as it does today.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var theme = document.getElementById('t-theme');
+  theme.addEventListener('click', function () {
+    var dark = root.getAttribute('data-theme') !== 'light';
+    root.setAttribute('data-theme', dark ? 'light' : 'dark');
+    theme.textContent = dark ? 'Dark theme' : 'Light theme';
+  });
+})();
+</script>
+</body>
+</html>

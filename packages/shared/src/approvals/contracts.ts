@@ -159,6 +159,8 @@ export const APPROVALS_ERROR = {
   approvalNotFound: 'approval_not_found',
   /** The PR is not waiting for a decision. */
   notWaiting: 'not_waiting',
+  /** The approval was closed (merged, dropped) while the decision was in flight. */
+  approvalClosed: 'approval_closed',
   /** The PR is merged or closed on GitHub. */
   prNotOpen: 'pr_not_open',
   /** D6: the `headSha` sent is not the PR's head. */

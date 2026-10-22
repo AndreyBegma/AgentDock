@@ -181,6 +181,20 @@ describe('surviving an API restart (spec 353)', () => {
     expect(reachability.isUnreachable()).toBe(false);
   });
 
+  test('a malformed csrf cookie does not throw and the write goes out without it', async () => {
+    (globalThis as { document?: unknown }).document = {
+      cookie: 'other=1; ad_csrf=%E0%A4%A',
+    };
+    const headers: (HeadersInit | undefined)[] = [];
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      headers.push(init?.headers);
+      return json({});
+    }) as unknown as typeof fetch;
+    await api('/x', { method: 'POST', body: {} });
+    expect(headers).toHaveLength(1);
+    expect(JSON.stringify(headers[0])).not.toContain('x-csrf-token');
+  });
+
   test('other 5xx answers are the server’s, not an outage', async () => {
     const calls = script(json({ message: 'boom' }, 500));
     const error = await api('/x').catch((e: unknown) => e);

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { card as fixtureCard } from '../../lib/board/fixtures';
 import {
   CardBranchLine,
   cardSheetFooter,
@@ -7,6 +8,7 @@ import {
   EscalationRow,
   focusSheetTitle,
   PrTargetBanner,
+  RunMoney,
 } from './card-sheet';
 
 interface Fake {
@@ -208,5 +210,38 @@ describe('Card sheet escalation row (#750 D9, D10)', () => {
     expect(html).toContain('The worker asks for Opus: misclassified');
     expect(html).toContain('The card needs a migration.');
     expect(html).not.toContain('Escalated to Opus');
+  });
+});
+
+describe('Card sheet Run row saving (#778)', () => {
+  const tokenSaved = { estimateUsd: 0.41, estimateTokens: 103_200 };
+  const money = (extra: Parameters<typeof fixtureCard>[2]) =>
+    renderToStaticMarkup(
+      <RunMoney card={fixtureCard(7, 'completed', extra)} />,
+    );
+
+  test('the saving follows the cost, with its tokens title', () => {
+    const html = money({ costUsd: '3.18', tokenSaved });
+    expect(html).toContain('$3.18');
+    expect(html).toContain('saved ≈');
+    expect(html).toContain('title="Token saver kept');
+    expect(html.indexOf('$3.18')).toBeLessThan(html.indexOf('saved ≈'));
+  });
+
+  test('a saving without a cost stands alone', () => {
+    const html = money({ costUsd: null, tokenSaved });
+    expect(html).toContain('saved ≈');
+    expect(html).not.toContain('$3.18');
+  });
+
+  test('no tokenSaved, or one that saved nothing, draws nothing for it', () => {
+    expect(money({ costUsd: '3.18', tokenSaved: null })).not.toContain('saved');
+    expect(
+      money({
+        costUsd: null,
+        tokenSaved: { estimateUsd: 0, estimateTokens: 0 },
+      }),
+    ).toBe('');
+    expect(money({ costUsd: null, tokenSaved: null })).toBe('');
   });
 });

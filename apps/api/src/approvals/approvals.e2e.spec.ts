@@ -533,6 +533,27 @@ describe('merge approval queue (e2e)', () => {
       expect(commands.approve).toHaveBeenCalledTimes(1);
     });
 
+    it('answers 409 approval_closed when the row closes while the decision is sent, and keeps it closed (L-11)', async () => {
+      jest.mocked(commands.approve).mockImplementation(async () => {
+        await ctx.prisma.mergeApproval.updateMany({
+          where: { projectId: a, prNumber: PR },
+          data: { status: 'merged' },
+        });
+        return signal;
+      });
+      const response = await approve(H1);
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('approval_closed');
+      expect(await rows()).toEqual([
+        expect.objectContaining({ status: 'merged', headSha: null }),
+      ]);
+      const [record] = await audits('approval.approve');
+      expect(record).toMatchObject({
+        result: 'denied',
+        after: { pr: PR, headSha: H1, decision: 'approved' },
+      });
+    });
+
     it('answers 503 command_unavailable when the runner does not answer (real RunnerCommandService, no runner connected), and records the error', async () => {
       jest.restoreAllMocks();
       const response = await approve(H1);
