@@ -60,7 +60,13 @@ import { HookSessions } from './local/sessions';
 import { acquireLock } from './lock';
 import { errorMessage, type Logger } from './log';
 import { createNormalizeHandlers, NormalizeExecutor } from './normalize';
-import { otlpSettings, ProjectDirectory, startOtlpReceiver } from './otlp';
+import {
+  loadOtlpToken,
+  otlpSettings,
+  otlpTokenPath,
+  ProjectDirectory,
+  startOtlpReceiver,
+} from './otlp';
 import { PaneStreamer } from './pane';
 import {
   createPlannerHandlers,
@@ -207,6 +213,7 @@ export const runDaemon = async (
           home,
           // The receiver's port as bound, not as configured (spec 13).
           config: { profiles: config.profiles, otlp: otlpCapability() },
+          otlpToken: otlp?.endpoint?.token,
         }),
         // Each (re)connect re-checks, so a later `gh auth login` takes effect.
         gitAuth.probe(),
@@ -339,7 +346,7 @@ export const runDaemon = async (
       keepPatchesLocal: config.skills.keepPatchesLocal,
       emit: (event) => connection?.emit(event),
       log,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
     });
     // #449 D2: haiku writes the notes of dead sessions and interrupted runs.
     const handoffDir = join(dirname(options.spoolDir), 'handoff');
@@ -348,7 +355,7 @@ export const runDaemon = async (
       env: process.env,
       clock,
       log,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
     });
     // Design builds and plan turns (#494): keyed by work, so one store serves both.
     const runNotes = new RunNotes({
@@ -367,7 +374,7 @@ export const runDaemon = async (
       slots,
       emit: (event) => connection?.emit(event),
       log,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
       attachmentSource: {
         server: config.server,
         insecureServer: config.insecureServer,
@@ -383,7 +390,7 @@ export const runDaemon = async (
       slots,
       emit: (event) => connection?.emit(event),
       log,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
       runNotes,
     });
     // #751 B6, B8: the launch prefix's headless calls, beside the spool.
@@ -393,7 +400,7 @@ export const runDaemon = async (
       dir: join(dirname(options.spoolDir), 'prefix-calls'),
       env: process.env,
       log,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
     });
     // Context handoff (#449): the card notes, the restart decision and the
     // warm-up. `cards` is built right below; nothing here runs before it.
@@ -430,7 +437,7 @@ export const runDaemon = async (
       },
       emit: (event) => connection?.emit(event),
       log,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
       sessionToken: (binding) => sessionTokens.mint(binding),
       // `steward` is built right below; a poll runs only after `start`.
       onSessionEnded: (record, exitCode) =>
@@ -467,7 +474,7 @@ export const runDaemon = async (
         env: process.env,
         clock,
         log,
-        otlpPort: () => otlp?.port ?? null,
+        otlp: () => otlp?.endpoint ?? null,
       }),
       emit: (event) => connection?.emit(event),
       clock,
@@ -507,7 +514,7 @@ export const runDaemon = async (
       log,
       profiles: () => config.profiles,
       watchedProjects: () => watchList.current,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
     });
     // Card capture (#244): headless, one per project; the API limits the rest.
     const capture = new CaptureExecutor({
@@ -517,7 +524,7 @@ export const runDaemon = async (
       env: process.env,
       emit: (event) => connection?.emit(event),
       log,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
     });
     // Text normalization (#271): headless; the API limits concurrency.
     const normalize = new NormalizeExecutor({
@@ -527,7 +534,7 @@ export const runDaemon = async (
       env: process.env,
       emit: (event) => connection?.emit(event),
       log,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
     });
     // Card model assessment (#322): headless; the API limits concurrency.
     const assess = new AssessExecutor({
@@ -536,7 +543,7 @@ export const runDaemon = async (
       env: process.env,
       emit: (event) => connection?.emit(event),
       log,
-      otlpPort: () => otlp?.port ?? null,
+      otlp: () => otlp?.endpoint ?? null,
     });
     const runLog = new RunLogStreamer({
       runs: runLogSources(runs, plans, uiProfiles),
@@ -587,7 +594,7 @@ export const runDaemon = async (
           profiles: () => config.profiles,
           watchedProjects: () => watchList.current,
           policy: () => policy.current(),
-          otlpPort: () => otlp?.port ?? null,
+          otlp: () => otlp?.endpoint ?? null,
         }),
       ),
       sessionMessage: new SessionMessenger({
@@ -631,7 +638,7 @@ export const runDaemon = async (
         profiles: readClaudeProfilesAgentdock(
           config.profiles,
           home,
-          otlpCapability()?.http ?? null,
+          otlp?.endpoint ?? null,
         ),
       };
     };
@@ -686,6 +693,8 @@ export const runDaemon = async (
     // `hello`, which reports its port.
     const otlp = startOtlpReceiver({
       settings: otlpSettings(config.otlp),
+      // L-30: kept beside the spool, so `setup claude` writes the same one.
+      token: loadOtlpToken(otlpTokenPath(dirname(options.spoolDir))),
       emit: (event) => live.emit(event),
       projects: () => watchList.current,
       sessionProject: (id) => hookSessions.projectOf(id, watchList.current),

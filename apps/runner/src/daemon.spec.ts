@@ -16,6 +16,7 @@ import { type HookDeps, runHook } from './hooks/run';
 import { localRequest } from './local/client';
 import { loadSessionTokenSecret, SessionTokens } from './local/session-tokens';
 import { FORBIDDEN, fixtureProtobuf, PROTOBUF_SESSION } from './otlp/testing';
+import { loadOtlpToken, otlpTokenPath } from './otlp/token';
 import { reportedPolicy } from './policy/schema';
 import {
   permissivePolicy,
@@ -152,10 +153,21 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     expect(hello?.capabilities.otlp?.grpc).toBeNull();
     await live();
 
-    const response = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
+    // L-30: the token the daemon created beside the spool.
+    const token = loadOtlpToken(otlpTokenPath(dir));
+    const bare = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
       method: 'POST',
       body: fixtureProtobuf(),
       headers: { 'content-type': 'application/x-protobuf' },
+    });
+    expect(bare.status).toBe(401);
+    const response = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
+      method: 'POST',
+      body: fixtureProtobuf(),
+      headers: {
+        'content-type': 'application/x-protobuf',
+        'x-nautelle-otlp-token': token,
+      },
     });
     expect(response.status).toBe(200);
 

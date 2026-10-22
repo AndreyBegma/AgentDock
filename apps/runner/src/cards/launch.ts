@@ -9,6 +9,7 @@ import type { ConfigProfile } from '../config';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { SESSION_TOKEN_ENV } from '../local/session-tokens';
 import { CARD_ESCALATE_ENV } from '../mcp/tools';
+import type { OtlpEndpoint } from '../otlp/token';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
 import { cardIssueNumber, finishGuardArgs } from './finish-guard';
@@ -147,14 +148,14 @@ export const cardLaunchSpec = (
   > &
     Partial<Pick<CardRunArgs, 'effort' | 'escalate'>>,
   worktree: string,
-  otlpPort: number | null,
+  otlp: OtlpEndpoint | null,
   wiring?: CardWiringFiles,
   tokenSaver?: TokenSaverLaunch | null,
   sessionToken?: string,
 ): LaunchSpec => ({
   ...cardArgv(profile, args, wiring, tokenSaver),
   env: {
-    ...runEnv(profile, args, otlpPort),
+    ...runEnv(profile, args, otlp),
     ...cardEnv(args.shortId),
     ...(tokenSaver?.env ?? {}),
     ...roundEnv(args),

@@ -19,6 +19,7 @@ import type { Cancel } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { Env } from '../env';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import { cutBytes } from '../planner/result';
 import { profileOf, type SkillsDeps } from '../skills/deps';
 import { runEnv } from '../skills/run/launch';
@@ -33,7 +34,7 @@ export interface UiProfileLearnerOptions {
   /** The runner's own environment; the profile's overlays it. */
   env: Env;
   log: Logger;
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   spawn?: CaptureSpawn;
 }
 
@@ -102,10 +103,7 @@ export class UiProfileLearner {
       for (const [key, value] of Object.entries(this.options.env)) {
         if (value !== undefined) env[key] = value;
       }
-      Object.assign(
-        env,
-        runEnv(profile, args, this.options.otlpPort?.() ?? null),
-      );
+      Object.assign(env, runEnv(profile, args, this.options.otlp?.() ?? null));
       Object.assign(env, HOOKS_OFF_ENV);
 
       let proc: CaptureProcess;

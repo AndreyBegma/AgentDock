@@ -387,7 +387,7 @@ const askSetup = async (stdout: string, deny: string[] = []) => {
     profiles: () => PROFILES,
     watchedProjects: () => [t.project],
     policy: t.deps.policy,
-    otlpPort: () => 4318,
+    otlp: () => ({ port: 4318, token: 'otlp-token' }),
     spawn,
   });
   const args = (extra: Partial<CodeAskArgs> = {}): CodeAskArgs => ({

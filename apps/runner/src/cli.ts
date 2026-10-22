@@ -26,7 +26,7 @@ import { type LocalCommandDeps, NotImplementedError } from './local/subcommand';
 import { LockError } from './lock';
 import { createLogger, errorMessage, type Logger, parseLogLevel } from './log';
 import { runMcp } from './mcp';
-import { otlpSettings } from './otlp';
+import { loadOtlpToken, otlpSettings, otlpTokenPath } from './otlp';
 import { PairingError, pair } from './pairing';
 import { runPolicy } from './policy/cli';
 import { nodeRealpath } from './policy/roots';
@@ -578,7 +578,13 @@ const setupCommand = async ({
     telemetry: !values['no-telemetry'],
     dryRun: values['dry-run'] === true,
     uninstall: values.uninstall === true,
-    otlpPort: otlp.enabled ? otlp.httpPort : null,
+    // L-30: the token the daemon asks for, from the same file it reads.
+    otlp: otlp.enabled
+      ? {
+          port: otlp.httpPort,
+          token: loadOtlpToken(otlpTokenPath(paths.stateDir)),
+        }
+      : null,
     home: paths.home,
     env: deps.env,
     exec: (env) => createExec(env),

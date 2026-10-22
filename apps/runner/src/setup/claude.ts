@@ -13,6 +13,7 @@ import { legacyPluginInstalled } from '../detect/capabilities';
 import type { Exec } from '../detect/exec';
 import { type Env, expandHome } from '../env';
 import { OTLP_HOST } from '../otlp/receiver';
+import { isOtlpHeaders, type OtlpEndpoint, otlpHeaders } from '../otlp/token';
 
 /** The repository marketplace and the plugin in it (spec 201 D21). */
 export const MARKETPLACE_SOURCE = 'AndreyBegma/Nautelle';
@@ -30,15 +31,21 @@ export const PLUGIN_COMMAND_TIMEOUT_MS = 120_000;
  * The exporter keys `setup` owns in `settings.json` → `env` (D21). Never
  * `OTEL_RESOURCE_ATTRIBUTES` — the runner sets it per managed launch — and
  * never `OTEL_LOG_*`, which would export prompt and tool content (ADR-0021 §3).
+ * The headers carry the receiver's token, which it refuses requests without
+ * (L-30).
  */
-export const exporterEnv = (port: number): Record<string, string> => ({
+export const exporterEnv = ({
+  port,
+  token,
+}: OtlpEndpoint): Record<string, string> => ({
   CLAUDE_CODE_ENABLE_TELEMETRY: '1',
   OTEL_LOGS_EXPORTER: 'otlp',
   OTEL_METRICS_EXPORTER: 'otlp',
   OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
   OTEL_EXPORTER_OTLP_ENDPOINT: `http://${OTLP_HOST}:${port}`,
+  OTEL_EXPORTER_OTLP_HEADERS: otlpHeaders(token),
 });
-export const EXPORTER_KEYS = Object.keys(exporterEnv(0));
+export const EXPORTER_KEYS = Object.keys(exporterEnv({ port: 0, token: '' }));
 
 /** An endpoint this command could have written, whatever the port was then. */
 const OUR_ENDPOINT = /^http:\/\/127\.0\.0\.1:\d+$/;
@@ -50,8 +57,8 @@ export interface SetupClaudeOptions {
   telemetry: boolean;
   dryRun: boolean;
   uninstall: boolean;
-  /** The OTLP receiver's port; null when the receiver is off. */
-  otlpPort: number | null;
+  /** The OTLP receiver's port and token; null when the receiver is off. */
+  otlp: OtlpEndpoint | null;
   home: string;
   env: Env;
   /** An `Exec` running with the given environment. */
@@ -113,9 +120,12 @@ export const envDiff = (
 };
 
 /** `settings.json` with the exporter keys merged in; every other key kept. */
-export const installedSettings = (current: Json | null, port: number): Json => {
+export const installedSettings = (
+  current: Json | null,
+  otlp: OtlpEndpoint,
+): Json => {
   const settings: Json = { ...(current ?? {}) };
-  settings.env = { ...envOf(current), ...exporterEnv(port) };
+  settings.env = { ...envOf(current), ...exporterEnv(otlp) };
   return settings;
 };
 
@@ -131,13 +141,15 @@ export const uninstalledSettings = (
   if (!current) return null;
   const env = { ...envOf(current) };
   const before = envOf(backup);
-  const ours = exporterEnv(0);
+  const ours = exporterEnv({ port: 0, token: '' });
   for (const key of EXPORTER_KEYS) {
     const value = env[key];
     const mine =
       key === 'OTEL_EXPORTER_OTLP_ENDPOINT'
         ? typeof value === 'string' && OUR_ENDPOINT.test(value)
-        : value === ours[key];
+        : key === 'OTEL_EXPORTER_OTLP_HEADERS'
+          ? isOtlpHeaders(value)
+          : value === ours[key];
     if (!mine) continue;
     if (key in before) env[key] = before[key];
     else delete env[key];
@@ -209,7 +221,7 @@ export const setupClaude = async (
     return 1;
   }
   const telemetry = options.telemetry && !options.uninstall;
-  if (telemetry && options.otlpPort === null) {
+  if (telemetry && options.otlp === null) {
     options.stderr(
       'The OTLP receiver is off (otlp.enabled: false); telemetry settings are skipped.\n',
     );
@@ -288,8 +300,8 @@ const settingsStep = (
   if (options.uninstall) {
     next = uninstalledSettings(current, readSettings(backupPath));
   } else {
-    if (options.otlpPort === null) return;
-    next = installedSettings(current, options.otlpPort);
+    if (options.otlp === null) return;
+    next = installedSettings(current, options.otlp);
   }
   const diff = envDiff(envOf(current), envOf(next));
   if (!next || diff.length === 0) {

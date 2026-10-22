@@ -20,6 +20,7 @@ import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import type { Env } from '../env';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import { profileOf } from '../skills/deps';
 import { runEnv } from '../skills/run/launch';
 import { finalResult } from '../skills/run/stream';
@@ -82,7 +83,7 @@ export interface StewardDigestOptions {
   log: Logger;
   profiles: () => readonly ConfigProfile[];
   watchedProjects: () => readonly WatchedProject[];
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   spawn?: CaptureSpawn;
   timeoutMs?: number;
 }
@@ -134,10 +135,7 @@ export class StewardDigestWriter {
       for (const [key, value] of Object.entries(this.options.env)) {
         if (value !== undefined) env[key] = value;
       }
-      Object.assign(
-        env,
-        runEnv(profile, args, this.options.otlpPort?.() ?? null),
-      );
+      Object.assign(env, runEnv(profile, args, this.options.otlp?.() ?? null));
       Object.assign(env, HOOKS_OFF_ENV);
       const proc = (this.options.spawn ?? bunSpawn)({
         command: [
