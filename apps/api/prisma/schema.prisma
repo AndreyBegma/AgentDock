@@ -2345,6 +2345,10 @@ model GitHubInstallationRepo {
 /// D11's "recent delivery"; 14 days (D17).
 model GitHubDelivery {
   deliveryId      String   @id
+  /// C-145: hex `sha256` of the raw body. The signature covers the body, not
+  /// `X-GitHub-Delivery`: a replay under a fresh id is caught here. Null on
+  /// rows stored before it.
+  bodySha256      String?  @unique
   event           String
   action          String?
   /// Lower-cased `repository.full_name`.

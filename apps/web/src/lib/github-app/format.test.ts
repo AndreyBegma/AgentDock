@@ -52,7 +52,7 @@ describe('credentials form', () => {
     slug: 'agentdock-x',
     privateKey:
       '-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----',
-    webhookSecret: 's3cret',
+    webhookSecret: 's3cret-0123456789abcdef',
   };
 
   test('a valid form has no problem and converts to numbers and trimmed text', () => {
@@ -73,6 +73,12 @@ describe('credentials form', () => {
     expect(credentialsProblem({ ...valid, webhookSecret: ' ' })?.field).toBe(
       'webhookSecret',
     );
+    expect(
+      credentialsProblem({ ...valid, webhookSecret: ` ${'x'.repeat(19)} ` }),
+    ).toMatchObject({
+      field: 'webhookSecret',
+      text: expect.stringContaining('20 characters'),
+    });
   });
 
   test('GitHub refusing the credentials points at the key; other errors at the form', () => {

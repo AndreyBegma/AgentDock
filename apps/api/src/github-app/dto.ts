@@ -1,5 +1,6 @@
 import {
   GITHUB_LOGIN_PATTERN,
+  GITHUB_WEBHOOK_SECRET_MIN_LENGTH,
   type GitHubAppCredentialsRequest,
   type GitHubManifestRequest,
 } from '@nautelle/shared';
@@ -12,6 +13,7 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 
 /** A 4096-bit RSA PEM is ~3.3 KB; this leaves room for any sane key. */
@@ -63,7 +65,9 @@ export class GitHubAppCredentialsDto implements GitHubAppCredentialsRequest {
   privateKey!: string;
 
   @IsString()
-  @IsNotEmpty()
+  @MinLength(GITHUB_WEBHOOK_SECRET_MIN_LENGTH, {
+    message: `webhookSecret must be at least ${GITHUB_WEBHOOK_SECRET_MIN_LENGTH} characters`,
+  })
   @MaxLength(SECRET_MAX_LENGTH)
   webhookSecret!: string;
 }

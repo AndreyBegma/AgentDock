@@ -212,8 +212,12 @@ export interface GitHubAppCredentialsRequest {
   slug: string;
   /** PEM of the App's RSA private key. */
   privateKey: string;
+  /** At least `GITHUB_WEBHOOK_SECRET_MIN_LENGTH` characters. */
   webhookSecret: string;
 }
+
+/** C-145: a shorter manual webhook secret is guessable; the API answers 400. */
+export const GITHUB_WEBHOOK_SECRET_MIN_LENGTH = 20;
 
 export interface GitHubInstallationRepoView {
   fullName: string;
