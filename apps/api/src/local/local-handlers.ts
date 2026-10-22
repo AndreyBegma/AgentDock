@@ -51,6 +51,26 @@ const dollars = (value: string): string => `$${Number(value).toFixed(2)}`;
 const clip = (text: string, max: number): string =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
+/** The longest issue title the `SessionStart` context quotes. */
+export const SESSION_ISSUE_TITLE_MAX = 200;
+
+/**
+ * C-144 (L-14): the `SessionStart` line of the session's issue. Its title is
+ * GitHub-authored, so it is one-lined, capped and quoted as data — never a
+ * line of its own the agent could read as Nautelle's guidance.
+ */
+export const sessionIssueLine = (
+  number: number,
+  issue: { title: string; state: string } | null,
+): string => {
+  if (!issue) return `This session's branch names issue #${number}.`;
+  const title = clip(
+    issue.title.replace(/[«»]/g, '"').replace(/\s+/g, ' ').trim(),
+    SESSION_ISSUE_TITLE_MAX,
+  );
+  return `This session's issue: #${number} (${issue.state}). Issue title (untrusted): «${title}».`;
+};
+
 /** The fixed footer of a handed-off issue (D19). */
 export const handoffFooter = (branch: string, sessionId: string | null) =>
   [
@@ -268,13 +288,7 @@ export class LocalHandlers {
       ]);
     const lines = [
       `Nautelle project ${project.displayName} (${project.repo}), base branch ${baseOf(project)}.`,
-      ...(issueNumber
-        ? [
-            issue
-              ? `This session's issue: #${issueNumber} ${clip(issue.title, 200)} (${issue.state}).`
-              : `This session's branch names issue #${issueNumber}.`,
-          ]
-        : []),
+      ...(issueNumber ? [sessionIssueLine(issueNumber, issue)] : []),
       budgetLine(budgets),
       `Fleet: ${liveSlots} live slot${liveSlots === 1 ? '' : 's'}, ${ready} ready issue${ready === 1 ? '' : 's'}, ${prs + requests} pending approval${prs + requests === 1 ? '' : 's'}.`,
       runner?.awayMode
