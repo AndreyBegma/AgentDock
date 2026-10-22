@@ -133,6 +133,11 @@ function Detail({ detail }: { detail: ApprovalDetail }) {
       {detail.inspectionError ? (
         <Banner tone="warn" title="The pull request could not be inspected">
           {detail.inspectionError.message}
+          {detail.inspectionError.detail ? (
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs">
+              {detail.inspectionError.detail}
+            </pre>
+          ) : null}
         </Banner>
       ) : null}
 
