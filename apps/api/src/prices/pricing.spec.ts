@@ -181,4 +181,32 @@ describe('matching order', () => {
     expect(compilePattern('(?i)^GPT-5$').test('gpt-5')).toBe(true);
     expect(() => compilePattern('(')).toThrow(SyntaxError);
   });
+
+  it('matches nothing with a stored pattern that fails the safety check', () => {
+    const t: PriceTier = {
+      name: 'Standard',
+      isDefault: true,
+      conditions: [],
+      prices: { input: '1', output: '1' },
+    };
+    const prices = compilePrices([
+      { modelName: 'evil', matchPattern: '^(a+)+$', priority: 1, tiers: [t] },
+    ]);
+    expect(prices).toHaveLength(0);
+  });
+
+  it('does not match a model name over the input cap', () => {
+    const t: PriceTier = {
+      name: 'Standard',
+      isDefault: true,
+      conditions: [],
+      prices: { input: '1', output: '1' },
+    };
+    const prices = compilePrices([
+      { modelName: 'any', matchPattern: '.*', priority: 1, tiers: [t] },
+    ]);
+    const start = performance.now();
+    expect(priceRequest(prices, 'a'.repeat(100_000), tokens({}))).toBeNull();
+    expect(performance.now() - start).toBeLessThan(50);
+  });
 });

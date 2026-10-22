@@ -140,6 +140,9 @@ describe('triggers admin API (e2e, spec 26)', () => {
     expect((await create({ valuePattern: '([' })).body).toMatchObject({
       error: 'invalid_template',
     });
+    const nested = await create({ valuePattern: '^(a+)+$' });
+    expect(nested.status).toBe(422);
+    expect(nested.body).toMatchObject({ error: 'invalid_template' });
     expect((await create({ allowedPaths: ['a..b'] })).body).toMatchObject({
       error: 'invalid_template',
       path: 'a..b',

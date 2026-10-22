@@ -1,9 +1,12 @@
-import type {
-  ConditionSubject,
-  ModelPriceInput,
-  PriceBucket,
-  PriceTier,
-  TierCondition,
+import {
+  type ConditionSubject,
+  checkSafePattern,
+  compileMatchPattern,
+  type ModelPriceInput,
+  type PriceBucket,
+  type PriceTier,
+  type TierCondition,
+  testBounded,
 } from '@nautelle/shared';
 import type { TokenBuckets } from '@nautelle/shared/protocol';
 import { Prisma } from '@prisma/client';
@@ -34,12 +37,16 @@ export interface PricedRequest {
  * PCRE flag Langfuse writes — is dropped, since JavaScript has no inline flags.
  * Throws a `SyntaxError` on an invalid regex.
  */
-export const compilePattern = (pattern: string): RegExp =>
-  new RegExp(pattern.replace(/^\(\?i\)/, ''), 'i');
+export const compilePattern = compileMatchPattern;
 
-/** Ordered for matching: lowest `priority` first, then by name for a stable tie-break. */
+/**
+ * Ordered for matching: lowest `priority` first, then by name for a stable
+ * tie-break. A stored pattern that fails the safety check (one saved before it
+ * existed) matches nothing rather than risk stalling the event loop.
+ */
 export const compilePrices = (models: ModelPriceInput[]): CompiledPrice[] =>
   models
+    .filter((m) => checkSafePattern(m.matchPattern, 'i').ok)
     .map((m) => ({
       modelName: m.modelName,
       pattern: compilePattern(m.matchPattern),
@@ -54,7 +61,8 @@ export const compilePrices = (models: ModelPriceInput[]): CompiledPrice[] =>
 export const matchModel = (
   prices: CompiledPrice[],
   model: string,
-): CompiledPrice | null => prices.find((p) => p.pattern.test(model)) ?? null;
+): CompiledPrice | null =>
+  prices.find((p) => testBounded(p.pattern, model)) ?? null;
 
 const subjectValue = (
   tokens: TokenBuckets,

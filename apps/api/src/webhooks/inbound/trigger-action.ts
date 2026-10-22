@@ -1,9 +1,10 @@
 import {
   checkArgsTemplate,
+  checkValuePattern,
   type InboundTriggerAction,
   inboundPayloadPathSchema,
   inboundTriggerActionSchema,
-  isValidValuePattern,
+  SAFE_PATTERN_MESSAGES,
   WEBHOOKS_ERROR,
 } from '@nautelle/shared';
 import { isRunnableSkill } from '@nautelle/shared/protocol';
@@ -51,12 +52,15 @@ export const checkTemplate = (
       { path: badPath },
     );
   }
-  if (valuePattern !== null && !isValidValuePattern(valuePattern)) {
-    throw webhooksError(
-      422,
-      WEBHOOKS_ERROR.invalidTemplate,
-      'valuePattern is not a valid regular expression',
-    );
+  if (valuePattern !== null) {
+    const pattern = checkValuePattern(valuePattern);
+    if (!pattern.ok) {
+      throw webhooksError(
+        422,
+        WEBHOOKS_ERROR.invalidTemplate,
+        `valuePattern: ${SAFE_PATTERN_MESSAGES[pattern.reason]}`,
+      );
+    }
   }
   if (action.kind !== 'skill') return;
   const checked = checkArgsTemplate(action.args, allowedPaths);

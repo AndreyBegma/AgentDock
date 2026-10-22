@@ -29,6 +29,7 @@ export * from './project-rules';
 export * from './projects';
 export * from './queue';
 export * from './readiness';
+export * from './regex';
 export * from './runners';
 export * from './schedules';
 export * from './session-message';

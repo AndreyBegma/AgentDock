@@ -265,6 +265,23 @@ describe('isValidValuePattern', () => {
     expect(isValidValuePattern('([')).toBe(false);
     expect(isValidValuePattern('')).toBe(false);
   });
+
+  it('refuses a nested quantifier and a pattern over 200 characters', () => {
+    expect(isValidValuePattern('^(a+)+$')).toBe(false);
+    expect(isValidValuePattern('a'.repeat(201))).toBe(false);
+    expect(isValidValuePattern('a'.repeat(200))).toBe(true);
+  });
+
+  it('does not run a stored unsafe pattern at fire time', () => {
+    expect(
+      renderArgsTemplate(
+        '{{payload.ref}}',
+        { ref: `${'a'.repeat(40)}!` },
+        ['ref'],
+        '^(a+)+$',
+      ),
+    ).toMatchObject({ ok: false, reason: 'pattern_mismatch' });
+  });
 });
 
 describe('buildWebhookEnvelope (D9, D10)', () => {
