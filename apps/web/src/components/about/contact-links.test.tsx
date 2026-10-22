@@ -11,21 +11,22 @@ const contact = (kind: AuthorContact['kind'], href: string): AuthorContact => ({
 });
 
 describe('ContactList (C-293)', () => {
-  test('renders GitHub and Telegram as new-tab links with accessible names', () => {
+  test('renders GitHub, Telegram and email as new-tab links with accessible names', () => {
     const html = renderToStaticMarkup(<ContactList />);
     expect(html).toContain('href="https://github.com/AndreyBegma"');
     expect(html).toContain('href="https://t.me/abegma"');
     expect(html).toContain('aria-label="GitHub: AndreyBegma"');
     expect(html).toContain('aria-label="Telegram: @abegma"');
+    expect(html).toContain('href="mailto:abegma137@gmail.com"');
+    expect(html).toContain('aria-label="Email: abegma137@gmail.com"');
     expect(html).toContain('>@abegma</span>');
-    expect(html.match(/target="_blank"/g)).toHaveLength(2);
-    expect(html.match(/rel="noopener noreferrer"/g)).toHaveLength(2);
+    expect(html.match(/target="_blank"/g)).toHaveLength(3);
+    expect(html.match(/rel="noopener noreferrer"/g)).toHaveLength(3);
   });
 
-  test('skips the entries without a link (LinkedIn, email)', () => {
+  test('skips the entry without a link (LinkedIn)', () => {
     const html = renderToStaticMarkup(<ContactList />);
     expect(html).not.toContain('LinkedIn');
-    expect(html).not.toContain('Email');
     expect(html.match(/<a /g)).toHaveLength(
       AUTHOR_CONTACTS.filter((each) => each.href).length,
     );
