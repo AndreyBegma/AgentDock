@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card page — full detail</title>
+<style>
+:root{color-scheme:dark;--font-sans:'SF Pro Text','SF Pro Display','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--focus-width:3px;--focus-offset:4px;--dur-fast:100ms;--dur-base:150ms;--glass-blur:26px}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#fff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246 / 0.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / 0.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90 / 0.18);--color-hue-3-ink:#ade58f;--color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110 / 0.18);--color-hue-6-ink:#ff9da5;--color-hue-7:#a68bfa;--canvas-glow:18%;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-clear:rgb(0 0 0 / 0.15);--glass-brightness:0.85}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#fff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#fff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214 / 0.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / 0.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28 / 0.12);--color-hue-3-ink:#2f6617;--color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62 / 0.12);--color-hue-6-ink:#ad1f31;--color-hue-7:#7244e0;--canvas-glow:10%;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-clear:rgb(0 0 0 / 0.08);--glass-brightness:1.15}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink);--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink);--color-status-error:var(--color-hue-6);--color-status-error-soft:var(--color-hue-6-soft);--color-status-error-ink:var(--color-hue-6-ink)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;color:var(--color-ink);-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--font-mono);font-size:0.92em}
+.num{font-variant-numeric:tabular-nums}
+a{color:var(--color-accent-ink);text-underline-offset:4px}
+:focus-visible{outline:var(--focus-width) solid var(--color-focus);outline-offset:var(--focus-offset)}
+svg.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.text-display{font-size:28px;line-height:32px;letter-spacing:-0.02em;font-weight:600;margin:0}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.shell{display:flex;gap:12px;padding:12px;min-height:100vh}
+.rail{position:sticky;top:12px;height:calc(100vh - 24px);width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:var(--radius-surface)}
+.rail-group-label{padding:8px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--color-ink-3)}
+.rail-item{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:var(--radius-control);font-size:14px;color:var(--color-ink-2);text-decoration:none}
+.rail-item:hover{background:var(--color-hover);color:var(--color-ink)}
+.rail-item.primary{border:1px solid color-mix(in oklab,var(--color-accent) 40%,transparent);background:color-mix(in oklab,var(--color-accent) 8%,transparent);color:var(--color-ink);font-weight:600;padding:6px 8px}
+.rail-glyph{display:grid;place-items:center;width:24px;height:24px;border-radius:var(--radius-control);background:var(--color-accent);color:var(--color-on-accent)}
+.main-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.topbar{height:56px;display:flex;align-items:center;gap:12px;padding:0 12px 0 16px;border-radius:var(--radius-surface)}
+.crumbs{display:flex;align-items:center;gap:6px;flex:1;min-width:0;font-size:14px;color:var(--color-ink-2)}
+.crumbs a{color:var(--color-ink-2);text-decoration:none}
+.crumbs [aria-current="page"]{color:var(--color-ink);font-size:15px;font-weight:600}
+.page{width:100%;max-width:80rem;margin:0 auto;padding:8px 4px 48px;display:flex;flex-direction:column;gap:20px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;height:var(--size-control);padding:0 16px;border-radius:var(--radius-control);border:0;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);color:var(--color-ink);border:1px solid var(--color-line-strong)}
+.btn-ghost{background:transparent;color:var(--color-ink-2)}
+.btn-ghost:hover{background:var(--color-hover);color:var(--color-ink)}
+.btn-icon{padding:0;aspect-ratio:1}
+.badge{display:inline-flex;align-items:center;white-space:nowrap;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;border-radius:999px;height:20px;min-width:20px;padding:0 6px;font-size:12px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-sm{height:18px;min-width:18px;padding:0 5px;font-size:10px}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge-sq{border-radius:4px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;flex-shrink:0;background:var(--color-ink-3)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.pill{--s:var(--color-ink-3);--s-soft:var(--color-hover);--s-ink:var(--color-ink-2);display:inline-flex;flex-shrink:0;align-items:center;gap:8px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;line-height:1;white-space:nowrap;background:var(--s-soft);color:var(--s-ink);border:1px solid color-mix(in oklab,var(--s) 45%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--s)}
+.pill-sm{height:20px;gap:6px;padding:0 8px;font-size:11px}
+.pill-waiting{--s:var(--color-status-waiting);--s-soft:var(--color-status-waiting-soft);--s-ink:var(--color-status-waiting-ink)}
+.pill-done{--s:var(--color-status-done);--s-soft:var(--color-status-done-soft);--s-ink:var(--color-status-done-ink)}
+.pill-error{--s:var(--color-status-error);--s-soft:var(--color-status-error-soft);--s-ink:var(--color-status-error-ink)}
+.tablist{display:flex;gap:4px;border-bottom:1px solid var(--color-line)}
+.tab{position:relative;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:0;background:none;font:inherit;font-size:14px;font-weight:500;color:var(--color-ink-2);cursor:pointer}
+.tab[aria-selected="true"]{color:var(--color-ink)}
+.tab[aria-selected="true"]::after{content:'';position:absolute;left:8px;right:8px;bottom:-1px;height:2px;border-radius:2px;background:var(--color-accent)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:10px 16px;margin:0;font-size:13px}
+.kv dt{color:var(--color-ink-3)}
+.kv dd{margin:0;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.table{width:100%;border-collapse:collapse;font-size:13px}
+.table th{font-size:12px;font-weight:500;color:var(--color-ink-3);text-align:left;padding:6px 10px;border-bottom:1px solid var(--color-line)}
+.table td{padding:6px 10px;border-bottom:1px solid var(--color-line)}
+.table tr:last-child td{border-bottom:0}
+.table .num{text-align:right}
+.separator-v{width:1px;height:14px;background:var(--color-line-strong)}
+.avatar{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:11px;font-weight:600}
+
+.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.ph-text{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ph-eyebrow{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.meta-bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:12px;color:var(--color-ink-2)}
+.meta-bar>span{display:inline-flex;align-items:center;gap:5px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+.side{position:sticky;top:12px;border-radius:var(--radius-surface);padding:16px;display:flex;flex-direction:column;gap:16px}
+.side h3{margin:0;font-size:12px;font-weight:600;color:var(--color-ink-3);text-transform:none}
+.round{border-radius:var(--radius-surface)}
+.round-head{display:flex;align-items:center;gap:10px;padding:12px 14px}
+.round-n{display:grid;place-items:center;width:26px;height:26px;border-radius:var(--radius-control);background:var(--color-hover);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.round-trig{flex:1;min-width:0;display:flex;flex-direction:column}
+.round-trig b{font-weight:500}
+.round-trig small{font-size:12px;color:var(--color-ink-3)}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 20px;margin:0;padding:12px 14px 14px;border-top:1px solid var(--color-line)}
+.facts dt{font-size:11px;font-weight:500;color:var(--color-ink-3);margin-bottom:2px}
+.facts dd{margin:0;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{color:var(--color-ink-3)}
+details.disc{border-top:1px solid var(--color-line)}
+details.disc>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;font-size:13px}
+details.disc>summary::-webkit-details-marker{display:none}
+details.disc>summary:hover{background:var(--color-hover)}
+details.disc .chev{width:14px;height:14px;color:var(--color-ink-3);transition:transform var(--dur-base)}
+details.disc[open] .chev{transform:rotate(90deg)}
+.lbl{font-weight:500}
+.prev{color:var(--color-ink-3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.disc-body{padding:0 14px 14px 36px;font-size:13px;color:var(--color-ink-2)}
+.disc-body ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.ok-ink{color:var(--color-ok)}.danger-ink{color:var(--color-danger)}
+.bar{height:6px;border-radius:999px;background:var(--color-hover);overflow:hidden;width:80px;display:inline-block;vertical-align:middle}
+.bar>span{display:block;height:100%;background:var(--color-ok)}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="shell">
+  <aside class="rail glass" aria-label="Main">
+    <div class="rail-group-label">Nautelle</div>
+    <a class="rail-item primary" href="#"><span class="rail-glyph"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg></span>Board</a>
+    <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Work</a>
+    <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Activity</a>
+    <div class="rail-group-label">More</div>
+    <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Fleet</a>
+    <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Queue</a>
+  </aside>
+  <div class="main-col">
+    <header class="topbar glass">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="#">Nautelle</a><span>/</span><a href="#">Board</a><span>/</span><span aria-current="page">C-332</span></nav>
+      <span class="dot" style="background:var(--color-ok)" title="Live"></span>
+      <span class="separator-v"></span>
+      <span class="avatar">AB</span>
+    </header>
+    <main id="main-content" class="page">
+      <header class="page-header">
+        <div class="ph-text">
+          <div class="ph-eyebrow"><span class="swatch" style="background:var(--color-hue-7)"></span>nautelle-web<span class="mono">C-332</span><span class="badge badge-sm badge-sq">Feature</span><span>· Stack S-8 · Stage 2</span></div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h1 class="text-display">Show full run facts in each round</h1><span class="pill pill-waiting">In review</span></div>
+          <div class="meta-bar">
+            <span><span class="dot" style="background:var(--color-hue-2)"></span>slot-3</span>
+            <span class="mono">feat/c-332-round-facts</span>
+            <span><a href="#">PR #812</a><span class="badge badge-sm badge-ok">CI passing</span></span>
+            <span class="num"><b style="color:var(--color-ink);font-weight:600">3</b>&nbsp;rounds</span>
+            <span class="num"><b style="color:var(--color-ink);font-weight:600">1.24M</b>&nbsp;tokens</span>
+            <span class="num"><b style="color:var(--color-ink);font-weight:600">$4.18</b></span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button class="btn btn-glass">Send back</button>
+          <button class="btn btn-solid">Accept</button>
+          <button class="btn btn-ghost btn-icon" aria-label="More actions"><svg class="icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+        </div>
+      </header>
+
+      <div class="tablist" role="tablist" aria-label="Card detail">
+        <button class="tab" role="tab" aria-selected="false">Overview</button>
+        <button class="tab" role="tab" aria-selected="true">Rounds <span class="badge badge-sm">3</span></button>
+        <button class="tab" role="tab" aria-selected="false">Attachments <span class="badge badge-sm">2</span></button>
+        <button class="tab" role="tab" aria-selected="false">Card</button>
+      </div>
+
+      <div class="layout">
+        <div style="display:flex;flex-direction:column;gap:12px" role="tabpanel" aria-label="Rounds">
+          <article class="round surface-content">
+            <div class="round-head">
+              <span class="round-n">3</span>
+              <div class="round-trig"><b>Sent back with feedback</b><small>by Andrew B. · "Keep the summary collapsed by default; show the saved share in the row"</small></div>
+              <span class="pill pill-sm pill-done">Finished</span>
+              <span class="sub num" style="font-size:12px">12m 08s</span>
+            </div>
+            <dl class="facts">
+              <div><dt>Model · effort</dt><dd>claude-opus-5-5 <span class="sub">· high</span></dd></div>
+              <div><dt>Started → ended</dt><dd>Oct 22, 14:02 → 14:14</dd></div>
+              <div><dt>Tokens in / out</dt><dd>412k / 38k <span class="sub">· 71% cached</span></dd></div>
+              <div><dt>Cost</dt><dd>$1.42</dd></div>
+              <div><dt>Pull request</dt><dd><a href="#">#812</a> <span class="sub">· 3 commits</span></dd></div>
+              <div><dt>CI</dt><dd class="ok-ink">Passed 4/4 · 6m 10s</dd></div>
+              <div><dt>Finished by</dt><dd><span class="ok-ink">finish_card</span> <span class="sub">· exit 0</span></dd></div>
+              <div><dt>Restart · warm-up</dt><dd>Resume <span class="sub">· 18k · 9s</span></dd></div>
+            </dl>
+            <details class="disc" open>
+              <summary><svg class="icon chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg><span class="lbl">Agent summary</span><span class="prev"></span></summary>
+              <div class="disc-body"><ul>
+                <li>Moved the agent summary and the token-saver breakdown into <span class="mono">Disclosure</span>, closed by default.</li>
+                <li>Round facts grid reads model, effort, timing, tokens, cost, PR/CI and exit from <span class="mono">CardRoundView</span>.</li>
+                <li>Added 6 tests in <span class="mono">card-sheet.spec.tsx</span>; <span class="mono">bun run check</span> clean.</li>
+              </ul></div>
+            </details>
+            <details class="disc" open>
+              <summary><svg class="icon chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg><span class="lbl">Token saver</span><span class="prev"></span><span class="badge badge-sm badge-ok">saved 128k · 31%</span></summary>
+              <div class="disc-body" style="padding-left:14px">
+                <table class="table">
+                  <thead><tr><th>Filter</th><th class="num">Runs</th><th class="num">Raw</th><th class="num">Kept</th><th>Saved</th></tr></thead>
+                  <tbody>
+                    <tr><td class="mono">bun test</td><td class="num">9</td><td class="num">82k</td><td class="num">11k</td><td><span class="bar"><span style="width:87%"></span></span> <span class="num">87%</span></td></tr>
+                    <tr><td class="mono">git diff</td><td class="num">14</td><td class="num">61k</td><td class="num">19k</td><td><span class="bar"><span style="width:69%"></span></span> <span class="num">69%</span></td></tr>
+                    <tr><td class="mono">biome check</td><td class="num">4</td><td class="num">23k</td><td class="num">8k</td><td><span class="bar"><span style="width:65%"></span></span> <span class="num">65%</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </article>
+
+          <article class="round surface-content">
+            <div class="round-head">
+              <span class="round-n">2</span>
+              <div class="round-trig"><b>Restarted after CI failure</b><small>automatic · fresh session · Exit 1: bun run check failed (2 Biome errors)</small></div>
+              <span class="pill pill-sm pill-error">Failed</span>
+              <span class="sub num" style="font-size:12px">21m 40s</span>
+            </div>
+            <details class="disc"><summary><svg class="icon chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg><span class="lbl">Facts and blocks</span><span class="prev">sonnet-5-5 · medium · 604k / 51k · $2.11 · PR #812 · CI failed 1/4 · saved 96k</span></summary></details>
+          </article>
+
+          <article class="round surface-content">
+            <div class="round-head">
+              <span class="round-n">1</span>
+              <div class="round-trig"><b>First run</b><small>Auto-run when ready · after C-331 finished</small></div>
+              <span class="pill pill-sm pill-done">Finished</span>
+              <span class="sub num" style="font-size:12px">7m 12s</span>
+            </div>
+            <details class="disc"><summary><svg class="icon chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg><span class="lbl">Facts and blocks</span><span class="prev">opus-5-5 · high · 226k / 19k · $0.65 · PR #812 opened</span></summary></details>
+          </article>
+        </div>
+
+        <aside class="side surface-content" aria-label="Card facts">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <h3>Card</h3>
+            <dl class="kv">
+              <dt>Status</dt><dd><span class="pill pill-sm pill-waiting">In review</span></dd>
+              <dt>Kind</dt><dd>Feature</dd>
+              <dt>Slot</dt><dd><span class="dot" style="background:var(--color-hue-2)"></span>slot-3</dd>
+              <dt>Branch</dt><dd class="mono" style="font-size:12px">feat/c-332-round-facts</dd>
+              <dt>Target</dt><dd class="mono" style="font-size:12px">develop</dd>
+              <dt>Pull request</dt><dd><a href="#">#812</a><span class="badge badge-sm badge-ok">CI passing</span></dd>
+              <dt>Created</dt><dd>Oct 22 by planner</dd>
+            </dl>
+          </div>
+          <div style="height:1px;background:var(--color-line)"></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h3>Depends on</h3>
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span class="mono ink-3">C-330</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Compact header and tabs</span><span class="pill pill-sm pill-done">Done</span></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px"><span class="mono ink-3">C-331</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">PR, commits and CI in rounds</span><span class="pill pill-sm pill-done">Done</span></div>
+          </div>
+          <div style="height:1px;background:var(--color-line)"></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h3>Attachments</h3>
+            <div style="font-size:13px" class="ink-2">round-facts.png · design-v1.html</div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
