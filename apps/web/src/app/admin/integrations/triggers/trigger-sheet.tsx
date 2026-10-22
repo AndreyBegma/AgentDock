@@ -277,9 +277,9 @@ export function TriggerSheet({
                   />
                   <p className="text-xs text-ink-3">
                     Send a signed POST to this URL. The caller must be able to
-                    reach this address; treat the URL like a password. Sign every request with the trigger’s
-                    secret; the secret itself is never shown again — Rotate
-                    secret issues a new one.
+                    reach this address; treat the URL like a password. Sign
+                    every request with the trigger’s secret; the secret itself
+                    is never shown again — Rotate secret issues a new one.
                   </p>
                 </section>
 

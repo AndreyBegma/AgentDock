@@ -205,7 +205,7 @@ export function maskUrlPath(url: string): string {
   }
 }
 
-export const eventsLabel =(events: readonly string[]): string =>
+export const eventsLabel = (events: readonly string[]): string =>
   events.length === 1 ? '1 event' : `${events.length} events`;
 
 export function actionSummary(action: InboundTriggerAction): string {

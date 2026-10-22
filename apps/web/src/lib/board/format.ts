@@ -551,7 +551,9 @@ const PROFILE_PLACEHOLDER = '<key>';
  * replacer function, so a `$&` in the key is not read as a pattern.
  */
 const setupCommandFor = (profileKey: string): string =>
-  SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, () => shellWord(profileKey));
+  SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, () =>
+    shellWord(profileKey),
+  );
 
 /** The setup commands of a terminal or fleet card, naming its profile if known. */
 const setupCommands = (profileKey: string | null) =>
