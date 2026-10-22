@@ -2,11 +2,15 @@
 
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Select } from '@andrewbehma/glass-ui/select';
-import type { DesignTemplate, DesignTemplateChoice } from '@nautelle/shared';
+import type { DesignTemplateChoice } from '@nautelle/shared';
 import { useId } from 'react';
 import { api } from '../../lib/api';
 import { designTemplatesApi } from '../../lib/design/href';
-import { templateOptions } from '../../lib/design/templates';
+import {
+  type DesignTemplatesResponse,
+  templateOptions,
+  templatesOf,
+} from '../../lib/design/templates';
 import { useSection } from '../../lib/section/use-section';
 
 /**
@@ -30,12 +34,10 @@ export function TemplateSelect({
 }) {
   const labelId = useId();
   const loaded = useSection(
-    () => api<DesignTemplate[]>(designTemplatesApi(projectId)),
+    () => api<DesignTemplatesResponse>(designTemplatesApi(projectId)),
     [projectId],
   );
-  const options = templateOptions(
-    Array.isArray(loaded.data) ? loaded.data : null,
-  );
+  const options = templateOptions(templatesOf(loaded.data));
   // A key the list no longer has (a deleted custom template) stays visible.
   const known = value === null || options.some((o) => o.key === value);
   return (

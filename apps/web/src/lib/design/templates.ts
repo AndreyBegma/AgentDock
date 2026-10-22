@@ -89,6 +89,21 @@ export function compareColumns(
   });
 }
 
+/**
+ * `GET design/templates` (#843): `{ templates }`. Local until the shared
+ * `DesignTemplatesView` is on develop.
+ */
+export interface DesignTemplatesResponse {
+  templates: DesignTemplate[];
+}
+
+/** The templates of a loaded response; null while loading or after a failed request. */
+export function templatesOf(
+  data: DesignTemplatesResponse | undefined,
+): DesignTemplate[] | null {
+  return Array.isArray(data?.templates) ? data.templates : null;
+}
+
 /** The select's options: the project's templates when they loaded, else the built-ins. */
 export function templateOptions(
   loaded: readonly DesignTemplate[] | null | undefined,

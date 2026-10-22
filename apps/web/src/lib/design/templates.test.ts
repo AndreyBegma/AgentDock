@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'bun:test';
+import { BUILTIN_DESIGN_TEMPLATES } from '@nautelle/shared';
 import { framesOf, revision } from './fixtures';
 import {
   compareColumns,
   conformanceNote,
   frameKindLabel,
   templateOptions,
+  templatesOf,
 } from './templates';
 
 describe('frameKindLabel (#833 D11)', () => {
@@ -70,6 +72,24 @@ describe('compareColumns', () => {
     const cols = compareColumns(revisions, [1, 2], 1);
     expect(cols[0].frame?.name).toBe('F1');
     expect(cols[1].frame).toBeNull();
+  });
+});
+
+describe('templatesOf (GET design/templates is { templates })', () => {
+  test('reads the project list, built-ins plus custom', () => {
+    const landing = { key: 'landing', name: 'Landing', frames: [] };
+    const data = { templates: [...BUILTIN_DESIGN_TEMPLATES, landing] };
+    expect(templateOptions(templatesOf(data)).map((o) => o.key)).toEqual([
+      'page',
+      'component',
+      'flow',
+      'landing',
+    ]);
+  });
+
+  test('a bare array or no answer is not a response', () => {
+    expect(templatesOf(undefined)).toBeNull();
+    expect(templatesOf([] as unknown as { templates: never[] })).toBeNull();
   });
 });
 
