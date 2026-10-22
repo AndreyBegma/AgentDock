@@ -764,7 +764,7 @@ describe('the fixed contract and the default instructions', () => {
       expect(PLANNER_DESIGN_CONTRACT).toContain(host);
     }
     // C-168: the npm CDNs serve only the listed packages, which the text names.
-    expect(PLANNER_DESIGN_CONTRACT).toContain('`react@18.3.1/`');
+    expect(PLANNER_DESIGN_CONTRACT).toContain('react@18.3.1 ');
     // #686: the per-frame and the total limit.
     expect(PLANNER_DESIGN_CONTRACT).toContain(
       'At most 160 KiB of HTML per frame, and 1024 KiB for all frames together.',

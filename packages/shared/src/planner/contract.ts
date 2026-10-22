@@ -3,7 +3,6 @@ import {
   cdnPackagePath,
   DESIGN_CDN_ALLOWLIST,
   DESIGN_CDN_PACKAGES,
-  isNpmCdnSource,
 } from '../design/cdn';
 import {
   DESIGN_FRAME_NAME_MAX,
@@ -793,16 +792,12 @@ export function parsePlannerOutput(
 }
 
 const CDN_HOSTS = DESIGN_CDN_ALLOWLIST.map(
-  (s) => `\`${s.host}${s.pathPrefix === '/' ? '' : s.pathPrefix}\``,
+  (s) => `${s.host}${s.pathPrefix === '/' ? '' : s.pathPrefix}`,
 ).join(', ');
 
-const NPM_CDN_HOSTS = DESIGN_CDN_ALLOWLIST.filter(isNpmCdnSource)
-  .map((s) => `\`${s.host}${s.pathPrefix === '/' ? '' : s.pathPrefix}\``)
-  .join(' and ');
-
-const CDN_PACKAGES = DESIGN_CDN_PACKAGES.map(
-  (p) => `\`${cdnPackagePath(p)}\``,
-).join(', ');
+const CDN_PACKAGES = DESIGN_CDN_PACKAGES.map((p) =>
+  cdnPackagePath(p).replace(/\/$/, ''),
+).join(' ');
 
 /**
  * Spec 223 D6, D7: the design action's rules. Part of the v2 text; the API
@@ -826,18 +821,17 @@ backticks, each holding one self-contained HTML document:
 
 Frames:
 
-- Draw one frame unless the task touches several pages or several standalone components. Then draw one frame per page, plus one per component that matters on its own (its states side by side).
-- \`"frames"\` lists a short name per frame (at most ${DESIGN_FRAME_NAME_MAX} characters, distinct), in the order of the design blocks: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out; the frame is then named "${DESIGN_LEGACY_FRAME_NAME}".
-- On a revision, \`"kept"\` names the frames of \`"frames"\` you leave exactly as the previous revision drew them, by their previous names. A kept frame has no design block — Nautelle copies it; every other frame of \`"frames"\` has one, in order.
+- Draw one frame, unless the task touches several pages or standalone components: then one per page, plus one per component that matters on its own (states side by side).
+- \`"frames"\` lists a short name per frame (max ${DESIGN_FRAME_NAME_MAX} characters, distinct), in block order: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out (named "${DESIGN_LEGACY_FRAME_NAME}").
+- On a revision, \`"kept"\` names the frames you leave exactly as the previous revision drew them. A kept frame has no design block — Nautelle copies it; every other frame has one, in order.
 
 The mockup's rules — a frame that breaks one fails the turn:
 
 - At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML per frame, and ${DESIGN_TOTAL_MAX_BYTES / 1024} KiB for all frames together. Inline CSS and JS are allowed.
-- External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS. No other host, and no relative URL: inline it or use a \`data:\` URL (images and fonts only).
-- From ${NPM_CDN_HOSTS}, only a file of one of these packages, at exactly this version: ${CDN_PACKAGES} — for example \`https://unpkg.com/react@18.3.1/umd/react.production.min.js\`. Any other package fails the turn; inline it instead.
-- Every script or package URL names an exact version: \`react@18.3.1\`, never \`react@18\` or \`latest\`.
+- External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS; no other host, no relative URL (inline it, or a \`data:\` URL for images and fonts).
+- npm CDNs, these only: ${CDN_PACKAGES}.
 - No network calls (\`fetch\`, \`XMLHttpRequest\`, \`WebSocket\`, \`EventSource\`, \`sendBeacon\`), no form that submits, no navigation of the top or parent window, no \`window.open\`, no \`<iframe>\`, \`<object>\`, \`<embed>\` or \`<base>\`, no link to another site.
-- Wrap inline scripts in an IIFE; never declare a top-level name after a window global (\`top\`, \`window\`, \`self\`, \`name\`, …).
+- Wrap inline scripts in an IIFE; no top-level name that is a window global (\`top\`, \`window\`, \`self\`, \`name\`, …).
 - The theme switches through \`:root[data-theme="light"]\` and \`:root[data-theme="dark"]\`.
 - \`variant\` is the variant the turn names (1–${DESIGN_VARIANTS_MAX}); \`addressed\` lists only ids of the open comments the turn gave you.
 `;
