@@ -5,6 +5,7 @@ import {
   ciBanner,
   ciDot,
   effectiveAutoMerge,
+  protectedPathsBanner,
   pullRequestRows,
   shippingBadge,
 } from './shipping';
@@ -87,6 +88,40 @@ describe('ciBanner', () => {
       card(1, 'in_progress', { needsPerson: true, ciChecks: checks }),
     );
     expect(b?.checks).toEqual(checks);
+  });
+});
+
+describe('protected paths (C-148)', () => {
+  const paths = ['.woodpecker/pipeline.yml'];
+  test('an unmerged card says a person merges it, with the paths', () => {
+    const c = card(1, 'finished', { protectedPaths: paths });
+    expect(shippingBadge(c)).toEqual({
+      tone: 'warn',
+      label: 'Protected paths changed; a person merges',
+    });
+    expect(protectedPathsBanner(c)).toMatchObject({
+      title: 'Protected paths changed; a person merges',
+      paths,
+    });
+  });
+  test('merged, or without protected paths, nothing is said', () => {
+    const merged = card(1, 'finished', {
+      protectedPaths: paths,
+      mergedAt: '2026-10-16T10:00:00.000Z',
+    });
+    expect(shippingBadge(merged)?.label).toBe('Merged');
+    expect(protectedPathsBanner(merged)).toBeNull();
+    expect(protectedPathsBanner(card(1, 'finished'))).toBeNull();
+  });
+  test('needsPerson still beats it', () => {
+    const c = card(1, 'finished', {
+      protectedPaths: paths,
+      needsPerson: true,
+      needsPersonReason: 'branch_diverged',
+    });
+    expect(shippingBadge(c)?.label).toBe(
+      'Branch diverged on origin; not pushed',
+    );
   });
 });
 
