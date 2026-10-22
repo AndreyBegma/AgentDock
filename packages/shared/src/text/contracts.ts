@@ -66,8 +66,8 @@ export const TEXT_VIEW_STATUSES = [
 ] as const;
 export type TextViewStatus = (typeof TEXT_VIEW_STATUSES)[number];
 
-/** Why a text is `not_normalized`: the request's reason, or the field's own `rejected`. */
-export type TextNoteReason = TextFailReason | 'rejected';
+/** Why a text is `not_normalized`: the request's reason, or the field's own `rejected` / `too_long`. */
+export type TextNoteReason = TextFailReason | 'rejected' | 'too_long';
 
 export interface TextFieldView {
   ownerType: TextOwnerType;
@@ -114,8 +114,8 @@ export const textFieldView = (
   if (outcome === 'already_english' || outcome === 'superseded') {
     return { ...base, status: 'english' };
   }
-  if (outcome === 'rejected') {
-    return { ...base, status: 'not_normalized', reason: 'rejected' };
+  if (outcome === 'rejected' || outcome === 'too_long') {
+    return { ...base, status: 'not_normalized', reason: outcome };
   }
   switch (row.status) {
     case 'pending':

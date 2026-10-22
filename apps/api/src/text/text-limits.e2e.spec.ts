@@ -1,4 +1,8 @@
-import { TEXT_OFFLINE_GIVE_UP_MS } from '@nautelle/shared';
+import {
+  BOARD_CARD_TITLE_MAX,
+  TEXT_OFFLINE_GIVE_UP_MS,
+  TEXT_RESULT_MAX_BYTES,
+} from '@nautelle/shared';
 import { RU_BODY, RU_TITLE, TextWorld, textBlock } from './testing/text-e2e';
 
 describe('text normalization limits and failures (e2e)', () => {
@@ -165,6 +169,56 @@ describe('text normalization limits and failures (e2e)', () => {
       reason: 'rejected',
       retryable: false,
     });
+  });
+
+  it('a translation past the field limit is too_long and keeps the original; the rest applies', async () => {
+    const { number, row } = await russianCard();
+    const runId = await w.start(row.id);
+    // The whole answer at the result cap: a title of almost 96 KiB.
+    const answer = (title: string) =>
+      textBlock([
+        { id: 'title', english: title },
+        { id: 'body', english: 'Users sign in.' },
+      ]);
+    const longTitle = 'Add login '.repeat(
+      Math.floor((TEXT_RESULT_MAX_BYTES - answer('').length) / 10),
+    );
+    expect(answer(longTitle).length).toBeGreaterThan(95 * 1024);
+    await w.finish(runId, answer(longTitle));
+
+    const card = await w.card(number);
+    expect(card.title).toBe(RU_TITLE);
+    expect(card.title.length).toBeLessThanOrEqual(BOARD_CARD_TITLE_MAX);
+    expect(card.body).toBe('Users sign in.');
+    expect(w.fields(await w.latest()).map((f) => [f.field, f.outcome])).toEqual(
+      [
+        ['title', 'too_long'],
+        ['body', 'translated'],
+      ],
+    );
+    const views = await w.views(`cardId=${row.cardId}`);
+    expect(views.get('board_card:title')).toMatchObject({
+      status: 'not_normalized',
+      reason: 'too_long',
+    });
+  });
+
+  it('a translation exactly at the field limit is applied unchanged', async () => {
+    const { number, row } = await russianCard();
+    const runId = await w.start(row.id);
+    const title = 'x'.repeat(BOARD_CARD_TITLE_MAX);
+    await w.finish(
+      runId,
+      textBlock([
+        { id: 'title', english: title },
+        { id: 'body', english: 'Users sign in.' },
+      ]),
+    );
+    expect((await w.card(number)).title).toBe(title);
+    expect(w.fields(await w.latest()).map((f) => f.outcome)).toEqual([
+      'translated',
+      'translated',
+    ]);
   });
 
   it('an operator retries a failed request with the current text; a viewer gets 403, a request not failed 409', async () => {
