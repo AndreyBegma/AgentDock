@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { attachmentIdSchema } from '../attachments/contracts';
 import { ATTACHMENTS_PER_CARD_MAX } from '../attachments/limits';
-import { DESIGN_FRAME_NAME_MAX } from '../design/frames';
+import { DESIGN_FRAME_NAME_MAX, DESIGN_FRAMES_MAX } from '../design/frames';
 import { DESIGN_RATIONALE_MAX, DESIGN_TITLE_MAX } from '../design/limits';
 import { designSuggestionSchema, designVariantSchema } from '../design/types';
 import { LOCAL_CARD_BODY_MAX } from '../protocol/local';
@@ -220,8 +220,8 @@ const idSchema = z
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 /** A title is one line: a newline would start a section of a prompt. */
-const lineText = (max: number) =>
-  text(max).refine((title) => !/[\r\n]/.test(title), 'title must be one line');
+const lineText = (max: number, what = 'title') =>
+  text(max).refine((line) => !/[\r\n]/.test(line), `${what} must be one line`);
 
 export const planQuestionOptionSchema = z.strictObject({
   id: idSchema,
@@ -425,11 +425,14 @@ export type ReviseOutput = z.infer<typeof reviseOutputSchema>;
  * Spec 223 D7: a design turn's plan block; the HTML travels in the
  * `agentdock-design` blocks beside it. `addressed` lists the ids of the open
  * comments this revision answers (D10). #441: `frames` names the frames, one
- * per design block in order — no upper limit but the HTML's byte cap;
- * without it the one block is a frame named `Mockup`. #628: a revise may
+ * per design block in order — one line each, at most `DESIGN_FRAMES_MAX`
+ * (DA-07, DA-08); without it the one block is a frame named `Mockup`. #628: a revise may
  * name in `kept` frames it copies unchanged; those have no block. The same shape under
  * every contract version: a v1 plan's design is switched on by hand.
  */
+/** DA-08: a frame name reaches prompts and file names, so it is one line. */
+const frameNameSchema = lineText(DESIGN_FRAME_NAME_MAX, 'a frame name');
+
 export const designOutputSchema = z.strictObject({
   action: z.literal('design'),
   taskKey: planTaskKeySchema,
@@ -437,12 +440,12 @@ export const designOutputSchema = z.strictObject({
   title: text(DESIGN_TITLE_MAX),
   rationale: text(DESIGN_RATIONALE_MAX),
   addressed: z.array(z.string().min(1).max(64)).max(100),
-  frames: z.array(text(DESIGN_FRAME_NAME_MAX)).min(1).optional(),
+  frames: z.array(frameNameSchema).min(1).max(DESIGN_FRAMES_MAX).optional(),
   /**
    * #628: on a revise, the frames of `frames` the turn leaves as the previous
    * revision drew them — they have no design block; the API copies them.
    */
-  kept: z.array(text(DESIGN_FRAME_NAME_MAX)).optional(),
+  kept: z.array(frameNameSchema).max(DESIGN_FRAMES_MAX).optional(),
 });
 export type DesignOutput = z.infer<typeof designOutputSchema>;
 

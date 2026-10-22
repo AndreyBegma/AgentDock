@@ -93,6 +93,23 @@ describe('hasClaudeTrailer (D7)', () => {
   ])('lets %p through', (message) => {
     expect(hasClaudeTrailer(message)).toBe(false);
   });
+
+  it('catches an indented trailer', () => {
+    expect(hasClaudeTrailer('x\n\n  \tCo-Authored-By: Claude <a@b>')).toBe(
+      true,
+    );
+  });
+
+  it.each([
+    ['newlines', '\n'.repeat(100_000)],
+    ['CRLF lines', '\r\n'.repeat(50_000)],
+    ['blank lines with spaces', ' \n'.repeat(50_000)],
+    ['lines of a near-miss', 'Co-Authored-By: \n'.repeat(6_000)],
+  ])('DA-06: answers on 100k characters of %s in under 50 ms', (_, body) => {
+    const started = performance.now();
+    expect(hasClaudeTrailer(`feat: x\n${body}`)).toBe(false);
+    expect(performance.now() - started).toBeLessThan(50);
+  });
 });
 
 describe('suggestIssueLink (D8)', () => {

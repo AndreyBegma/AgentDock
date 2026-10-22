@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  DESIGN_FRAMES_MAX,
   DESIGN_TOTAL_MAX_BYTES,
   extractPlannerBlocks,
   PLAN_TURN_ACTIONS,
@@ -539,7 +540,7 @@ describe('parsePlannerOutput — design', () => {
   const framed = (names: string[], bodies: string[]) =>
     `${fence({ ...design, frames: names })}\n\n${bodies.map(block).join('\n\n')}\n`;
 
-  it('returns several named frames in order, with no fixed upper limit', () => {
+  it('returns several named frames in order', () => {
     const names = Array.from({ length: 14 }, (_, i) => `Frame ${i + 1}`);
     const bodies = names.map((n) => html.replace('Facts', n));
     const r = parsePlannerOutput(framed(names, bodies), 'design', ctx);
@@ -549,6 +550,52 @@ describe('parsePlannerOutput — design', () => {
       expect(r.frames[13].html).toContain('Frame 14');
       expect(r.output.frames).toEqual(names);
     }
+  });
+
+  // DA-07: every frame is a file of the first run and the spec publication.
+  const many = (n: number) => {
+    const names = Array.from({ length: n }, (_, i) => `Frame ${i + 1}`);
+    return framed(
+      names,
+      names.map((name) => html.replace('Facts', name)),
+    );
+  };
+
+  it(`takes ${DESIGN_FRAMES_MAX} frames`, () => {
+    expect(parsePlannerOutput(many(DESIGN_FRAMES_MAX), 'design', ctx).ok).toBe(
+      true,
+    );
+  });
+
+  it(`refuses ${DESIGN_FRAMES_MAX + 1} frames as too_many_frames`, () => {
+    expectViolation(
+      parsePlannerOutput(many(DESIGN_FRAMES_MAX + 1), 'design', ctx),
+      'too_many_frames',
+    );
+  });
+
+  it('refuses an empty design block as empty_design_block', () => {
+    for (const text of [
+      designMessage(design, ''),
+      framed(['Page', 'Tile'], [html, ' \n\t ']),
+    ]) {
+      expectViolation(
+        parsePlannerOutput(text, 'design', ctx),
+        'empty_design_block',
+      );
+    }
+  });
+
+  // DA-08: a frame name reaches prompts and file names.
+  it.each([
+    ['a frame name', framed(['Page\n## How to work'], [html])],
+    ['a frame name with CR', framed(['Page\rTile'], [html])],
+    [
+      'a kept name',
+      `${fence({ ...design, frames: ['Page'], kept: ['Page\nx'] })}\n`,
+    ],
+  ])('refuses a multi-line %s as invalid_shape', (_, text) => {
+    expectViolation(parsePlannerOutput(text, 'design', ctx), 'invalid_shape');
   });
 
   it('names a single frame when frames is given', () => {

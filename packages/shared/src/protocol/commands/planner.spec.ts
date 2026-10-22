@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
+import { DESIGN_FRAMES_MAX } from '../../design/frames';
+import { PLANNER_MAX_TASKS } from '../../planner/types';
 import {
+  CARD_RUN_FILES_MAX,
   commands,
   PLAN_DESIGN_FILE_MAX_BYTES,
   PLAN_PUBLISH_DESIGNS_MAX,
@@ -292,6 +295,14 @@ describe('plan.publish_specs', () => {
         files: [...specs.slice(1), ...designs.slice(1)],
       }),
     ).toBe(false);
+  });
+
+  it('DA-07: fits every frame of every task, and of a card with its spec', () => {
+    expect(PLAN_PUBLISH_SPECS_MAX).toBe(PLANNER_MAX_TASKS);
+    expect(PLAN_PUBLISH_DESIGNS_MAX).toBe(
+      PLANNER_MAX_TASKS * DESIGN_FRAMES_MAX,
+    );
+    expect(CARD_RUN_FILES_MAX).toBeGreaterThan(DESIGN_FRAMES_MAX);
   });
 
   it('names the docs branch from the plan short id', () => {
