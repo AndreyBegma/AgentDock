@@ -49,6 +49,7 @@ import {
 } from '../handoff/service';
 import type { SessionBinding } from '../local/session-tokens';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import { QuotaResumer } from '../quota/resume';
 import { type DeliveryTmux, deliverText } from '../session/deliver';
 import { profileOf, type SkillsDeps } from '../skills/deps';
@@ -91,7 +92,7 @@ export interface CardExecutorOptions {
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
   /** The OTLP receiver's bound port, null when it is off. */
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   pollMs?: number;
   /** #359 D1: `CARD_PUSH_MIN_INTERVAL_MS` unless a test sets it. */
   pushIntervalMs?: number;
@@ -370,7 +371,7 @@ export class CardExecutor {
             profile,
             launch,
             record.worktree,
-            this.options.otlpPort?.() ?? null,
+            this.options.otlp?.() ?? null,
             wiring.files,
             tokenSaver,
             this.options.sessionToken?.({
@@ -699,7 +700,7 @@ export class CardExecutor {
             profile,
             launch,
             record.worktree,
-            this.options.otlpPort?.() ?? null,
+            this.options.otlp?.() ?? null,
             wiring.files,
             tokenSaver,
             this.options.sessionToken?.({

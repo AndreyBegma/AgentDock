@@ -9,6 +9,7 @@ import {
   tokenSaverLaunch,
 } from '../../launch/token-saver';
 import { OTLP_HOST } from '../../otlp/receiver';
+import { type OtlpEndpoint, otlpHeaders } from '../../otlp/token';
 import type { LaunchSpec } from './record';
 
 /** The Claude CLI's `--permission-mode` value for each protocol mode (as spec 17 D3). */
@@ -58,22 +59,24 @@ const attribute = (value: string): string =>
 
 /**
  * D9: the profile's env, the run's resource attributes and — when the
- * runner's OTLP receiver listens — telemetry pointed at it.
+ * runner's OTLP receiver listens — telemetry pointed at it, with the
+ * receiver's token (L-30).
  */
 export const runEnv = (
   profile: ConfigProfile,
   args: Pick<SkillRunArgs, 'projectId' | 'runId'>,
-  otlpPort: number | null,
+  otlp: OtlpEndpoint | null,
 ): Record<string, string> => ({
   ...profile.env,
   OTEL_RESOURCE_ATTRIBUTES: `agentdock.project=${attribute(args.projectId)},agentdock.run=${attribute(args.runId)}`,
-  ...(otlpPort
+  ...(otlp
     ? {
         CLAUDE_CODE_ENABLE_TELEMETRY: '1',
         OTEL_LOGS_EXPORTER: 'otlp',
         OTEL_METRICS_EXPORTER: 'otlp',
         OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
-        OTEL_EXPORTER_OTLP_ENDPOINT: `http://${OTLP_HOST}:${otlpPort}`,
+        OTEL_EXPORTER_OTLP_ENDPOINT: `http://${OTLP_HOST}:${otlp.port}`,
+        OTEL_EXPORTER_OTLP_HEADERS: otlpHeaders(otlp.token),
       }
     : {}),
 });
@@ -82,11 +85,11 @@ export const launchSpec = (
   profile: ConfigProfile,
   args: SkillRunArgs,
   worktree: string,
-  otlpPort: number | null,
+  otlp: OtlpEndpoint | null,
   tokenSaver?: TokenSaverLaunch | null,
 ): LaunchSpec => ({
   ...runArgv(profile, args, tokenSaver),
-  env: { ...runEnv(profile, args, otlpPort), ...(tokenSaver?.env ?? {}) },
+  env: { ...runEnv(profile, args, otlp), ...(tokenSaver?.env ?? {}) },
   cwd: worktree,
 });
 

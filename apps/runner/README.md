@@ -211,7 +211,17 @@ telemetry on reports each LLM request as it happens, before its transcript is
 read. It speaks OTLP/HTTP only (`application/x-protobuf` or
 `application/json`, optionally gzip) on `POST /v1/logs`. `/v1/metrics` and
 `/v1/traces` are accepted and discarded. Connections from anything but
-loopback are refused, and so are bodies over 4 MiB.
+loopback are refused, and so are bodies over 4 MiB and requests with more than
+5000 log records (413).
+
+Every request must carry the header `x-nautelle-otlp-token` with the token kept
+in `~/.local/state/nautelle/otlp.key` (created 0600 on first start); without it
+the receiver answers 401. A `Host` other than `127.0.0.1:<port>` or
+`localhost:<port>` gets 421, which stops a web page that rebinds its own name to
+the loopback address. The runner adds the header to every session it launches,
+and `nautelle-runner setup claude` writes it into `settings.json` next to the
+endpoint. Deleting the file revokes the token: the runner makes a new one on its
+next start, and `setup claude` has to be run again.
 
 Only `claude_code.api_request` records are read. Each one becomes one
 `llm.request` carrying model, request id, token counts, duration and the
@@ -226,6 +236,7 @@ CLAUDE_CODE_ENABLE_TELEMETRY=1 \
 OTEL_LOGS_EXPORTER=otlp \
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 \
+OTEL_EXPORTER_OTLP_HEADERS="x-nautelle-otlp-token=$(cat ~/.local/state/nautelle/otlp.key)" \
 OTEL_RESOURCE_ATTRIBUTES=agentdock.project=<id>,agentdock.slot=<slot>,agentdock.issue=<n>,agentdock.run=<run> \
 claude
 ```

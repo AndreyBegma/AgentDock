@@ -30,6 +30,7 @@ import { CommandFailure } from '../commands/failure';
 import { watchedProject } from '../control/target';
 import type { Env } from '../env';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import { cutBytes } from '../planner/result';
 import { policyFailure, policyRefusal } from '../policy/check';
 import type { PolicyConfig } from '../policy/schema';
@@ -51,7 +52,7 @@ export interface PrefixCallsOptions {
   /** The runner's own environment; the profile's overlays it. */
   env: Env;
   log: Logger;
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   spawn?: CaptureSpawn;
 }
 
@@ -196,10 +197,7 @@ export class PrefixCalls {
       for (const [key, value] of Object.entries(this.options.env)) {
         if (value !== undefined) env[key] = value;
       }
-      Object.assign(
-        env,
-        runEnv(profile, call, this.options.otlpPort?.() ?? null),
-      );
+      Object.assign(env, runEnv(profile, call, this.options.otlp?.() ?? null));
       Object.assign(env, HOOKS_OFF_ENV);
 
       let proc: CaptureProcess;

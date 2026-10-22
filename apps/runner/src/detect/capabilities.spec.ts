@@ -112,14 +112,24 @@ describe('nautelle plugin and telemetry per profile (#281 D1)', () => {
       JSON.stringify({ version: 2, plugins }),
     );
   };
-  const writeEndpoint = (endpoint: unknown) =>
+  const TOKEN = 'b'.repeat(64);
+  const AT = { port: 4318, token: TOKEN };
+  const writeEndpoint = (
+    endpoint: unknown,
+    headers: unknown = `x-nautelle-otlp-token=${TOKEN}`,
+  ) =>
     writeFileSync(
       join(dir, 'settings.json'),
-      JSON.stringify({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: endpoint } }),
+      JSON.stringify({
+        env: {
+          OTEL_EXPORTER_OTLP_ENDPOINT: endpoint,
+          OTEL_EXPORTER_OTLP_HEADERS: headers,
+        },
+      }),
     );
 
   it('reports plugin: null and telemetry: false for an empty profile', () => {
-    expect(readProfileAgentdock(dir, 4318)).toEqual({
+    expect(readProfileAgentdock(dir, AT)).toEqual({
       plugin: null,
       telemetry: false,
     });
@@ -144,24 +154,36 @@ describe('nautelle plugin and telemetry per profile (#281 D1)', () => {
         { version: '1.24.0', installPath: '/c', scope: 'user' },
       ],
     });
-    expect(readProfileAgentdock(dir, 4318).plugin).toBeNull();
+    expect(readProfileAgentdock(dir, AT).plugin).toBeNull();
     writeFileSync(join(dir, 'plugins', 'installed_plugins.json'), '{nope');
-    expect(readProfileAgentdock(dir, 4318).plugin).toBeNull();
+    expect(readProfileAgentdock(dir, AT).plugin).toBeNull();
   });
 
   it("is telemetry: true only when the endpoint is this runner's OTLP port", () => {
     writeEndpoint('http://127.0.0.1:4318');
-    expect(readProfileAgentdock(dir, 4318).telemetry).toBe(true);
-    expect(readProfileAgentdock(dir, 4319).telemetry).toBe(false);
+    expect(readProfileAgentdock(dir, AT).telemetry).toBe(true);
+    expect(readProfileAgentdock(dir, { ...AT, port: 4319 }).telemetry).toBe(
+      false,
+    );
     expect(readProfileAgentdock(dir, null).telemetry).toBe(false);
     writeEndpoint('http://localhost:4318');
-    expect(readProfileAgentdock(dir, 4318).telemetry).toBe(true);
+    expect(readProfileAgentdock(dir, AT).telemetry).toBe(true);
     writeEndpoint('http://collector.example:4318');
-    expect(readProfileAgentdock(dir, 4318).telemetry).toBe(false);
+    expect(readProfileAgentdock(dir, AT).telemetry).toBe(false);
     writeEndpoint('not a url');
-    expect(readProfileAgentdock(dir, 4318).telemetry).toBe(false);
+    expect(readProfileAgentdock(dir, AT).telemetry).toBe(false);
     writeEndpoint(4318);
-    expect(readProfileAgentdock(dir, 4318).telemetry).toBe(false);
+    expect(readProfileAgentdock(dir, AT).telemetry).toBe(false);
+  });
+
+  it('is telemetry: false when the headers miss the receiver token (L-30)', () => {
+    writeEndpoint('http://127.0.0.1:4318', null);
+    expect(readProfileAgentdock(dir, AT).telemetry).toBe(false);
+    writeEndpoint(
+      'http://127.0.0.1:4318',
+      `x-nautelle-otlp-token=${'c'.repeat(64)}`,
+    );
+    expect(readProfileAgentdock(dir, AT).telemetry).toBe(false);
   });
 
   it('reads each Claude profile fresh on every call, and never a Codex one (#348 D4)', () => {
@@ -174,7 +196,7 @@ describe('nautelle plugin and telemetry per profile (#281 D1)', () => {
       },
       { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
     ];
-    expect(readClaudeProfilesAgentdock(profiles, dir, 4318)).toEqual({
+    expect(readClaudeProfilesAgentdock(profiles, dir, AT)).toEqual({
       'claude-a': { plugin: null, telemetry: false },
     });
     writePlugins({
@@ -182,12 +204,13 @@ describe('nautelle plugin and telemetry per profile (#281 D1)', () => {
         { version: '0.2.0', installPath: '/p', scope: 'user' },
       ],
     });
-    expect(
-      readClaudeProfilesAgentdock(profiles, dir, 4318)['claude-a'],
-    ).toEqual({ plugin: '0.2.0', telemetry: false });
+    expect(readClaudeProfilesAgentdock(profiles, dir, AT)['claude-a']).toEqual({
+      plugin: '0.2.0',
+      telemetry: false,
+    });
     writePlugins({});
     expect(
-      readClaudeProfilesAgentdock(profiles, dir, 4318)['claude-a']?.plugin,
+      readClaudeProfilesAgentdock(profiles, dir, AT)['claude-a']?.plugin,
     ).toBeNull();
   });
 
@@ -213,6 +236,7 @@ describe('nautelle plugin and telemetry per profile (#281 D1)', () => {
         ],
         otlp: { grpc: null, http: 4318 },
       },
+      otlpToken: TOKEN,
     });
     expect(capabilities.profiles[0].agentdock).toEqual({
       plugin: '0.2.0',

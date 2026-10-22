@@ -6,6 +6,7 @@ import {
   handleOtlpRequest,
   isLoopback,
   MAX_BODY_BYTES,
+  MAX_RECORDS_PER_REQUEST,
   OtlpReceiver,
   type ReceiverDeps,
 } from './receiver';
@@ -18,10 +19,15 @@ import {
 
 const silent = createLogger({ level: 'error', write: () => {} });
 
+const TOKEN = 'f'.repeat(64);
+const AUTH = { 'x-nautelle-otlp-token': TOKEN };
+
 const deps = (
   emitted: UnsequencedEvent[],
   overrides: Partial<ReceiverDeps> = {},
 ): ReceiverDeps => ({
+  port: 4318,
+  token: TOKEN,
   emit: (event) => emitted.push(event),
   projects: async () => new Map(),
   codexExperimental: false,
@@ -38,7 +44,12 @@ const post = (
   new Request(`http://127.0.0.1:4318${path}`, {
     method: 'POST',
     body,
-    headers: { 'content-type': 'application/x-protobuf', ...headers },
+    headers: {
+      host: '127.0.0.1:4318',
+      'content-type': 'application/x-protobuf',
+      ...AUTH,
+      ...headers,
+    },
   });
 
 const LOCAL = '127.0.0.1';
@@ -122,7 +133,11 @@ describe('otlp receiver — handler (D11, D16)', () => {
       new Request('http://127.0.0.1:4318/v1/logs', {
         method: 'POST',
         body: stream,
-        headers: { 'content-type': 'application/x-protobuf' },
+        headers: {
+          host: '127.0.0.1:4318',
+          'content-type': 'application/x-protobuf',
+          ...AUTH,
+        },
       }),
       LOCAL,
       deps(emitted),
@@ -203,7 +218,9 @@ describe('otlp receiver — handler (D11, D16)', () => {
     );
     expect(other.status).toBe(404);
     const get = await handleOtlpRequest(
-      new Request('http://127.0.0.1:4318/v1/logs'),
+      new Request('http://127.0.0.1:4318/v1/logs', {
+        headers: { host: '127.0.0.1:4318', ...AUTH },
+      }),
       LOCAL,
       deps(emitted),
     );
@@ -245,6 +262,83 @@ describe('otlp receiver — handler (D11, D16)', () => {
     });
   });
 
+  it('answers 401 without the token, or with a wrong one (L-30)', async () => {
+    const emitted: UnsequencedEvent[] = [];
+    for (const token of [null, '', 'f'.repeat(63), 'e'.repeat(64)]) {
+      const request = post('/v1/logs', fixtureProtobuf());
+      if (token === null) request.headers.delete('x-nautelle-otlp-token');
+      else request.headers.set('x-nautelle-otlp-token', token);
+      const response = await handleOtlpRequest(request, LOCAL, deps(emitted));
+      expect(response.status).toBe(401);
+    }
+    expect(emitted).toEqual([]);
+  });
+
+  it('answers 421 for a Host other than 127.0.0.1 or localhost on its port (L-30)', async () => {
+    const emitted: UnsequencedEvent[] = [];
+    for (const host of [
+      'evil.example:4318',
+      '127.0.0.1:4319',
+      'localhost',
+      '127.0.0.2:4318',
+    ]) {
+      const response = await handleOtlpRequest(
+        post('/v1/logs', fixtureProtobuf(), { host }),
+        LOCAL,
+        deps(emitted),
+      );
+      expect(response.status).toBe(421);
+    }
+    const request = post('/v1/logs', fixtureProtobuf());
+    request.headers.delete('host');
+    expect(
+      (await handleOtlpRequest(request, LOCAL, deps(emitted))).status,
+    ).toBe(421);
+    expect(emitted).toEqual([]);
+
+    const localhost = await handleOtlpRequest(
+      post('/v1/logs', fixtureProtobuf(), { host: 'localhost:4318' }),
+      LOCAL,
+      deps(emitted),
+    );
+    expect(localhost.status).toBe(200);
+  });
+
+  it('answers 413 for more records than the per-request cap (L-30)', async () => {
+    const emitted: UnsequencedEvent[] = [];
+    const body = (count: number) =>
+      JSON.stringify({
+        resourceLogs: [
+          {
+            scopeLogs: [
+              {
+                logRecords: Array.from({ length: count }, () => ({
+                  body: { stringValue: 'claude_code.api_request' },
+                })),
+              },
+            ],
+          },
+        ],
+      });
+    const over = await handleOtlpRequest(
+      post('/v1/logs', body(MAX_RECORDS_PER_REQUEST + 1), {
+        'content-type': 'application/json',
+      }),
+      LOCAL,
+      deps(emitted),
+    );
+    expect(over.status).toBe(413);
+    expect(emitted).toEqual([]);
+    const at = await handleOtlpRequest(
+      post('/v1/logs', body(MAX_RECORDS_PER_REQUEST), {
+        'content-type': 'application/json',
+      }),
+      LOCAL,
+      deps(emitted),
+    );
+    expect(at.status).toBe(200);
+  });
+
   it('classifies loopback addresses', () => {
     for (const a of ['127.0.0.1', '127.1.2.3', '::1', '::ffff:127.0.0.1']) {
       expect(isLoopback(a)).toBe(true);
@@ -272,18 +366,53 @@ describe('otlp receiver — server', () => {
     const pb = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
       method: 'POST',
       body: fixtureProtobuf(),
-      headers: { 'content-type': 'application/x-protobuf' },
+      headers: { 'content-type': 'application/x-protobuf', ...AUTH },
     });
     expect(pb.status).toBe(200);
     const json = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
       method: 'POST',
       body: fixtureJson(),
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...AUTH },
     });
     expect(json.status).toBe(200);
     expect(emitted).toHaveLength(4);
     const sent = JSON.stringify(emitted);
     for (const value of FORBIDDEN) expect(sent).not.toContain(value);
+  });
+
+  it('refuses an export without the token, or for another Host, on the wire (L-30)', async () => {
+    const emitted: UnsequencedEvent[] = [];
+    receiver = new OtlpReceiver({ ...deps(emitted), port: 0 });
+    const port = receiver.start();
+    expect(receiver.endpoint).toEqual({ port, token: TOKEN });
+    const bare = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
+      method: 'POST',
+      body: fixtureProtobuf(),
+      headers: { 'content-type': 'application/x-protobuf' },
+    });
+    expect(bare.status).toBe(401);
+    const rebound = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
+      method: 'POST',
+      body: fixtureProtobuf(),
+      headers: {
+        host: `rebind.example:${port}`,
+        'content-type': 'application/x-protobuf',
+        ...AUTH,
+      },
+    });
+    expect(rebound.status).toBe(421);
+    expect(emitted).toEqual([]);
+    const viaLocalhost = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
+      method: 'POST',
+      body: fixtureProtobuf(),
+      headers: {
+        host: `localhost:${port}`,
+        'content-type': 'application/x-protobuf',
+        ...AUTH,
+      },
+    });
+    expect(viaLocalhost.status).toBe(200);
+    expect(emitted).toHaveLength(2);
   });
 
   it('refuses a body over 4 MiB on the wire', async () => {
@@ -293,7 +422,7 @@ describe('otlp receiver — server', () => {
     const response = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
       method: 'POST',
       body: new Uint8Array(MAX_BODY_BYTES + 1),
-      headers: { 'content-type': 'application/x-protobuf' },
+      headers: { 'content-type': 'application/x-protobuf', ...AUTH },
     });
     expect(response.status).toBe(413);
     expect(emitted).toEqual([]);

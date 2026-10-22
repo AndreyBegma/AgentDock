@@ -4,6 +4,7 @@ import type { Capabilities, ProfileAgentdock } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import type { ConfigProfile, RunnerConfig } from '../config';
 import { profileMcpServerNames } from '../launch/profile-mcp';
+import { type OtlpEndpoint, otlpHeaders } from '../otlp/token';
 import type { Exec } from './exec';
 import { claudeConfigDir, withAuthentication } from './profiles';
 
@@ -132,11 +133,16 @@ const settingsEnvSchema = z.object({
 
 /**
  * Whether `settings.json` → `env.OTEL_EXPORTER_OTLP_ENDPOINT` points at the
- * runner's OTLP http port on this machine (#281 D1). False when the receiver
- * is off, the file is unreadable, or the endpoint names another host or port.
+ * runner's OTLP http port on this machine (#281 D1) and
+ * `OTEL_EXPORTER_OTLP_HEADERS` carries its token (L-30). False when the
+ * receiver is off, the file is unreadable, the endpoint names another host or
+ * port, or the token is missing or stale — `setup claude` fixes all three.
  */
-const readTelemetry = (configDir: string, port: number | null): boolean => {
-  if (port === null) return false;
+const readTelemetry = (
+  configDir: string,
+  otlp: OtlpEndpoint | null,
+): boolean => {
+  if (otlp === null) return false;
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(join(configDir, 'settings.json'), 'utf8'));
@@ -148,12 +154,18 @@ const readTelemetry = (configDir: string, port: number | null): boolean => {
     ? parsed.data.env?.OTEL_EXPORTER_OTLP_ENDPOINT
     : undefined;
   if (typeof endpoint !== 'string') return false;
+  if (
+    !parsed.success ||
+    parsed.data.env?.OTEL_EXPORTER_OTLP_HEADERS !== otlpHeaders(otlp.token)
+  ) {
+    return false;
+  }
   try {
     const url = new URL(endpoint);
     return (
       url.protocol === 'http:' &&
       ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) &&
-      Number(url.port) === port
+      Number(url.port) === otlp.port
     );
   } catch {
     return false;
@@ -166,10 +178,10 @@ const readTelemetry = (configDir: string, port: number | null): boolean => {
  */
 export const readProfileAgentdock = (
   configDir: string,
-  otlpPort: number | null,
+  otlp: OtlpEndpoint | null,
 ): ProfileAgentdock => ({
   plugin: readNautellePlugin(configDir),
-  telemetry: readTelemetry(configDir, otlpPort),
+  telemetry: readTelemetry(configDir, otlp),
 });
 
 /**
@@ -180,15 +192,12 @@ export const readProfileAgentdock = (
 export const readClaudeProfilesAgentdock = (
   profiles: readonly ConfigProfile[],
   home: string,
-  otlpPort: number | null,
+  otlp: OtlpEndpoint | null,
 ): Record<string, ProfileAgentdock> =>
   Object.fromEntries(
     profiles
       .filter((p) => p.runtime === 'claude')
-      .map((p) => [
-        p.id,
-        readProfileAgentdock(claudeConfigDir(p, home), otlpPort),
-      ]),
+      .map((p) => [p.id, readProfileAgentdock(claudeConfigDir(p, home), otlp)]),
   );
 
 /** `a.b.c` ≥ `min`, comparing the leading numbers; an unparsable version is not. */
@@ -266,6 +275,8 @@ export interface DetectOptions {
   exec: Exec;
   home: string;
   config: Pick<RunnerConfig, 'profiles' | 'otlp'>;
+  /** L-30: the receiver's token, which telemetry in `settings.json` must carry. */
+  otlpToken?: string;
 }
 
 /** Everything `hello` reports about the machine (D5). Never throws for a missing tool. */
@@ -273,6 +284,10 @@ export const detectCapabilities = async (
   options: DetectOptions,
 ): Promise<Capabilities> => {
   const { exec, home, config } = options;
+  const otlp: OtlpEndpoint | null =
+    config.otlp?.http && options.otlpToken
+      ? { port: config.otlp.http, token: options.otlpToken }
+      : null;
   const [tmux, git, gh, claude, codex] = await Promise.all([
     versionOf(exec, 'tmux', ['-V']),
     versionOf(exec, 'git', ['--version']),
@@ -305,7 +320,7 @@ export const detectCapabilities = async (
             ...profile,
             agentdock: readProfileAgentdock(
               claudeConfigDir(configured, home),
-              config.otlp?.http ?? null,
+              otlp,
             ),
             // #445 Amendment 2: names only, from the profile's own config.
             mcpServers: profileMcpServerNames(configured, home),

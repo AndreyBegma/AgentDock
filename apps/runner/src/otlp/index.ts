@@ -11,6 +11,12 @@ import { DEFAULT_OTLP_HTTP_PORT, OTLP_HOST, OtlpReceiver } from './receiver';
 
 export { ProjectDirectory } from './projects';
 export { OtlpReceiver } from './receiver';
+export {
+  loadOtlpToken,
+  type OtlpEndpoint,
+  otlpHeaders,
+  otlpTokenPath,
+} from './token';
 
 /** The receiver settings from the runner config's `otlp` key (spec 13). */
 export interface OtlpSettings {
@@ -28,6 +34,8 @@ export const otlpSettings = (otlp: RunnerConfig['otlp']): OtlpSettings => ({
 
 export interface StartOtlpOptions {
   settings: OtlpSettings;
+  /** L-30: what every request must carry; `loadOtlpToken`. */
+  token: string;
   emit: (event: UnsequencedEvent) => void;
   projects: () => readonly WatchedProject[];
   /** The hook session map's project of a session (spec 201 D22). */
@@ -53,6 +61,7 @@ export const startOtlpReceiver = (
     new ProjectDirectory({ projects: options.projects, exec: options.exec });
   const receiver = new OtlpReceiver({
     port: settings.httpPort,
+    token: options.token,
     emit: options.emit,
     projects: (ids) => directory.resolve(ids),
     codexExperimental: settings.codexExperimental,
