@@ -1711,10 +1711,16 @@ reaches the API only when `projects[].shipContent` is true (ADR-0021).
 **Person lines (D7).** The lines a person wrote are instructions: the agent
 never rewrites them. They travel as `personLines`, sorted 1-based inclusive
 `{ from, to }` ranges of `content.split('\n')` that never touch, never covering
-a blank line. On disk each carries the suffix ` <!-- person -->`
-(`markPersonLines` / `splitPersonMarks`). The runner refuses an agent rewrite
-that drops or changes one (`personLinesKept`); the API marks a person's edit
-with `markPersonEdit` against the note it holds.
+a blank line. On disk and in a session's context each carries the suffix
+` <!-- person -->` (`markPersonLines`). The marks are output only: the stored
+ranges are the one record of a person's lines (DA-05), so every reader of a
+note — the runner reading the file, the API taking an event or a person's
+edit — drops anything that reads as a mark, in any case or spacing and
+anywhere in a line (`stripPersonMarks`), and `markPersonLines` strips again
+before it marks. The runner refuses an agent rewrite that drops or changes a
+person line and re-anchors the ranges by finding each line's text again
+(`personLinesKept`); the API marks a person's edit with `markPersonEdit`
+against the note it holds.
 
 **The `handoff.updated` event.** In the ordinary `events` stream,
 `source: "runner"`, sent **only** when the project ships content. The whole

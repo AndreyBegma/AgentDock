@@ -197,34 +197,47 @@ export const personLinesKept = (
   return { ok: true, personLines: rangesOfLines(found) };
 };
 
-/** The note as the runner writes it to disk: person lines carry the mark. */
+/**
+ * Anything that reads as a person mark: any case, any spacing, anywhere in a
+ * line, with the spaces before it.
+ */
+const PERSON_MARK_LIKE = /[ \t]*<!--\s*person\s*-->/gi;
+
+/**
+ * The content without anything that reads as a person mark (DA-05). The
+ * stored ranges are the only record of a person's lines, so a mark in text an
+ * agent or a request wrote is dropped, never read as a claim. Removing one
+ * mark can join two halves into another, so it repeats until none is left.
+ */
+export const stripPersonMarks = (text: string): string => {
+  let lines = linesOf(text);
+  for (;;) {
+    let changed = false;
+    lines = lines.map((line) => {
+      const bare = line.replace(PERSON_MARK_LIKE, '');
+      if (bare === line) return line;
+      changed = true;
+      return bare.trimEnd();
+    });
+    if (!changed) return lines.join('\n');
+  }
+};
+
+/**
+ * The note as the runner writes it to disk and into a session: the person's
+ * lines carry the mark, and only they do — any mark already in the content is
+ * dropped first.
+ */
 export const markPersonLines = (
   content: string,
   ranges: readonly HandoffLineRange[],
 ): string => {
   const person = new Set(linesOfRanges(ranges));
-  return linesOf(content)
+  return linesOf(stripPersonMarks(content))
     .map((line, i) =>
       person.has(i + 1) && !isBlank(line)
         ? `${line}${HANDOFF_PERSON_MARK}`
         : line,
     )
     .join('\n');
-};
-
-/** The inverse of `markPersonLines`: the content without marks, and its ranges. */
-export const splitPersonMarks = (
-  marked: string,
-): { content: string; personLines: HandoffLineRange[] } => {
-  const person: number[] = [];
-  const lines = linesOf(marked).map((line, i) => {
-    const bare = line.trimEnd();
-    if (!bare.endsWith(HANDOFF_PERSON_MARK.trimStart())) return line;
-    const text = bare
-      .slice(0, -HANDOFF_PERSON_MARK.trimStart().length)
-      .trimEnd();
-    if (!isBlank(text)) person.push(i + 1);
-    return text;
-  });
-  return { content: lines.join('\n'), personLines: rangesOfLines(person) };
 };

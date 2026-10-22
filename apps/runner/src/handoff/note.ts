@@ -5,7 +5,7 @@ import {
   handoffRejectionText,
   markPersonLines,
   personLinesKept,
-  splitPersonMarks,
+  stripPersonMarks,
   validateHandoffNote,
 } from '@nautelle/shared';
 import type { StoredNote } from './state';
@@ -61,7 +61,7 @@ export const judgeNote = (
   raw: string,
   stored: StoredNote | null,
 ): Exclude<NoteReading, { kind: 'missing' }> => {
-  const { content } = splitPersonMarks(raw.replace(/\r\n/g, '\n'));
+  const content = stripPersonMarks(raw.replace(/\r\n/g, '\n'));
   if (stored && content.trimEnd() === stored.content.trimEnd()) {
     return { kind: 'unchanged' };
   }
