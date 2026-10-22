@@ -9,6 +9,7 @@ import {
   quotaWaitOf,
   recommendationOf,
   restartOf,
+  roundPushesOf,
   stewardChipOf,
 } from './board-mapper';
 
@@ -293,5 +294,75 @@ describe('escalationOf (#750 D9)', () => {
       note: 'Needs a schema decision.',
       at: now.toISOString(),
     });
+  });
+});
+
+describe('roundPushesOf (#837)', () => {
+  const PR = 'https://github.com/acme/widget/pull/7';
+  const sha = (c: string) => c.repeat(40);
+  const pushed = (over: Partial<BoardCardRound> = {}) =>
+    round({
+      prNumber: 7,
+      prUrl: PR,
+      headSha: sha('a'),
+      headAhead: 2,
+      ciState: null,
+      ciPassed: null,
+      ciTotal: null,
+      ...over,
+    });
+  const none = {
+    prNumber: null,
+    prUrl: null,
+    headSha: null,
+    headAhead: null,
+    ciState: null,
+    ciPassed: null,
+    ciTotal: null,
+  };
+
+  it('gives a round that pushed nothing, or one from before #837, nulls', () => {
+    expect(roundPushesOf([round(none)])).toEqual([
+      { pullRequest: null, headSha: null, commits: null, ci: null },
+    ]);
+  });
+
+  it("counts a round's commits from the head the round before it left on the PR", () => {
+    const pushes = roundPushesOf([
+      pushed({ headAhead: 2 }),
+      round(none),
+      pushed({ headSha: sha('b'), headAhead: 5 }),
+      pushed({ prNumber: 8, prUrl: `${PR.slice(0, -1)}8`, headAhead: 1 }),
+    ]);
+    expect(pushes.map((p) => p.commits)).toEqual([2, null, 3, 1]);
+    expect(pushes[2]?.pullRequest).toEqual({ number: 7, url: PR });
+    expect(pushes[2]?.headSha).toBe(sha('b'));
+  });
+
+  it('leaves the count unknown when a head has no ahead, or it shrank', () => {
+    const pushes = roundPushesOf([
+      pushed({ headAhead: null }),
+      pushed({ headSha: sha('b'), headAhead: 4 }),
+      pushed({ headSha: sha('c'), headAhead: 1 }),
+    ]);
+    expect(pushes.map((p) => p.commits)).toEqual([null, null, null]);
+  });
+
+  it("shows the head's checks, linked to its checks page; none without any", () => {
+    const [pending, passed, failed, noChecks] = roundPushesOf([
+      pushed({ ciState: 'pending', ciPassed: 1, ciTotal: 3 }),
+      pushed({ headSha: sha('b'), ciState: 'green', ciPassed: 4, ciTotal: 4 }),
+      pushed({ headSha: sha('c'), ciState: 'red', ciPassed: 2, ciTotal: 4 }),
+      pushed({ headSha: sha('d'), ciState: 'none', ciPassed: 0, ciTotal: 0 }),
+    ]);
+    expect(pending?.ci).toEqual({
+      state: 'pending',
+      passed: 1,
+      total: 3,
+      url: `https://github.com/acme/widget/commit/${sha('a')}/checks`,
+    });
+    expect(passed?.ci?.state).toBe('passed');
+    expect(failed?.ci).toMatchObject({ state: 'failed', passed: 2, total: 4 });
+    expect(noChecks?.ci).toBeNull();
   });
 });

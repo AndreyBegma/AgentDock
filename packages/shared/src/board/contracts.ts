@@ -469,6 +469,44 @@ export interface CardRoundView {
   /** #449 D9: from `round.warmup`; null until the round's first edit. */
   warmupTokens?: number | null;
   warmupMs?: number | null;
+  // #837 — optional so older fixtures stay valid; absent reads as null.
+  /**
+   * #837: the pull request the round pushed to; null for a round that pushed
+   * nothing, or one recorded before #837.
+   */
+  pullRequest?: CardRoundPullRequestView | null;
+  /** #837: the last commit the round pushed — the head it left; null as `pullRequest`. */
+  headSha?: string | null;
+  /**
+   * #837: the commits the round added to its pull request; null when a
+   * runner older than #837 pushed it, or the round pushed nothing.
+   */
+  commits?: number | null;
+  /**
+   * #837: the checks on `headSha`, kept as they last answered — also once a
+   * later round moved the PR's head on; null while `headSha` has none.
+   */
+  ci?: CardRoundCiView | null;
+}
+
+/** #837: a round's pull request, as `CardRoundView.pullRequest`. */
+export interface CardRoundPullRequestView {
+  number: number;
+  url: string;
+}
+
+/** #837: a round head's checks — `green` reads `passed`, `red` `failed`. */
+export const CARD_ROUND_CI_STATES = ['pending', 'passed', 'failed'] as const;
+export type CardRoundCiState = (typeof CARD_ROUND_CI_STATES)[number];
+
+/** #837: the checks on a round's head (`card.checks`), as `CardRoundView.ci`. */
+export interface CardRoundCiView {
+  state: CardRoundCiState;
+  /** Checks that passed, of `total`; cancelled and skipped ones are not counted. */
+  passed: number;
+  total: number;
+  /** The head commit's checks page on GitHub. */
+  url: string;
 }
 
 /** #322 D6: one recommended model, with its one-line reason. */

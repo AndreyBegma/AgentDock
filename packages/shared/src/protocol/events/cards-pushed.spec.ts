@@ -54,9 +54,9 @@ describe('card_run.pushed (#359 D1)', () => {
     ).toBe(3);
     expect(cardRunPushedDataSchema.safeParse(data).data?.ahead).toBeUndefined();
     for (const ahead of [-1, 1.5]) {
-      expect(cardRunPushedDataSchema.safeParse({ ...data, ahead }).success).toBe(
-        false,
-      );
+      expect(
+        cardRunPushedDataSchema.safeParse({ ...data, ahead }).success,
+      ).toBe(false);
     }
   });
 

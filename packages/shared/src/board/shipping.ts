@@ -48,6 +48,32 @@ export const cardCiStateOf = (checks: readonly CardCheck[]): CardCiState => {
 };
 
 /**
+ * #837: the head's checks as a round counts them — passed, of those
+ * `cardCiStateOf` counts (cancelled and skipped ones left out).
+ */
+export const cardCheckCounts = (
+  checks: readonly CardCheck[],
+): { passed: number; total: number } => {
+  const counted = checks.filter((c) => !IGNORED_BUCKETS.has(c.bucket));
+  return {
+    passed: counted.filter((c) => c.bucket === 'pass').length,
+    total: counted.length,
+  };
+};
+
+/** `https://github.com/<owner>/<repo>` of a pull request's URL. */
+const PR_URL = /^(https:\/\/[^/]+\/[^/]+\/[^/]+)\/pull\/\d+\/?$/;
+
+/**
+ * #837: GitHub's checks page of `sha`, in the repository of `prUrl`; the PR's
+ * own URL when `prUrl` is not a pull request's.
+ */
+export const commitChecksUrl = (prUrl: string, sha: string): string => {
+  const repo = PR_URL.exec(prUrl)?.[1];
+  return repo ? `${repo}/commit/${sha}/checks` : prUrl;
+};
+
+/**
  * C-182 (D-12, ADR-0080): whether the head's checks let auto-merge ship it —
  * stricter than `cardCiStateOf`'s `green`. At least one check, and every one
  * passed: no checks, a cancelled or a skipped check is not proof that CI ran
