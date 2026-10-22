@@ -5,12 +5,24 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { rawBodyMiddleware } from './webhooks/common/raw-body';
 
-/** Parses `TRUST_PROXY` into Express's `trust proxy` value. */
+/**
+ * Parses `TRUST_PROXY` into Express's `trust proxy` value. `true` trusts every
+ * hop, so a client-forged `X-Forwarded-For` becomes the client IP; under
+ * `APP_ENV=production` it is refused at boot (C-142, L-46).
+ */
 export const trustProxySetting = (
   value: string | undefined,
+  appEnv?: string,
 ): boolean | number | string => {
   if (value === undefined || value === '') return 'loopback';
-  if (value === 'true') return true;
+  if (value === 'true') {
+    if (appEnv === 'production') {
+      throw new Error(
+        'TRUST_PROXY=true is refused when APP_ENV=production: it trusts a forged X-Forwarded-For. Set a hop count (for example 1) or an address list (for example uniquelocal).',
+      );
+    }
+    return true;
+  }
   if (value === 'false') return false;
   if (/^\d+$/.test(value)) return Number(value);
   return value;
@@ -20,7 +32,7 @@ export const trustProxySetting = (
 export const configureApp = (app: INestApplication): void => {
   (app as NestExpressApplication).set(
     'trust proxy',
-    trustProxySetting(process.env.TRUST_PROXY),
+    trustProxySetting(process.env.TRUST_PROXY, process.env.APP_ENV),
   );
 
   // The runner gateway (`/runner`) shares the API's port: plain `ws`, no socket.io.

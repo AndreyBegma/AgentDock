@@ -74,6 +74,23 @@ Cloudflare ──tunnel──▶ cloudflared ──▶ proxy (Caddy :80) ─┬�
 Nothing is published on the host. The stack runs on its own compose network
 (`agentdock-staging`).
 
+### `TRUST_PROXY` per topology
+
+`TRUST_PROXY` is Express's `trust proxy` for the API: which hops' `X-Forwarded-For`
+it believes when it works out the client IP, which the login throttle and the
+audit log use. A value that trusts too many hops lets a client forge its IP. The
+API refuses to boot with `TRUST_PROXY=true` when `APP_ENV=production`; set a hop
+count or an address list.
+
+| Topology | Value |
+|---|---|
+| Development, or a single host (browser → Next `/api` rewrite → API) | `loopback` (the default) |
+| nginx in front of Next (browser → nginx → Next → API) | `2`, and make nginx overwrite `X-Forwarded-For` with `$remote_addr` instead of appending to the client's |
+| Staging (Cloudflare → cloudflared → Caddy → API, all on the private bridge) | `uniquelocal` (`deploy/staging/env/api.env.example`) |
+
+Count every proxy between the client and the API. A count that is too high
+trusts a forged header; one that is too low shows the proxy's own address.
+
 ### One-time setup
 
 1. **Cloudflare.** Create the tunnel `agentdock-staging` in Zero Trust. Give it
