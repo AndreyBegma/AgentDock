@@ -63,6 +63,10 @@ export const AUDIT_ACTIONS = [
   'telegram.configure',
   'telegram.clear',
   'telegram.link',
+  /** C-147: a chat redeemed a link code and waits for confirmation in the app (`after: { username }`). */
+  'telegram.link_request',
+  /** C-147: the user turned a waiting chat away in the app. */
+  'telegram.link_decline',
   'telegram.unlink',
   'telegram.approval',
   'telegram.project',

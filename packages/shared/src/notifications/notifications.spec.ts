@@ -50,6 +50,13 @@ describe('notification kinds (spec 22 D1)', () => {
     }
   });
 
+  it('offers telegram.link_pending to every role, in the app only (C-147)', () => {
+    for (const role of ['viewer', 'operator', 'admin'] as const) {
+      expect(kindsFor(role)).toContain('telegram.link_pending');
+    }
+    expect(kindAllowsChannel('telegram.link_pending', 'telegram')).toBe(false);
+  });
+
   it('returns a copy of the defaults', () => {
     defaultChannels('pane.prompt', 'admin').telegram = false;
     expect(defaultChannels('pane.prompt', 'admin').telegram).toBe(true);
