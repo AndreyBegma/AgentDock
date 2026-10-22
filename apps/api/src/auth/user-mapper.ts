@@ -8,6 +8,7 @@ export const toPublicUser = (user: User): PublicUser => ({
   name: user.name,
   role: user.role,
   status: user.status,
+  twoFactorEnabled: user.totpEnabledAt !== null,
 });
 
 export const toAdminUser = (user: User): AdminUser => ({

@@ -116,6 +116,7 @@ describe('auth (e2e)', () => {
         name: null,
         role: 'operator',
         status: 'active',
+        twoFactorEnabled: false,
       });
       const cookies = setCookies(response);
       const session = cookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`));

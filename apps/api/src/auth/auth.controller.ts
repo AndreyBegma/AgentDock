@@ -1,9 +1,13 @@
 import {
   AUTH_ERROR,
+  type CurrentUserResponse,
   type PublicUser,
+  type RecoveryCodesResponse,
   type RegisterResponse,
   type RegistrationState,
   type SessionInfo,
+  type TwoFactorSetupResponse,
+  type TwoFactorStatus,
 } from '@nautelle/shared';
 import {
   Body,
@@ -28,10 +32,21 @@ import { AuthService } from './auth.service';
 import { authError, SourceThrottledFilter } from './auth-error';
 import type { AuthenticatedRequest, AuthUser } from './auth-request';
 import { clearSessionCookies, setSessionCookies } from './cookies';
-import { CurrentUser, Public } from './decorators';
-import { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
+import { AllowedBeforeTwoFactorSetup, Public } from './decorators';
+import {
+  ChangePasswordDto,
+  LoginDto,
+  RegisterDto,
+  TwoFactorConfirmDto,
+  TwoFactorEnableDto,
+  TwoFactorSetupDto,
+} from './dto';
 import { SessionService } from './session.service';
+import { TwoFactorService } from './two-factor.service';
 
+// An admin who must still set up two-factor sign-in (C-189) can do it here,
+// see who they are, change their password and sign out — nothing else.
+@AllowedBeforeTwoFactorSetup()
 @Controller('auth')
 @UseFilters(SourceThrottledFilter)
 export class AuthController {
@@ -40,6 +55,7 @@ export class AuthController {
     private readonly sessions: SessionService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   @Public()
@@ -93,8 +109,13 @@ export class AuthController {
   }
 
   @Get('me')
-  me(@CurrentUser() user: AuthUser): PublicUser {
-    return user;
+  async me(@Req() request: AuthenticatedRequest): Promise<CurrentUserResponse> {
+    const user: AuthUser = request.auth.user;
+    return {
+      ...user,
+      twoFactorSetupRequired:
+        !user.twoFactorEnabled && (await this.twoFactor.requiredFor(user)),
+    };
   }
 
   // Per IP, as for login; the wrong-password counter is the login one (C-109).
@@ -106,6 +127,71 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ): Promise<void> {
     await this.auth.changePassword(request.auth, dto, requestOrigin(request));
+  }
+
+  @Get('me/two-factor')
+  twoFactorStatus(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<TwoFactorStatus> {
+    return this.auth.twoFactorStatus(request.auth);
+  }
+
+  // The password and code checks share the login counter, so the same per-IP
+  // request limit as login (C-109).
+  @UseGuards(ThrottlerGuard)
+  @Post('me/two-factor/setup')
+  @HttpCode(200)
+  beginTwoFactorSetup(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: TwoFactorSetupDto,
+  ): Promise<TwoFactorSetupResponse> {
+    return this.auth.beginTwoFactorSetup(
+      request.auth,
+      dto.password,
+      requestOrigin(request),
+    );
+  }
+
+  @UseGuards(ThrottlerGuard)
+  @Post('me/two-factor/enable')
+  @HttpCode(200)
+  async enableTwoFactor(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: TwoFactorEnableDto,
+  ): Promise<RecoveryCodesResponse> {
+    return {
+      recoveryCodes: await this.auth.enableTwoFactor(
+        request.auth,
+        dto.code,
+        requestOrigin(request),
+      ),
+    };
+  }
+
+  @UseGuards(ThrottlerGuard)
+  @Post('me/two-factor/disable')
+  @HttpCode(204)
+  async disableTwoFactor(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: TwoFactorConfirmDto,
+  ): Promise<void> {
+    await this.auth.disableTwoFactor(request.auth, dto, requestOrigin(request));
+  }
+
+  @UseGuards(ThrottlerGuard)
+  @Post('me/two-factor/recovery-codes')
+  @HttpCode(200)
+  async regenerateRecoveryCodes(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: TwoFactorConfirmDto,
+  ): Promise<RecoveryCodesResponse> {
+    return {
+      recoveryCodes: await this.auth.regenerateRecoveryCodes(
+        request.auth,
+        dto,
+        requestOrigin(request),
+      ),
+    };
   }
 
   @Get('sessions')
