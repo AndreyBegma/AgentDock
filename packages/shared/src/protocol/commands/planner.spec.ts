@@ -76,7 +76,11 @@ describe('planner commands', () => {
   it('refuse unknown keys in every command', () => {
     const valid = {
       'plan.turn': turn,
-      'plan.cancel': { planId: 'cmplan0001', turnId: 'cmturn0001' },
+      'plan.cancel': {
+        planId: 'cmplan0001',
+        turnId: 'cmturn0001',
+        projectId: 'prj_1',
+      },
       'plan.close': { planId: 'cmplan0001', projectId: 'prj_1' },
       'plan.publish_specs': publish,
       'plan.queue_issues': { projectId: 'prj_1', numbers: [201, 202] },
@@ -160,7 +164,15 @@ describe('plan.turn', () => {
 describe('plan.cancel and plan.close', () => {
   it('take only ids', () => {
     expect(
-      planCancelArgsSchema.safeParse({ planId: '../x', turnId: 't' }).success,
+      planCancelArgsSchema.safeParse({
+        planId: '../x',
+        turnId: 't',
+        projectId: 'p',
+      }).success,
+    ).toBe(false);
+    // C-161: the runner refuses a turn of another project, so the project is required.
+    expect(
+      planCancelArgsSchema.safeParse({ planId: 'p1', turnId: 't1' }).success,
     ).toBe(false);
     expect(planCloseArgsSchema.safeParse({ planId: 'p' }).success).toBe(false);
   });

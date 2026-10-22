@@ -455,8 +455,13 @@ describe('command dispatcher', () => {
         phase: 'queued',
       });
       expect(
-        (await run('plan.cancel', { planId: 'plan_1', turnId: 'turn_1' }))
-          .output,
+        (
+          await run('plan.cancel', {
+            planId: 'plan_1',
+            turnId: 'turn_1',
+            projectId: 'prj_1',
+          })
+        ).output,
       ).toEqual({ cancelled: true });
       expect(seen).toEqual(['turn', 'cancel']);
     });

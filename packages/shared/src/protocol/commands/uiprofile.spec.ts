@@ -93,16 +93,21 @@ describe('uiprofile commands', () => {
     ).toBe(false);
   });
 
-  it('uiprofile.cancel takes only a run id, answers {cancelled}, needs an operator', () => {
+  it('uiprofile.cancel takes a run id and its project, answers {cancelled}, needs an operator', () => {
     expect(uiprofileCancelCommand.minRole).toBe('operator');
     expect(uiprofileCancelCommand.timeoutMs).toBe(15_000);
     expect(
-      uiProfileCancelArgsSchema.safeParse({ runId: 'cmrun0001' }).success,
+      uiProfileCancelArgsSchema.safeParse({
+        runId: 'cmrun0001',
+        projectId: 'prj_1',
+      }).success,
     ).toBe(true);
     for (const bad of [
       {},
-      { runId: '' },
-      { runId: 'cmrun0001', projectId: 'prj_1' },
+      { runId: 'cmrun0001' },
+      { runId: '', projectId: 'prj_1' },
+      { runId: 'cmrun0001', projectId: '' },
+      { runId: 'cmrun0001', projectId: 'prj_1', root: '/x' },
     ]) {
       expect(uiProfileCancelArgsSchema.safeParse(bad).success).toBe(false);
     }

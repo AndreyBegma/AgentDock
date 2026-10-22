@@ -467,7 +467,7 @@ export class PlanTurnService {
       await this.commands.send(
         project.runnerId,
         'plan.cancel',
-        { planId: plan.id, turnId },
+        { planId: plan.id, turnId, projectId: plan.projectId },
         { role: caller.role, ctx: caller.ctx },
       ),
     );

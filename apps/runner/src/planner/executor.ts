@@ -290,13 +290,16 @@ export class PlanTurnExecutor {
     return { phase: turn.phase === 'queued' ? 'queued' : 'running' };
   }
 
-  /** `plan.cancel`: a queued turn leaves the queue, a running one loses its session. */
+  /**
+   * `plan.cancel`: a queued turn leaves the queue, a running one loses its
+   * session. A turn of another project is `not_found` and keeps going.
+   */
   async cancel(args: PlanCancelArgs): Promise<PlanCancelResult> {
     const record = this.turn(args.planId, args.turnId);
-    if (!record) {
+    if (record?.projectId !== args.projectId) {
       throw new CommandFailure(
         'not_found',
-        `no turn ${args.turnId} in plan ${args.planId}`,
+        `no turn ${args.turnId} in plan ${args.planId} of ${args.projectId}`,
       );
     }
     const key = turnKey(args.planId, args.turnId);
@@ -389,7 +392,11 @@ export class PlanTurnExecutor {
     this.closing.add(plan.planId);
     for (const turn of [...this.active.values()]) {
       if (turn.planId === plan.planId) {
-        await this.cancel({ planId: turn.planId, turnId: turn.turnId });
+        await this.cancel({
+          planId: turn.planId,
+          turnId: turn.turnId,
+          projectId: turn.projectId,
+        });
       }
     }
     // A turn still preparing removes the worktree itself once it sees `closing`.
