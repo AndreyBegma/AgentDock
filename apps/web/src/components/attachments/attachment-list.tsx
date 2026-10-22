@@ -3,17 +3,20 @@
 import { Button } from '@andrewbehma/glass-ui/button';
 import { FileItem } from '@andrewbehma/glass-ui/file-item';
 import type { AttachmentView } from '@nautelle/shared';
+import { useState } from 'react';
 import {
   attachmentHref,
   canRemoveAttachment,
   isImageMime,
+  removeAttachmentCopy,
 } from '../../lib/attachments/format';
 import { Time } from '../../lib/format/time';
+import { ConfirmGate } from '../confirm/confirm-gate';
 
 /**
  * The saved attachments of a card or of one round (#309 D13): `FileItem` rows,
  * an image thumbnail that opens the bytes in a new tab, Download for the rest,
- * and Remove for the uploader or an admin.
+ * and Remove for the uploader or an admin — which asks first (C-166).
  */
 export function AttachmentList({
   attachments,
@@ -31,55 +34,67 @@ export function AttachmentList({
   removing?: string;
   onRemove?: (attachment: AttachmentView) => void;
 }) {
+  const [asking, setAsking] = useState<AttachmentView>();
   if (attachments.length === 0) return null;
   return (
-    <ul className="flex flex-col gap-1">
-      {attachments.map((a) => {
-        const href = attachmentHref(a);
-        const image = isImageMime(a.mime);
-        return (
-          <li key={a.id}>
-            <FileItem
-              name={a.name}
-              size={a.size}
-              mime={a.mime}
-              thumbnailUrl={image ? href : undefined}
-              status="done"
-              actions={
-                <span className="flex gap-1">
-                  <a
-                    href={href}
-                    target={image ? '_blank' : undefined}
-                    rel={image ? 'noreferrer' : undefined}
-                    download={image ? undefined : a.name}
-                    className="rounded-control px-2 py-1 text-xs text-accent-ink underline-offset-2 hover:underline"
-                  >
-                    {image ? 'Open' : 'Download'}
-                  </a>
-                  {canRemove &&
-                  user &&
-                  onRemove &&
-                  canRemoveAttachment(a, user) ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      disabled={removing === a.id}
-                      onClick={() => onRemove(a)}
+    <>
+      <ul className="flex flex-col gap-1">
+        {attachments.map((a) => {
+          const href = attachmentHref(a);
+          const image = isImageMime(a.mime);
+          return (
+            <li key={a.id}>
+              <FileItem
+                name={a.name}
+                size={a.size}
+                mime={a.mime}
+                thumbnailUrl={image ? href : undefined}
+                status="done"
+                actions={
+                  <span className="flex gap-1">
+                    <a
+                      href={href}
+                      target={image ? '_blank' : undefined}
+                      rel={image ? 'noreferrer' : undefined}
+                      download={image ? undefined : a.name}
+                      className="rounded-control px-2 py-1 text-xs text-accent-ink underline-offset-2 hover:underline"
                     >
-                      Remove
-                    </Button>
-                  ) : null}
-                </span>
-              }
-            />
-            <p className="px-2 text-xs text-ink-3">
-              {a.uploaderName ? `${a.uploaderName} · ` : ''}
-              <Time value={a.createdAt} />
-            </p>
-          </li>
-        );
-      })}
-    </ul>
+                      {image ? 'Open' : 'Download'}
+                    </a>
+                    {canRemove &&
+                    user &&
+                    onRemove &&
+                    canRemoveAttachment(a, user) ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        disabled={removing === a.id}
+                        onClick={() => setAsking(a)}
+                      >
+                        Remove
+                      </Button>
+                    ) : null}
+                  </span>
+                }
+              />
+              <p className="px-2 text-xs text-ink-3">
+                {a.uploaderName ? `${a.uploaderName} · ` : ''}
+                <Time value={a.createdAt} />
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+      <ConfirmGate
+        pending={asking}
+        copy={removeAttachmentCopy}
+        onConfirm={(attachment) => {
+          setAsking(undefined);
+          onRemove?.(attachment);
+        }}
+        onCancel={() => setAsking(undefined)}
+      />
+    </>
   );
 }

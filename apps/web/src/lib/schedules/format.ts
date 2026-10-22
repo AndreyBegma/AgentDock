@@ -79,6 +79,16 @@ export function describeTarget(target: ScheduleTarget): string {
   return `${target.skill} ${args.length > 60 ? `${args.slice(0, 59)}…` : args}`;
 }
 
+/** C-166: Run now asks first, naming what starts. */
+export const runNowCopy = (
+  schedule: Pick<ScheduleView, 'name' | 'target'>,
+) => ({
+  title: `Run ${schedule.name} now?`,
+  consequence: `It fires once, outside its times: ${describeTarget(schedule.target)}. The run starts on the project's runner and shows in the firings.`,
+  verb: 'Run now',
+  tone: 'default' as const,
+});
+
 /** A fire time in the schedule's own timezone, e.g. `Oct 10, 03:00`; a dash for none. */
 export function formatFireTime(
   iso: string | null,

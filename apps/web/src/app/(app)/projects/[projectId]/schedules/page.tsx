@@ -16,6 +16,7 @@ import { CalendarPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ConfirmGate } from '../../../../../components/confirm/confirm-gate';
 import { PageHeader } from '../../../../../components/page-header/page-header';
 import { AsyncSection } from '../../../../../components/prerequisites/async-section';
 import { RunnerOfflineBanner } from '../../../../../components/prerequisites/prerequisite-banner';
@@ -26,6 +27,7 @@ import { useLive } from '../../../../../lib/live/use-live';
 import {
   describeSchedulesError,
   isNotFound,
+  runNowCopy,
 } from '../../../../../lib/schedules/format';
 import { useSection } from '../../../../../lib/section/use-section';
 import { useProjectDetail } from '../use-project-detail';
@@ -72,6 +74,7 @@ export default function ProjectSchedulesPage() {
   const [editing, setEditing] = useState<ScheduleView | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<ScheduleView | null>(null);
+  const [running, setRunning] = useState<ScheduleView>();
   const [selected, setSelected] = useState<string>();
   const [busyId, setBusyId] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -186,21 +189,25 @@ export default function ProjectSchedulesPage() {
                 }`,
               ),
             onEdit: setEditing,
-            onRunNow: (schedule: ScheduleView) =>
-              void act(
-                schedule,
-                () =>
-                  api(
-                    `/projects/${projectId}/schedules/${schedule.id}/run-now`,
-                    { method: 'POST' },
-                  ),
-                'Fired once. It shows in the firings.',
-              ),
+            // C-166: Run now asks first; `confirmRunNow` fires it.
+            onRunNow: setRunning,
             onDelete: setDeleting,
           }
         : undefined,
     [canOperate, act, projectId, user.id],
   );
+
+  const confirmRunNow = async (schedule: ScheduleView) => {
+    await act(
+      schedule,
+      () =>
+        api(`/projects/${projectId}/schedules/${schedule.id}/run-now`, {
+          method: 'POST',
+        }),
+      'Fired once. It shows in the firings.',
+    );
+    setRunning(undefined);
+  };
 
   const confirmDelete = async () => {
     const target = deleting;
@@ -301,6 +308,13 @@ export default function ProjectSchedulesPage() {
         busy={busyId !== null && busyId === deleting?.id}
         onCancel={() => setDeleting(null)}
         onConfirm={confirmDelete}
+      />
+      <ConfirmGate
+        pending={running}
+        copy={runNowCopy}
+        busy={busyId !== null && busyId === running?.id}
+        onConfirm={(schedule) => void confirmRunNow(schedule)}
+        onCancel={() => setRunning(undefined)}
       />
       <ScheduleSheet
         projectId={projectId}

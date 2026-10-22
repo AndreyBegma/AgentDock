@@ -51,3 +51,12 @@ export const approvableDrafts = (plan: Pick<PlanDetail, 'tasks'>) =>
     (t: PlanTaskView) =>
       (t.status === 'draft' || t.status === 'ready') && canApprove(t),
   );
+
+/** C-166: Share with project asks first — every member of it can then read the plan. */
+export const sharePlanCopy = (plan: Pick<PlanDetail, 'title'>) => ({
+  title: `Share ${plan.title} with the project?`,
+  consequence:
+    'Every member of the project can read the plan, its brief and its conversation from now on.',
+  verb: 'Share',
+  tone: 'default' as const,
+});
