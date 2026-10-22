@@ -844,7 +844,7 @@ backticks, each holding one self-contained HTML document:
 Frames:
 
 - Draw one frame, unless the task touches several pages or standalone components: then one per page, plus one per component that matters on its own (states side by side).
-- \`"frames"\` lists a short one-line name per frame (max ${DESIGN_FRAME_NAME_MAX} characters, distinct; at most ${DESIGN_FRAMES_MAX} frames), in block order: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out (named "${DESIGN_LEGACY_FRAME_NAME}").
+- \`"frames"\` lists one-line names (max ${DESIGN_FRAME_NAME_MAX} chars, distinct, ≤${DESIGN_FRAMES_MAX} frames), in block order: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out (named "${DESIGN_LEGACY_FRAME_NAME}").
 - On a revision, \`"kept"\` names the frames you leave exactly as the previous revision drew them. A kept frame has no design block — Nautelle copies it; every other frame has one, in order.
 
 The mockup's rules — a frame that breaks one fails the turn:
