@@ -196,6 +196,7 @@ describe('presentation', () => {
   test('links must be in-app paths', () => {
     expect(safeLink('/projects/p1/history/r1')).toBe('/projects/p1/history/r1');
     expect(safeLink('//evil.example')).toBeUndefined();
+    expect(safeLink('/\\evil.example')).toBeUndefined();
     expect(safeLink('https://evil.example')).toBeUndefined();
     expect(safeLink('javascript:alert(1)')).toBeUndefined();
     expect(safeLink(null)).toBeUndefined();

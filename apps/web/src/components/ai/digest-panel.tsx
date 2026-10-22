@@ -7,8 +7,8 @@ import type { AiDigestItem, AiDigestView } from '@nautelle/shared';
 import Link from 'next/link';
 import { fetchLatestAiDigest } from '../../lib/ai/actions';
 import { Time } from '../../lib/format/time';
-import { safeHttpsUrl } from '../../lib/queue/format';
 import { useSection } from '../../lib/section/use-section';
+import { externalHttpsUrl } from '../../lib/url';
 
 /** Lines per section before "and n more" — the full list is in Telegram. */
 const ITEMS_SHOWN = 5;
@@ -57,7 +57,7 @@ function Section({ title, items }: { title: string; items: AiDigestItem[] }) {
       ) : (
         <ul className="flex flex-col">
           {items.slice(0, ITEMS_SHOWN).map((item) => {
-            const href = item.url ? safeHttpsUrl(item.url) : null;
+            const href = item.url ? externalHttpsUrl(item.url) : null;
             const body = (
               <>
                 <span className="shrink-0 font-mono text-ink-3 text-xs">

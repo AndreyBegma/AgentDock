@@ -5,10 +5,10 @@ import type { QueueItemView } from '@nautelle/shared';
 import {
   computedNote,
   STATE_CHIP_LABEL,
-  safeHttpsUrl,
   sourceLabel,
 } from '../../../../../lib/queue/format';
 import { QUEUE_PILL_STATUS } from '../../../../../lib/status/pill';
+import { githubUrl } from '../../../../../lib/url';
 
 /** Where the issue stands: process state, so a pill (#213). */
 export function StateBadge({ item }: { item: QueueItemView }) {
@@ -38,7 +38,7 @@ export function SourceDot({ item }: { item: QueueItemView }) {
 }
 
 export function IssueLink({ item }: { item: QueueItemView }) {
-  const href = safeHttpsUrl(item.url);
+  const href = githubUrl(item.url);
   return href ? (
     <a
       href={href}

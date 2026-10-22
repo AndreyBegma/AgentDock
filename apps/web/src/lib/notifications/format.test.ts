@@ -169,6 +169,7 @@ describe('safeLink', () => {
     expect(safeLink('/projects/p1/fleet')).toBe('/projects/p1/fleet');
     expect(safeLink('https://evil.example')).toBeNull();
     expect(safeLink('//evil.example')).toBeNull();
+    expect(safeLink('/\\evil.example')).toBeNull();
     expect(safeLink(null)).toBeNull();
   });
 });

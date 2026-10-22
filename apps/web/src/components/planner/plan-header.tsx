@@ -18,6 +18,7 @@ import {
 import { briefBeyondTitle, createCardsBlock } from '../../lib/planner/header';
 import { plannerHref } from '../../lib/planner/href';
 import { useTextNotes } from '../../lib/text/use-text-notes';
+import { githubUrl } from '../../lib/url';
 import { PageHeader } from '../page-header/page-header';
 import { NormalizedNote } from '../text/normalized-note';
 
@@ -102,6 +103,8 @@ export function PlanHeader({
     : brief;
   const notes = useTextNotes(projectId, { planId: plan.id }, plan.version);
   const briefNote = notes.view('plan', plan.id, 'brief');
+  // The docs PR link is followed only when it really is GitHub.
+  const docsPrHref = githubUrl(plan.docsPrUrl);
 
   return (
     <PageHeader
@@ -168,9 +171,9 @@ export function PlanHeader({
       }
       actions={
         closed ? (
-          plan.docsPrUrl ? (
+          docsPrHref ? (
             <a
-              href={plan.docsPrUrl}
+              href={docsPrHref}
               target="_blank"
               rel="noreferrer noopener"
               className="text-sm text-accent-ink underline underline-offset-2"

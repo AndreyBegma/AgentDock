@@ -13,7 +13,6 @@ import type {
 import { useEffect } from 'react';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
-import { safeHttpsUrl } from '../../lib/queue/format';
 import { useSection } from '../../lib/section/use-section';
 import { fetchLatestDigest } from '../../lib/steward/actions';
 import {
@@ -21,6 +20,7 @@ import {
   digestCounts,
   digestIsQuiet,
 } from '../../lib/steward/format';
+import { externalHttpsUrl } from '../../lib/url';
 
 /** A digest is a glance; look again every few minutes. */
 const REFRESH_MS = 300_000;
@@ -68,7 +68,7 @@ function Bucket({
       <h4 className="font-medium text-ink-2 text-xs">{title}</h4>
       <ul className="flex flex-col">
         {items.slice(0, ITEMS_SHOWN).map((item) => {
-          const href = item.url ? safeHttpsUrl(item.url) : null;
+          const href = item.url ? externalHttpsUrl(item.url) : null;
           const body = (
             <>
               <span className="shrink-0 font-mono text-ink-3 text-xs">

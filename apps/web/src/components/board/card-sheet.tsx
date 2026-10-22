@@ -93,11 +93,11 @@ import {
 } from '../../lib/board/shipping';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
-import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { cardSessionMessenger } from '../../lib/session-message/actions';
 import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
 import { savedLabel } from '../../lib/token-saver/format';
+import { externalHttpsUrl, githubUrl } from '../../lib/url';
 import { SummaryPanel } from '../ai/summary-panel';
 import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
@@ -248,13 +248,13 @@ function roundItems(
 }
 
 function Links({ card }: { card: BoardCardDetail }) {
-  const pr = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
-  const issue = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
+  const pr = card.prUrl ? githubUrl(card.prUrl) : null;
+  const issue = card.issueUrl ? githubUrl(card.issueUrl) : null;
   // #379: the spec's pull request in an external docs repository.
   const spec = card.specPr
     ? {
         label: `Spec ${card.specPr.repo}#${card.specPr.number}`,
-        href: safeHttpsUrl(card.specPr.url),
+        href: githubUrl(card.specPr.url),
       }
     : null;
   const items = [
@@ -294,7 +294,7 @@ function PullRequestList({ card }: { card: BoardCardDetail }) {
   return (
     <ul className="flex flex-col gap-1 text-sm" aria-label="Pull requests">
       {rows.map((row) => {
-        const href = safeHttpsUrl(row.url);
+        const href = githubUrl(row.url);
         const text = `PR #${row.number} · ${row.state}`;
         return (
           <li key={row.number} className="flex flex-wrap gap-2">
@@ -329,7 +329,7 @@ function CiStoppedBanner({ card }: { card: BoardCardDetail }) {
         {banner.checks.length > 0 ? (
           <ul className="list-disc pl-4">
             {banner.checks.map((check) => {
-              const href = check.link ? safeHttpsUrl(check.link) : null;
+              const href = check.link ? externalHttpsUrl(check.link) : null;
               return (
                 <li key={check.name}>
                   {href ? (

@@ -28,7 +28,6 @@ import { PageHeader } from '../../../../../../../components/page-header/page-hea
 import { RunLogPanel } from '../../../../../../../components/runs/run-log-panel';
 import { TerminalSheet } from '../../../../../../../components/terminal/terminal-sheet';
 import { api } from '../../../../../../../lib/api';
-import { safeHttpsUrl } from '../../../../../../../lib/fleet/format';
 import { parseRunUpdate } from '../../../../../../../lib/history/format';
 import { useLive } from '../../../../../../../lib/live/use-live';
 import {
@@ -44,6 +43,7 @@ import {
 } from '../../../../../../../lib/skills/format';
 import { SKILL_PILL_STATUS } from '../../../../../../../lib/status/pill';
 import { useTerminalAvailable } from '../../../../../../../lib/terminal/use-terminal-available';
+import { githubUrl } from '../../../../../../../lib/url';
 import { ProjectRunnerBanner } from '../../../project-runner-banner';
 
 const REFETCH_DEBOUNCE_MS = 300;
@@ -155,7 +155,7 @@ export default function SkillRunPage() {
 
   const active = isActivePhase(run.phase);
   const canOperate = role !== undefined && role !== 'viewer';
-  const prUrl = safeHttpsUrl(run.prUrl);
+  const prUrl = githubUrl(run.prUrl);
   const files = run.changedFiles ?? [];
   // The runner resolves a run's session only while it is running.
   const attachable = run.phase === 'running' && canAttach;

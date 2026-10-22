@@ -13,6 +13,7 @@ import {
 import { ApiError } from '../api';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
 import { isSlotName } from '../fleet/workspace-url';
+import { internalHref } from '../url';
 
 /** Projects the global feed follows live; past it the page polls (the socket is shared, cap 50). */
 export const LIVE_PROJECT_BUDGET = 10;
@@ -402,7 +403,7 @@ export function itemMeta(
 
 /** An in-app link only: the API sends paths, but the page does not trust it. */
 export const safeLink = (link: string | null): string | undefined =>
-  link?.startsWith('/') && !link.startsWith('//') ? link : undefined;
+  link?.startsWith('/') ? internalHref(link) : undefined;
 
 /**
  * Where a row opens (#213). An item about a slot whose link is its project's

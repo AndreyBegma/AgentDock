@@ -23,7 +23,6 @@ import {
   refusedLabels,
   roundFooter,
   STATE_CHIP_LABEL,
-  safeHttpsUrl,
   stateLabel,
 } from './format';
 
@@ -239,12 +238,6 @@ describe('describeQueueError', () => {
 });
 
 describe('misc', () => {
-  test('safeHttpsUrl only lets https through', () => {
-    expect(safeHttpsUrl('https://github.com/o/r/issues/1')).not.toBeNull();
-    expect(safeHttpsUrl('javascript:alert(1)')).toBeNull();
-    expect(safeHttpsUrl(null)).toBeNull();
-  });
-
   test('an old runner is named and told to update, with no developer wording', () => {
     const text = describeQueueError(
       new ApiError(503, 'command_unavailable' as never, 'x'),

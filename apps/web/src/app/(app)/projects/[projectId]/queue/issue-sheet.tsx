@@ -9,9 +9,9 @@ import {
   blockerLabel,
   describeQueueError,
   priorityLabel,
-  safeHttpsUrl,
   stateLabel,
 } from '../../../../../lib/queue/format';
+import { githubUrl } from '../../../../../lib/url';
 import { ComputedNote, StateBadge } from './state-cells';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -24,7 +24,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Detail({ issue }: { issue: QueueIssueDetail }) {
-  const href = safeHttpsUrl(issue.url);
+  const href = githubUrl(issue.url);
   return (
     <dl className="flex flex-col gap-4">
       <Row label="State">
@@ -44,7 +44,7 @@ function Detail({ issue }: { issue: QueueIssueDetail }) {
         ) : (
           <ul className="flex flex-col gap-1">
             {issue.blockers.map((blocker) => {
-              const link = safeHttpsUrl(blocker.url);
+              const link = githubUrl(blocker.url);
               return (
                 <li key={blocker.number}>
                   {link ? (

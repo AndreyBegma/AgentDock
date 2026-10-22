@@ -205,16 +205,6 @@ export const QUEUE_FILTER_CODEC: FilterCodec<QueueFilters> = {
   },
 };
 
-/** Only `https:` links become anchors; the URL came from a GitHub payload. */
-export function safeHttpsUrl(url: string | null): string | null {
-  if (url === null) return null;
-  try {
-    return new URL(url).protocol === 'https:' ? url : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Labels the dialog offers (D7): those seen on the cached issues plus
  * `enhancement`/`bug`, minus the ready label — the toggle owns that one.

@@ -29,7 +29,6 @@ import { api, describeErrorHint } from '../../../../../lib/api';
 import {
   CHECKPOINT_LABEL,
   CHECKPOINT_TONE,
-  safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
 import { formatNumber } from '../../../../../lib/format';
 import { Time } from '../../../../../lib/format/time';
@@ -51,6 +50,7 @@ import { planHref } from '../../../../../lib/planner/href';
 import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { formatDuration } from '../../../../../lib/sessions/format';
 import { RUN_PILL_STATUS } from '../../../../../lib/status/pill';
+import { githubUrl } from '../../../../../lib/url';
 import { ActorIcon } from './actor-icon';
 
 const REFETCH_DEBOUNCE_MS = 300;
@@ -229,7 +229,7 @@ export function RunDetailPane({
     );
   }
 
-  const prUrl = safeHttpsUrl(run.prUrl);
+  const prUrl = githubUrl(run.prUrl);
   // Checkpoints, sessions and the feed are a worker slot's; other runs have none.
   const isSlot = run.kind === 'orchestrator_slot';
   return (
