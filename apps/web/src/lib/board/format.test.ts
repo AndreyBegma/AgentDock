@@ -397,6 +397,21 @@ describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
     expect(notice.commands[0]?.label).toContain('claude-work');
   });
 
+  test('C-177: the profile key is one shell word in the command', () => {
+    for (const round of [
+      { wiring: null },
+      { wiring: null, hooksCause: 'no_plugin', hooksProfile: "a'b $&;x" },
+    ] as const) {
+      const notice = hooksNotice(
+        { source: 'terminal', profileKey: "a'b $&;x" },
+        round,
+      );
+      expect(notice.commands.map((c) => c.code)).toEqual([
+        `nautelle-runner setup claude --profile 'a'\\''b $&;x'`,
+      ]);
+    }
+  });
+
   test('#348: no_plugin names the profile and its setup command, no placeholder', () => {
     for (const source of ['manual', 'terminal'] as const) {
       const notice = hooksNotice(
