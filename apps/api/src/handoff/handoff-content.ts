@@ -3,7 +3,7 @@ import {
   type HandoffLineRange,
   type HandoffUpdatedBy,
   personLinesKept,
-  splitPersonMarks,
+  stripPersonMarks,
 } from '@nautelle/shared';
 import type { RunnerEvent } from '@nautelle/shared/protocol';
 
@@ -30,8 +30,7 @@ export const stripHandoffContent = (event: RunnerEvent): void => {
  * are the only record of what a person wrote, so a mark in what the runner
  * or a person sends is text to drop, never a claim to honour.
  */
-export const unmarked = (content: string): string =>
-  splitPersonMarks(content).content;
+export const unmarked = (content: string): string => stripPersonMarks(content);
 
 /** The API's copy of a note, as far as an update needs it. */
 export interface StoredNote {
