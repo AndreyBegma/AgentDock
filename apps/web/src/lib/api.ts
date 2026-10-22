@@ -5,6 +5,7 @@ import {
   CSRF_COOKIE,
   CSRF_HEADER,
 } from '@nautelle/shared';
+import { readCookie } from './cookies';
 import { reachability } from './live/reachability';
 
 export class ApiError extends Error {
@@ -20,16 +21,6 @@ export class ApiError extends Error {
     super(message);
   }
 }
-
-const readCookie = (name: string): string | undefined => {
-  for (const part of document.cookie.split('; ')) {
-    const eq = part.indexOf('=');
-    if (part.slice(0, eq) === name) {
-      return decodeURIComponent(part.slice(eq + 1));
-    }
-  }
-  return undefined;
-};
 
 /** The CSRF header a write carries, for calls that cannot go through `api` (a stream). */
 export const csrfHeaders = (): Record<string, string> => {

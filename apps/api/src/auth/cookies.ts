@@ -3,8 +3,9 @@ import type { CookieOptions, Response } from 'express';
 import type { IssuedSession } from './session.service';
 import { SESSION_ABSOLUTE_MS } from './session.service';
 
+/** Secure unless the deployment says it is a local `development` or `test` one. */
 const baseOptions = (): CookieOptions => ({
-  secure: process.env.APP_ENV === 'production',
+  secure: !['development', 'test'].includes(process.env.APP_ENV ?? ''),
   sameSite: 'lax',
   path: '/',
 });

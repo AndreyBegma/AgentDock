@@ -49,7 +49,7 @@ taken, with its source.
 | D2 | First admin via `bun run admin:create` (interactive prompt, or `ADMIN_EMAIL` / `ADMIN_PASSWORD` env for non-interactive use). It creates an `active` admin; it refuses an email that already exists. The seed creates **no** users | ADR-0008, security.md |
 | D3 | Registration is closed by default. Setting `registration.open` (boolean) in a `settings` key/value table, changed only by admins. Closed → `POST /auth/register` answers 403 `registration_closed` | ADR-0008 |
 | D4 | Approval is one action that sets status `active` **and** the role. Rejection sets `rejected`; a rejected email cannot register again until an admin deletes the account | ADR-0008; Mission Control access-request flow (inspiration) |
-| D5 | Sessions are server-side: a random 32-byte token in an httpOnly, `Secure` (when `APP_ENV=production`), `SameSite=Lax` cookie `ad_session`; the database stores only its SHA-256. Idle expiry 7 days, absolute 30 days, refreshed `lastSeenAt` at most once a minute | security.md |
+| D5 | Sessions are server-side: a random 32-byte token in an httpOnly, `Secure` (unless `APP_ENV` is `development` or `test`), `SameSite=Lax` cookie `ad_session`; the database stores only its SHA-256. Idle expiry 7 days, absolute 30 days, refreshed `lastSeenAt` at most once a minute | security.md |
 | D6 | Passwords: argon2id (`argon2` package, library defaults), length 12–256, no composition rules. Emails are trimmed and lower-cased | security.md — length policy is new here |
 | D7 | CSRF: double-submit — a non-httpOnly `ad_csrf` cookie set with the session, and every non-GET request must send the same value in `X-CSRF-Token`. Login and register are exempt (no session yet) but require `Content-Type: application/json` | security.md |
 | D8 | Rate limit: `@nestjs/throttler`, 10 requests / minute per IP on `/auth/login` and `/auth/register`. ~~Lockout: 10 consecutive failed logins for one account → locked 15 minutes~~ — replaced by [ADR-0048](../adr/0048-failed-passwords-slow-the-source-never-lock-the-account.md): failures counted per (email, IP), only that source waits (1 s doubling to 60 s), no account lock | security.md — numbers are new here |
@@ -142,7 +142,7 @@ Pages, plain layout (no app shell yet):
 |---|---|---|
 | `API_URL` | `apps/web` | target of the `/api` rewrite (default `http://localhost:8180`) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | `admin:create` only | non-interactive admin creation |
-| `APP_ENV` | `apps/api` (exists) | `production` → `Secure` cookies |
+| `APP_ENV` | `apps/api` (exists) | `development` and `test` → plain-http cookies; anything else → `Secure` |
 | `TRUST_PROXY` | `apps/api` | Express `trust proxy` (default `loopback`). The per-IP login limit must see the client's address, not the address of the Next `/api` rewrite or the reverse proxy |
 | `TEST_DATABASE_URL` | `apps/api` tests | the database the e2e suite resets; its name must end in `_test` |
 
@@ -164,7 +164,7 @@ Add each to the matching `.env.example`. `NEXT_PUBLIC_API_URL` is removed from
 - [ ] Demoting, disabling or deleting the last active admin returns 409 `last_admin`.
 - [ ] Disabling a user ends their existing sessions immediately (next request 401).
 - [ ] No response body or log line contains a password, password hash, session token or token hash.
-- [ ] The session cookie is httpOnly and SameSite=Lax; `Secure` when `APP_ENV=production`.
+- [ ] The session cookie is httpOnly and SameSite=Lax; `Secure` unless `APP_ENV` is `development` or `test`.
 - [ ] Web: an unauthenticated visit to `/admin/users` redirects to `/login`; the full flow register → pending → admin approves → login works in the browser against the real API.
 - [ ] `bun run check`, `bun run test`, `bun run build` pass; new API behaviour is covered by e2e tests (Nest testing module + supertest against the docker PostgreSQL).
 
