@@ -41,6 +41,13 @@ describe('CardDescription (#431)', () => {
     expect(html).toContain('>Edit<');
   });
 
+  test('a /\\host link in the body is not followed (spec 164)', () => {
+    const html = render({ body: 'See [the docs](/\\evil.com).' });
+    expect(html).toContain('the docs');
+    expect(html).not.toContain('evil.com"');
+    expect(html).not.toContain('<a ');
+  });
+
   test('Edit shows the textarea with the raw text, and offers Preview', () => {
     const html = render({ editing: true });
     expect(html).toContain('<textarea');

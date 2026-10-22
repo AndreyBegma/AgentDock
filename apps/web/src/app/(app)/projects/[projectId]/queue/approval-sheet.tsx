@@ -21,7 +21,7 @@ import {
   STATUS_TONE,
 } from '../../../../../lib/approvals/format';
 import { formatAgo } from '../../../../../lib/fleet/format';
-import { safeHttpsUrl } from '../../../../../lib/queue/format';
+import { externalHttpsUrl, githubUrl } from '../../../../../lib/url';
 import { ApproveDialog, RequestChangesDialog } from './decision-dialogs';
 
 const CHECK_TONE = { pass: 'ok', wait: 'warn', fail: 'danger' } as const;
@@ -112,7 +112,7 @@ function PrDecision({
 function Detail({ detail }: { detail: ApprovalDetail }) {
   const [filesOpen, setFilesOpen] = useState(false);
   const inspection = detail.inspection;
-  const href = safeHttpsUrl(inspection?.url ?? detail.url);
+  const href = githubUrl(inspection?.url ?? detail.url);
 
   return (
     <dl className="flex flex-col gap-4">
@@ -169,7 +169,7 @@ function Detail({ detail }: { detail: ApprovalDetail }) {
             ) : (
               <ul className="flex flex-col gap-1">
                 {inspection.checkList.map((check) => {
-                  const link = safeHttpsUrl(check.url ?? null);
+                  const link = externalHttpsUrl(check.url);
                   return (
                     <li
                       key={`${check.name}/${check.state}`}

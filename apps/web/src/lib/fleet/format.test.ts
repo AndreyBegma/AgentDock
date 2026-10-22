@@ -20,7 +20,6 @@ import {
   ORCHESTRATOR_STATUS_HINT,
   ORCHESTRATOR_STATUS_LABEL,
   parseIssueFilter,
-  safeHttpsUrl,
   showStopControl,
   slotStatusOptions,
   slotsQuery,
@@ -93,7 +92,7 @@ describe('formatAheadBehind / formatOccupancy / formatRound', () => {
   });
 });
 
-describe('issueUrl / safeHttpsUrl', () => {
+describe('issueUrl', () => {
   test('derives the issue from a pull request of the same repository', () => {
     expect(issueUrl(11, 'https://github.com/o/r/pull/7')).toBe(
       'https://github.com/o/r/issues/11',
@@ -104,16 +103,6 @@ describe('issueUrl / safeHttpsUrl', () => {
     expect(issueUrl(null, 'https://github.com/o/r/pull/7')).toBeNull();
     expect(issueUrl(11, null)).toBeNull();
     expect(issueUrl(11, 'https://example.com/not-a-pr')).toBeNull();
-  });
-
-  test('only https links are rendered as anchors', () => {
-    expect(safeHttpsUrl('https://github.com/o/r/pull/7')).toBe(
-      'https://github.com/o/r/pull/7',
-    );
-    expect(safeHttpsUrl('javascript:alert(1)')).toBeNull();
-    expect(safeHttpsUrl('http://github.com/o/r')).toBeNull();
-    expect(safeHttpsUrl('not a url')).toBeNull();
-    expect(safeHttpsUrl(null)).toBeNull();
   });
 });
 

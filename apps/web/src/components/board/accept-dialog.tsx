@@ -31,7 +31,7 @@ import {
 } from '../../lib/board/accept';
 import { fetchPullRequest } from '../../lib/board/actions';
 import { describeBoardError } from '../../lib/board/format';
-import { safeHttpsUrl } from '../../lib/queue/format';
+import { githubUrl } from '../../lib/url';
 
 type PullRequest =
   | { state: 'loading' }
@@ -327,7 +327,7 @@ function ClosePrChoice({
 }
 
 function PullRequestBlock({ pr }: { pr: CardPullRequestView }) {
-  const href = safeHttpsUrl(pr.url);
+  const href = githubUrl(pr.url);
   const checks = CHECKS_PILL[pr.checks];
   return (
     <div className="flex flex-col gap-2 rounded-control bg-surface p-3">

@@ -17,8 +17,8 @@ import {
 } from '../../lib/board/format';
 import { Time } from '../../lib/format/time';
 import { projectHue } from '../../lib/hue';
-import { safeHttpsUrl } from '../../lib/queue/format';
 import { TASK_STATUS_LABEL } from '../../lib/tasks/format';
+import { githubUrl } from '../../lib/url';
 import {
   WORK_KIND_LABEL,
   WORK_PILL_STATUS,
@@ -50,7 +50,7 @@ function ExternalLink({ href, label }: { href: string; label: string }) {
 
 function ref(number: number | null, url: string | null) {
   if (number === null) return <span className="text-ink-3">—</span>;
-  const safe = safeHttpsUrl(url);
+  const safe = githubUrl(url);
   return safe ? (
     <ExternalLink href={safe} label={`#${number}`} />
   ) : (

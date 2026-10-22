@@ -10,6 +10,7 @@ import {
   type NotificationView,
 } from '@nautelle/shared';
 import { formatRelative } from '../format';
+import { internalHref } from '../url';
 
 export const BELL_LIMIT = 20;
 
@@ -232,7 +233,7 @@ export const relativeTime = (iso: string, now: number = Date.now()): string =>
 
 /** A link from the API is a path in this app; anything else is not followed. */
 export const safeLink = (link: string | null): string | null =>
-  link?.startsWith('/') && !link.startsWith('//') ? link : null;
+  link?.startsWith('/') ? (internalHref(link) ?? null) : null;
 
 /** `YYYY-MM-DD` of a local date, for `<input type="date">`. */
 export function toDateInput(iso: string | null): string {

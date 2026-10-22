@@ -11,15 +11,15 @@ import {
   issueUrl,
   SLOT_STATUS_LABEL,
   SLOT_TERM_HINT,
-  safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
 import { Time } from '../../../../../lib/format/time';
 import { slotHue } from '../../../../../lib/hue';
 import { SLOT_PILL_STATUS } from '../../../../../lib/status/pill';
+import { githubUrl } from '../../../../../lib/url';
 
 function IssueCell({ slot }: { slot: SlotSummary }) {
   if (slot.issue === null) return <>—</>;
-  const href = safeHttpsUrl(issueUrl(slot.issue, slot.prUrl));
+  const href = githubUrl(issueUrl(slot.issue, slot.prUrl));
   return href ? (
     <a
       href={href}
@@ -49,7 +49,7 @@ function ModelCell({ slot }: { slot: SlotSummary }) {
 
 function PrCell({ slot }: { slot: SlotSummary }) {
   if (slot.prNumber === null) return <>—</>;
-  const href = safeHttpsUrl(slot.prUrl);
+  const href = githubUrl(slot.prUrl);
   return (
     // `relative`: the sr-only label is absolutely positioned, and without an
     // anchor inside the table's scroller it escapes it and widens the page.

@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ScrollX } from '../scroll-x/scroll-x';
-import { isExternal, safeHref } from './safe-href';
+import { externalHost, isExternal, safeHref } from './safe-href';
 
 type MarkdownProps = {
   /** Markdown source: a checkpoint, an outcome, a brief. */
@@ -54,7 +54,13 @@ const COMPONENTS: Components = {
       <a
         href={target}
         className="text-accent-ink underline underline-offset-2"
-        {...(external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+        {...(external
+          ? {
+              target: '_blank',
+              rel: 'noreferrer noopener',
+              title: externalHost(target),
+            }
+          : {})}
       >
         {children}
       </a>

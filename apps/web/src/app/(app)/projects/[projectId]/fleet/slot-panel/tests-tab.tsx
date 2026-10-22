@@ -8,9 +8,9 @@ import {
   CHECKS_LABEL,
   CHECKS_TONE,
   formatAgo,
-  safeHttpsUrl,
 } from '../../../../../../lib/fleet/format';
 import { lastLocalChecks } from '../../../../../../lib/slot/format';
+import { githubUrl } from '../../../../../../lib/url';
 
 /**
  * The pull request's checks, as GitHub reports them, and the worker's own
@@ -23,7 +23,7 @@ export function TestsTab({
   slot: SlotDetail;
   conversation: SlotConversation | undefined;
 }) {
-  const prHref = safeHttpsUrl(slot.prUrl);
+  const prHref = githubUrl(slot.prUrl);
   const local = conversation
     ? lastLocalChecks(conversation.entries)
     : undefined;

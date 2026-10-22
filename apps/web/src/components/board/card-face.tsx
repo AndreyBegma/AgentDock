@@ -45,7 +45,7 @@ import { prChipText } from '../../lib/board/pull-request';
 import { ciDot, shippingBadge } from '../../lib/board/shipping';
 import { hintsLabel } from '../../lib/board-ai/triage';
 import { formatCost } from '../../lib/format';
-import { safeHttpsUrl } from '../../lib/queue/format';
+import { githubUrl } from '../../lib/url';
 import { StewardChip } from '../steward/steward-chip';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
 import { RestartChip } from './handoff/restart-chip';
@@ -427,8 +427,8 @@ function FaceLinks({
  */
 function CardFooter({ card, cost }: { card: BoardCardView; cost: string }) {
   const dot = ciDot(card);
-  const prHref = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
-  const issueHref = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
+  const prHref = card.prUrl ? githubUrl(card.prUrl) : null;
+  const issueHref = card.issueUrl ? githubUrl(card.issueUrl) : null;
   return (
     <div
       data-card-row="footer"
