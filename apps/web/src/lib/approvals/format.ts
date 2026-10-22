@@ -182,8 +182,14 @@ export function describeApprovalError(
       return `The note is over ${APPROVAL_NOTE_MAX_BYTES / 1024} KB.`;
     case APPROVALS_ERROR.commandUnavailable:
       return commandUnavailableText(runnerName);
-    case APPROVALS_ERROR.commandFailed:
-      return `The runner could not complete the request: ${error instanceof ApiError ? error.message : 'unknown error'}`;
+    case APPROVALS_ERROR.commandFailed: {
+      if (!(error instanceof ApiError)) {
+        return 'The runner could not complete the request: unknown error';
+      }
+      // WI-74: `detail` is the runner's own text, already redacted by the API.
+      const detail = error.body?.detail;
+      return `The runner could not complete the request: ${error.message}${typeof detail === 'string' && detail ? ` — ${detail}` : ''}`;
+    }
     default:
       break;
   }

@@ -6,7 +6,7 @@ export const approvalsError = (
   statusCode: number,
   error: ApprovalsErrorCode,
   message: string,
-  extra: Pick<ApprovalsErrorBody, 'headSha'> = {},
+  extra: Pick<ApprovalsErrorBody, 'headSha' | 'detail'> = {},
 ): HttpException => {
   const body: ApprovalsErrorBody = { statusCode, error, message, ...extra };
   return new HttpException(body, statusCode);

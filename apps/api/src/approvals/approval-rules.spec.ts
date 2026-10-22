@@ -95,6 +95,31 @@ describe('readApprovalEvents', () => {
     expect(prs?.get(4)?.closed).toBe('merged');
   });
 
+  it('lets an agent-written event close nothing and bind no head (C-169)', () => {
+    const roots = readApprovalEvents(
+      (['code-sentinel', 'hook', 'scraped'] as const).flatMap((source, i) => [
+        event('pr.merged', { number: 10 + i }, { source }),
+        event(
+          'pr.closed',
+          { number: 20 + i, branch: 'b', merged: true },
+          { source },
+        ),
+        event(
+          'pr.checks_changed',
+          { number: 30 + i, branch: 'b', checks: 'green', headSha: H1 },
+          { source },
+        ),
+      ]),
+    );
+    const prs = roots.get(ROOT)?.prs;
+    for (const i of [0, 1, 2]) {
+      expect(prs?.get(10 + i)?.closed ?? null).toBeNull();
+      expect(prs?.get(20 + i)?.closed ?? null).toBeNull();
+      // Only a re-check: the head is re-read with `pr.inspect`.
+      expect(prs?.get(30 + i)).toMatchObject({ moved: true, headSha: null });
+    }
+  });
+
   it('keeps the last head a pr.opened or pr.checks_changed carried', () => {
     const roots = readApprovalEvents([
       event('pr.opened', {

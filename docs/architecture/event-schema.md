@@ -173,6 +173,12 @@ from `@nautelle/shared`. It then adds `seq` and sends the event. A rejected
 line becomes `events.unparsed` (`eventsUnparsedData(file, line, reason,
 offset?)`), and the collector reads on.
 
+The file is written by the agents, so the collector accepts only the types the
+plugin writes (`CODE_SENTINEL_EVENT_TYPES`: the `EVENTS.md` closed list, the
+plugin#8 `pr.awaiting_approval` / `pr.approved` / `pr.changes_requested`, and
+the echoed `watch.sh` types). Any other type, such as `approvals.*`, is logged
+as a warning and becomes `events.unparsed` (C-169).
+
 | The normalizer | |
 |---|---|
 | refuses | malformed JSON, a non-object, `v` ≠ 1, a missing `type`, `ts` or `eid` |
@@ -203,6 +209,15 @@ again. It is stored as `events.duplicate { pluginEventId, type }`, so its
 `commit.trailer_found` (`via: "watch"`) are stored only, because the runner
 observes those itself. For the same field, a `code-sentinel` value is never
 overwritten by a `scraped` one (spec 16 D7).
+
+**Advisory sources (C-169).** `code-sentinel`, `scraped` and `hook` events are
+written by the agents themselves (`ADVISORY_EVENT_SOURCES`). They are stored
+and shown, and they may name a slot's pull request, but they never set its
+`prState`, `prChecks` or `prMergeable`. In the approval rules they close no
+row and bind no head; a moved head is re-read with `pr.inspect`. A plugin
+`pr.awaiting_approval` still opens a waiting row, because it only asks a
+person. Merge, approval and check state come only from the runner's own `gh`
+observations (`pr.*` with source `runner`), its commands and GitHub.
 
 ### Queue (spec 19)
 
@@ -252,7 +267,8 @@ with the pull request's number when a merged pull request closed it, else
 
 The schemas live in `packages/shared/src/protocol/events/hooks.ts`
 (`hookEventDataSchemas`, `parseHookEvent`). The `agentdock` plugin's hooks
-emit them through the runner's local socket. Each one carries the envelope
+emit them through the runner's local socket, which refuses an `op:event` of
+any other type with `forbidden` and spools nothing (C-169). Each one carries the envelope
 `session: { runtime: "claude", id: <session_id> }`. `project` is present when
 the daemon correlated the cwd. The data schemas are strict.
 

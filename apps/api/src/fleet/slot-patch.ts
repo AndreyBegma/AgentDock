@@ -1,8 +1,9 @@
 import type { PaneState, PrState } from '@nautelle/shared';
-import type {
-  CheckpointKind,
-  PrChecks,
-  SlotRuntime,
+import {
+  type CheckpointKind,
+  isAdvisorySource,
+  type PrChecks,
+  type SlotRuntime,
 } from '@nautelle/shared/protocol';
 import type { Applied } from './projection';
 
@@ -54,6 +55,26 @@ export const sourceOf = (applied: Applied): RunSource => ({
   source: applied.event.source,
   issue: applied.event.issue,
 });
+
+/**
+ * C-169: an event the agents can write (`isAdvisorySource`) may name a slot's
+ * pull request, never its merge or check state — those come from the runner's
+ * own `gh` observations only. The approvals sink reads that state, so a
+ * forged `pr.merged` or green `pr.checks_changed` moves no approval either.
+ */
+export const withoutAdvisoryPrState = (
+  source: RunSource['source'],
+  patch: SlotPatch,
+): SlotPatch => {
+  if (!isAdvisorySource(source)) return patch;
+  const {
+    prState: _prState,
+    prChecks: _prChecks,
+    prMergeable: _prMergeable,
+    ...rest
+  } = patch;
+  return rest;
+};
 
 export const PANE_OF = {
   'pane.prompt': 'prompt',

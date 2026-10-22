@@ -2,9 +2,10 @@
 #
 #   docker build -t agentdock-api:staging -f apps/api/Dockerfile .
 #
-# The runtime stage keeps the full dependency tree, dev dependencies included:
-# the entrypoint needs the Prisma CLI for `migrate deploy` and ts-node for the
-# seed. A slimmer image is a production concern, not a staging one.
+# The runtime stage carries production dependencies only: no ts-node, jest or
+# Nest CLI. The entrypoint migrates with the Prisma CLI (a dependency for that
+# reason) and seeds from the compiled dist/prisma/seed.js.
+# deploy/staging/check-api-image.sh fails the build if dev tooling comes back.
 
 # The base is pinned by digest (ADR-0053): a moved tag cannot change what is
 # built. Bump it together with deploy/ci-image/Dockerfile and the app
@@ -17,8 +18,8 @@ ARG BUN_IMAGE=oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2
 
 FROM ${BUN_IMAGE} AS bun
 
-# ─── deps ────────────────────────────────────────────────────────────────────
-FROM ${NODE_IMAGE} AS deps
+# ─── base ────────────────────────────────────────────────────────────────────
+FROM ${NODE_IMAGE} AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl unzip \
@@ -37,7 +38,16 @@ COPY apps/web/package.json apps/web/
 COPY apps/runner/package.json apps/runner/
 COPY packages/shared/package.json packages/shared/
 
+# ─── deps (everything the build needs) ───────────────────────────────────────
+FROM base AS deps
+
 RUN bun install --frozen-lockfile
+
+# ─── prod-deps (what the runtime ships) ──────────────────────────────────────
+# The API and its workspace dependencies only, without dev dependencies.
+FROM base AS prod-deps
+
+RUN bun install --frozen-lockfile --production --filter @nautelle/api
 
 # ─── builder ─────────────────────────────────────────────────────────────────
 FROM deps AS builder
@@ -56,11 +66,13 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=8180
-# The Prisma CLI and ts-node (seed) the entrypoint calls.
+# The Prisma CLI the entrypoint calls.
 ENV PATH=/app/node_modules/.bin:$PATH
 
 COPY --from=builder --chown=node:node /app/package.json /app/tsconfig.json ./
-COPY --from=builder --chown=node:node /app/node_modules node_modules/
+COPY --from=prod-deps --chown=node:node /app/node_modules node_modules/
+# The client `prisma generate` wrote in the builder (prisma-client-js output).
+COPY --from=builder --chown=node:node /app/node_modules/.prisma node_modules/.prisma/
 COPY --from=builder --chown=node:node /app/packages/shared packages/shared/
 COPY --from=builder --chown=node:node /app/apps/api apps/api/
 # The attachments volume's mount point (ADR-0031): a new named volume takes

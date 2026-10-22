@@ -47,8 +47,8 @@ const walk = (dir: string, found: string[] = []): string[] => {
  * on the reference machine — so nothing is parsed: each file under
  * `<CODEX_HOME>/sessions/` is reported once as a session with
  * `parsed: false`. Its `cwd` is the file's own directory, which is honest
- * (no line was read) and keeps it out of every project, so it is admin-only
- * (D10). The fixture tests in `codex/` are skipped until a real one exists.
+ * (no line was read) and keeps it out of every project unless `CODEX_HOME`
+ * lies inside a watched root, so it is not reported (ADR-0078). The fixture tests in `codex/` are skipped until a real one exists.
  */
 export const codexAdapter: RuntimeAdapter = {
   runtime: 'codex',
