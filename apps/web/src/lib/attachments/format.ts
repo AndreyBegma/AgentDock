@@ -126,3 +126,13 @@ export function splitByRound(attachments: readonly AttachmentView[]): {
 /** The card face's count, "1 attachment" / "3 attachments". */
 export const attachmentCountLabel = (count: number): string =>
   `${count} attachment${count === 1 ? '' : 's'}`;
+
+/** C-166: Remove asks first, naming the file that goes. */
+export const removeAttachmentCopy = (
+  attachment: Pick<AttachmentView, 'name'>,
+) => ({
+  title: `Remove ${attachment.name}?`,
+  consequence:
+    'The file is deleted from the card. Agents and people no longer see it; this cannot be undone.',
+  verb: 'Remove',
+});

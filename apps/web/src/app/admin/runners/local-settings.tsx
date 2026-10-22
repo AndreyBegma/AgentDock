@@ -9,16 +9,22 @@ import type {
   UpdateRunnerSettingsRequest,
 } from '@nautelle/shared';
 import { useEffect, useState } from 'react';
+import { ConfirmGate } from '../../../components/confirm/confirm-gate';
 import { api } from '../../../lib/api';
 import { describeRunnerError } from '../../../lib/runners/format';
-import { localUserOptions } from '../../../lib/runners/local-settings';
+import {
+  type LocalUserChange,
+  localUserChangeCopy,
+  localUserOptions,
+} from '../../../lib/runners/local-settings';
 import { useErrorToast } from '../../../lib/section/use-error-toast';
 
 /**
  * The runner sheet's "Claude Code sessions" section (spec 201 D8, D17): the
  * user a local request from this machine acts as, and away mode, which sends a
  * permission prompt to the web app and Telegram instead of the terminal.
- * Admin only; the sheet is already an admin page.
+ * Admin only; the sheet is already an admin page. A new local user asks
+ * first (C-166).
  */
 export function LocalSettings({
   runner,
@@ -32,6 +38,7 @@ export function LocalSettings({
 }) {
   const [users, setUsers] = useState<AdminUser[]>();
   const [busy, setBusy] = useState(false);
+  const [changing, setChanging] = useState<LocalUserChange>();
   const showError = useErrorToast();
 
   useEffect(() => {
@@ -78,12 +85,15 @@ export function LocalSettings({
           id="runner-local-user"
           value={runner.localUserId ?? ''}
           disabled={disabled || busy || users === undefined}
-          onChange={(e) =>
-            void patch(
-              { localUserId: e.target.value || null },
-              'Local user saved',
-            )
-          }
+          onChange={(e) => {
+            const id = e.target.value || null;
+            setChanging({
+              id,
+              label:
+                options.find((option) => option.id === id)?.label ??
+                'No local user',
+            });
+          }}
         >
           <option value="">No local user</option>
           {options.map((option) => (
@@ -115,6 +125,17 @@ export function LocalSettings({
           labelledBy="runner-away-label"
         />
       </div>
+      <ConfirmGate
+        pending={changing}
+        copy={localUserChangeCopy}
+        busy={busy}
+        onConfirm={(change) =>
+          void patch({ localUserId: change.id }, 'Local user saved').then(() =>
+            setChanging(undefined),
+          )
+        }
+        onCancel={() => setChanging(undefined)}
+      />
     </section>
   );
 }

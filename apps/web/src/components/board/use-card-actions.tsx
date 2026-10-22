@@ -1,6 +1,5 @@
 'use client';
 
-import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import type {
   AcceptBoardCardRequest,
@@ -26,9 +25,14 @@ import {
   runCard,
   stopCard,
 } from '../../lib/board/actions';
+import {
+  type CardConfirmation,
+  cardConfirmCopy,
+} from '../../lib/board/card-confirm';
 import { runWaitsFor } from '../../lib/board/dependencies';
 import { describeBoardError } from '../../lib/board/format';
 import { collectMessage } from '../../lib/board/pull-request';
+import { ConfirmGate } from '../confirm/confirm-gate';
 import { AcceptDialog } from './accept-dialog';
 
 /** The card's own buttons, shared by the board's menu and the card sheet. */
@@ -49,8 +53,11 @@ export interface CardActions {
     card: BoardCardView,
     edits?: AcceptSuggestionRequest,
   ) => Promise<boolean>;
-  /** #244 D9: deletes the card and remembers its fingerprint. */
-  dismiss: (card: BoardCardView) => Promise<boolean>;
+  /**
+   * #244 D9: deletes the card and remembers its fingerprint. C-166: asks
+   * first; `onDone` runs once the card is gone.
+   */
+  askDismiss: (card: BoardCardView, onDone?: () => void) => void;
   /** #244: asks first, then dismisses every Inbox card. */
   askDismissAll: (count: number) => void;
   /** Both ask first (`ConfirmDialog`). */
@@ -60,10 +67,6 @@ export interface CardActions {
   /** The confirm dialogs; render once. */
   dialogs: ReactNode;
 }
-
-type Pending =
-  | { kind: 'stop' | 'delete'; card: BoardCardView }
-  | { kind: 'dismiss-all'; count: number };
 
 export function useCardActions({
   projectId,
@@ -81,7 +84,7 @@ export function useCardActions({
   onDeleted: (card: BoardCardView) => void;
 }): CardActions {
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<Pending>();
+  const [pending, setPending] = useState<CardConfirmation>();
   const [accepting, setAccepting] = useState<BoardCardView>();
   const [acceptVersion, setAcceptVersion] = useState(0);
   // #709: an Accept refused for work not in the base, waiting for the
@@ -138,8 +141,7 @@ export function useCardActions({
     }
   };
 
-  const confirm = async () => {
-    if (!pending) return;
+  const confirm = async (pending: CardConfirmation) => {
     if (pending.kind === 'dismiss-all') {
       await perform(
         () => dismissAllSuggestions(projectId),
@@ -149,6 +151,15 @@ export function useCardActions({
       return;
     }
     const { kind, card } = pending;
+    if (kind === 'dismiss') {
+      const done = await perform(
+        () => dismissSuggestion(projectId, card.number),
+        `Dismissed ${card.label}.`,
+      );
+      setPending(undefined);
+      if (done) pending.onDone?.();
+      return;
+    }
     if (kind === 'stop') {
       await perform(
         () => stopCard(projectId, card.number),
@@ -161,31 +172,6 @@ export function useCardActions({
       }, `Deleted ${card.label}.`);
     }
     setPending(undefined);
-  };
-
-  const dialogTitle = (): string => {
-    if (pending?.kind === 'dismiss-all') {
-      return pending.count === 1
-        ? 'Dismiss the suggestion?'
-        : `Dismiss all ${pending.count} suggestions?`;
-    }
-    return pending?.kind === 'stop'
-      ? `Stop the worker of ${pending.card.label}?`
-      : `Delete ${pending?.card.label ?? 'the card'}?`;
-  };
-
-  const dialogConsequence = (): string => {
-    if (pending?.kind === 'dismiss-all') {
-      return 'The cards are deleted. Nautelle remembers their titles for 90 days so the same suggestion does not come back.';
-    }
-    return pending?.kind === 'stop'
-      ? 'The tmux session is killed. The work already committed in the worktree stays; you can run the card again.'
-      : 'The card and its rounds are removed, and its worktree is cleaned up. A pull request it opened stays on GitHub.';
-  };
-
-  const verb = (): string => {
-    if (pending?.kind === 'dismiss-all') return 'Dismiss all';
-    return pending?.kind === 'stop' ? 'Stop worker' : 'Delete';
   };
 
   // #638 (ADR-0065): an open dependency holds Run on every surface; a card
@@ -238,11 +224,7 @@ export function useCardActions({
         () => acceptSuggestion(projectId, card.number, edits),
         `${card.label} is in To Do.`,
       ),
-    dismiss: (card) =>
-      perform(
-        () => dismissSuggestion(projectId, card.number),
-        `Dismissed ${card.label}.`,
-      ),
+    askDismiss: (card, onDone) => setPending({ kind: 'dismiss', card, onDone }),
     askDismissAll: (count) => setPending({ kind: 'dismiss-all', count }),
     askStop: (card) => setPending({ kind: 'stop', card }),
     askDelete: (card) => setPending({ kind: 'delete', card }),
@@ -265,17 +247,12 @@ export function useCardActions({
             setUnlanded(undefined);
           }}
         />
-        <ConfirmDialog
-          open={pending !== undefined}
-          onOpenChange={(open) => {
-            if (!open && !busy) setPending(undefined);
-          }}
-          title={dialogTitle()}
-          consequence={dialogConsequence()}
-          verb={verb()}
-          tone="danger"
+        <ConfirmGate
+          pending={pending}
+          copy={cardConfirmCopy}
           busy={busy}
-          onConfirm={() => void confirm()}
+          onConfirm={(p) => void confirm(p)}
+          onCancel={() => setPending(undefined)}
         />
       </>
     ),

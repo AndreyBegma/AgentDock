@@ -22,6 +22,7 @@ import {
   type WebhookCircuitState,
   type WebhookCreateRequest,
   type WebhookDeliveryStatus,
+  type WebhookDeliveryView,
   type WebhookEventType,
   type WebhookUpdateRequest,
   type WebhookView,
@@ -490,5 +491,19 @@ export function verify(rawBody, header, secret) {
   const wanted = Buffer.from(expected, 'hex');
   return given.length === wanted.length && timingSafeEqual(given, wanted);
 }`;
+
+/**
+ * C-166: Redeliver asks first — the receiver gets the same event again and
+ * acts on it again unless it deduplicates.
+ */
+export const redeliverCopy = (
+  delivery: Pick<WebhookDeliveryView, 'eventType'>,
+) => ({
+  title: `Send ${delivery.eventType} again?`,
+  consequence:
+    'The same event is queued for the receiver once more, with a new signature. A receiver that does not deduplicate acts on it twice.',
+  verb: 'Redeliver',
+  tone: 'default' as const,
+});
 
 export { DEFAULT_INBOUND_VALUE_PATTERN };

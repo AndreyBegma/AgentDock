@@ -62,10 +62,6 @@ export function SuggestionSheetBody({
     }
   };
 
-  const dismiss = async () => {
-    if (await actions.dismiss(card)) onDone();
-  };
-
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -178,7 +174,7 @@ export function SuggestionSheetBody({
               variant="ghost"
               type="button"
               disabled={actions.busy}
-              onClick={() => void dismiss()}
+              onClick={() => actions.askDismiss(card, onDone)}
             >
               Dismiss
             </Button>

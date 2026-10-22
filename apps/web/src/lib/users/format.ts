@@ -50,6 +50,28 @@ export function roleChangeCopy(
       };
 }
 
+/**
+ * C-166: Approve asks first and names the role in the title, so a stray click
+ * cannot let someone in, least of all as an admin. Approving an admin is
+ * `danger`: the focus lands on Cancel.
+ */
+export function approveCopy(
+  user: Pick<AdminUser, 'email'>,
+  role: Role,
+): {
+  title: string;
+  consequence: string;
+  verb: string;
+  tone: 'danger' | 'default';
+} {
+  return {
+    title: `Approve ${user.email} as ${ROLE_LABEL[role]}?`,
+    consequence: `${user.email} can sign in at once. ${ROLE_HINT[role]}`,
+    verb: 'Approve',
+    tone: role === 'admin' ? 'danger' : 'default',
+  };
+}
+
 /** What deleting an account removes, and what stays (the schema's cascades). */
 export const deleteUserCopy = (user: Pick<AdminUser, 'email'>): string =>
   `${user.email} is signed out and removed, with their project memberships, notification settings, Telegram link, personal budgets and the schedules they created. Work they did — sessions, runs, approvals, audit records — stays. Disable the account instead to keep everything.`;
