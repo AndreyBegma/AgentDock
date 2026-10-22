@@ -49,6 +49,8 @@ export class AuthService {
         'Registration is closed',
       );
     }
+    // Hashed before the email is looked at, so a taken email costs the same
+    // time as a new one.
     const passwordHash = await hashPassword(dto.password);
     try {
       const user = await this.prisma.user.create({
@@ -67,7 +69,18 @@ export class AuthService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw authError(409, AUTH_ERROR.emailTaken, 'Email already registered');
+        // The caller gets the same answer as for a new email (L-12): the
+        // response must not say which addresses have an account. The attempt
+        // is kept for admins, against the email and not the account.
+        await this.audit.recordFolded({
+          actor: ANONYMOUS_ACTOR,
+          origin,
+          action: 'auth.register',
+          target: { type: 'email', id: dto.email },
+          result: 'denied',
+          meta: { reason: 'email_taken' },
+        });
+        return;
       }
       throw error;
     }

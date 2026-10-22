@@ -74,14 +74,22 @@ describe('auth (e2e)', () => {
       expect(setCookies(loginResponse)).toEqual([]);
     });
 
-    it('refuses a taken email with 409 email_taken', async () => {
+    it('answers a taken email like a new one and creates no user', async () => {
       await openRegistration();
       await createUser(ctx.prisma, 'taken@example.com', 'viewer');
+      const before = await ctx.prisma.user.findUniqueOrThrow({
+        where: { email: 'taken@example.com' },
+      });
 
       const response = await register('taken@example.com');
 
-      expect(response.status).toBe(409);
-      expect(response.body.error).toBe(AUTH_ERROR.emailTaken);
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual({ status: 'pending' });
+      expect(await ctx.prisma.user.count()).toBe(1);
+      const after = await ctx.prisma.user.findUniqueOrThrow({
+        where: { email: 'taken@example.com' },
+      });
+      expect(after).toEqual(before);
     });
 
     it('rejects a password shorter than 12 characters', async () => {
