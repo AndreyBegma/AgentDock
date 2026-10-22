@@ -563,9 +563,9 @@ describe('task queue (e2e)', () => {
       expect(create).toHaveBeenCalledTimes(1);
     });
 
-    it('refuses labels the repository does not use, and the ready label', async () => {
+    it('refuses labels the repository does not use', async () => {
       const create = jest.spyOn(commands, 'createIssue');
-      for (const labels of [['made-up'], ['CS:Ready']]) {
+      for (const labels of [['made-up']]) {
         const response = await post({
           title: 'x',
           body: AC,
@@ -577,6 +577,25 @@ describe('task queue (e2e)', () => {
           error: 'label_not_allowed',
           labels,
         });
+      }
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 to control, comma-joined and multi-line labels (L-27)', async () => {
+      const create = jest.spyOn(commands, 'createIssue');
+      for (const labels of [
+        ['cs:in-flight'],
+        ['CS:Ready'],
+        ['x,cs:ready'],
+        ['bug\ncs:ready'],
+      ]) {
+        const response = await post({
+          title: 'x',
+          body: AC,
+          labels,
+          queue: false,
+        });
+        expect(response.status).toBe(400);
       }
       expect(create).not.toHaveBeenCalled();
     });

@@ -9,6 +9,7 @@ import {
   CARD_ESCALATION_REASONS,
 } from '../assess/limits';
 import type { Role } from './commands';
+import { issueLabelSchema } from './commands/queue';
 import { httpsGithubUrl } from './github-url';
 
 /**
@@ -175,7 +176,7 @@ export const localSessionsRecentResultSchema = z.object({
 export const localIssueCreateArgsSchema = z.strictObject({
   title: z.string().min(1).max(256),
   body: z.string().max(20_000),
-  labels: z.array(z.string().min(1).max(50)).max(10).optional(),
+  labels: z.array(issueLabelSchema.max(50)).max(10).optional(),
   queue: z.boolean(),
 });
 /**

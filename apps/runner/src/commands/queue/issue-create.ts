@@ -56,9 +56,11 @@ export const issueCreate = async (
   const readyLabel =
     args.readyLabel ?? readyLabelOf(project.root) ?? DEFAULT_READY_LABEL;
   // The ready label is never taken from the caller: only `queue` may set it.
-  const labels = args.labels.filter(
-    (l) => l.toLowerCase() !== readyLabel.toLowerCase(),
-  );
+  // `gh --label` splits on commas, so compare the parts it will see (L-27).
+  const labels = args.labels
+    .flatMap((l) => l.split(','))
+    .map((l) => l.trim())
+    .filter((l) => l && l.toLowerCase() !== readyLabel.toLowerCase());
   const reason = args.queue ? specGap(args.body, labels) : null;
   const queued = args.queue && reason === null;
   if (queued) labels.push(readyLabel);

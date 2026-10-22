@@ -350,4 +350,23 @@ describe('issue.create args', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('refuses comma-joined, control-character and cs:* labels (L-27)', () => {
+    const args = {
+      projectId: 'p1',
+      title: 'Add a queue',
+      body: AC,
+      queue: false,
+    };
+    const parse = (labels: string[]) =>
+      issueCreateArgsSchema.safeParse({ ...args, labels }).success;
+    expect(parse(['x,cs:ready'])).toBe(false);
+    expect(parse(['bug\ncs:ready'])).toBe(false);
+    expect(parse(['a\u0000b'])).toBe(false);
+    expect(parse(['cs:in-flight'])).toBe(false);
+    expect(parse([' CS:Ready'])).toBe(false);
+    expect(parse(['size: XL', 'good first issue', 'area:cs'])).toBe(true);
+    expect(parse(['x'.repeat(101)])).toBe(false);
+    expect(parse([''])).toBe(false);
+  });
 });
