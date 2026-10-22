@@ -3,7 +3,11 @@
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
-import type { ModelPriceInput } from '@nautelle/shared';
+import {
+  checkSafePattern,
+  type ModelPriceInput,
+  testBounded,
+} from '@nautelle/shared';
 import { type FormEvent, useEffect, useState } from 'react';
 import {
   compilePattern,
@@ -25,8 +29,9 @@ const PRICE_FIELDS = [
 /** Whether `pattern` (case-insensitive regex) matches `sample`; null when either is unusable. */
 function patternMatches(pattern: string, sample: string): boolean | null {
   if (!pattern || !sample) return null;
+  if (!checkSafePattern(pattern, 'i').ok) return null;
   try {
-    return compilePattern(pattern).test(sample);
+    return testBounded(compilePattern(pattern), sample);
   } catch {
     return null;
   }

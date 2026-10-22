@@ -1,7 +1,10 @@
 import type { ChartSeries } from '@andrewbehma/glass-ui/chart';
 import {
+  checkSafePattern,
+  compileMatchPattern,
   type ModelPriceInput,
   type PriceTier,
+  SAFE_PATTERN_MESSAGES,
   USAGE_ERROR,
   type UsageDimension,
   type UsageInterval,
@@ -261,8 +264,7 @@ export function perToken(perMillionText: string): string | null {
  * A match pattern as the API compiles it: case-insensitive, with the inline
  * `(?i)` flag the seeded Langfuse patterns start with dropped (JS has none).
  */
-export const compilePattern = (pattern: string): RegExp =>
-  new RegExp(pattern.replace(/^\(\?i\)/, ''), 'i');
+export const compilePattern = compileMatchPattern;
 
 export const defaultTier = (model: ModelPriceInput): PriceTier | undefined =>
   model.tiers.find((tier) => tier.isDefault) ?? model.tiers[0];
@@ -331,10 +333,12 @@ export function modelFromForm(
   if (!matchPattern) return { ok: false, error: 'Match pattern is required.' };
   // An untouched stored pattern is the API's to judge; only a new one is checked here.
   if (matchPattern !== existing?.matchPattern) {
-    try {
-      compilePattern(matchPattern);
-    } catch {
-      return { ok: false, error: 'The match pattern is not a valid regex.' };
+    const problem = checkSafePattern(matchPattern, 'i');
+    if (!problem.ok) {
+      return {
+        ok: false,
+        error: `Match pattern: ${SAFE_PATTERN_MESSAGES[problem.reason]}`,
+      };
     }
   }
   const priority = Number(form.priority);

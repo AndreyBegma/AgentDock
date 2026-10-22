@@ -10,6 +10,13 @@ import {
   skillInvocationSchema,
   skillRunOutputSchema,
 } from '../protocol/commands/skills';
+import {
+  checkSafePattern,
+  SAFE_PATTERN_ERRORS,
+  SAFE_PATTERN_MAX_CHARS,
+  type SafePatternCheck,
+  testBounded,
+} from '../regex/safe-pattern';
 
 /**
  * What an inbound trigger starts (docs/specs/26-webhooks.md D3), stored as
@@ -61,7 +68,7 @@ export const INBOUND_PAYLOAD_NOTICE =
 /** D4: longest stringified value a placeholder may render. */
 export const INBOUND_VALUE_MAX_CHARS = 500;
 /** Longest `valuePattern` an admin may set. */
-export const INBOUND_VALUE_PATTERN_MAX_CHARS = 500;
+export const INBOUND_VALUE_PATTERN_MAX_CHARS = SAFE_PATTERN_MAX_CHARS;
 /** Most `allowedPaths` one trigger may list. */
 export const INBOUND_ALLOWED_PATHS_MAX = 50;
 /** Most dotted segments in one path. */
@@ -149,17 +156,17 @@ export const checkArgsTemplate = (
       };
 };
 
-/** A `valuePattern` an admin may store: compiles, and is not absurdly long. */
-export const isValidValuePattern = (pattern: string): boolean => {
-  if (pattern.length === 0 || pattern.length > INBOUND_VALUE_PATTERN_MAX_CHARS)
-    return false;
-  try {
-    new RegExp(pattern, 'u');
-    return true;
-  } catch {
-    return false;
-  }
-};
+/**
+ * A `valuePattern` an admin may store: compiles, is short, and has no shape
+ * that backtracks exponentially (`checkSafePattern`).
+ */
+export const checkValuePattern = (pattern: string): SafePatternCheck =>
+  pattern.length === 0
+    ? { ok: false, reason: SAFE_PATTERN_ERRORS.invalid }
+    : checkSafePattern(pattern, 'u');
+
+export const isValidValuePattern = (pattern: string): boolean =>
+  checkValuePattern(pattern).ok;
 
 /** Own properties only, so a path never reaches `Object.prototype`. */
 const lookup = (
@@ -220,10 +227,9 @@ export const renderArgsTemplate = (
 ): RenderedArgs => {
   const checked = checkArgsTemplate(template, allowedPaths);
   if (!checked.ok) return checked;
-  const pattern = new RegExp(
-    valuePattern ?? DEFAULT_INBOUND_VALUE_PATTERN,
-    'u',
-  );
+  // A pattern stored before the safety check is refused here too, not run.
+  const source = valuePattern ?? DEFAULT_INBOUND_VALUE_PATTERN;
+  const pattern = isValidValuePattern(source) ? new RegExp(source, 'u') : null;
 
   const values = new Map<string, string>();
   for (const path of checked.paths) {
@@ -235,7 +241,7 @@ export const renderArgsTemplate = (
       return { ok: false, reason: INBOUND_TEMPLATE_ERRORS.notScalar, path };
     if (rendered.length > INBOUND_VALUE_MAX_CHARS)
       return { ok: false, reason: INBOUND_TEMPLATE_ERRORS.tooLong, path };
-    if (!pattern.test(rendered))
+    if (pattern === null || !testBounded(pattern, rendered))
       return {
         ok: false,
         reason: INBOUND_TEMPLATE_ERRORS.patternMismatch,

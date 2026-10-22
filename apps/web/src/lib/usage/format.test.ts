@@ -229,7 +229,8 @@ describe('price forms', () => {
       return result.ok ? null : result.error;
     };
     expect(error({ modelName: ' ' })).toMatch(/Model name/);
-    expect(error({ matchPattern: '(' })).toMatch(/valid regex/);
+    expect(error({ matchPattern: '(' })).toMatch(/valid regular expression/);
+    expect(error({ matchPattern: '^(a+)+$' })).toMatch(/repeats a group/);
     expect(error({ priority: '-1' })).toMatch(/Priority/);
     expect(error({ output: '' })).toMatch(/Input and output/);
     expect(error({ cacheRead: 'x' })).toMatch(/cacheRead/);

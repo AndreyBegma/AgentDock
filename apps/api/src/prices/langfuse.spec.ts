@@ -1,3 +1,4 @@
+import { checkSafePattern } from '@nautelle/shared';
 import { convertLangfusePrices, type LangfuseModel } from './langfuse';
 import { compilePattern } from './pricing';
 import { readLangfuseSnapshot } from './seed-prices';
@@ -62,6 +63,12 @@ describe('convertLangfusePrices on the vendored snapshot', () => {
   it('compiles every match pattern as a JavaScript regex', () => {
     for (const price of result.prices) {
       expect(() => compilePattern(price.matchPattern)).not.toThrow();
+    }
+  });
+
+  it('keeps every seeded pattern within the safe-pattern check', () => {
+    for (const price of result.prices) {
+      expect(checkSafePattern(price.matchPattern, 'i')).toEqual({ ok: true });
     }
   });
 

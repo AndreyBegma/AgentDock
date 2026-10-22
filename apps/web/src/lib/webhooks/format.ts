@@ -1,10 +1,10 @@
 import {
   checkArgsTemplate,
+  checkValuePattern,
   DEFAULT_INBOUND_VALUE_PATTERN,
   INBOUND_ALLOWED_PATHS_MAX,
   INBOUND_DELIVERY_REASONS,
   INBOUND_TEMPLATE_ERRORS,
-  INBOUND_VALUE_PATTERN_MAX_CHARS,
   type InboundDeliveryStatus,
   type InboundTemplateError,
   type InboundTriggerAction,
@@ -12,8 +12,8 @@ import {
   type InboundTriggerUpdateRequest,
   type InboundTriggerView,
   inboundPayloadPathSchema,
-  isValidValuePattern,
   normalizeAllowedTarget,
+  SAFE_PATTERN_MESSAGES,
   WEBHOOK_ATTEMPT_ERRORS,
   WEBHOOK_CIRCUIT_OPEN_MS,
   WEBHOOK_EVENT_TYPES,
@@ -303,10 +303,9 @@ export function triggerFormProblem(
     return `“${badPath}” is not a valid payload path (dotted letters, digits, _ and -).`;
   const pattern = form.valuePattern.trim();
   if (pattern !== '') {
-    if (pattern.length > INBOUND_VALUE_PATTERN_MAX_CHARS)
-      return 'The value pattern is too long.';
-    if (!isValidValuePattern(pattern))
-      return 'The value pattern is not a valid regular expression.';
+    const problem = checkValuePattern(pattern);
+    if (!problem.ok)
+      return `Value pattern: ${SAFE_PATTERN_MESSAGES[problem.reason]}`;
   }
   if (form.kind === 'orchestrator') return null;
   if (form.skill.trim() === '') return 'Name the skill to run.';
