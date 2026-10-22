@@ -5,6 +5,7 @@ import type {
   ReportedProfileEnv,
   Runtime,
 } from '../protocol';
+import type { RunnerUpdate } from './release';
 
 /**
  * Derived, never stored: `online` while a socket is open and the last
@@ -70,6 +71,27 @@ export interface AdminRunner {
    */
   localUserId?: string | null;
   awayMode?: boolean;
+  /**
+   * C-328: the reported version against the latest `nautelle-runner`
+   * release; null when the runner never reported one or the API has not
+   * read the registry yet. An offline runner is judged by its last report.
+   */
+  update: RunnerUpdate | null;
+}
+
+/**
+ * A row of `GET /runners/local` and the answer of `PATCH /runners/:id`: a
+ * runner the caller is the local user of (spec 201), with its version check
+ * (C-328).
+ */
+export interface LocalRunner {
+  id: string;
+  name: string;
+  localUserId: string | null;
+  awayMode: boolean;
+  hostname: string | null;
+  version: string | null;
+  update: RunnerUpdate | null;
 }
 
 /** `PATCH /runners/:id` (spec 201): `localUserId` admin only; `awayMode` admin or the local user. */

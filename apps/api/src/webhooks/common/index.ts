@@ -28,8 +28,10 @@ export {
 } from './signature';
 export {
   checkWebhookTarget,
+  type GuardedGetRequest,
   type GuardedPostRequest,
   type GuardedPostResult,
+  guardedGet,
   guardedPost,
   type HostResolver,
   isBlockedAddress,

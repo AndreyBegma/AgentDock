@@ -2,6 +2,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
   checkWebhookTarget,
+  guardedGet,
   guardedPost,
   type HostResolver,
   isBlockedAddress,
@@ -191,7 +192,12 @@ describe('guardedPost (D12, D15)', () => {
   let server: http.Server;
   let port: number;
   let handler: Handler;
-  const hits: { url: string; host: string | undefined; body: string }[] = [];
+  const hits: {
+    url: string;
+    host: string | undefined;
+    body: string;
+    method?: string;
+  }[] = [];
 
   beforeAll(async () => {
     server = http.createServer((req, res) => {
@@ -200,7 +206,12 @@ describe('guardedPost (D12, D15)', () => {
         body += chunk.toString();
       });
       req.on('end', () => {
-        hits.push({ url: req.url ?? '', host: req.headers.host, body });
+        hits.push({
+          url: req.url ?? '',
+          host: req.headers.host,
+          body,
+          ...(req.method === 'POST' ? {} : { method: req.method }),
+        });
         handler(req, res);
       });
     });
@@ -339,5 +350,41 @@ describe('guardedPost (D12, D15)', () => {
       resolve,
     );
     expect(result).toMatchObject({ succeeded: false, error: 'network_error' });
+  });
+
+  it('GETs through the same check, with no body (C-328)', async () => {
+    handler = (_req, res) => res.writeHead(200).end('{"version":"0.15.0"}');
+    const { resolve } = lan();
+    const result = await guardedGet({
+      url: `http://n8n.lan:${port}/nautelle-runner/latest`,
+      headers: { Accept: 'application/json' },
+      allowlist: new TargetAllowlist(['n8n.lan']),
+      resolve,
+    });
+    expect(result).toEqual({
+      succeeded: true,
+      status: 200,
+      body: '{"version":"0.15.0"}',
+      error: null,
+    });
+    expect(hits).toEqual([
+      {
+        url: '/nautelle-runner/latest',
+        host: `n8n.lan:${port}`,
+        body: '',
+        method: 'GET',
+      },
+    ]);
+    const refused = await guardedGet({
+      url: `http://n8n.lan:${port}/nautelle-runner/latest`,
+      headers: {},
+      allowlist: none,
+      resolve,
+    });
+    expect(refused).toMatchObject({
+      succeeded: false,
+      error: 'blocked_address',
+    });
+    expect(hits).toHaveLength(1);
   });
 });

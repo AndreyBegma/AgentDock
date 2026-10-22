@@ -9,6 +9,11 @@ import { RunnerIngestService } from './runner-ingest.service';
 import { RunnerLocalRequests } from './runner-local-requests';
 import { defaultRunnerOptions, RUNNER_OPTIONS } from './runner-options';
 import { RunnerPresence } from './runner-presence';
+import {
+  RUNNER_RELEASE_OPTIONS,
+  runnerReleaseOptionsFromEnv,
+} from './runner-release';
+import { RunnerReleaseService } from './runner-release.service';
 import { RunnerReplacements } from './runner-replacements';
 import { RunnerSettingsService } from './runner-settings.service';
 import { RunnerStreams } from './runner-streams';
@@ -28,6 +33,11 @@ import { RunnersService } from './runners.service';
   ],
   providers: [
     { provide: RUNNER_OPTIONS, useValue: defaultRunnerOptions },
+    {
+      provide: RUNNER_RELEASE_OPTIONS,
+      useFactory: () => runnerReleaseOptionsFromEnv(),
+    },
+    RunnerReleaseService,
     RunnerConnections,
     RunnerConnectHooks,
     RunnerReplacements,

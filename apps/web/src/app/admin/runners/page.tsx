@@ -192,6 +192,16 @@ function RunnerRows({
               .filter(Boolean)
               .join(' · ') || '—'}
           </span>
+          {runner.update?.outdated ? (
+            // C-328: the last reported version is behind the latest release.
+            <Badge
+              tone="warn"
+              size="md"
+              label="Update available"
+              title={`v${runner.update.latest} is out`}
+              className="mt-1 self-start"
+            />
+          ) : null}
         </div>
       ),
     },

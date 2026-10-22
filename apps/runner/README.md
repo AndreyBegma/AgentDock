@@ -46,6 +46,33 @@ does not install ([ADR-0049](../../docs/adr/0049-runner-releases-are-signed-and-
 first, so it works on a clean checkout. Releasing is in
 [deploy/README.md](../../deploy/README.md#releasing-the-runner).
 
+## Updating
+
+The API reads the latest released `nautelle-runner` from the npm registry
+(`registry.npmjs.org`) once an hour, in the background, through the same
+outbound guard as webhooks, and keeps the last good answer when a read fails.
+A version counts as released only when the meta package and all four platform
+packages report it as their `latest`; a prerelease is never offered. It
+compares that with the version each runner reported when it connected (an
+offline runner keeps its last one) and puts the result on the runner reads as
+`update: { current, latest, outdated }` — `null` when the runner never
+reported a version or the API has not read the registry yet. Versions compare
+by major, minor and patch only.
+
+When your runner is behind, the web app says so on every page ("Your runner
+`<hostname>` is on 0.14.0 — 0.15.0 is out.") until you dismiss it for that
+release, and Runners marks it **Update available**. To update, on the
+runner's machine:
+
+```sh
+npm i -g nautelle-runner@<version>
+systemctl --user restart nautelle-runner                   # Linux (install-service)
+launchctl kickstart -k gui/$(id -u)/com.nautelle.runner    # macOS (install-service)
+```
+
+With Homebrew: `brew upgrade nautelle-runner && brew services restart
+nautelle-runner`. What changed is in [CHANGELOG.md](CHANGELOG.md).
+
 ## Update prompt
 
 While a command you type runs (`pair`, `status`, `profiles`, `policy`,
