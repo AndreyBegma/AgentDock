@@ -451,6 +451,9 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 - `projectId` and `slot` are the adapter's correlation (D6). `projectId` comes
   from the watch list; the API stores it only when that project belongs to the
   sending runner, otherwise the session has no project.
+- The runner sends these only for a session inside a watched root, the ones
+  that correlate to a project (ADR-0078). A session that leaves every root is
+  sent one `session.observed` without a project, then nothing.
 - A subagent is linked by `parent` on its own `session.observed`, by
   `childSessionId` on the spawning `tool.call`, or both. It takes its parent's
   project and slot.

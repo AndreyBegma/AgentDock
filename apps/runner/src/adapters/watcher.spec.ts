@@ -289,12 +289,8 @@ describe('SessionWatcher: correlation follows the watch list (D6)', () => {
   it('re-sends session.observed when a session gains a project', async () => {
     const { instance, events } = watcher();
     await instance.start([]);
-    const before = events
-      .filter((e) => e.type === 'session.observed')
-      .map((e) => e.data as SessionObservedData);
-    expect(before.every((o) => o.projectId === undefined)).toBe(true);
+    expect(events).toEqual([]);
 
-    events.length = 0;
     await instance.setProjects([ACME]);
     expect(events.map((e) => [e.type, e.session?.id])).toEqual(
       expect.arrayContaining([
@@ -314,8 +310,130 @@ describe('SessionWatcher: correlation follows the watch list (D6)', () => {
   });
 });
 
+describe('SessionWatcher: only sessions inside watched roots (ADR-0078)', () => {
+  const PRIVATE_ID = '22222222-2222-4222-8222-222222222222';
+  const PRIVATE: WatchedProject = {
+    id: 'prj_private',
+    root: '/home/u/private',
+  };
+
+  const privateLine = (requestId: string, ts: string) =>
+    `${JSON.stringify({
+      type: 'assistant',
+      requestId,
+      sessionId: PRIVATE_ID,
+      cwd: '/home/u/private',
+      gitBranch: 'secret-branch',
+      timestamp: ts,
+      message: {
+        id: `msg_${requestId}`,
+        model: 'claude-opus-5-5',
+        content: [],
+        usage: { input_tokens: 1, output_tokens: 2 },
+      },
+    })}\n`;
+
+  let privateFile: string;
+  beforeEach(() => {
+    const projectDir = join(dir, 'claude', 'projects', '-home-u-private');
+    mkdirSync(projectDir, { recursive: true });
+    privateFile = join(projectDir, `${PRIVATE_ID}.jsonl`);
+    writeFileSync(
+      privateFile,
+      [
+        JSON.stringify({
+          type: 'user',
+          promptId: 'p-private',
+          sessionId: PRIVATE_ID,
+          cwd: '/home/u/private',
+          gitBranch: 'secret-branch',
+          timestamp: '2026-10-01T09:00:00.000Z',
+          message: { role: 'user', content: 'hello' },
+        }),
+        JSON.stringify({ type: 'custom-title', customTitle: 'Secret title' }),
+        privateLine('req_P1', '2026-10-01T09:00:01.000Z').trimEnd(),
+        '',
+      ].join('\n'),
+    );
+  });
+
+  const ofPrivate = (events: UnsequencedEvent[]) =>
+    events.filter((e) => e.session?.id === PRIVATE_ID);
+
+  it('sends nothing of a session outside every watched root', async () => {
+    const { instance, events } = watcher();
+    await instance.start([ACME]);
+    appendFileSync(
+      privateFile,
+      privateLine('req_P2', '2026-10-01T09:01:00.000Z'),
+    );
+    await instance.scan();
+    await instance.backfill({ since: LONG_AGO });
+    await instance.setProjects([ACME, OTHER]);
+
+    expect(ofPrivate(events)).toEqual([]);
+    const sent = JSON.stringify(events);
+    for (const secret of ['/home/u/private', 'secret-branch', 'Secret title']) {
+      expect(sent).not.toContain(secret);
+    }
+    // The session inside a watched root is reported as before.
+    expect(requestIds(events)).toEqual(
+      expect.arrayContaining(['req_A', 'req_S1']),
+    );
+    await instance.stop();
+  });
+
+  it('reports a session from the moment it enters a watched root', async () => {
+    const { instance, events } = watcher();
+    await instance.start([ACME]);
+    expect(ofPrivate(events)).toEqual([]);
+
+    await instance.setProjects([ACME, PRIVATE]);
+    expect(ofPrivate(events).map((e) => [e.type, e.data])).toEqual([
+      [
+        'session.observed',
+        expect.objectContaining({
+          projectId: 'prj_private',
+          cwd: '/home/u/private',
+          title: 'Secret title',
+        }),
+      ],
+    ]);
+
+    appendFileSync(
+      privateFile,
+      privateLine('req_P2', '2026-10-01T09:01:00.000Z'),
+    );
+    await instance.scan();
+    expect(requestIds(ofPrivate(events))).toEqual(['req_P2']);
+    await instance.stop();
+  });
+
+  it('unlinks a session that leaves every watched root, then sends nothing', async () => {
+    const { instance, events } = watcher();
+    await instance.start([ACME]);
+    events.length = 0;
+
+    await instance.setProjects([]);
+    expect(events).toHaveLength(2);
+    for (const event of events) {
+      expect(event.type).toBe('session.observed');
+      expect((event.data as SessionObservedData).projectId).toBeUndefined();
+    }
+
+    events.length = 0;
+    appendFileSync(
+      mainFile,
+      assistantLine('req_J', '2026-10-01T10:11:00.000Z'),
+    );
+    await instance.scan();
+    expect(events).toEqual([]);
+    await instance.stop();
+  });
+});
+
 describe('SessionWatcher: codex (D7)', () => {
-  it('reports each codex transcript once, as not parsed', async () => {
+  const setup = () => {
     const codexHome = join(dir, 'codex');
     const day = join(codexHome, 'sessions', '2026', '10', '01');
     mkdirSync(day, { recursive: true });
@@ -326,19 +444,37 @@ describe('SessionWatcher: codex (D7)', () => {
       env: { CODEX_HOME: codexHome },
       args: [],
     };
+    return { codexHome, day, codex };
+  };
+
+  it('reports each codex transcript once, as not parsed', async () => {
+    const { codexHome, day, codex } = setup();
+    const home: WatchedProject = { id: 'prj_codex', root: codexHome };
     const { instance, events } = watcher({ profiles: [codex] });
-    await instance.start([ACME]);
+    await instance.start([home]);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       type: 'session.observed',
       session: { runtime: 'codex', id: 'rollout-1' },
-      data: { parsed: false, cwd: day, profileKey: 'codex-test' },
+      data: {
+        parsed: false,
+        cwd: day,
+        profileKey: 'codex-test',
+        projectId: 'prj_codex',
+      },
     });
-    expect((events[0].data as SessionObservedData).projectId).toBeUndefined();
 
     appendFileSync(join(day, 'rollout-1.jsonl'), '{"more":1}\n');
     await instance.scan();
     expect(events).toHaveLength(1);
+    await instance.stop();
+  });
+
+  it('sends nothing of a codex transcript outside every watched root', async () => {
+    const { codex } = setup();
+    const { instance, events } = watcher({ profiles: [codex] });
+    await instance.start([ACME]);
+    expect(events).toEqual([]);
     await instance.stop();
   });
 });
