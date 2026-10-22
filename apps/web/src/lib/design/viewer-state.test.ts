@@ -9,6 +9,7 @@ import {
   applyViewerChange,
   clampWidth,
   frameOf,
+  parseZoom,
   resolveViewerState,
   revisionsOf,
   variantsOf,
@@ -211,6 +212,20 @@ describe('zoom in the URL', () => {
     for (const raw of ['abc', '', '-1', '0', '1e3', '0.5x', 'NaN', '.']) {
       expect(resolve(`zoom=${raw}`).zoom).toBe('fit');
     }
+  });
+
+  test('a number past eight characters is Fit', () => {
+    expect(parseZoom('1.234567')).toBe(1.23);
+    expect(parseZoom('1.2345678')).toBe('fit');
+    expect(parseZoom('00000001')).toBe(1);
+    expect(parseZoom('1.')).toBe('fit');
+  });
+
+  // WI-61: `/^\d*\.?\d+$/` was quadratic on a long run of digits.
+  test('turns down 100 KB of digits in under 50 ms', () => {
+    const started = performance.now();
+    expect(parseZoom(`${'1'.repeat(100_000)}x`)).toBe('fit');
+    expect(performance.now() - started).toBeLessThan(50);
   });
 
   test('round-trips through the URL', () => {

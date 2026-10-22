@@ -362,8 +362,29 @@ const checkTaskGraph = (
   return null;
 };
 
-const hasHeading = (document: string, heading: string): boolean =>
-  new RegExp(`^##[ \\t]+${heading}[ \\t]*#*[ \\t]*$`, 'im').test(document);
+/**
+ * `## <one of headings>` lines, with the rest of each line; whether the rest
+ * is only a closing run of `#` and blanks is checked in code (`isClosing`).
+ * WI-61: `[ \t]*#*[ \t]*$` in the pattern was quadratic on a long run of
+ * blanks.
+ */
+const headingLines = (headings: readonly string[]): RegExp =>
+  new RegExp(`^##[ \\t]+(?:${headings.join('|')})(.*)$`, 'gim');
+
+const isClosing = (rest: string): boolean => {
+  const trimmed = rest.trimEnd();
+  let end = trimmed.length;
+  // A loop, not `/#+$/`: that restarts at every `#` of a long run.
+  while (end > 0 && trimmed[end - 1] === '#') end--;
+  return trimmed.slice(0, end).trimEnd() === '';
+};
+
+const hasHeading = (document: string, heading: string): boolean => {
+  for (const match of document.matchAll(headingLines([heading]))) {
+    if (isClosing(match[1])) return true;
+  }
+  return false;
+};
 
 /** The heading each kind's document must carry (D4). */
 export const PLANNER_REQUIRED_HEADING: Record<PlanTaskKind, string> = {
@@ -375,10 +396,7 @@ export const PLANNER_REQUIRED_HEADING: Record<PlanTaskKind, string> = {
 export const missingCardSections = (body: string): string[] =>
   CARD_DRAFT_SECTIONS.filter((section) => !hasHeading(body, section));
 
-const SECTION_LINE = new RegExp(
-  `^##[ \\t]+(?:${CARD_DRAFT_SECTIONS.join('|')})[ \\t]*#*[ \\t]*$`,
-  'gim',
-);
+const SECTION_LINE = headingLines(CARD_DRAFT_SECTIONS);
 
 /**
  * #337 D5: the card's title and body pass ADR-0027 §6's English check. The
@@ -388,7 +406,11 @@ const SECTION_LINE = new RegExp(
  */
 export const isCardDraftEnglish = (draft: Pick<CardDraft, 'title' | 'body'>) =>
   isReliablyEnglish(draft.title) &&
-  isReliablyEnglish(draft.body.replace(SECTION_LINE, ''));
+  isReliablyEnglish(
+    draft.body.replace(SECTION_LINE, (line, rest: string) =>
+      isClosing(rest) ? '' : line,
+    ),
+  );
 
 /**
  * #337 D5, D6; #409: a written card — the single one or one of a split —

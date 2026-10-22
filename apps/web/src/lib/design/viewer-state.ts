@@ -46,9 +46,22 @@ export const VIEWER_PARAM = {
   zoom: 'zoom',
 } as const;
 
-/** `zoom=fit`, a number clamped to the bounds, anything else is Fit. */
+/** A zoom's longest spelling in a link: `0.123456` is already past any use. */
+const ZOOM_PARAM_MAX = 8;
+
+/**
+ * `zoom=fit`, a number clamped to the bounds, anything else is Fit. WI-61:
+ * the length is checked first, and the pattern cannot split a run of digits
+ * two ways.
+ */
 export function parseZoom(raw: string | null): Zoom {
-  if (raw === null || !/^\d*\.?\d+$/.test(raw)) return 'fit';
+  if (
+    raw === null ||
+    raw.length > ZOOM_PARAM_MAX ||
+    !/^(?:\d+|\d*\.\d+)$/.test(raw)
+  ) {
+    return 'fit';
+  }
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? clampZoom(n) : 'fit';
 }
