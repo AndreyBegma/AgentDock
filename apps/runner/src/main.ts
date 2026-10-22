@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { existsSync } from 'node:fs';
 import { arch, hostname, platform } from 'node:os';
 
 /** A compiled binary runs from Bun's embedded filesystem. */
@@ -42,6 +43,41 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => controller.abort());
 }
 
+// C-327: a person's command checks npm for a newer runner while it runs, and
+// asks after it finished; every other start makes no request.
+const update = await (async () => {
+  const [
+    { startUpdateCheck, askOnTerminal },
+    { createExec },
+    { resolvePaths },
+    { RUNNER_VERSION },
+  ] = await Promise.all([
+    import('./update'),
+    import('./detect/exec'),
+    import('./env'),
+    import('./version'),
+  ]);
+  return startUpdateCheck({
+    command: argv[0],
+    env: process.env,
+    os: platform(),
+    arch: arch(),
+    current: RUNNER_VERSION,
+    binary: compiled ? process.execPath : null,
+    stdinIsTTY: process.stdin.isTTY === true,
+    stdoutIsTTY: process.stdout.isTTY === true,
+    fetch,
+    ask: askOnTerminal((text) => process.stderr.write(text)),
+    install: async (args) =>
+      Bun.spawn([...args], { stdio: ['inherit', 'inherit', 'inherit'] }).exited,
+    exec: createExec(process.env),
+    exists: existsSync,
+    stderr: (text) => process.stderr.write(text),
+    paths: resolvePaths(process.env),
+    uid: process.getuid?.() ?? 0,
+  });
+})();
+
 // `exec-run <runDir>` is what a skill run's tmux session executes (spec 24
 // D7); it is internal, so it is not one of the CLI's documented commands.
 const code =
@@ -78,4 +114,11 @@ const code =
           },
         });
       })();
+// Ctrl-C at the question ends the process again, as it would without one.
+if (update && !controller.signal.aborted) {
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.removeAllListeners(signal);
+  }
+  await update.offer();
+}
 process.exit(code);
