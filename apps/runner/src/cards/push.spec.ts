@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
-import { existsSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CARD_PR_DESCRIPTION_FILE,
@@ -476,5 +476,22 @@ describe('follow-up branch and cleanup (#359 D8)', () => {
     expect(
       await t.f.run(t.f.root, 'branch', '--list', '--format=%(refname:short)'),
     ).toContain(BRANCH);
+  });
+});
+
+describe('commitFiles (C-161)', () => {
+  it('writes card files 0600 in new 0700 directories, also over an existing file', async () => {
+    const { f, record, deps } = await setup();
+    f.write(record.worktree, { 'README.md': 'old\n' });
+    chmodSync(join(record.worktree, 'README.md'), 0o644);
+    await commitFiles(deps, record.worktree, [
+      { path: SPEC, content: '# C-12\n' },
+      { path: 'README.md', content: 'new\n' },
+    ]);
+    const mode = (path: string) =>
+      statSync(join(record.worktree, path)).mode & 0o777;
+    expect(mode(SPEC)).toBe(0o600);
+    expect(mode('README.md')).toBe(0o600);
+    expect(mode('docs/specs')).toBe(0o700);
   });
 });
