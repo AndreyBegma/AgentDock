@@ -8,7 +8,7 @@ Several people may use one AgentDock, but agents run on the owner's subscription
 
 ## Decision
 
-First admin created by CLI. Email + password, server-side cookie sessions. Registration is closed by default and toggled by an admin. A registration creates a `pending` user; an admin approves (assigning admin / operator / viewer) or rejects. Access to a project requires membership. 2FA and OAuth are deferred.
+First admin created by CLI. Email + password, server-side cookie sessions. Registration is closed by default and toggled by an admin. A registration creates a `pending` user; an admin approves (assigning admin / operator / viewer) or rejects. Access to a project requires membership. OAuth is deferred. 2FA was deferred too; [ADR-0081](0081-totp-two-factor-sign-in-with-hashed-recovery-codes.md) adds TOTP two-factor sign-in.
 
 ## Consequences
 

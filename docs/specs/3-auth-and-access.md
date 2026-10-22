@@ -34,7 +34,7 @@ authorizes against it.
   M1.4, which adds `ProjectMember` and a project-access guard on top of this.
 - Audit records for these actions — M1.2 adds the audit log and retrofits the
   actions listed under *Audited later*.
-- Password reset by email, email verification, 2FA, OAuth/SSO (ADR-0008).
+- Password reset by email, email verification, OAuth/SSO (ADR-0008). 2FA arrived later as TOTP ([ADR-0081](../adr/0081-totp-two-factor-sign-in-with-hashed-recovery-codes.md), C-189).
 - Notifying admins of pending registrations (M2.7 notifications).
 - The application shell / navigation (M1.8). This item ships plain pages.
 
@@ -101,7 +101,7 @@ with `class-validator`; responses never include `passwordHash` or token hashes.
 | Method | Path | Who | Behaviour |
 |---|---|---|---|
 | POST | `/auth/register` | anyone, when open | `{ email, password, name? }` → 201 `{ status: "pending" }`; 403 `registration_closed`; a taken email gets the same 201, no row is created (C-141) |
-| POST | `/auth/login` | anyone | `{ email, password }` → 200 user + sets `ad_session`, `ad_csrf`; errors per D8/D9 |
+| POST | `/auth/login` | anyone | `{ email, password, code? }` → 200 user + sets `ad_session`, `ad_csrf`; errors per D8/D9; an account with two-factor sign-in needs `code` (ADR-0081) |
 | POST | `/auth/logout` | session | revokes current session, clears cookies |
 | GET | `/auth/me` | session | current user `{ id, email, name, role, status }` |
 | PATCH | `/auth/me/password` | session | `{ currentPassword, newPassword }` → revokes other sessions |
