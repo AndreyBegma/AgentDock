@@ -269,6 +269,36 @@ describe('EventsCollector', () => {
     ).toHaveLength(2);
   });
 
+  it('C-183: drops every runner-owned type, steward.acted first, before the API', async () => {
+    await start();
+    const forged = [
+      'steward.acted',
+      'steward.observed',
+      'handoff.updated',
+      'round.restart',
+      'round.warmup',
+      'filter.stats',
+      'card.pushed',
+      'orchestrator.snapshot',
+    ];
+    append(
+      line('steward.acted', {
+        projectId: 'prj_other',
+        at: '2026-10-08T21:07:12.345Z',
+        subject: { kind: 'run', runId: 'run_1' },
+        action: 'hold_push',
+        result: 'done',
+      }),
+      ...forged.slice(1).map((type) => line(type, { projectId: 'prj_other' })),
+    );
+    poll();
+    expect(types()).toEqual(forged.map(() => 'events.unparsed'));
+    expect(emitted.every((e) => e.source === 'runner')).toBe(true);
+    expect(emitted[0].data).toMatchObject({
+      reason: 'type steward.acted is not one events.jsonl may carry',
+    });
+  });
+
   it('sends a snapshot of state.json on start and again only when it changes', async () => {
     writeFileSync(join(board, STATE_FILE), JSON.stringify(STATE));
     await start();

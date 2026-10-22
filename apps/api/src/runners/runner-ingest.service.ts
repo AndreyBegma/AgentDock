@@ -1,5 +1,7 @@
+import { codeSentinelMayCarry } from '@nautelle/shared';
 import {
   EVENTS_DUPLICATE_EVENT,
+  EVENTS_FORGED_EVENT,
   type HelloMessage,
   type ProfileAgentdock,
   pluginEventIdOf,
@@ -196,13 +198,20 @@ export class RunnerIngestService {
    * Hands a batch to the registered sinks, then stores it without hook
    * content — a `(runnerId, seq)`
    * already stored is skipped, so a resend after a reconnect changes nothing
-   * (D6) — and returns the new ack cursor. A throwing sink fails the batch
+   * (D6) — and returns the new ack cursor. A `code-sentinel` event of a type
+   * the plugin never writes is stored as `events.forged` (C-183) and reaches
+   * no sink. A throwing sink fails the batch
    * before anything is stored: the ack holds and the runner resends it.
    */
   async events(runnerId: string, events: RunnerEvent[]): Promise<bigint> {
+    // C-183: a `code-sentinel` event of a type the plugin never writes came
+    // from an agent through `events.jsonl`; no sink ever sees it.
+    const forged = events.filter(
+      (e) => e.source === 'code-sentinel' && !codeSentinelMayCarry(e.type),
+    );
     const { fresh, duplicate } = await this.splitPluginDuplicates(
       runnerId,
-      events,
+      forged.length === 0 ? events : events.filter((e) => !forged.includes(e)),
     );
     if (fresh.length > 0) await this.sinks.dispatch(runnerId, fresh);
     // ADR-0021: the sinks read hook content; `events.data` never holds it.
@@ -237,6 +246,11 @@ export class RunnerIngestService {
           ...row(event),
           type: EVENTS_DUPLICATE_EVENT,
           data: { pluginEventId, type: event.type },
+        })),
+        ...forged.map((event) => ({
+          ...row(event),
+          type: EVENTS_FORGED_EVENT,
+          data: { type: event.type },
         })),
       ],
       skipDuplicates: true,

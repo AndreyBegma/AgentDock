@@ -176,6 +176,18 @@ export const CODE_SENTINEL_EVENT_TYPES: ReadonlySet<string> = new Set([
   'commit.trailer_found',
 ]);
 
+/** The snapshot the runner builds from the plugin's `state.json`. */
+const CODE_SENTINEL_SNAPSHOT_EVENT = 'orchestrator.snapshot';
+
+/**
+ * Whether an event with `source: "code-sentinel"` may carry `type` (C-183):
+ * a type from `CODE_SENTINEL_EVENT_TYPES` or the `state.json` snapshot. The
+ * API drops any other — a runner-owned type relayed from `events.jsonl` by a
+ * runner older than C-169 is a forgery.
+ */
+export const codeSentinelMayCarry = (type: string): boolean =>
+  CODE_SENTINEL_EVENT_TYPES.has(type) || type === CODE_SENTINEL_SNAPSHOT_EVENT;
+
 /** Drops `undefined` values, so a mapped key the plugin did not send stays absent. */
 const defined = (data: Data): Data =>
   Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
