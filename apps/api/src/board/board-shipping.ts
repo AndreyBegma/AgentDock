@@ -16,6 +16,7 @@ import {
 } from '@nautelle/shared';
 import type { CardChecksResult } from '@nautelle/shared/protocol';
 import {
+  ForbiddenException,
   Injectable,
   Logger,
   type OnApplicationBootstrap,
@@ -25,6 +26,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
+import { BudgetExceededError } from '../budgets/budget-error';
 import { PrismaService } from '../database/prisma.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure } from './board-error';
@@ -615,7 +617,17 @@ export class BoardShipping
       await this.rounds.ciFix(project.id, card.number, input);
     } catch (error) {
       // No room, a budget stop, the runner away: the next poll tries again.
-      if (!(error instanceof BoardFailure)) throw error;
+      // C-181: so does a mode or an access the round's person lacks (403),
+      // and their budget's stop.
+      if (
+        !(
+          error instanceof BoardFailure ||
+          error instanceof ForbiddenException ||
+          error instanceof BudgetExceededError
+        )
+      ) {
+        throw error;
+      }
       this.logger.warn(
         `ci_fix round of ${cardLabel(card.number)} not started: ${error.message}`,
       );

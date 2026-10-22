@@ -81,6 +81,7 @@ model User {
   boardStackRunsStarted       BoardStackRun[]               @relation("BoardStackRunStartedBy")
   boardCardsMoved             BoardCard[]                   @relation("BoardCardMovedBy")
   boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
+  boardCardsAutoRunArmed      BoardCard[]                   @relation("BoardCardAutoRunArmedBy")
   boardCardRounds             BoardCardRound[]
   boardSettingsUpdated        BoardSettings[]
   cardDismissals              CardDismissal[]
@@ -3217,6 +3218,10 @@ model BoardCard {
   /// the Run. Off by default; it turns itself off when it fires, so it starts
   /// the card at most once.
   autoRunWhenReady        Boolean               @default(false)
+  /// C-181 (D-09): who turned Auto-run when ready on, or last edited the card
+  /// while it was on — the Run it starts runs as them (their project role,
+  /// their budget). `null` (or a deleted user) runs as the board, as operator.
+  autoRunArmedById        String?
   /// #282 D1: the manual session a `terminal` card tracks; unique, so a
   /// second `card.track` of the session updates its card.
   trackedSessionId        String?               @unique
@@ -3258,6 +3263,7 @@ model BoardCard {
   createdBy            User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   movedBy              User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
   completedBy          User?                  @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  autoRunArmedBy       User?                  @relation("BoardCardAutoRunArmedBy", fields: [autoRunArmedById], references: [id], onDelete: SetNull)
   capture              CardCapture?           @relation(fields: [captureId], references: [id], onDelete: SetNull)
   sourceSession        AgentSession?          @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
   rounds               BoardCardRound[]

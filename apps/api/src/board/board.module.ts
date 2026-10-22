@@ -14,6 +14,7 @@ import { BoardCommands } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardPlanCards } from './board-plan-cards';
+import { BoardPrincipals } from './board-principal';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardSessionMessages } from './board-session-message.service';
 import { BoardShipping } from './board-shipping';
@@ -53,6 +54,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardDependencies,
     BoardInboxService,
     BoardPlanCards,
+    // C-181: whom an automatic round runs as.
+    BoardPrincipals,
     BoardRoundsService,
     BoardService,
     // #489: a person's message to a card's running session.
