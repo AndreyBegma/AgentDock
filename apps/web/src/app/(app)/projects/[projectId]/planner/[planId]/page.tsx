@@ -38,7 +38,10 @@ export default function PlanPage() {
   const role = project?.role ?? 'viewer';
   const section = usePlan(projectId, planId);
   const settings = useSection(
-    () => api<PlannerSettingsView>(`/projects/${projectId}/planner/settings`),
+    () =>
+      api<PlannerSettingsView>(
+        `/projects/${encodeURIComponent(projectId)}/planner/settings`,
+      ),
     [projectId],
   );
   // D3: a project whose profile says it has no UI hides the design toggle.

@@ -105,7 +105,10 @@ export function BudgetFormDialog({
     setBusy(true);
     setError(undefined);
     try {
-      const base = admin ? '/admin/budgets' : `/projects/${projectId}/budgets`;
+      const base =
+        projectId === undefined
+          ? '/admin/budgets'
+          : `/projects/${encodeURIComponent(projectId)}/budgets`;
       let saved: BudgetView;
       if (budget) {
         const patch = toUpdateRequest(form, budget);
@@ -113,10 +116,13 @@ export function BudgetFormDialog({
           onClose();
           return;
         }
-        saved = await api<BudgetView>(`${base}/${budget.id}`, {
-          method: 'PATCH',
-          body: patch,
-        });
+        saved = await api<BudgetView>(
+          `${base}/${encodeURIComponent(budget.id)}`,
+          {
+            method: 'PATCH',
+            body: patch,
+          },
+        );
       } else {
         saved = await api<BudgetView>(base, {
           method: 'POST',

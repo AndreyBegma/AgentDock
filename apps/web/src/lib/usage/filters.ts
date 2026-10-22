@@ -1,5 +1,6 @@
 import type { UsageBreakdownRow, UsageDimension } from '@nautelle/shared';
 import type { ChipDef, FilterCodec } from '../filters/url-filters';
+import { entityIdOrUndefined } from '../ids';
 import {
   BREAKDOWN_DIMENSIONS,
   customRange,
@@ -71,7 +72,8 @@ export function usageFiltersFromSearch(params: URLSearchParams): UsageFilters {
     fromDate: range === 'custom' && DAY.test(from) ? from : '',
     toDate: range === 'custom' && DAY.test(to) ? to : '',
     tz: read('tz'),
-    projectId: read('projectId'),
+    // C-165: it reaches API paths (budgets, token saver); not an id → all.
+    projectId: entityIdOrUndefined(read('projectId')) ?? '',
     by: oneOf(BREAKDOWN_DIMENSIONS, read('by')) ?? DEFAULT_USAGE_FILTERS.by,
   };
 }
