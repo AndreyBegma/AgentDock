@@ -364,6 +364,110 @@ describe('usage (e2e)', () => {
     });
   });
 
+  describe('private plans (L-24)', () => {
+    it('leaves a private plan’s turns out of other members’ per-run breakdown, never out of totals', async () => {
+      const { id: runnerId } = await runnerRow(ctx.prisma);
+      const projectId = (await projectRow(ctx.prisma, runnerId, 'a')).id;
+      const authorUser = await createUser(
+        ctx.prisma,
+        'author@example.com',
+        'viewer',
+      );
+      await ctx.prisma.projectMember.create({
+        data: { projectId, userId: authorUser.id },
+      });
+      const author = await login(ctx, 'author@example.com');
+      const other = await member(projectId, 'other@example.com');
+      const instructions = await ctx.prisma.plannerInstructions.create({
+        data: { projectId, version: 1, body: 'plan well' },
+      });
+      const planRun = async (
+        title: string,
+        visibility: 'private' | 'project',
+        input: number,
+      ) => {
+        const plan = await ctx.prisma.plan.create({
+          data: {
+            projectId,
+            authorId: authorUser.id,
+            title,
+            brief: title,
+            mode: 'batch',
+            visibility,
+            status: 'drafting',
+            sessionId: '6f1c1d0e-5b7a-4c1e-9a52-1f3a7c9d2e10',
+            instructionsId: instructions.id,
+            contractVersion: 1,
+            profileKey: 'claude-main',
+            model: 'opus',
+          },
+        });
+        const run = await ctx.prisma.run.create({
+          data: {
+            kind: 'plan',
+            projectId,
+            title,
+            status: 'succeeded',
+            triggeredByType: 'user',
+            startedAt: new Date(T0),
+            updatedAt: new Date(T0),
+          },
+        });
+        await ctx.prisma.planTurn.create({
+          data: {
+            planId: plan.id,
+            runId: run.id,
+            action: 'decompose',
+            input: {},
+          },
+        });
+        // input at 3e-6 per token.
+        await ctx.prisma.usageRollup.create({
+          data: {
+            hour: new Date(T0),
+            dimensionKey: run.id,
+            projectId,
+            runtime: 'claude',
+            model: SONNET,
+            runId: run.id,
+            requests: 1,
+            input: BigInt(input),
+            output: 0n,
+            cacheRead: 0n,
+            cacheWrite5m: 0n,
+            cacheWrite1h: 0n,
+            reasoning: 0n,
+            costUsd: (input * 3e-6).toFixed(6),
+            unpricedRequests: 0,
+          },
+        });
+        return run.id;
+      };
+      const secret = await planRun('Secret', 'private', 2_000_000);
+      const shared = await planRun('Shared', 'project', 1_000_000);
+
+      const runs = async (session: Session) =>
+        (
+          (
+            await session.get(
+              `/usage/breakdown?${range}&dimension=run&projectId=${projectId}`,
+            )
+          ).body as UsageBreakdownResponse
+        ).rows.map((r) => r.key);
+      const total = async (session: Session) =>
+        (
+          (await session.get(`/usage/summary?${range}&projectId=${projectId}`))
+            .body as UsageSummaryResponse
+        ).totals.costUsd;
+
+      expect(await runs(other)).toEqual([shared]);
+      expect(await runs(admin)).toEqual([shared]);
+      expect(await runs(author)).toEqual([secret, shared]);
+      expect(await total(other)).toBe('9.000000');
+      expect(await total(author)).toBe('9.000000');
+    });
+  });
+
   describe('timeseries', () => {
     it('fills every bucket and cuts days in the requested zone', async () => {
       const { id: runnerId } = await runnerRow(ctx.prisma);
