@@ -40,7 +40,7 @@ describe('protected paths (C-148, D-12)', () => {
       'plugins/',
       '.claude-plugin/',
     ]) {
-      expect(PROTECTED_PATHS).toContain(p);
+      expect((PROTECTED_PATHS as readonly string[]).includes(p)).toBe(true);
     }
   });
 });
