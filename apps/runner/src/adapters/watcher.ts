@@ -50,9 +50,10 @@ export interface BackfillScope {
 /**
  * Turns every runtime profile's transcripts into session events (spec 12).
  * One per daemon, not per project: a profile holds the sessions of every
- * directory on the machine, and those outside any project are reported too,
- * for admins (D10). Reads are serialized, so a scan, a watch-list change and
- * a backfill never read the same file at once.
+ * directory on the machine, but only those inside a watched root are
+ * reported; nothing of any other leaves the machine (ADR-0078). Reads are
+ * serialized, so a scan, a watch-list change and a backfill never read the
+ * same file at once.
  */
 export class SessionWatcher {
   private store: OffsetStore | null = null;
@@ -115,7 +116,12 @@ export class SessionWatcher {
     return this.enqueue(() => this.readNew());
   }
 
-  /** The watch list changed: re-sends `session.observed` whose correlation moved (D6). */
+  /**
+   * The watch list changed: re-sends `session.observed` whose correlation
+   * moved (D6). A session that enters a watched root is reported from then
+   * on; one that leaves it is sent once without a project, so the server
+   * unlinks it, and nothing after that (ADR-0078).
+   */
   setProjects(projects: readonly WatchedProject[]): Promise<void> {
     return this.enqueue(async () => {
       this.projects = projects;
@@ -208,16 +214,20 @@ export class SessionWatcher {
     for (const source of this.discover()) {
       if (source.mtimeMs <= since) continue;
       const adapter = this.options.adapters[source.runtime];
-      // Without a project, every session counts; with one, a file is
-      // decided by its `session.observed`, and what precedes it waits.
-      let wanted: boolean | null = scope.projectId ? null : true;
+      // A file is decided by its `session.observed`, and what precedes it
+      // waits: it counts when it is inside a watched root (ADR-0078) and,
+      // with a project, inside that one.
+      let wanted: boolean | null = null;
       const held: UnsequencedEvent[] = [];
       for await (const chunk of adapter.tail(source, freshState(), {
         projects: this.projects,
         log: this.options.log,
       })) {
         if (wanted === null && chunk.state.observed) {
-          wanted = chunk.state.observed.projectId === scope.projectId;
+          const { projectId } = chunk.state.observed;
+          wanted =
+            projectId !== undefined &&
+            (!scope.projectId || projectId === scope.projectId);
         }
         if (wanted === false) break;
         if (wanted === null) {
@@ -241,7 +251,9 @@ export class SessionWatcher {
       projects: this.projects,
       log: this.options.log,
     })) {
-      this.send(chunk.events);
+      // A session outside every watched root sends nothing (ADR-0078); its
+      // offset still moves, so a root added later reports it from then on.
+      if (chunk.state.observed?.projectId) this.send(chunk.events);
       // Saved after the events are spooled: a crash in between re-sends,
       // which the API deduplicates, and never loses (D5).
       this.requireStore().set(source.path, chunk.state);

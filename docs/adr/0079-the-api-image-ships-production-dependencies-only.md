@@ -1,4 +1,4 @@
-# ADR-0078: The API image ships production dependencies only
+# ADR-0079: The API image ships production dependencies only
 
 Status: accepted · Date: 2026-10-22 · Amends [ADR-0016](0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md) (its consequence that the API image keeps dev dependencies)
 
