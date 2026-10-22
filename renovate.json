@@ -1,11 +1,20 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "@andrewbehma/glass-ui, pinned, and the docker image digests (F-31), as pull requests into develop (#171). Every other dependency is updated by hand.",
+  "description": "Security pull requests for every manager (C-173), @andrewbehma/glass-ui, pinned, and the docker image digests (F-31), all into develop (#171) and never automerged. Every other update is made by hand.",
   "baseBranchPatterns": ["develop"],
-  "enabledManagers": ["bun", "dockerfile", "docker-compose"],
+  "automerge": false,
   "pinDigests": true,
   "dependencyDashboard": false,
   "semanticCommits": "enabled",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "rangeStrategy": "pin",
+    "semanticCommitType": "fix",
+    "semanticCommitScope": "deps",
+    "labels": ["security"],
+    "automerge": false
+  },
   "packageRules": [
     {
       "matchPackageNames": ["*"],
