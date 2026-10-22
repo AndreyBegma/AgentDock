@@ -63,6 +63,7 @@ import {
   isNotFound,
   parseCardParam,
 } from '../../../../../lib/board/format';
+import { newWorkBrief } from '../../../../../lib/board/intake';
 import {
   boardItems,
   fetchPlanTasks,
@@ -108,6 +109,10 @@ function BoardScreen() {
   const planPanelId = params.get('planPanel') ?? undefined;
   const planPanelOpen = planPanelId !== undefined;
   const newWorkLinked = params.has('newWork') || params.has('newPlan');
+  // L-45: a `?brief=` someone else wrote is flagged; Discuss's own hand-over
+  // is remembered here so it is not.
+  const [ownBrief, setOwnBrief] = useState<string>();
+  const linkedBrief = newWorkBrief(params, ownBrief);
   // #590: a discussion (`?discussion=`) lives in the URL too; Discuss opens
   // the start panel, which then becomes the discussion.
   const discussionId = params.get('discussion') ?? undefined;
@@ -437,9 +442,8 @@ function BoardScreen() {
             project={project}
             open={creating || newWorkLinked || intakeId !== undefined}
             planId={intakeId}
-            initialBrief={
-              newWorkLinked ? (params.get('brief') ?? undefined) : undefined
-            }
+            initialBrief={linkedBrief.brief}
+            briefFromLink={linkedBrief.fromLink}
             board={board.data}
             onOpenChange={(open) => {
               setCreating(open);
@@ -477,6 +481,7 @@ function BoardScreen() {
               // ADR-0037 §5: New work, What to do prefilled; the
               // discussion stays in Drafts.
               setDiscussing(false);
+              setOwnBrief(brief);
               setParams({ discussion: undefined, newWork: '1', brief });
             }}
             onDiscarded={() => {

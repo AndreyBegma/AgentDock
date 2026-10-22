@@ -1,5 +1,6 @@
 'use client';
 
+import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { Field, Select, Textarea } from '@andrewbehma/glass-ui/field';
@@ -42,6 +43,7 @@ export function NewCardDialog({
   open,
   planId: controlledId,
   initialBrief,
+  briefFromLink = false,
   board,
   onOpenChange,
   onStarted,
@@ -58,6 +60,11 @@ export function NewCardDialog({
   planId?: string;
   /** What to do, prefilled (the Board's `?brief=`, "Plan this"). */
   initialBrief?: string;
+  /**
+   * The prefilled brief came from a link (the Board's `?brief=`), not from
+   * this person: a notice asks them to check it before sending.
+   */
+  briefFromLink?: boolean;
   /** Where the generated card is found by its `planId`; fetched when absent. */
   board?: BoardView;
   /**
@@ -97,6 +104,7 @@ export function NewCardDialog({
       project={project}
       open={open}
       initialBrief={initialBrief}
+      briefFromLink={briefFromLink}
       busy={busy}
       setBusy={setBusy}
       onCancel={wide === false ? undefined : () => onOpenChange(false)}
@@ -132,6 +140,16 @@ export function NewCardDialog({
         {body}
       </DialogContent>
     </DialogRoot>
+  );
+}
+
+/**
+ * Shown above What to do when a link filled it (security audit L-45): a
+ * crafted link must not pass for the person's own draft.
+ */
+export function PrefilledBriefNotice() {
+  return (
+    <Banner tone="warn">Pre-filled from a link — check before sending.</Banner>
   );
 }
 
@@ -217,6 +235,7 @@ function StartForm({
   project,
   open,
   initialBrief,
+  briefFromLink,
   busy,
   setBusy,
   onCancel,
@@ -226,6 +245,7 @@ function StartForm({
   project?: ProjectDetail;
   open: boolean;
   initialBrief?: string;
+  briefFromLink: boolean;
   busy: boolean;
   setBusy: (busy: boolean) => void;
   /** Absent on a phone, where the bar's Close is the way out. */
@@ -293,6 +313,7 @@ function StartForm({
         void start();
       }}
     >
+      {briefFromLink && initialBrief ? <PrefilledBriefNotice /> : null}
       <Field
         label="What to do"
         htmlFor="board-new-what"
