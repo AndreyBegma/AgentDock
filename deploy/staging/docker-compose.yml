@@ -33,7 +33,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    mem_limit: 512m
+    # 512m was outgrown once the database passed ~550 MB: the cgroup OOM killer
+    # took backends dozens of times an hour and the API answered 500.
+    mem_limit: 1g
     logging: *logging
     networks: [staging]
 
