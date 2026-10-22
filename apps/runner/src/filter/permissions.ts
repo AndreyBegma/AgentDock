@@ -179,20 +179,59 @@ export interface SettingsSources {
   home: string;
   /** The session's project directory (`CLAUDE_PROJECT_DIR`, else the hook's cwd). */
   projectDir: string;
+  /** `process.platform`; it chooses where the managed policy sits. */
   os: string;
 }
 
-/** Every settings file Claude Code reads permission rules from, plus the launch's. */
-export const settingsFiles = (sources: SettingsSources): string[] => {
-  const { env, home, projectDir, os } = sources;
-  const configDir = env.CLAUDE_CONFIG_DIR || join(home, '.claude');
-  const managed =
+const configDirOf = ({ env, home }: SettingsSources): string =>
+  env.CLAUDE_CONFIG_DIR || join(home, '.claude');
+
+/**
+ * Every place a managed policy can sit (DR-06). The hook cannot read all of
+ * them — an MDM profile is a plist, server-delivered settings are a cache
+ * whose shape is Claude Code's — and a managed policy can carry more than
+ * permission rules, so the presence of any of them alone means no rewrite.
+ */
+export const managedPolicyPaths = (sources: SettingsSources): string[] => {
+  const { env, os } = sources;
+  const system =
     os === 'darwin'
-      ? '/Library/Application Support/ClaudeCode/managed-settings.json'
-      : '/etc/claude-code/managed-settings.json';
+      ? '/Library/Application Support/ClaudeCode'
+      : '/etc/claude-code';
+  const paths = [
+    join(system, 'managed-settings.json'),
+    join(system, 'managed-settings.d'),
+    // The server-delivered managed settings Claude Code caches locally.
+    join(configDirOf(sources), 'remote-settings.json'),
+  ];
+  if (os === 'darwin') {
+    const plist = 'com.anthropic.claudecode.plist';
+    paths.push(join('/Library/Managed Preferences', plist));
+    if (env.USER) {
+      paths.push(join('/Library/Managed Preferences', env.USER, plist));
+    }
+  }
+  return paths;
+};
+
+/** Whether any managed policy exists; an unreadable check counts as one. */
+export const hasManagedPolicy = (sources: SettingsSources): boolean => {
+  try {
+    return managedPolicyPaths(sources).some((path) => existsSync(path));
+  } catch {
+    return true;
+  }
+};
+
+/**
+ * Every settings file Claude Code reads permission rules from, plus the
+ * launch's. The managed file is not among them: its presence alone already
+ * stops the rewrite (`hasManagedPolicy`).
+ */
+export const settingsFiles = (sources: SettingsSources): string[] => {
+  const { env, projectDir } = sources;
   const files = [
-    managed,
-    join(configDir, 'settings.json'),
+    join(configDirOf(sources), 'settings.json'),
     join(projectDir, '.claude', 'settings.json'),
     join(projectDir, '.claude', 'settings.local.json'),
   ];

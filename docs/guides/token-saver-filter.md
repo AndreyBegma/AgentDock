@@ -122,10 +122,19 @@ Each text is also tried from every word on, so the rule matches wherever the
 command sits in the line. Every mismatch therefore leaves the command alone.
 `git  push`, with two spaces, gets no rewrite under `Bash(git push:*)`.
 
-The rules come from the files Claude Code loads:
+A managed policy stops every rewrite by its presence alone (DR-06): the hook
+cannot read an MDM profile or the server-delivered settings, and a managed
+policy can hold more than permission rules. These paths count:
 
-- the managed settings (`/etc/claude-code/managed-settings.json`, or
-  `/Library/Application Support/ClaudeCode/managed-settings.json` on macOS);
+- `managed-settings.json` and the `managed-settings.d` directory under
+  `/etc/claude-code` (`/Library/Application Support/ClaudeCode` on macOS);
+- `$CLAUDE_CONFIG_DIR/remote-settings.json`, Claude Code's local copy of the
+  server-delivered managed settings;
+- on macOS, the MDM profile `com.anthropic.claudecode.plist` under
+  `/Library/Managed Preferences`, machine-wide or for `$USER`.
+
+Otherwise, the rules come from the files Claude Code loads:
+
 - `$CLAUDE_CONFIG_DIR/settings.json` (default `~/.claude/settings.json`);
 - `<project>/.claude/settings.json` and `<project>/.claude/settings.local.json`,
   where `<project>` is `$CLAUDE_PROJECT_DIR`, or the hook's `cwd` when it is unset;

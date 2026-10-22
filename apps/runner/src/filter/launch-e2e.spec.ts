@@ -62,6 +62,7 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
         os: 'linux',
         now: Date.now,
         rules: () => ({ allow: [], deny: [], ask: [] }),
+        managedPolicy: () => false,
       },
     );
     expect(
@@ -156,6 +157,7 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
         os: 'linux',
         now: Date.now,
         rules: () => ({ allow: [], deny: [], ask: [] }),
+        managedPolicy: () => false,
       },
     );
     const output = (JSON.parse(out) as HookOutput).hookSpecificOutput;

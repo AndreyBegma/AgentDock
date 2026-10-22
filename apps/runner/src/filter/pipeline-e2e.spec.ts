@@ -62,6 +62,7 @@ describe('Token saver on pipelines and lists (#610)', () => {
       os: 'linux',
       now: Date.now,
       rules: () => ({ allow: [], deny: [], ask: [] }),
+      managedPolicy: () => false,
     };
   });
   afterEach(() => cleanup());
