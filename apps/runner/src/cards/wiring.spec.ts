@@ -73,7 +73,7 @@ describe('card wiring (#367 D1, D2)', () => {
       expect(ours.timeout).toBe(theirs.timeout);
       expect(ours.async === true).toBe(theirs.async === true);
       const subcommand = theirs.command.match(
-        /nautelle-runner (hook [a-z-]+) \|\| true$/,
+        /"\$r" (hook [a-z-]+) \|\| true$/,
       )?.[1];
       expect(subcommand).toBeDefined();
       expect(ours.command).toBe(

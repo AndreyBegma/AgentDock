@@ -44,6 +44,31 @@ const hooksFile = readJson(join(pluginDir, 'hooks/hooks.json')) as {
   hooks: Record<string, HookGroup[]>;
 };
 
+const mcpServer = (): { command: string; args: string[] } =>
+  (
+    readJson(join(pluginDir, '.mcp.json')) as {
+      mcpServers: Record<string, { command: string; args: string[] }>;
+    }
+  ).mcpServers.nautelle as { command: string; args: string[] };
+
+/**
+ * C-162: the hook command runs the runner `setup claude` wrote as
+ * NAUTELLE_RUNNER_BIN, and the `nautelle-runner` on PATH only without one.
+ */
+const hookCommand = (arg: string): string =>
+  'r=$NAUTELLE_RUNNER_BIN; case $r in /*) [ -x "$r" ] ;; *) false ;; esac' +
+  ` || r=$(command -v nautelle-runner) || exit 0; "$r" hook ${arg} || true`;
+
+/** A fake runner in a fresh directory that logs its argv. */
+const fakeRunner = (): { bin: string; stub: string; log: string } => {
+  const bin = mkdtempSync(join(tmpdir(), 'nautelle-stub-'));
+  const log = join(bin, 'argv.log');
+  const stub = join(bin, 'nautelle-runner');
+  writeFileSync(stub, `#!/bin/sh\necho "$@" > "${log}"\n`);
+  chmodSync(stub, 0o755);
+  return { bin, stub, log };
+};
+
 describe('manifests', () => {
   test('marketplace lists the plugin at a path that exists', () => {
     const m = readJson(join(repoRoot, '.claude-plugin/marketplace.json')) as {
@@ -68,14 +93,13 @@ describe('manifests', () => {
     expect(typeof p.version).toBe('string');
   });
 
-  test('.mcp.json runs nautelle-runner mcp as server "nautelle"', () => {
-    const m = readJson(join(pluginDir, '.mcp.json')) as {
-      mcpServers: Record<string, { command: string; args: string[] }>;
-    };
-    expect(m.mcpServers.nautelle).toEqual({
-      command: 'nautelle-runner',
-      args: ['mcp'],
-    });
+  test('.mcp.json runs the runner mcp as server "nautelle" through /bin/sh (C-162)', () => {
+    const server = mcpServer();
+    expect(server.command).toBe('/bin/sh');
+    expect(server.args[0]).toBe('-c');
+    expect(server.args[1]).toEndWith('exec "$r" mcp');
+    // Claude Code expands `${VAR}` in .mcp.json; the script must not use it.
+    expect(server.args[1]).not.toContain('${');
   });
 
   test('slash commands exist with a description', () => {
@@ -108,9 +132,9 @@ describe('track-work skill (#282)', () => {
     expect(skill).toContain('not_a_manual_session');
   });
 
-  test('plugin version is bumped for the PreCompact hook (#494)', () => {
+  test('plugin version is bumped for the absolute runner path (C-162)', () => {
     const p = readJson(join(pluginDir, '.claude-plugin/plugin.json'));
-    expect(p.version).toBe('0.4.0');
+    expect(p.version).toBe('0.5.0');
   });
 });
 
@@ -129,9 +153,7 @@ describe('hooks.json shape', () => {
       expect(entries).toHaveLength(1);
       const h = entries[0] as HookEntry;
       expect(h.type).toBe('command');
-      expect(h.command).toBe(
-        `command -v nautelle-runner >/dev/null 2>&1 && nautelle-runner hook ${arg} || true`,
-      );
+      expect(h.command).toBe(hookCommand(arg));
       if (sync) {
         expect(h.async).toBeUndefined();
         expect(h.timeout).toBe(event === 'SessionStart' ? 10 : 300);
@@ -160,11 +182,7 @@ describe('hooks are silent without nautelle-runner on PATH', () => {
   }
 
   test('with the binary present, the hook is invoked with the event argument', () => {
-    const bin = mkdtempSync(join(tmpdir(), 'nautelle-stub-'));
-    const log = join(bin, 'argv.log');
-    const stub = join(bin, 'nautelle-runner');
-    writeFileSync(stub, `#!/bin/sh\necho "$@" > "${log}"\n`);
-    chmodSync(stub, 0o755);
+    const { bin, log } = fakeRunner();
     const command = hooksFile.hooks.SessionStart?.[0]?.hooks[0]
       ?.command as string;
     const proc = Bun.spawnSync(['/bin/sh', '-c', command], {
@@ -172,6 +190,56 @@ describe('hooks are silent without nautelle-runner on PATH', () => {
     });
     expect(proc.exitCode).toBe(0);
     expect(readFileSync(log, 'utf8').trim()).toBe('hook session-start');
+  });
+});
+
+describe('the runner path setup writes (C-162)', () => {
+  const command = hooksFile.hooks.SessionStart?.[0]?.hooks[0]
+    ?.command as string;
+  const runHook = (env: Record<string, string>) =>
+    Bun.spawnSync(['/bin/sh', '-c', command], { env });
+  const runMcp = (env: Record<string, string>) =>
+    Bun.spawnSync([mcpServer().command, ...mcpServer().args], { env });
+
+  test('the hook runs NAUTELLE_RUNNER_BIN, not the nautelle-runner on PATH', () => {
+    const pinned = fakeRunner();
+    const shadow = fakeRunner();
+    const proc = runHook({
+      PATH: shadow.bin,
+      NAUTELLE_RUNNER_BIN: pinned.stub,
+    });
+    expect(proc.exitCode).toBe(0);
+    expect(readFileSync(pinned.log, 'utf8').trim()).toBe('hook session-start');
+    expect(existsSync(shadow.log)).toBe(false);
+  });
+
+  test('a missing or relative NAUTELLE_RUNNER_BIN falls back to PATH', () => {
+    for (const value of ['/nonexistent/nautelle-runner', 'nautelle-runner']) {
+      const fallback = fakeRunner();
+      const proc = runHook({ PATH: fallback.bin, NAUTELLE_RUNNER_BIN: value });
+      expect(proc.exitCode).toBe(0);
+      expect(readFileSync(fallback.log, 'utf8').trim()).toBe(
+        'hook session-start',
+      );
+    }
+  });
+
+  test('the MCP server runs NAUTELLE_RUNNER_BIN mcp', () => {
+    const pinned = fakeRunner();
+    const shadow = fakeRunner();
+    const proc = runMcp({ PATH: shadow.bin, NAUTELLE_RUNNER_BIN: pinned.stub });
+    expect(proc.exitCode).toBe(0);
+    expect(readFileSync(pinned.log, 'utf8').trim()).toBe('mcp');
+    expect(existsSync(shadow.log)).toBe(false);
+  });
+
+  test('without NAUTELLE_RUNNER_BIN the MCP server runs nautelle-runner from PATH', () => {
+    for (const env of [{}, { NAUTELLE_RUNNER_BIN: '/nonexistent/x' }]) {
+      const fallback = fakeRunner();
+      const proc = runMcp({ PATH: fallback.bin, ...env });
+      expect(proc.exitCode).toBe(0);
+      expect(readFileSync(fallback.log, 'utf8').trim()).toBe('mcp');
+    }
   });
 });
 

@@ -3,21 +3,37 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import type { ConfigProfile } from '../config';
 import { legacyPluginInstalled } from '../detect/capabilities';
 import type { Exec } from '../detect/exec';
 import { type Env, expandHome } from '../env';
 import { OTLP_HOST } from '../otlp/receiver';
+import { RUNNER_VERSION } from '../version';
 
 /** The repository marketplace and the plugin in it (spec 201 D21). */
 export const MARKETPLACE_SOURCE = 'AndreyBegma/Nautelle';
 export const MARKETPLACE_NAME = 'nautelle';
 export const PLUGIN_REF = `nautelle@${MARKETPLACE_NAME}`;
+
+/**
+ * C-162: the marketplace is pinned to the release tag of this runner, so a
+ * change landing on the default branch is not what `setup claude` installs.
+ */
+export const MARKETPLACE_REF = `runner-v${RUNNER_VERSION}`;
+export const PINNED_MARKETPLACE_SOURCE = `${MARKETPLACE_SOURCE}#${MARKETPLACE_REF}`;
+
+/**
+ * C-162: the `settings.json` → `env` key holding the absolute path of the
+ * runner; the plugin's hooks and MCP server run it instead of the
+ * `nautelle-runner` they would find on `PATH`, which stays the fallback.
+ */
+export const RUNNER_BIN_ENV = 'NAUTELLE_RUNNER_BIN';
 
 /** ADR-0073: the marketplace and plugin names before the rename. */
 export const LEGACY_MARKETPLACE_NAME = 'agentdock';
@@ -52,6 +68,11 @@ export interface SetupClaudeOptions {
   uninstall: boolean;
   /** The OTLP receiver's port; null when the receiver is off. */
   otlpPort: number | null;
+  /**
+   * The absolute path of the running runner binary, written as
+   * `RUNNER_BIN_ENV`; null (from source) leaves the plugin on `PATH`.
+   */
+  runnerBinary?: string | null;
   home: string;
   env: Env;
   /** An `Exec` running with the given environment. */
@@ -112,11 +133,37 @@ export const envDiff = (
   return lines;
 };
 
-/** `settings.json` with the exporter keys merged in; every other key kept. */
-export const installedSettings = (current: Json | null, port: number): Json => {
+/**
+ * `settings.json` with the exporter keys (when `port` is set) and the runner
+ * path (when `runnerBinary` is set) merged in; every other key kept.
+ */
+export const installedSettings = (
+  current: Json | null,
+  port: number | null,
+  runnerBinary: string | null = null,
+): Json => {
   const settings: Json = { ...(current ?? {}) };
-  settings.env = { ...envOf(current), ...exporterEnv(port) };
+  settings.env = {
+    ...envOf(current),
+    ...(port === null ? {} : exporterEnv(port)),
+    ...(runnerBinary ? { [RUNNER_BIN_ENV]: runnerBinary } : {}),
+  };
   return settings;
+};
+
+/**
+ * The path to write as `RUNNER_BIN_ENV`: the `nautelle-runner` on `PATH` when
+ * it is this very binary (a package manager's stable symlink outlives an
+ * upgrade, its versioned target does not), else the binary itself.
+ */
+export const runnerBinaryPath = (binary: string, path: string): string => {
+  const onPath = Bun.which('nautelle-runner', { PATH: path });
+  if (!onPath || !isAbsolute(onPath)) return binary;
+  try {
+    return realpathSync(onPath) === realpathSync(binary) ? onPath : binary;
+  } catch {
+    return binary;
+  }
 };
 
 /**
@@ -142,6 +189,11 @@ export const uninstalledSettings = (
     if (key in before) env[key] = before[key];
     else delete env[key];
   }
+  const runner = env[RUNNER_BIN_ENV];
+  if (typeof runner === 'string' && isAbsolute(runner)) {
+    if (RUNNER_BIN_ENV in before) env[RUNNER_BIN_ENV] = before[RUNNER_BIN_ENV];
+    else delete env[RUNNER_BIN_ENV];
+  }
   const settings: Json = { ...current };
   if (Object.keys(env).length === 0 && !(backup && 'env' in backup)) {
     delete settings.env;
@@ -160,16 +212,43 @@ const LEGACY_PLUGIN_COMMANDS: readonly string[][] = [
   ['plugin', 'marketplace', 'remove', LEGACY_MARKETPLACE_NAME],
 ];
 
-const pluginCommands = (uninstall: boolean): string[][] =>
+const pluginCommands = (uninstall: boolean, repin: boolean): string[][] =>
   uninstall
     ? [
         ['plugin', 'uninstall', PLUGIN_REF, '--scope', 'user'],
         ['plugin', 'marketplace', 'remove', MARKETPLACE_NAME],
       ]
     : [
-        ['plugin', 'marketplace', 'add', MARKETPLACE_SOURCE],
+        ...(repin
+          ? [['plugin', 'marketplace', 'remove', MARKETPLACE_NAME]]
+          : []),
+        ['plugin', 'marketplace', 'add', PINNED_MARKETPLACE_SOURCE],
         ['plugin', 'install', PLUGIN_REF, '--scope', 'user'],
       ];
+
+/**
+ * C-162: whether the marketplace is already added from a source other than
+ * this runner's tag — the default branch, or an older tag. `marketplace add`
+ * refuses a second source under the same name, so it is removed first.
+ */
+export const marketplaceNeedsRepin = (configDir: string): boolean => {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(
+      readFileSync(
+        join(configDir, 'plugins', 'known_marketplaces.json'),
+        'utf8',
+      ),
+    );
+  } catch {
+    return false;
+  }
+  if (!isObject(raw)) return false;
+  const entry = raw[MARKETPLACE_NAME];
+  if (!isObject(entry)) return false;
+  const source = isObject(entry.source) ? entry.source : {};
+  return source.ref !== MARKETPLACE_REF;
+};
 
 /**
  * A command that failed only because the state is already there — an added
@@ -187,8 +266,9 @@ const configDirOf = (profile: ConfigProfile, home: string): string => {
 /**
  * `nautelle-runner setup claude` (spec 201 D21): per Claude profile, with
  * `CLAUDE_CONFIG_DIR` set, installs the `nautelle` plugin from the
- * repository marketplace (argv, never a shell) and merges the exporter keys
- * into the user `settings.json` → `env`. Writes `<settings>.bak` once, before
+ * repository marketplace pinned to this runner's tag (argv, never a shell)
+ * and merges the exporter keys and the runner's absolute path (C-162) into
+ * the user `settings.json` → `env`. Writes `<settings>.bak` once, before
  * its first change, prints the diff, and changes nothing on a rerun.
  * `--uninstall` reverses both. `--dry-run` prints without running or writing.
  */
@@ -214,6 +294,15 @@ export const setupClaude = async (
       'The OTLP receiver is off (otlp.enabled: false); telemetry settings are skipped.\n',
     );
   }
+  const runnerBinary =
+    options.runnerBinary && !options.uninstall
+      ? runnerBinaryPath(options.runnerBinary, options.env.PATH ?? '')
+      : null;
+  if (!options.runnerBinary && !options.uninstall) {
+    options.stderr(
+      'This runner is not a compiled binary; the plugin finds nautelle-runner on PATH.\n',
+    );
+  }
 
   let failed = false;
   for (const profile of selected) {
@@ -227,8 +316,14 @@ export const setupClaude = async (
     out(`${profile.id} (CLAUDE_CONFIG_DIR=${configDir})`);
 
     try {
-      if (options.uninstall || telemetry) {
-        settingsStep(options, configDir, out);
+      if (options.uninstall || telemetry || runnerBinary) {
+        settingsStep(
+          options,
+          configDir,
+          telemetry ? options.otlpPort : null,
+          runnerBinary,
+          out,
+        );
       }
     } catch (error) {
       if (!(error instanceof SetupError)) throw error;
@@ -240,7 +335,10 @@ export const setupClaude = async (
     const exec = options.exec(env);
     const commands = [
       ...(legacyPluginInstalled(configDir) ? LEGACY_PLUGIN_COMMANDS : []),
-      ...pluginCommands(options.uninstall),
+      ...pluginCommands(
+        options.uninstall,
+        !options.uninstall && marketplaceNeedsRepin(configDir),
+      ),
     ];
     for (const args of commands) {
       const shown = `  $ ${binary} ${args.join(' ')}`;
@@ -279,6 +377,8 @@ export const setupClaude = async (
 const settingsStep = (
   options: SetupClaudeOptions,
   configDir: string,
+  port: number | null,
+  runnerBinary: string | null,
   out: (line: string) => void,
 ): void => {
   const path = join(configDir, 'settings.json');
@@ -288,8 +388,8 @@ const settingsStep = (
   if (options.uninstall) {
     next = uninstalledSettings(current, readSettings(backupPath));
   } else {
-    if (options.otlpPort === null) return;
-    next = installedSettings(current, options.otlpPort);
+    if (port === null && !runnerBinary) return;
+    next = installedSettings(current, port, runnerBinary);
   }
   const diff = envDiff(envOf(current), envOf(next));
   if (!next || diff.length === 0) {
