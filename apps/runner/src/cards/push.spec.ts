@@ -125,6 +125,7 @@ describe('push and draft PR (#359 D1)', () => {
       headSha: await head(),
       pushed: true,
       protectedPaths: [],
+      ahead: 1,
       pr: {
         number: 7,
         url: 'https://github.com/acme/widget/pull/7',
@@ -169,6 +170,8 @@ describe('push and draft PR (#359 D1)', () => {
     expect(next).toMatchObject({
       headSha: await head(),
       pushed: true,
+      // #837: the commits on the branch ahead of the base.
+      ahead: 2,
       pr: { number: 7, state: 'draft', opened: true },
     });
     expect(await originHead()).toBe(await head());
@@ -236,6 +239,7 @@ describe('push and draft PR (#359 D1)', () => {
     expect(await pendingPush(deps, record)).toEqual({
       headSha: await head(),
       push: false,
+      ahead: 1,
     });
     const retried = await pushCardHead(deps, record);
     expect(retried).toMatchObject({ pushed: false, pr: { number: 7 } });

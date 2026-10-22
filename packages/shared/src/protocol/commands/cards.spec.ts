@@ -341,6 +341,17 @@ describe('card.stop, card.collect, card.close', () => {
     ).toBe(false);
   });
 
+  it('collect reports the head it pushed (#837): a full SHA only', () => {
+    const pushed = { ahead: 2, pushed: true };
+    expect(
+      cardCollectResultSchema.safeParse({ ...pushed, headSha: 'a'.repeat(40) })
+        .data?.headSha,
+    ).toBe('a'.repeat(40));
+    expect(
+      cardCollectResultSchema.safeParse({ ...pushed, headSha: 'abc' }).success,
+    ).toBe(false);
+  });
+
   it('close says whether to remove the worktree', () => {
     expect(
       cardCloseArgsSchema.safeParse({ ...target, removeWorktree: true })

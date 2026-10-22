@@ -644,7 +644,14 @@ export const collectCard = async (
     root: record.root,
   });
   const protectedPaths = await protectedPathsOf(deps.exec, wt, args.base);
-  await pushCardBranch(deps, github, wt, record.branch, record.pushedHead);
+  // #630: a reconciled push adds a merge, so the head pushed is its own.
+  const headSha = await pushCardBranch(
+    deps,
+    github,
+    wt,
+    record.branch,
+    record.pushedHead,
+  );
   // #359 D3: the worker's description is the body — of a new PR, and of an
   // open one, edited. Without it, a new PR gets the API's body with the spec
   // link, and an open one keeps its body.
@@ -692,6 +699,7 @@ export const collectCard = async (
     prUrl: pr.url,
     prState: pr.state,
     protectedPaths,
+    headSha,
     ...listed,
   };
 };

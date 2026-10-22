@@ -48,6 +48,18 @@ describe('card_run.pushed (#359 D1)', () => {
     }
   });
 
+  it('counts the commits ahead of the base (#837), optional for an older runner', () => {
+    expect(
+      cardRunPushedDataSchema.safeParse({ ...data, ahead: 3 }).data?.ahead,
+    ).toBe(3);
+    expect(cardRunPushedDataSchema.safeParse(data).data?.ahead).toBeUndefined();
+    for (const ahead of [-1, 1.5]) {
+      expect(cardRunPushedDataSchema.safeParse({ ...data, ahead }).success).toBe(
+        false,
+      );
+    }
+  });
+
   it('is its own event type, apart from the phase events the sink handles', () => {
     expect(isCardPushEventType('card_run.pushed')).toBe(true);
     expect(isCardRunEventType('card_run.pushed')).toBe(false);

@@ -30,6 +30,8 @@ export interface PushStep {
   held?: TrailerCommit[];
   /** C-148 (D-12): the protected paths the branch changes; with a push only. */
   protectedPaths?: string[];
+  /** #837: commits on the branch ahead of `origin/<base>` before the push. */
+  ahead?: number;
 }
 
 type PushRecord = Pick<
@@ -55,7 +57,7 @@ type PushRecord = Pick<
 export const pendingPush = async (
   deps: GitDeps,
   record: PushRecord,
-): Promise<{ headSha: string; push: boolean } | null> => {
+): Promise<{ headSha: string; push: boolean; ahead: number } | null> => {
   if (!record.pullRequest || record.branch === record.base) return null;
   const wt = record.worktree;
   const current = await deps.exec('git', [
@@ -79,10 +81,11 @@ export const pendingPush = async (
     '--count',
     `refs/remotes/origin/${record.base}..HEAD`,
   ]);
-  if (ahead?.code !== 0 || !(Number(ahead.stdout.trim()) > 0)) return null;
+  const count = ahead?.code === 0 ? Number(ahead.stdout.trim()) : 0;
+  if (!(count > 0)) return null;
   const push = headSha !== record.pushedHead;
   if (!push && record.pushPr) return null;
-  return { headSha, push };
+  return { headSha, push, ahead: count };
 };
 
 /** `gh pr create --draft`, the body in a private temporary file, never argv. */
@@ -176,7 +179,10 @@ export const pushCardHead = async (
         record.pushedHead,
       )
     : pending.headSha;
-  const paths = protectedPaths ? { protectedPaths } : {};
+  const paths = {
+    ...(protectedPaths ? { protectedPaths } : {}),
+    ahead: pending.ahead,
+  };
   try {
     const open = await openPullRequest(deps, github, record.branch);
     const pr = open
