@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import {
   convertLangfusePrices,
@@ -7,10 +7,20 @@ import {
   type LangfuseModel,
 } from './langfuse';
 
+/**
+ * The API package root: the nearest directory with a package.json. This file
+ * runs from `src/prices` in the repository and from `dist/src/prices` in the
+ * image (the compiled seed), so a fixed `../..` would miss in one of them.
+ */
+export const findApiRoot = (dir: string): string =>
+  existsSync(resolve(dir, 'package.json')) || dirname(dir) === dir
+    ? dir
+    : findApiRoot(dirname(dir));
+
 /** The vendored Langfuse snapshot (spec 13 D4; see its ATTRIBUTION.md). */
 export const LANGFUSE_SNAPSHOT_PATH = resolve(
-  __dirname,
-  '../../prisma/seed-data/langfuse-model-prices.json',
+  findApiRoot(__dirname),
+  'prisma/seed-data/langfuse-model-prices.json',
 );
 
 export const readLangfuseSnapshot = (): LangfuseModel[] =>
