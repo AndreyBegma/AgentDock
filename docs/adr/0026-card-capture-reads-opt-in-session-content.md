@@ -51,7 +51,9 @@ runner, recorded as a `runs` row.
    editable.
 6. **Suggestions are content.** Inbox cards are derived from content, so
    ADR-0021 §5 applies to them: only operators and above see the Inbox and its
-   notification; evidence excerpts (at most 300 characters each) appear only in
+   notification (ADR-0050 lets viewers read content; the Inbox stays
+   operator-only as the triage queue only operators act on, and an accepted
+   card's `captureWhy` is visible to viewers); evidence excerpts (at most 300 characters each) appear only in
    the card sheet and are stripped on Accept; a content purge deletes Inbox
    cards and capture rows; Inbox cards past the content retention are deleted;
    the stored model result is deleted with content retention.

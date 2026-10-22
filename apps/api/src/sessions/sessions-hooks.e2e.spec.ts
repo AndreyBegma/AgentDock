@@ -553,6 +553,16 @@ describe('manual sessions: hook ingest (e2e)', () => {
           )
         ).status,
       ).toBe(403);
+      // A viewer reads content (ADR-0050) but never purges it.
+      const viewer = await userOn(a.id, 'viewer@example.com');
+      expect(
+        (
+          await viewer.session.send(
+            'delete',
+            `/projects/${a.id}/session-content`,
+          )
+        ).status,
+      ).toBe(403);
       expect(await ctx.prisma.sessionContent.count()).toBe(2);
 
       const response = await admin.send(

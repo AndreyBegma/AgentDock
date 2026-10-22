@@ -76,8 +76,11 @@ import { type CardModelByTypeArm, MODEL_BY_TYPE } from './launch-choice';
 const USER_REF = { select: { id: true, email: true } } as const;
 
 /**
- * #244 D8: Inbox cards are content-derived, so only operators and above see
- * them (ADR-0021 §5). A role left out is the board's own read: everything.
+ * #244 D8: the Inbox is a triage queue only operators act on (accept,
+ * dismiss), so only operators and above see it (ADR-0026 §6). It is not a
+ * content rule: viewers read content (ADR-0050), and an accepted card keeps
+ * its `captureWhy` for them. A role left out is the board's own read:
+ * everything.
  */
 const seesInbox = (role: Role | undefined): boolean =>
   role === undefined || roleAtLeast(role, 'operator');

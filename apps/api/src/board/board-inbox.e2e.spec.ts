@@ -80,6 +80,28 @@ describe('board Inbox (e2e)', () => {
     expect(audit.after).toMatchObject({ number: suggested.number });
   });
 
+  it('shows a viewer the why of an accepted suggestion; a non-member gets 404 (ADR-0050)', async () => {
+    await w.suggest([{ title: 'Fix the redirect loop' }]);
+    const [suggested] = await w.inbox();
+    const path = `${w.path()}/board/cards/${suggested.number}`;
+    // The Inbox itself stays operator-only (ADR-0026 §6).
+    expect((await w.viewer.get(path)).status).toBe(404);
+    await w.operator.send('post', `${path}/accept-suggestion`, {});
+
+    const seen = await w.viewer.get(path);
+    expect(seen.status).toBe(200);
+    expect(seen.body).toMatchObject({
+      column: 'todo',
+      captureWhy: 'The developer said to do it later.',
+    });
+    const board = (await w.viewer.get(`${w.path()}/board`)).body as BoardView;
+    const todo = board.columns.find((c) => c.column === 'todo');
+    expect(todo?.cards[0].captureWhy).toBe(
+      'The developer said to do it later.',
+    );
+    expect((await w.outsider.get(path)).status).toBe(404);
+  });
+
   it('Edit & accept changes the card on the way, and its fingerprint', async () => {
     await w.suggest([{ title: 'Fix the redirect loop' }]);
     const [suggested] = await w.inbox();

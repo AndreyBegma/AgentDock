@@ -20,7 +20,8 @@ import { SessionContentQuery } from './dto';
 import { SessionContentService } from './session-content.service';
 
 /**
- * ADR-0021 reads and purge; any member reads (ADR-0050). Project-scoped:
+ * ADR-0021 reads and purge. Every project member, viewers included, reads
+ * content (ADR-0050 amends ADR-0021 §5); only admins purge. Project-scoped:
  * non-members get 404, below-role members 403.
  */
 @Controller('projects/:projectId')
