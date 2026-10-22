@@ -8,11 +8,14 @@ import {
 
 /** An action on the Users page that waits for its confirmation. */
 export type Confirmation =
-  | { user: AdminUser; action: 'reject' | 'disable' | 'delete' }
+  | {
+      user: AdminUser;
+      action: 'reject' | 'disable' | 'delete' | 'reset_two_factor';
+    }
   | { user: AdminUser; action: 'role' | 'approve'; role: Role };
 
 const CONFIRM_COPY: Record<
-  'reject' | 'disable' | 'delete',
+  'reject' | 'disable' | 'delete' | 'reset_two_factor',
   { title: string; verb: string; text: (u: AdminUser) => string }
 > = {
   reject: {
@@ -31,6 +34,12 @@ const CONFIRM_COPY: Record<
     title: 'Delete this account?',
     verb: 'Delete',
     text: deleteUserCopy,
+  },
+  reset_two_factor: {
+    title: 'Turn off two-factor sign-in?',
+    verb: 'Turn off',
+    text: (u) =>
+      `${u.email} signs in with the password alone until they set up two-factor sign-in again. Their authenticator key and recovery codes stop working. Do this only once you know it is really them asking.`,
   },
 };
 

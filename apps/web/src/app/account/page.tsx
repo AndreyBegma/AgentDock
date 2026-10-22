@@ -27,6 +27,7 @@ import { Time } from '../../lib/format/time';
 import { useErrorToast } from '../../lib/section/use-error-toast';
 import { useSection } from '../../lib/section/use-section';
 import { PlanningModelCard } from './planning-model-card';
+import { TwoFactorCard } from './two-factor-card';
 import { parseUserAgent } from './user-agent';
 
 const ROLE_LABEL: Record<PublicUser['role'], string> = {
@@ -243,12 +244,13 @@ export default function AccountPage() {
     <div>
       <PageHeader
         title="Account"
-        description="Your profile, planning model, password and the devices signed in as you."
+        description="Your profile, planning model, password, two-factor sign-in and the devices signed in as you."
       />
       <div className="flex flex-col gap-6">
         <Profile user={user} />
         <PlanningModelCard />
         <PasswordCard />
+        <TwoFactorCard />
         <SessionsCard />
       </div>
     </div>

@@ -41,6 +41,7 @@ import {
 } from '../../../lib/users/format';
 import { type Confirmation, confirmationCopy } from './confirmation';
 import { RegistrationCard } from './registration-card';
+import { TwoFactorPolicyCard } from './two-factor-policy-card';
 
 const TABS: { status: UserStatus; label: string }[] = [
   { status: 'pending', label: 'Pending' },
@@ -178,6 +179,11 @@ function UsersTable({ viewer }: { viewer: string }) {
         if (action === 'reject') {
           return api(`/admin/users/${user.id}/reject`, { method: 'POST' });
         }
+        if (action === 'reset_two_factor') {
+          return api(`/admin/users/${user.id}/two-factor`, {
+            method: 'DELETE',
+          });
+        }
         if (action === 'disable') {
           return api(`/admin/users/${user.id}`, {
             method: 'PATCH',
@@ -238,6 +244,9 @@ function UsersTable({ viewer }: { viewer: string }) {
                     {own ? (
                       <Badge className="ml-2" tone="neutral" label="you" />
                     ) : null}
+                    {user.twoFactorEnabled ? (
+                      <Badge className="ml-2" tone="ok" label="2FA" />
+                    ) : null}
                   </TableCell>
                   <TableCell>{user.name ?? '—'}</TableCell>
                   <TableCell>
@@ -283,6 +292,17 @@ function UsersTable({ viewer }: { viewer: string }) {
                       {own ? (
                         <DisabledReason>{OWN_ROW_REASON}</DisabledReason>
                       ) : null}
+                      {user.twoFactorEnabled && !own ? (
+                        <Button
+                          variant="glass"
+                          size="sm"
+                          onClick={() =>
+                            setConfirm({ user, action: 'reset_two_factor' })
+                          }
+                        >
+                          Reset 2FA
+                        </Button>
+                      ) : null}
                       {user.status === 'active' && !own ? (
                         <Button
                           variant="danger"
@@ -327,8 +347,9 @@ function UsersTable({ viewer }: { viewer: string }) {
 
   return (
     <>
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col gap-4">
         <RegistrationCard section={registration} />
+        <TwoFactorPolicyCard />
       </div>
 
       <TabGroup
