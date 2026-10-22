@@ -1,9 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { LAUNCH_SETTINGS_ENV } from './env';
 import {
+  hasManagedPolicy,
+  managedPolicyPaths,
   type PermissionRules,
   parseBashRule,
   permissionFor,
@@ -137,7 +145,7 @@ describe('settings sources', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('names the managed, user, project, local and launch files', () => {
+  it('names the user, project, local and launch files', () => {
     const files = settingsFiles({
       env: {
         CLAUDE_CONFIG_DIR: '/profiles/x',
@@ -148,7 +156,6 @@ describe('settings sources', () => {
       os: 'linux',
     });
     expect(files).toEqual([
-      '/etc/claude-code/managed-settings.json',
       '/profiles/x/settings.json',
       '/repo/.claude/settings.json',
       '/repo/.claude/settings.local.json',
@@ -160,8 +167,48 @@ describe('settings sources', () => {
         home: '/home/u',
         projectDir: '/repo',
         os: 'darwin',
-      })[1],
+      })[0],
     ).toBe('/home/u/.claude/settings.json');
+  });
+
+  it('names every managed policy source, MDM and server-delivered included (DR-06)', () => {
+    expect(
+      managedPolicyPaths({
+        env: { CLAUDE_CONFIG_DIR: '/profiles/x' },
+        home: '/home/u',
+        projectDir: '/repo',
+        os: 'linux',
+      }),
+    ).toEqual([
+      '/etc/claude-code/managed-settings.json',
+      '/etc/claude-code/managed-settings.d',
+      '/profiles/x/remote-settings.json',
+    ]);
+    expect(
+      managedPolicyPaths({
+        env: { USER: 'u' },
+        home: '/Users/u',
+        projectDir: '/repo',
+        os: 'darwin',
+      }),
+    ).toEqual([
+      '/Library/Application Support/ClaudeCode/managed-settings.json',
+      '/Library/Application Support/ClaudeCode/managed-settings.d',
+      '/Users/u/.claude/remote-settings.json',
+      '/Library/Managed Preferences/com.anthropic.claudecode.plist',
+      '/Library/Managed Preferences/u/com.anthropic.claudecode.plist',
+    ]);
+  });
+
+  it('finds a managed policy by its presence alone (DR-06)', () => {
+    const sources = { env: {}, home: dir, projectDir: dir, os: 'linux' };
+    expect(hasManagedPolicy(sources)).toBe(
+      existsSync('/etc/claude-code/managed-settings.json') ||
+        existsSync('/etc/claude-code/managed-settings.d'),
+    );
+    mkdirSync(join(dir, '.claude'));
+    writeFileSync(join(dir, '.claude', 'remote-settings.json'), '{}');
+    expect(hasManagedPolicy(sources)).toBe(true);
   });
 
   it('merges the rules of every file that exists', () => {

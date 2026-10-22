@@ -38,6 +38,7 @@ describe('Bash read refusal (#663 D8)', () => {
       now: () => Date.parse('2026-10-19T12:00:00.000Z'),
       random: () => 0.5,
       rules: () => ({ allow: [], deny: [], ask: [] }),
+      managedPolicy: () => false,
     };
   });
   afterEach(() => {

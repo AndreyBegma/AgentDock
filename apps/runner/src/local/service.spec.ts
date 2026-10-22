@@ -27,7 +27,11 @@ interface SetupOptions
   extends Partial<
     Pick<
       LocalServiceDeps,
-      'liveRound' | 'ancestorsOf' | 'alive' | 'launchedSession'
+      | 'liveRound'
+      | 'ancestorsOf'
+      | 'alive'
+      | 'launchedSession'
+      | 'readDescription'
     >
   > {
   reply?: LocalResult<unknown>;
@@ -75,6 +79,9 @@ const setup = (
     ...(options.liveRound ? { liveRound: options.liveRound } : {}),
     ...(options.ancestorsOf ? { ancestorsOf: options.ancestorsOf } : {}),
     ...(options.alive ? { alive: options.alive } : {}),
+    ...(options.readDescription
+      ? { readDescription: options.readDescription }
+      : {}),
     ...(options.launchedSession
       ? { launchedSession: options.launchedSession }
       : {}),
@@ -444,6 +451,92 @@ describe('LocalService — card rounds after a restart (#482)', () => {
     sessions.started('s-own', WORKTREE, [{ pid: 4242, comm: 'claude' }]);
     await service.handle('request', finish, as('s-own', WORKTREE));
     expect(relayed[0]?.session).toEqual({ runtime: 'claude', id: 's-own' });
+  });
+
+  it('drops an artifactIncomplete the caller sets (DA-18)', async () => {
+    const { service, relayed } = setup(false, true, { liveRound });
+    await service.handle(
+      'request',
+      { ...finish, args: { ...finish.args, artifactIncomplete: true } },
+      as(SESSION, WORKTREE),
+    );
+    expect(relayed[0]?.args).toEqual({ summary: 'Done. Tested.' });
+  });
+
+  describe('the artifact guard on the daemon’s side (#445 D8, DR-10)', () => {
+    const COMPLETE = [
+      'Closes #12',
+      '## What changed and why',
+      'The daemon guards the finish.',
+      '## Acceptance criteria',
+      '- [x] tested',
+    ].join('\n');
+    const guarded: CardRecord = { ...round, finishGuard: { issueNumber: 12 } };
+    const guardedRound = (cwd: string) =>
+      cwd.startsWith(WORKTREE) ? guarded : null;
+    const call = (service: LocalService, args: Record<string, unknown>) =>
+      service.handle('request', { ...finish, args }, as(SESSION, WORKTREE));
+
+    it('refuses an incomplete finish twice, whatever the caller claims, then relays it as incomplete', async () => {
+      const { service, relayed, emitted } = setup(false, true, {
+        liveRound: guardedRound,
+        readDescription: () => COMPLETE.replace('## Acceptance criteria', ''),
+      });
+      const claimed = { summary: 'Done. Tested.', artifactIncomplete: false };
+      const first = await call(service, claimed);
+      expect(first.ok).toBe(false);
+      expect(!first.ok && first.error.code).toBe('artifact_incomplete');
+      expect(!first.ok && first.error.message).toContain(
+        '## Acceptance criteria',
+      );
+      expect((await call(service, claimed)).ok).toBe(false);
+      expect(relayed).toEqual([]);
+      expect(emitted).toEqual([]);
+      expect((await call(service, claimed)).ok).toBe(true);
+      expect(relayed[0]?.args).toEqual({
+        summary: 'Done. Tested.',
+        artifactIncomplete: true,
+      });
+    });
+
+    it('relays a complete finish as is', async () => {
+      const { service, relayed } = setup(false, true, {
+        liveRound: guardedRound,
+        readDescription: () => COMPLETE,
+      });
+      expect((await call(service, { summary: 'Done. Tested.' })).ok).toBe(true);
+      expect(relayed[0]?.args).toEqual({ summary: 'Done. Tested.' });
+    });
+
+    it('reads the description of the round’s worktree, never the caller’s cwd', async () => {
+      const read: string[] = [];
+      const { service } = setup(false, true, {
+        liveRound: guardedRound,
+        readDescription: (worktree) => {
+          read.push(worktree);
+          return COMPLETE;
+        },
+      });
+      await service.handle(
+        'request',
+        { ...finish, cwd: `${WORKTREE}/apps/api` },
+        as(SESSION, WORKTREE),
+      );
+      expect(read).toEqual([WORKTREE]);
+    });
+
+    it('starts each round without rejections', async () => {
+      let current = guarded;
+      const { service } = setup(false, true, {
+        liveRound: () => current,
+        readDescription: () => null,
+      });
+      const summary = { summary: 'Done. Tested.' };
+      expect((await call(service, summary)).ok).toBe(false);
+      expect((await call(service, summary)).ok).toBe(false);
+      current = { ...guarded, runId: 'run_2' };
+      expect((await call(service, summary)).ok).toBe(false);
+    });
   });
 
   it('reports a refused finish_card of a live round as card_run.finish_refused', async () => {

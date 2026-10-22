@@ -5,6 +5,7 @@ import {
   cardIdSchema,
   cardShortIdSchema,
   cardTmuxSessionSchema,
+  orchestratorPermissionModeSchema,
   skillRunIdSchema,
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
@@ -53,6 +54,18 @@ export const cardRecordSchema = z.object({
    */
   sessionId: z.uuid().optional(),
   profileKey: z.string().min(1).optional(),
+  /**
+   * DA-15: the mode the round's `card.run` launched in; `card.resume`
+   * relaunches in it, never in a mode of its own. Absent on an older record.
+   */
+  permissionMode: orchestratorPermissionModeSchema.optional(),
+  /**
+   * #445 D8, DR-10: set when the round launched with Token saver on — the
+   * daemon then guards its `finish_card`, asking for `Closes #issueNumber`.
+   */
+  finishGuard: z
+    .object({ issueNumber: z.number().int().positive().nullable() })
+    .optional(),
   startedAt: z.iso.datetime(),
   endedAt: z.iso.datetime().optional(),
   /**

@@ -10,6 +10,7 @@ import {
 } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { Plan, PlanTask } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { BoardPlanCards } from '../board/board-plan-cards';
 import { PrismaService } from '../database/prisma.service';
 import type { PlanActor } from './plan.service';
@@ -74,6 +75,7 @@ export class PlanCardsService {
     private readonly store: PlanStore,
     private readonly planCards: BoardPlanCards,
     private readonly candidates: PlanCandidatesService,
+    private readonly audit: AuditService,
   ) {}
 
   async create(plan: Plan, actor: PlanActor): Promise<CreatePlanCardsResponse> {
@@ -191,11 +193,13 @@ export class PlanCardsService {
    * `stack`, in stage order, the stack's title, body, design switch and
    * stages beside them, whichever the intake proposed. #592 (ADR-0058): they
    * become candidates, not cards — the person accepts or rejects each in
-   * Drafts, and the intake is `reviewing` until none is pending.
+   * Drafts, and the intake is `reviewing` until none is pending. DA-16: the
+   * confirmation is the caller's — `actor`, never the intake's author.
    */
   async confirmSplit(
     plan: Plan,
     request: ConfirmSplitRequest,
+    actor: PlanActor,
   ): Promise<ConfirmSplitResponse> {
     if (plan.mode !== 'card') {
       throw plannerError(
@@ -302,6 +306,15 @@ export class PlanCardsService {
             }
           : null,
       );
+    });
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'plan.split_confirmed',
+      target: { type: 'plan', id: plan.id },
+      projectId: plan.projectId,
+      after: { candidates: made.length, stack: Boolean(stack) },
+      result: 'ok',
+      meta: { turnId: request.turnId },
     });
     this.store.publish(plan.projectId, plan.id);
     return { candidates: made.map(toCandidateView) };
