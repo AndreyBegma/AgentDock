@@ -8,6 +8,7 @@ import {
   CURRENT_APPROVAL_STATUSES,
   configMergeApproval,
   mergeApprovalMismatch,
+  redactSecrets,
 } from '@nautelle/shared';
 import type { PrInspection } from '@nautelle/shared/protocol';
 import { HttpException, Injectable } from '@nestjs/common';
@@ -136,16 +137,34 @@ export class ApprovalsQueryService {
   }
 }
 
-const inspectionErrorOf = (error: HttpException): ApprovalInspectionError => {
+/**
+ * The reason `inspection` is null, as every reader sees it (D-03). Text that
+ * may come from the runner is redacted here too (WI-74), whichever path built
+ * the error.
+ */
+export const inspectionErrorOf = (
+  error: HttpException,
+): ApprovalInspectionError => {
   const body = error.getResponse();
   if (typeof body === 'object' && body !== null) {
-    const { error: code, message } = body as {
+    const {
+      error: code,
+      message,
+      detail,
+    } = body as {
       error?: unknown;
       message?: unknown;
+      detail?: unknown;
     };
     if (typeof code === 'string' && typeof message === 'string') {
-      return { code, message };
+      return typeof detail === 'string'
+        ? {
+            code,
+            message: redactSecrets(message),
+            detail: redactSecrets(detail),
+          }
+        : { code, message: redactSecrets(message) };
     }
   }
-  return { code: 'internal', message: error.message };
+  return { code: 'internal', message: redactSecrets(error.message) };
 };
