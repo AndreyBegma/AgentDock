@@ -14,6 +14,7 @@ import {
   inboundPayloadPathSchema,
   normalizeAllowedTarget,
   SAFE_PATTERN_MESSAGES,
+  shellWord,
   WEBHOOK_ATTEMPT_ERRORS,
   WEBHOOK_CIRCUIT_OPEN_MS,
   WEBHOOK_EVENT_TYPES,
@@ -188,7 +189,23 @@ export function urlHost(url: string): string {
   }
 }
 
-export const eventsLabel = (events: readonly string[]): string =>
+const MASK = '••••••••';
+
+/**
+ * C-177: a URL that works as a bearer secret, with everything after the host
+ * (path, query, fragment) and any user name or password hidden, so a glance
+ * or a screenshot does not leak it. A URL that does not parse is hidden whole.
+ */
+export function maskUrlPath(url: string): string {
+  try {
+    const { protocol, host } = new URL(url);
+    return `${protocol}//${host}/${MASK}`;
+  } catch {
+    return MASK;
+  }
+}
+
+export const eventsLabel =(events: readonly string[]): string =>
   events.length === 1 ? '1 event' : `${events.length} events`;
 
 export function actionSummary(action: InboundTriggerAction): string {
@@ -459,11 +476,15 @@ export function parseTargets(text: string): TargetsParse {
 
 // ─── Samples (shown next to the secret) ─────────────────────────────────────
 
-/** A shell sample that signs and sends one delivery (D2). */
+/**
+ * A shell sample that signs and sends one delivery (D2). The secret and the
+ * URL are each one shell word (C-177), so a quote in either cannot end the
+ * string early and run what follows.
+ */
 export function curlExample(url: string, secret: string): string {
   return [
-    `SECRET='${secret}'`,
-    `URL='${url}'`,
+    `SECRET=${shellWord(secret)}`,
+    `URL=${shellWord(url)}`,
     `BODY='{"example":"value"}'`,
     'TS=$(date +%s)',
     'DELIVERY=$(uuidgen)',

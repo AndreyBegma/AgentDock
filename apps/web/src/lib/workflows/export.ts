@@ -12,6 +12,13 @@ import { formatFlow } from './format';
 type Cell = string | number | null;
 
 /**
+ * Text a spreadsheet may run as a formula (C-177): a formula sign, ASCII or
+ * full-width (`＝＋－＠`, which some spreadsheets fold to ASCII), after any
+ * leading whitespace or line breaks; or a leading tab or line break at all.
+ */
+const FORMULA_LIKE = /^\s*[=+\-@＝＋－＠]|^[\t\r\n]/;
+
+/**
  * One CSV field. Quoted when it carries a quote, comma or line break; text
  * that a spreadsheet would run as a formula gets a leading `'`, since tool
  * and type names come from agents.
@@ -19,7 +26,7 @@ type Cell = string | number | null;
 function csvField(value: Cell): string {
   if (value === null) return '';
   if (typeof value === 'number') return String(value);
-  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  const safe = FORMULA_LIKE.test(value) ? `'${value}` : value;
   return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 

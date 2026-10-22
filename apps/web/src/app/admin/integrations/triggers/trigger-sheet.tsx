@@ -3,7 +3,6 @@
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Field, Textarea } from '@andrewbehma/glass-ui/field';
@@ -38,6 +37,7 @@ import {
   INBOUND_STATUS_LABEL,
   INBOUND_STATUS_TONE,
 } from '../../../../lib/webhooks/format';
+import { MaskedUrl } from '../../../../lib/webhooks/masked-url';
 
 const POLL_MS = 15_000;
 
@@ -272,12 +272,12 @@ export function TriggerSheet({
                   <h3 id="trigger-url" className="text-sm font-semibold">
                     Endpoint
                   </h3>
-                  <CodeBlock
-                    code={triggerUrl(window.location.origin, detail.path)}
+                  <MaskedUrl
+                    url={triggerUrl(window.location.origin, detail.path)}
                   />
                   <p className="text-xs text-ink-3">
                     Send a signed POST to this URL. The caller must be able to
-                    reach this address. Sign every request with the trigger’s
+                    reach this address; treat the URL like a password. Sign every request with the trigger’s
                     secret; the secret itself is never shown again — Rotate
                     secret issues a new one.
                   </p>

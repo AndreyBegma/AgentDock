@@ -356,6 +356,12 @@ describe('export', () => {
     );
   });
 
+  test('C-177: a formula after a line break or in full width is defused', () => {
+    expect(toCsv([['\n=1+1', '＝1+1', '  @SUM(A1)', '\tx', 'a=b']])).toBe(
+      `"'\n=1+1",'＝1+1,'  @SUM(A1),'\tx,a=b\r\n`,
+    );
+  });
+
   test('the summary CSV keeps a null blank, never 0', () => {
     const summary: WorkflowsSummaryResponse = {
       sessions: 0,

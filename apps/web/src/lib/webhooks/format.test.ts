@@ -260,7 +260,8 @@ describe('labels and samples', () => {
 
   test('curlExample signs timestamp.delivery.body and sends the three headers', () => {
     const text = curlExample('https://x.test/hooks/abc', 's3cret');
-    expect(text).toContain("SECRET='s3cret'");
+    expect(text).toContain('SECRET=s3cret\n');
+    expect(text).toContain("URL='https://x.test/hooks/abc'");
     expect(text).toContain('"%s.%s.%s" "$TS" "$DELIVERY" "$BODY"');
     for (const header of [
       'X-Nautelle-Timestamp',
@@ -268,5 +269,11 @@ describe('labels and samples', () => {
       'X-Nautelle-Signature: sha256=',
     ])
       expect(text).toContain(header);
+  });
+
+  test('C-177: a quote in the secret or URL cannot break out of the string', () => {
+    const text = curlExample("https://x.test/a'b", "s'; rm -rf ~ #");
+    expect(text).toContain(`SECRET='s'\\''; rm -rf ~ #'\n`);
+    expect(text).toContain(`URL='https://x.test/a'\\''b'\n`);
   });
 });

@@ -39,9 +39,11 @@ import {
   DELIVERY_STATUS_LABEL,
   DELIVERY_STATUS_TONE,
   describeWebhooksError,
+  maskUrlPath,
   redeliverCopy,
   VERIFY_SAMPLE,
 } from '../../../../lib/webhooks/format';
+import { MaskedUrl } from '../../../../lib/webhooks/masked-url';
 
 const POLL_MS = 15_000;
 
@@ -203,7 +205,7 @@ export function WebhookSheet({
           <SheetContent
             side="right"
             title={webhook?.name ?? 'Webhook'}
-            description={webhook?.url}
+            description={webhook ? maskUrlPath(webhook.url) : undefined}
           >
             {loadError ? (
               <div className="mb-4">
@@ -305,6 +307,16 @@ export function WebhookSheet({
                     Delete
                   </Button>
                 </div>
+
+                <section
+                  aria-labelledby="webhook-url"
+                  className="flex flex-col gap-2"
+                >
+                  <h3 id="webhook-url" className="text-sm font-semibold">
+                    Destination
+                  </h3>
+                  <MaskedUrl url={webhook.url} />
+                </section>
 
                 <section
                   aria-labelledby="webhook-log"
