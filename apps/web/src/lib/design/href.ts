@@ -12,9 +12,9 @@ export const designHref = (
   taskKey: string,
   search = '',
 ): string =>
-  `/projects/${projectId}/planner/${planId}/tasks/${encodeURIComponent(
-    taskKey,
-  )}/design${search}`;
+  `/projects/${encodeURIComponent(projectId)}/planner/${encodeURIComponent(
+    planId,
+  )}/tasks/${encodeURIComponent(taskKey)}/design${search}`;
 
 /** A task's design: GET / PATCH, and `/generate|/comments|/revise|/approve`. */
 export const designApi = (
@@ -29,21 +29,21 @@ export const designApi = (
  * the card's per-project number.
  */
 export const cardDesignApi = (projectId: string, number: number): string =>
-  `/projects/${projectId}/board/cards/${number}/design`;
+  `/projects/${encodeURIComponent(projectId)}/board/cards/${number}/design`;
 
 /** The card's design viewer, with its URL state when given (`viewerSearch`). */
 export const cardDesignHref = (
   projectId: string,
   number: number,
   search = '',
-): string => `/projects/${projectId}/board/cards/${number}/design${search}`;
+): string => `/projects/${encodeURIComponent(projectId)}/board/cards/${number}/design${search}`;
 
 /** The project's UI profile: GET / PUT, and `/versions`, `/rebuild`. */
 export const uiProfileApi = (projectId: string): string =>
-  `/projects/${projectId}/ui-profile`;
+  `/projects/${encodeURIComponent(projectId)}/ui-profile`;
 
 export const designSettingsApi = (projectId: string): string =>
-  `/projects/${projectId}/design-settings`;
+  `/projects/${encodeURIComponent(projectId)}/design-settings`;
 
 /**
  * The profile's style kit and snippets as one page, served with the mockup's
@@ -62,15 +62,15 @@ export { runHref } from '../history/format';
 
 /** The project's installed skills (#24): the choices for design skills. */
 export const installedSkillsApi = (projectId: string): string =>
-  `/projects/${projectId}/skills`;
+  `/projects/${encodeURIComponent(projectId)}/skills`;
 
 /** #480: a stack's shared design — the same routes as a card's, at its number. */
 export const stackDesignApi = (projectId: string, number: number): string =>
-  `/projects/${projectId}/board/stacks/${number}/design`;
+  `/projects/${encodeURIComponent(projectId)}/board/stacks/${number}/design`;
 
 /** #480: the stack's design viewer. */
 export const stackDesignHref = (
   projectId: string,
   number: number,
   search = '',
-): string => `/projects/${projectId}/board/stacks/${number}/design${search}`;
+): string => `/projects/${encodeURIComponent(projectId)}/board/stacks/${number}/design${search}`;
