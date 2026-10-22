@@ -9,8 +9,10 @@ import {
 } from '@nautelle/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import type { AuthUser } from '../auth';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
+import { ProjectAccessService } from '../projects';
 import { notificationError, notificationNotFound } from './notification-error';
 import {
   NOTIFICATION_INCLUDE,
@@ -39,16 +41,12 @@ const decodeCursor = (cursor: string): { lastAt: Date; id: bigint } | null => {
   return { lastAt: new Date(Number(match[1])), id: BigInt(match[2]) };
 };
 
-/** Not read and not muted: what the bell counts (D3). */
-const unreadWhere = (userId: string): Prisma.NotificationWhereInput => ({
-  userId,
-  readAt: null,
-  muted: false,
-});
+type Caller = Pick<AuthUser, 'id' | 'role'>;
 
 /**
  * The in-app notification centre (spec 22 D11): a user reads and marks only
- * their own rows — another user's id answers 404 like a missing one.
+ * their own rows — another user's id answers 404 like a missing one. A row of
+ * a project the user can no longer see is hidden the same way (C-149).
  */
 @Injectable()
 export class NotificationsService {
@@ -57,24 +55,40 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly live: LiveService,
+    private readonly access: ProjectAccessService,
   ) {}
 
-  async list(userId: string, query: ListQuery): Promise<NotificationPage> {
+  /** The caller's rows of projects they can still see, and project-less ones. */
+  private mineWhere(user: Caller): Prisma.NotificationWhereInput {
+    return {
+      userId: user.id,
+      OR: [{ projectId: null }, { project: this.access.visibleWhere(user) }],
+    };
+  }
+
+  /** Not read and not muted: what the bell counts (D3). */
+  private unreadWhere(user: Caller): Prisma.NotificationWhereInput {
+    return { ...this.mineWhere(user), readAt: null, muted: false };
+  }
+
+  async list(user: Caller, query: ListQuery): Promise<NotificationPage> {
     const limit = query.limit ?? NOTIFICATION_PAGE_DEFAULT;
     const after = query.cursor ? decodeCursor(query.cursor) : null;
     if (query.cursor && !after) {
       throw notificationError(400, 'invalid_cursor', 'Malformed cursor');
     }
     const where: Prisma.NotificationWhereInput = {
-      ...(query.unread ? unreadWhere(userId) : { userId }),
-      ...(after
-        ? {
-            OR: [
-              { lastAt: { lt: after.lastAt } },
-              { lastAt: after.lastAt, id: { lt: after.id } },
-            ],
-          }
-        : {}),
+      AND: [
+        query.unread ? this.unreadWhere(user) : this.mineWhere(user),
+        after
+          ? {
+              OR: [
+                { lastAt: { lt: after.lastAt } },
+                { lastAt: after.lastAt, id: { lt: after.id } },
+              ],
+            }
+          : {},
+      ],
     };
     const [rows, unreadCount] = await Promise.all([
       this.prisma.notification.findMany({
@@ -83,7 +97,7 @@ export class NotificationsService {
         orderBy: [{ lastAt: 'desc' }, { id: 'desc' }],
         take: limit + 1,
       }),
-      this.unreadCount(userId),
+      this.unreadCount(user),
     ]);
     const page = rows.slice(0, limit);
     const last = page.at(-1);
@@ -95,27 +109,27 @@ export class NotificationsService {
     };
   }
 
-  unreadCount(userId: string): Promise<number> {
-    return this.prisma.notification.count({ where: unreadWhere(userId) });
+  unreadCount(user: Caller): Promise<number> {
+    return this.prisma.notification.count({ where: this.unreadWhere(user) });
   }
 
-  async markRead(userId: string, id: string): Promise<NotificationReadResult> {
+  async markRead(user: Caller, id: string): Promise<NotificationReadResult> {
     if (!/^\d{1,19}$/.test(id) || BigInt(id) > INT8_MAX)
       throw notificationNotFound();
     const { count } = await this.prisma.notification.updateMany({
-      where: { id: BigInt(id), userId },
+      where: { ...this.mineWhere(user), id: BigInt(id) },
       data: { readAt: new Date() },
     });
     if (count === 0) throw notificationNotFound();
-    return this.publishRead(userId, [id]);
+    return this.publishRead(user, [id]);
   }
 
-  async markAllRead(userId: string): Promise<NotificationReadResult> {
+  async markAllRead(user: Caller): Promise<NotificationReadResult> {
     await this.prisma.notification.updateMany({
-      where: { userId, readAt: null },
+      where: { ...this.mineWhere(user), readAt: null },
       data: { readAt: new Date() },
     });
-    return this.publishRead(userId, null);
+    return this.publishRead(user, null);
   }
 
   /** `notification.new` on `user:<id>` for rows written by a committed transaction. */
@@ -123,13 +137,16 @@ export class NotificationsService {
     if (written.length === 0) return;
     const rows = await this.prisma.notification.findMany({
       where: { id: { in: written.map((w) => w.notificationId) } },
-      include: NOTIFICATION_INCLUDE,
+      include: { ...NOTIFICATION_INCLUDE, user: { select: { role: true } } },
     });
     for (const row of rows) {
       try {
         const data: NotificationNewLive = {
           notification: toNotificationView(row),
-          unreadCount: await this.unreadCount(row.userId),
+          unreadCount: await this.unreadCount({
+            id: row.userId,
+            role: row.user.role,
+          }),
         };
         this.live.publish(`user:${row.userId}`, NOTIFICATION_NEW_EVENT, data);
       } catch (error) {
@@ -141,12 +158,12 @@ export class NotificationsService {
   }
 
   private async publishRead(
-    userId: string,
+    user: Caller,
     ids: string[] | null,
   ): Promise<NotificationReadResult> {
-    const unreadCount = await this.unreadCount(userId);
+    const unreadCount = await this.unreadCount(user);
     const data: NotificationReadLive = { ids, unreadCount };
-    this.live.publish(`user:${userId}`, NOTIFICATION_READ_EVENT, data);
+    this.live.publish(`user:${user.id}`, NOTIFICATION_READ_EVENT, data);
     return { unreadCount };
   }
 }
