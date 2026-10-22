@@ -73,11 +73,12 @@ describe('RUNNER_NPM_PLATFORM_PACKAGES (C-328)', () => {
   it('lists every optional dependency of the published meta package', () => {
     const manifest = JSON.parse(
       readFileSync(
-        join(import.meta.dir, '../../../../apps/runner/npm/package.json'),
+        join(process.cwd(), '../../apps/runner/npm/package.json'),
         'utf8',
       ),
     ) as { optionalDependencies: Record<string, string> };
-    expect([...RUNNER_NPM_PLATFORM_PACKAGES].sort()).toEqual(
+    const listed: string[] = [...RUNNER_NPM_PLATFORM_PACKAGES];
+    expect(listed.sort()).toEqual(
       Object.keys(manifest.optionalDependencies).sort(),
     );
   });
