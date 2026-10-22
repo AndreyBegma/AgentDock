@@ -41,10 +41,12 @@ import { busyStatusOf, type DesignOwner } from './design-owner';
 import {
   batchOf,
   commentAnchor,
+  completeBatchOf,
   type DesignTurnPlan,
   withDesign,
 } from './design-rules';
 import {
+  conformanceOfRow,
   type DesignKey,
   defaultSkillsOf,
   designWhere,
@@ -174,6 +176,11 @@ export class DesignService implements OnModuleInit {
     await this.reviseOf(await this.taskOwner(plan, key, 'change'), actor);
   }
 
+  /** #833 D7: `POST …/design/complete` — the repair turn by hand. */
+  async complete(plan: Plan, key: string, actor: PlanActor): Promise<void> {
+    await this.completeOf(await this.taskOwner(plan, key, 'change'), actor);
+  }
+
   /** `POST …/design/comments` (D9). */
   async comment(
     plan: Plan,
@@ -262,6 +269,16 @@ export class DesignService implements OnModuleInit {
     await this.stacks.assertStackApproved(owner.target.id);
     await this.rememberLaunch(owner, projectId, number, launch);
     await this.reviseOf(owner, actor);
+  }
+
+  async cardComplete(
+    projectId: string,
+    number: number,
+    actor: PlanActor,
+  ): Promise<void> {
+    const owner = await this.cardOwner(projectId, number);
+    await this.stacks.assertStackApproved(owner.target.id);
+    await this.completeOf(owner, actor);
   }
 
   /**
@@ -355,6 +372,14 @@ export class DesignService implements OnModuleInit {
     actor: PlanActor,
   ): Promise<void> {
     await this.reviseOf(await this.stackOwner(projectId, number), actor);
+  }
+
+  async stackComplete(
+    projectId: string,
+    number: number,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.completeOf(await this.stackOwner(projectId, number), actor);
   }
 
   async stackComment(
@@ -823,6 +848,73 @@ export class DesignService implements OnModuleInit {
         ...(readiness.kind === 'building'
           ? { profileBuildRunId: readiness.runId }
           : { turnId }),
+      },
+      result: 'ok',
+    });
+  }
+
+  /**
+   * #833 D7: Complete — the repair turn by hand, for every variant whose
+   * latest revision does not follow its template. It draws from the profile
+   * those revisions were drawn from: a repair fixes the frames, not the style.
+   */
+  private async completeOf(
+    owner: DesignOwner,
+    actor: PlanActor,
+  ): Promise<void> {
+    const design = await this.drawable(owner);
+    const revisions = await this.prisma.designRevision.findMany({
+      where: { designId: design.id, archived: false },
+      orderBy: { revision: 'desc' },
+      select: { id: true, variant: true, conformance: true },
+    });
+    const latest = new Map<number, (typeof revisions)[number]>();
+    for (const r of revisions)
+      if (!latest.has(r.variant)) latest.set(r.variant, r);
+    const off = [...latest.values()].filter(
+      (r) => conformanceOfRow(r.conformance)?.ok === false,
+    );
+    const batch = completeBatchOf(
+      off.map((r) => r.variant),
+      design.profileId,
+    );
+    if (!batch) {
+      throw designError(
+        409,
+        DESIGN_ERROR.invalidArgs,
+        'Every variant follows its template; there is nothing to complete',
+      );
+    }
+    await owner.assertIdle();
+    const project = await this.store.project(owner.projectId);
+    this.commands.assertServed(
+      project.runnerId,
+      RUNNER_FEATURE_COMMANDS.design,
+    );
+    const claimed = await this.prisma.taskDesign.updateMany({
+      where: { id: design.id, status: design.status },
+      data: { status: busyStatusOf('revise'), busySince: new Date() },
+    });
+    if (claimed.count === 0) throw busy();
+    owner.publish();
+    let turnId: string;
+    try {
+      turnId = await owner.runTurn(batch, callerOf(actor));
+    } catch (error) {
+      await settleDesign(this.prisma, owner.key);
+      owner.publish();
+      throw error;
+    }
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'design.completed',
+      target: owner.target,
+      projectId: owner.projectId,
+      after: {
+        ...owner.label,
+        revisions: off.map((r) => r.id),
+        variants: off.map((r) => r.variant),
+        turnId,
       },
       result: 'ok',
     });

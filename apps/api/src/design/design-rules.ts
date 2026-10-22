@@ -143,6 +143,15 @@ export const designTurnPlanSchema = z.strictObject({
   profileId: z.string().min(1).nullable(),
   /** #275 D1: the build this batch waited for — its turns are step 2 of 2. */
   profileBuildRunId: z.string().min(1).optional(),
+  /**
+   * #833 D7: a repair turn — a revise of the variant's latest revision that
+   * does not follow its template. `next` is what the rest of the batch
+   * draws: the batch's own mode after an automatic repair, `repair` when a
+   * person's Complete repairs every variant. A repair is never repaired again.
+   */
+  repair: z
+    .strictObject({ next: z.enum(['generate', 'revise', 'repair']) })
+    .optional(),
 });
 export type DesignTurnPlan = z.infer<typeof designTurnPlanSchema>;
 
@@ -189,8 +198,43 @@ export const batchOf = (
   };
 };
 
-/** The next turn of a batch, after `plan`'s variant is drawn. */
+/**
+ * The next turn of a batch, after `plan`'s variant is drawn. #833: after an
+ * automatic repair the batch goes on in its own mode.
+ */
 export const nextOfBatch = (plan: DesignTurnPlan): DesignTurnPlan | null => {
   const [variant, ...remaining] = plan.remaining;
-  return variant === undefined ? null : { ...plan, variant, remaining };
+  if (variant === undefined) return null;
+  const { repair, ...rest } = plan;
+  if (!repair || repair.next === 'repair') {
+    return { ...plan, variant, remaining };
+  }
+  return { ...rest, mode: repair.next, variant, remaining };
+};
+
+/**
+ * #833 D7: the one automatic repair of the revision `plan` just drew — a
+ * revise of the same variant that carries the rest of the batch.
+ */
+export const repairOf = (plan: DesignTurnPlan): DesignTurnPlan => ({
+  ...plan,
+  mode: 'revise',
+  repair: { next: plan.mode },
+});
+
+/** #833 D7: a person's Complete — a repair of every listed variant. */
+export const completeBatchOf = (
+  variants: readonly number[],
+  profileId: string | null,
+): DesignTurnPlan | null => {
+  const [variant, ...remaining] = [...variants].sort((a, b) => a - b);
+  if (variant === undefined) return null;
+  return {
+    mode: 'revise',
+    variant,
+    remaining,
+    comments: [],
+    profileId,
+    repair: { next: 'repair' },
+  };
 };

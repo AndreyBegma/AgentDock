@@ -125,6 +125,24 @@ export class StackDesignController {
     return this.designs.stackView(access.projectId, n);
   }
 
+  /** #833 D7: no body; the repair turn of every variant off its template. */
+  @Post('complete')
+  @ProjectRole('operator')
+  async complete(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<TaskDesignView> {
+    const n = stackNumber(number);
+    await this.designs.stackComplete(
+      access.projectId,
+      n,
+      actorOf(access, user, ctx),
+    );
+    return this.designs.stackView(access.projectId, n);
+  }
+
   @Post('stop')
   @HttpCode(200)
   @ProjectRole('operator')
