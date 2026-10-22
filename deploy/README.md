@@ -54,6 +54,13 @@ only a person can change (P-01). Neither is in place yet: same-repository pull
 requests start without approval (#504), so a pull request that edits its
 pipeline file can still reach the Docker socket. See the setup below.
 
+The `secrets` step runs gitleaks, pinned by digest, over the commits the clone
+holds, with `.gitleaks.toml`, on every event. It mounts nothing and reads no
+secret, and `--redact` keeps a value it finds out of the public log.
+`bun run check:secrets` runs the same scan locally. A false positive gets a
+narrow allowlist entry in `.gitleaks.toml`, with a comment: name the file and,
+where possible, the rule.
+
 The CI PostgreSQL is throwaway. Its data directory is on tmpfs, and it runs
 with `fsync`, `synchronous_commit` and `full_page_writes` off. The `test` step
 prints those three settings.

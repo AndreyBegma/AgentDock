@@ -101,6 +101,17 @@ steps:
     commands:
       - docker build --pull -t agentdock-ci:node-bun deploy/ci-image
 
+  # Secrets in the commits the clone holds, with .gitleaks.toml: the scan
+  # `bun run check:secrets` runs. The oldest commit of a shallow clone shows
+  # its whole tree, so the tree is scanned too. --redact keeps a value it finds
+  # out of the log, which is public. It reads only the clone and needs no
+  # other step. Keep the image in step with scripts/check-secrets.sh.
+  - name: secrets
+    image: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+    depends_on: []
+    commands:
+      - gitleaks git --no-banner --redact --config .gitleaks.toml .
+
   - name: install
     image: *ci_image
     depends_on: [{ name: ci-image, optional: true }]

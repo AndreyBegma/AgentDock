@@ -1,0 +1,40 @@
+# gitleaks configuration: `bun run check:secrets` and the `secrets` CI step
+# (.woodpecker/pipeline.yml) scan the git history with it.
+#
+# The default rules apply. Each allowlist below names the files it covers and,
+# where it can, the rule: a test fixture is not exempt from scanning as a
+# whole, because a token pasted into a fixture is exactly what the scan is
+# for. Allow a new false positive the same way, narrowly, with a comment.
+
+title = "Nautelle"
+
+[extend]
+useDefault = true
+
+# Tests of the redactors: they feed token-shaped strings in on purpose.
+[[allowlists]]
+description = "Redactor tests"
+paths = [
+  '''^apps/runner/src/(local|pane)/redact\.spec\.ts$''',
+  '''^packages/shared/src/text/redact\.spec\.ts$''',
+]
+
+# Langfuse's model price list: `tokenizerModel` names look like generic keys.
+[[allowlists]]
+description = "Langfuse model price seed data"
+targetRules = ["generic-api-key"]
+paths = ['''^apps/api/prisma/seed-data/langfuse-model-prices\.json$''']
+
+# A fixed HMAC key the signature test signs with.
+[[allowlists]]
+description = "Webhook signature test key"
+targetRules = ["generic-api-key"]
+paths = ['''^apps/api/src/webhooks/common/signature\.spec\.ts$''']
+
+# Placeholder keys in tests, built from the hex digits in order.
+[[allowlists]]
+description = "Placeholder keys in tests"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''\.(spec|test)\.ts$''']
+regexes = ['''^(s3cret-)?0123456789abcdef$''']
