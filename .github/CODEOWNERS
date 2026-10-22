@@ -1,0 +1,15 @@
+# Paths whose changes need a person's review before they merge: they decide
+# what CI, deploys and plugins run. The runner reports a card push that changes
+# them, and the board never auto-merges such a card.
+# Decision: docs/adr/0077-runner-pushes-follow-a-branch-policy-and-protected-paths-need-a-person.md
+# Keep this list in step with PROTECTED_PATHS in packages/shared/src/protocol/branch-policy.ts.
+# Enforcing the review ("Require review from Code Owners") is a GitHub branch
+# protection setting only a person can change.
+
+/.woodpecker/ @AndreyBegma
+/.woodpecker.yml @AndreyBegma
+/.woodpecker.yaml @AndreyBegma
+/deploy/ @AndreyBegma
+/plugins/ @AndreyBegma
+/.claude-plugin/ @AndreyBegma
+/.github/ @AndreyBegma
