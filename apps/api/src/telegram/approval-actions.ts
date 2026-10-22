@@ -135,6 +135,7 @@ export const serviceErrorText = (code: string | null, pr: number): string => {
     case APPROVALS_ERROR.headMoved:
       return `PR #${pr} has new commits since this message. Review the new head in Nautelle.`;
     case APPROVALS_ERROR.notWaiting:
+    case APPROVALS_ERROR.approvalClosed:
       return `PR #${pr} is not waiting for a decision.`;
     case APPROVALS_ERROR.approvalNotFound:
       return `PR #${pr} is not in this project's approval queue.`;

@@ -170,6 +170,8 @@ export function describeApprovalError(
       return 'The pull request has a newer commit than the one you reviewed. Nothing was sent; review the new head and decide again.';
     case APPROVALS_ERROR.notWaiting:
       return 'This pull request is no longer waiting for a decision.';
+    case APPROVALS_ERROR.approvalClosed:
+      return 'This approval was closed while your decision was being sent; it was not recorded.';
     case APPROVALS_ERROR.prNotOpen:
       return 'This pull request is merged or closed on GitHub.';
     case APPROVALS_ERROR.approvalNotFound:
