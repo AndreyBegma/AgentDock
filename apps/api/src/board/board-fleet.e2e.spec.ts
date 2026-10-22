@@ -230,10 +230,29 @@ describe('board fleet mirror (e2e, #282 D4)', () => {
       await ready(42);
       await fleet.mirror(w.a);
       expect(await fleetCards()).toHaveLength(1);
+      const [card] = await fleetCards();
       await leaveQueue('open');
       await fleet.mirror(w.a);
 
       expect(await fleetCards()).toHaveLength(0);
+      // C-187: the removal leaves an audit row naming the card and the issue.
+      const removed = await w.audit('card.fleet_removed');
+      expect(removed).toHaveLength(1);
+      expect(removed[0]).toMatchObject({
+        actorType: 'system',
+        targetType: 'board_card',
+        targetId: card.id,
+        projectId: w.a,
+        result: 'ok',
+        before: {
+          number: card.number,
+          title: 'Widget export',
+          issue: 42,
+          reason: 'left_queue',
+        },
+      });
+      await fleet.mirror(w.a);
+      expect(await w.audit('card.fleet_removed')).toHaveLength(1);
     });
 
     it('lets a person move a slotless card, while a live slot’s card is still refused', async () => {

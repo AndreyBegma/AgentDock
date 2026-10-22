@@ -146,6 +146,11 @@ export const AUDIT_ACTIONS = [
   /** #652: Stop removed the stack run's queue (`after: { number, removed }`). */
   'stack.run_stopped',
   'card.deleted',
+  /**
+   * C-187: the fleet mirror removed a slotless To Do card whose open issue
+   * left the ready queue (system actor, `before: { number, title, issue, reason }`).
+   */
+  'card.fleet_removed',
   'card.moved',
   'card.run_started',
   'card.feedback',

@@ -468,6 +468,7 @@ const AUDIT_TITLES: Record<string, string> = {
   'action_request.decided': 'Action request decided',
   'action_request.executed': 'Requested action executed',
   'session_content.purged': 'Session content purged',
+  'card.fleet_removed': 'Fleet card removed: its issue left the queue',
 };
 
 /** Every audit action the feed shows — the projector's `action IN (…)` filter. */
