@@ -161,8 +161,9 @@ export const isCardPrState = (value: string): value is CardPrState =>
  * #359 D5: the checks on the head of the card's PR.
  * - `none` — no PR, or the head has no checks;
  * - `pending` — a check is still running;
- * - `green` — every check passed (or was skipped);
- * - `red` — a check failed or was cancelled; `ciChecks` names them.
+ * - `green` — every check passed, cancelled and skipped ones ignored;
+ * - `red` — a check failed; `ciChecks` names them.
+ * Auto-merge asks more than `green` (`cardCiMergeable`, C-182).
  */
 export const CARD_CI_STATES = ['none', 'pending', 'green', 'red'] as const;
 export type CardCiState = (typeof CARD_CI_STATES)[number];
@@ -193,11 +194,14 @@ export const CARD_CI_MISSING_MS = 5 * 60_000;
  * had, so nothing was pushed (#630). A stacked PR that merged into a
  * dependency branch whose own PR had already merged gets a forward PR into
  * the base (#709): `forward_conflict` when that PR conflicts with the base,
- * `forward_failed` when it could not be opened.
+ * `forward_failed` when it could not be opened. Auto-merge refuses a head
+ * whose checks are not all passed — none, cancelled or skipped ones —
+ * with `ci_not_green` (C-182).
  */
 export const CARD_NEEDS_PERSON_REASONS = [
   'ci_still_failing',
   'ci_not_reported',
+  'ci_not_green',
   'round_failed',
   'round_pushed_nothing',
   'round_ended_at_once',

@@ -21,7 +21,7 @@ export const cardBranchSchema = gitRefSchema.refine(hasCardBranchPrefix, {
 
 /**
  * C-148 (D-12, ADR-0077): the paths whose change a person reviews — CI,
- * deployment and the released plugins. A directory ends in `/`; anything
+ * deployment, the images it builds (C-182) and the released plugins. A directory ends in `/`; anything
  * else is one file at the repository's root. Fixed here, not read from the
  * repository, so a branch cannot shorten the list it is checked against.
  */
@@ -33,6 +33,7 @@ export const PROTECTED_PATHS = [
   'deploy/',
   'plugins/',
   '.claude-plugin/',
+  'docker/',
 ] as const;
 
 /** Whether a repository-relative path is under `PROTECTED_PATHS`. */

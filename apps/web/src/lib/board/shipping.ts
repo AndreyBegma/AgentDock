@@ -32,6 +32,9 @@ export const CI_STILL_FAILING_TEXT = `CI still failing after ${CARD_CI_FIX_ATTEM
 /** #484: the budget stop's text when CI never reported on the head. */
 export const CI_NOT_REPORTED_TEXT = 'CI reported no checks';
 
+/** C-182: auto-merge refused a head whose checks did not all pass. */
+export const CI_NOT_GREEN_TEXT = 'Not every check passed; not merged';
+
 /**
  * #542: why auto-merge refused the head the latest round left — the round
  * did not do the card's work.
@@ -71,6 +74,8 @@ const needsPersonText = (
       return CI_STILL_FAILING_TEXT;
     case 'ci_not_reported':
       return CI_NOT_REPORTED_TEXT;
+    case 'ci_not_green':
+      return CI_NOT_GREEN_TEXT;
     case 'round_failed':
     case 'round_pushed_nothing':
     case 'round_ended_at_once':

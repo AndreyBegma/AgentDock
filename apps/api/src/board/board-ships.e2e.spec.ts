@@ -353,14 +353,68 @@ describe('a card ships itself (e2e, #359)', () => {
       expect(w.sent('card.merge')).toHaveLength(1);
     });
 
-    it('a PR with no checks is green on its second read of the same head', async () => {
+    it('C-182: a PR with no checks goes to Finished on its second read of the same head, but is never auto-merged', async () => {
       checksAnswer({ checks: [] });
       await started();
       await ended();
       expect((await w.card(1)).column).toBe('in_progress');
       await shipping.poll();
       await w.work.settled();
-      expect((await w.card(1)).column).toBe('finished');
+      await shipping.poll();
+      await w.work.settled();
+      expect(w.sent('card.merge')).toEqual([]);
+      const card = await detail();
+      expect(card).toMatchObject({
+        column: 'finished',
+        mergedAt: null,
+        needsPerson: true,
+        needsPersonReason: 'ci_not_green',
+      });
+      const [record] = await w.audit('card.auto_run_failed');
+      expect(record.after).toMatchObject({ reason: 'ci_not_green' });
+    });
+
+    it('C-182: a cancelled or skipped check beside passed ones is never auto-merged', async () => {
+      for (const bucket of ['cancel', 'skipping']) {
+        await w.reset();
+        w.checksServed = true;
+        checksAnswer({
+          checks: [
+            { name: 'ci/check', bucket: 'pass', link: null },
+            { name: 'ci/e2e', bucket, link: null },
+          ],
+        });
+        await started();
+        await ended();
+        await shipping.poll();
+        await w.work.settled();
+        expect(w.sent('card.merge')).toEqual([]);
+        expect(await detail()).toMatchObject({
+          column: 'finished',
+          ciState: 'green',
+          mergedAt: null,
+          needsPerson: true,
+          needsPersonReason: 'ci_not_green',
+        });
+      }
+    });
+
+    it('C-182: a green push that changed docker/ waits for a person', async () => {
+      await started();
+      await pushed({
+        prNumber: 77,
+        prUrl: PR_URL,
+        protectedPaths: ['docker/api.Dockerfile'],
+      });
+      await ended();
+      await shipping.poll();
+      await w.work.settled();
+      expect(w.sent('card.merge')).toEqual([]);
+      expect(await detail()).toMatchObject({
+        column: 'finished',
+        ciState: 'green',
+        mergedAt: null,
+      });
     });
 
     it('a refused merge is audited and the card waits for Accept', async () => {

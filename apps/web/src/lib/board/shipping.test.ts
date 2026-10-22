@@ -75,6 +75,15 @@ describe('shippingBadge (#359 D6–D8)', () => {
     );
     expect(ciBanner(c)?.hint).toContain('Merge them into the branch');
   });
+  test('needsPerson on a head whose checks did not all pass says it was not merged (C-182)', () => {
+    const c = card(1, 'finished', {
+      needsPerson: true,
+      needsPersonReason: 'ci_not_green',
+      ciState: 'green',
+    });
+    expect(shippingBadge(c)?.label).toBe('Not every check passed; not merged');
+    expect(ciBanner(c)?.title).toBe('Not every check passed; not merged');
+  });
   test('a plain card has no badge', () => {
     expect(shippingBadge(card(1, 'in_progress'))).toBeNull();
   });
