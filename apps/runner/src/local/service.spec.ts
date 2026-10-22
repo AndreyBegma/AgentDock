@@ -111,6 +111,27 @@ describe('LocalService — hook events (spec 201 D11, D13)', () => {
     expect(parsed?.ok).toBe(true);
   });
 
+  it('refuses an event of a type outside the hook allowlist and spools nothing (C-169)', async () => {
+    const { service, emitted, sessions } = setup(false);
+    for (const type of [
+      'pr.merged',
+      'approvals.decided',
+      'card_run.phase_changed',
+    ]) {
+      const result = await service.handle(
+        'event',
+        { type, sessionId: 's-1', cwd: ROOT, data: { number: 7 } },
+        as('s-1'),
+      );
+      expect(result).toEqual({
+        ok: false,
+        error: { code: 'forbidden', message: `${type} is not a hook event` },
+      });
+    }
+    expect(emitted).toEqual([]);
+    expect(sessions.claudePidOf('s-1')).toBeNull();
+  });
+
   it('strips every content field when the project does not ship content', async () => {
     const { service, emitted } = setup(false);
     await service.handle(

@@ -1,5 +1,6 @@
 import type { ApprovalSource, ApprovalStatus } from '@nautelle/shared';
 import {
+  isAdvisorySource,
   type PrChecks,
   parseFleetEvent,
   type RunnerEvent,
@@ -87,18 +88,23 @@ export const readApprovalEvents = (
     if (!parsed?.ok) continue;
     const fleet = parsed.event;
     const root = rootOf(event.project.root);
+    // C-169: an agent-written event only asks for a re-check — its head is
+    // re-read with `pr.inspect`, and only the runner's `gh` closes a PR.
+    const advisory = isAdvisorySource(fleet.source);
     switch (fleet.type) {
       case 'pr.opened':
       case 'pr.checks_changed': {
         const touch = touchOf(root, fleet.data.number);
         touch.moved = true;
-        if (fleet.data.headSha) touch.headSha = fleet.data.headSha;
+        if (fleet.data.headSha && !advisory) touch.headSha = fleet.data.headSha;
         break;
       }
       case 'pr.merged':
+        if (advisory) break;
         touchOf(root, fleet.data.number).closed = 'merged';
         break;
       case 'pr.closed':
+        if (advisory) break;
         touchOf(root, fleet.data.number).closed =
           fleet.data.merged === true ? 'merged' : 'closed';
         break;

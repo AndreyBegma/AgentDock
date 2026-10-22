@@ -138,6 +138,44 @@ const MAPPERS: Record<string, (data: Data, ts: string) => Data> = {
   'pr.merged': (data) => ({ number: int(data.pr) }),
 };
 
+/**
+ * The types Code Sentinel writes to `events.jsonl` (plugin `EVENTS.md`, a
+ * closed list, plus plugin#8's approval types), and nothing else (C-169). The
+ * file is writable by every agent on the machine, so the runner's `events`
+ * collector drops any other type instead of forwarding it — an agent cannot
+ * pass itself off as the runner, GitHub or the API through it.
+ */
+export const CODE_SENTINEL_EVENT_TYPES: ReadonlySet<string> = new Set([
+  'orchestrator.started',
+  'orchestrator.stopped',
+  'orchestrator.heartbeat',
+  'round.started',
+  'round.decided',
+  'slot.dispatched',
+  'slot.resumed',
+  'slot.redispatched',
+  'slot.checkpoint',
+  'slot.message_sent',
+  'slot.fence_widened',
+  'slot.stopped',
+  'pr.merged',
+  'pr.checks_changed',
+  'pr.closed',
+  'pr.cleaned',
+  'pr.awaiting_approval',
+  'pr.approved',
+  'pr.changes_requested',
+  'issue.blocked',
+  'person.needed',
+  // `watch.sh`'s echoes of what the runner observes itself (`via: "watch"`).
+  'session.appeared',
+  'session.vanished',
+  'pane.prompt',
+  'pane.idle',
+  'pane.quota_hit',
+  'commit.trailer_found',
+]);
+
 /** Drops `undefined` values, so a mapped key the plugin did not send stays absent. */
 const defined = (data: Data): Data =>
   Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));

@@ -24,6 +24,7 @@ import {
   SLOT_GROUPS,
   type SlotPatch,
   sourceOf,
+  withoutAdvisoryPrState,
 } from './slot-patch';
 import { deriveSlotStatus } from './slot-status';
 
@@ -449,7 +450,12 @@ export class SlotProjection {
     patch: SlotPatch,
     options: { startedAt?: Date; extra?: SlotSources } = {},
   ): Promise<void> {
-    const guarded = guardGroups(SLOT_GROUPS, {}, source.source, patch);
+    const guarded = guardGroups(
+      SLOT_GROUPS,
+      {},
+      source.source,
+      withoutAdvisoryPrState(source.source, patch),
+    );
     const fields = {
       sessionAlive: null,
       pane: null,
@@ -493,7 +499,7 @@ export class SlotProjection {
       SLOT_GROUPS,
       current,
       source.source,
-      patch,
+      withoutAdvisoryPrState(source.source, patch),
     );
     const fields = {
       ...guarded.patch,

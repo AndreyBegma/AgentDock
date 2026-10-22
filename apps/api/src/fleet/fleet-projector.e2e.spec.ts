@@ -132,6 +132,69 @@ describe('fleet projector (e2e)', () => {
     });
   });
 
+  it('lets an advisory event name a PR but never change its merge or check state (C-169)', async () => {
+    await project(
+      appeared(),
+      stream.next(
+        'pr.opened',
+        {
+          number: 7,
+          branch: 'feat/42',
+          url: PR_URL,
+          title: 'widget',
+          checks: 'red',
+          mergeable: false,
+        },
+        { slot: 'i42' },
+      ),
+    );
+    for (const source of ['code-sentinel', 'hook', 'scraped'] as const) {
+      await project(
+        stream.next(
+          'pr.checks_changed',
+          { number: 7, branch: 'feat/42', checks: 'green', mergeable: true },
+          { slot: 'i42', source },
+        ),
+        stream.next('pr.merged', { number: 7 }, { slot: 'i42', source }),
+        stream.next(
+          'pr.closed',
+          { number: 7, branch: 'feat/42', merged: true },
+          { slot: 'i42', source },
+        ),
+        stream.next(
+          'orchestrator.snapshot',
+          {
+            state: {
+              v: 1,
+              slots: {
+                i42: { status: 'merged', pr: { number: 7, rollup: 'green' } },
+              },
+            },
+          },
+          { source },
+        ),
+      );
+      expect(await slot()).toMatchObject({
+        status: 'running',
+        prNumber: 7,
+        prState: 'open',
+        prChecks: 'red',
+        prMergeable: false,
+        endedAt: null,
+      });
+    }
+
+    // The runner's own `gh` observation still decides.
+    await project(
+      stream.next(
+        'pr.closed',
+        { number: 7, branch: 'feat/42', merged: true },
+        { slot: 'i42' },
+      ),
+    );
+    expect(await slot()).toMatchObject({ prState: 'merged' });
+  });
+
   it('follows the pane through prompt, idle, quota and busy', async () => {
     await project(appeared());
     const pane = (type: string, data: Record<string, unknown> = {}) =>

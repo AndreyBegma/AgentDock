@@ -1,6 +1,7 @@
 import { type FSWatcher, watch } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
+  CODE_SENTINEL_EVENT_TYPES,
   eventsUnparsedData,
   normalizeCodeSentinelLine,
 } from '@nautelle/shared';
@@ -178,7 +179,26 @@ export class EventsCollector implements Collector {
           repo: project.repo,
           root: project.root,
         });
-        if (result.ok) {
+        if (result.ok && !CODE_SENTINEL_EVENT_TYPES.has(result.event.type)) {
+          // Agents can write the file: only the plugin's own types go on (C-169).
+          this.context.log.warn(
+            'events: dropped a type the plugin never writes',
+            {
+              projectId: project.id,
+              type: result.event.type,
+              offset: line.offset,
+            },
+          );
+          emitFleet(
+            'events.unparsed',
+            eventsUnparsedData(
+              file,
+              line.text,
+              `type ${result.event.type} is not one events.jsonl may carry`,
+              line.offset,
+            ),
+          );
+        } else if (result.ok) {
           emitRaw(result.event);
         } else {
           emitFleet(
