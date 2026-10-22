@@ -882,7 +882,7 @@ export class DesignService implements OnModuleInit {
       key: { planId: plan.id, taskKey: key },
       projectId: plan.projectId,
       target: { type: 'plan', id: plan.id },
-      label: { key },
+      label: { task: key },
       gate: async (design) => {
         status = await this.gateTask(task, design);
       },

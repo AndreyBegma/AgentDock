@@ -21,7 +21,7 @@ export interface DesignOwner {
   /** The audit target of `design.*` (D10). */
   target: { type: 'plan' | 'board_card' | 'board_stack'; id: string };
   /** What names the owner in an audit record's `before` / `after`. */
-  label: { key: string } | { number: number } | { stack: number };
+  label: { task: string } | { number: number } | { stack: number };
   /** D1 for a task: its status follows its design. A card has none. */
   gate(design: Pick<TaskDesign, 'needed' | 'status'>): Promise<void>;
   /** 409 when a turn of the owner's host is queued or running. */

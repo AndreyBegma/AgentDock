@@ -5,7 +5,12 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { SettingsService } from '../settings/settings.service';
-import { computeHash, GENESIS_HASH, type JsonValue } from './canonical';
+import {
+  AUDIT_HMAC_KEY_ENV,
+  auditHmacKey,
+  ChainWalk,
+  type JsonValue,
+} from './canonical';
 
 const BATCH = 1000;
 
@@ -19,9 +24,12 @@ export class AuditVerificationService {
     private readonly settings: SettingsService,
   ) {}
 
-  /** Recomputes every hash in `seq` order; checks each link to its predecessor. */
+  /**
+   * Recomputes every hash in `seq` order; checks each link to its predecessor.
+   * Keyed and pre-key records verify as `ChainWalk` describes (C-174).
+   */
   async verify(): Promise<AuditVerification> {
-    let prevHash = GENESIS_HASH;
+    const walk = new ChainWalk(auditHmacKey());
     let after: bigint | undefined;
     let checked = 0;
     for (;;) {
@@ -32,13 +40,13 @@ export class AuditVerificationService {
       });
       for (const row of rows) {
         checked += 1;
-        const recomputed = computeHash(row.prevHash, {
+        const intact = walk.accept({
           ...row,
           before: row.before as JsonValue | null,
           after: row.after as JsonValue | null,
           meta: row.meta as JsonValue | null,
         });
-        if (row.prevHash !== prevHash || recomputed !== row.hash) {
+        if (!intact) {
           return this.done({
             ok: false,
             checked,
@@ -46,7 +54,6 @@ export class AuditVerificationService {
             verifiedAt: new Date().toISOString(),
           });
         }
-        prevHash = row.hash;
       }
       if (rows.length < BATCH) break;
       after = rows[rows.length - 1].seq;
@@ -73,7 +80,11 @@ export class AuditVerificationService {
   private done(result: AuditVerification): AuditVerification {
     if (!result.ok) {
       this.logger.error(
-        `audit chain broken at seq ${result.firstBrokenSeq} (${result.checked} checked)`,
+        `audit chain broken at seq ${result.firstBrokenSeq} (${result.checked} checked)${
+          auditHmacKey() === null
+            ? `; ${AUDIT_HMAC_KEY_ENV} is not set, so no keyed record verifies`
+            : ''
+        }`,
       );
     }
     return result;

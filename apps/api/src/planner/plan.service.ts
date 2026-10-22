@@ -466,7 +466,7 @@ export class PlanService implements OnModuleInit {
         action: 'plan.task_reviewed',
         target: { type: 'plan', id: plan.id },
         projectId: plan.projectId,
-        after: { key, decision, version: plan.version },
+        after: { task: key, decision, version: plan.version },
         result,
         meta,
       });
