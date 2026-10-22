@@ -44,17 +44,24 @@ const BLOCKED = (() => {
     ['169.254.0.0', 16], // link-local, cloud metadata
     ['172.16.0.0', 12], // private
     ['192.0.0.0', 24], // IETF protocol assignments
+    ['192.0.2.0', 24], // TEST-NET-1
     ['192.168.0.0', 16], // private
     ['198.18.0.0', 15], // benchmarking
+    ['198.51.100.0', 24], // TEST-NET-2
+    ['203.0.113.0', 24], // TEST-NET-3
     ['224.0.0.0', 4], // multicast
     ['240.0.0.0', 4], // reserved, broadcast
   ];
   const v6: [string, number][] = [
     ['::', 96], // unspecified, loopback, IPv4-compatible
     ['64:ff9b::', 96], // NAT64: embeds an IPv4 address
+    ['64:ff9b:1::', 48], // local-use NAT64
+    ['100::', 64], // discard-only
+    ['2001::', 32], // Teredo: embeds an IPv4 address
     ['2002::', 16], // 6to4: embeds an IPv4 address
     ['fc00::', 7], // unique local
     ['fe80::', 10], // link-local
+    ['fec0::', 10], // site-local (deprecated)
     ['ff00::', 8], // multicast
   ];
   for (const [net, bits] of v4) list.addSubnet(net, bits, 'ipv4');
