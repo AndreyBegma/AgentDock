@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { GitHubHookAnswer } from '@nautelle/shared';
 import type { PollableCollector } from '@nautelle/shared/protocol';
 import {
@@ -32,6 +33,7 @@ import {
 } from './github-routing';
 import { verifyGitHubSignature } from './github-signature';
 import { type DebouncedPoll, PollDebouncer } from './poll-debouncer';
+import { ResyncThrottle } from './resync-throttle';
 import { SignatureFailureTracker } from './signature-failure-tracker';
 
 /** `X-GitHub-Delivery` is a GUID; anything visible up to 100 characters is kept. */
@@ -78,15 +80,17 @@ interface ProjectKeying {
 
 /**
  * `POST /hooks/github` (docs/specs/27-github-app.md D5–D9). Verifies
- * `X-Hub-Signature-256` over the raw bytes, dedupes by `X-GitHub-Delivery`,
- * maps the repository to projects (D7), records one `github.<event>` row per
- * project it polls (D9, spec notes) — all before answering. The polls,
- * debounced per project, and any resync run after the response (`after`).
+ * `X-Hub-Signature-256` over the raw bytes, dedupes by `X-GitHub-Delivery`
+ * and by the body's hash (C-145), maps the repository to projects (D7),
+ * records one `github.<event>` row per project it polls (D9, spec notes) — all
+ * before answering. The polls, debounced per project, and any resync,
+ * throttled to one a minute, run after the response (`after`).
  */
 @Injectable()
 export class GitHubHookService implements OnApplicationShutdown {
   private readonly logger = new Logger(GitHubHookService.name);
   readonly debouncer: PollDebouncer;
+  readonly resyncs: ResyncThrottle;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -102,10 +106,15 @@ export class GitHubHookService implements OnApplicationShutdown {
       windowMs: options.debounceMs,
       flush: (poll) => this.sendPoll(poll),
     });
+    this.resyncs = new ResyncThrottle({
+      windowMs: options.resyncWindowMs,
+      run: () => this.installations.resyncInBackground(),
+    });
   }
 
   onApplicationShutdown(): void {
     this.debouncer.clear();
+    this.resyncs.clear();
   }
 
   async receive(input: GitHubHookRequest): Promise<GitHubHookReceived> {
@@ -149,7 +158,10 @@ export class GitHubHookService implements OnApplicationShutdown {
     if (!body.ok) throw new BadRequestException('The body is not JSON');
 
     const facts = payloadFacts(event, body.value);
-    const routing = routeGitHubEvent(event, facts);
+    const routing = await this.knownInstallationOnly(
+      routeGitHubEvent(event, facts),
+      facts.installationId,
+    );
     const matched =
       routing.kind === 'poll' || routing.kind === 'rename'
         ? await this.projectsFor(
@@ -176,6 +188,7 @@ export class GitHubHookService implements OnApplicationShutdown {
         await tx.gitHubDelivery.create({
           data: {
             deliveryId,
+            bodySha256: createHash('sha256').update(rawBody).digest('hex'),
             event,
             action: facts.action,
             fullName: facts.fullName,
@@ -223,6 +236,7 @@ export class GitHubHookService implements OnApplicationShutdown {
       });
     } catch (error) {
       // D6: GitHub redelivers on its own; a stored id is 200, never 409.
+      // C-145: so is a stored body under a new id — a replay.
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
@@ -266,11 +280,31 @@ export class GitHubHookService implements OnApplicationShutdown {
     };
   }
 
-  /** After the response: hands polls to the debouncer, starts a resync. */
+  /** After the response: hands polls to the debouncer, asks for a resync. */
   after(work: GitHubHookWork): void {
     for (const poll of work.polls)
       this.debouncer.request(poll.projectId, poll.collectors);
-    if (work.resync) this.installations.resyncInBackground();
+    if (work.resync) this.resyncs.request();
+  }
+
+  /**
+   * C-145: a delivery polls or renames only for an installation the last
+   * resync listed — a payload naming another, or none, is ignored. Until a
+   * new installation's resync lands, the runners' own 60 s poll covers it
+   * (D6, D12). `installation*` deliveries are exempt: they are how a new
+   * installation becomes known.
+   */
+  private async knownInstallationOnly(
+    routing: GitHubRouting,
+    installationId: number | null,
+  ): Promise<GitHubRouting> {
+    if (routing.kind !== 'poll' && routing.kind !== 'rename') return routing;
+    const known =
+      installationId !== null &&
+      (await this.prisma.gitHubInstallation.count({
+        where: { id: installationId },
+      })) > 0;
+    return known ? routing : { kind: 'ignore', reason: 'unknown_installation' };
   }
 
   /**

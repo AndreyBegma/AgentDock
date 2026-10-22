@@ -16,6 +16,8 @@ export interface GitHubAppOptions {
   apiBase: string;
   /** D8: the poll debounce window. */
   debounceMs: number;
+  /** C-145: at most one delivery-triggered installation resync per window. */
+  resyncWindowMs: number;
   /** D11: health recompute interval. */
   healthIntervalMs: number;
   /** Start the health loop at bootstrap. Never under `APP_ENV=test`: suites drive it. */
@@ -30,6 +32,8 @@ export const GITHUB_APP_OPTIONS = Symbol('GITHUB_APP_OPTIONS');
 
 export const DEFAULT_GITHUB_API_BASE = 'https://api.github.com';
 
+export const GITHUB_RESYNC_WINDOW_MS = 60_000;
+
 const url = (raw: string | undefined): string | null =>
   raw?.trim().replace(/\/+$/, '') || null;
 
@@ -40,6 +44,7 @@ export const githubAppOptionsFromEnv = (
   appUrl: url(env.APP_URL) ?? url(env.WEB_URL) ?? 'http://localhost:3517',
   apiBase: url(env.GITHUB_API_BASE) ?? DEFAULT_GITHUB_API_BASE,
   debounceMs: GITHUB_POLL_DEBOUNCE_MS,
+  resyncWindowMs: GITHUB_RESYNC_WINDOW_MS,
   healthIntervalMs: GITHUB_HEALTH_INTERVAL_MS,
   autoStart: env.APP_ENV !== 'test',
   requestTimeoutMs: 10_000,
