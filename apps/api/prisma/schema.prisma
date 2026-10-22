@@ -56,6 +56,7 @@ model User {
   notificationMutes           NotificationMute[]
   telegramLink                TelegramLink?
   telegramLinkCodes           TelegramLinkCode[]
+  telegramPendingLink         TelegramPendingLink?
   skillInstallPreviews        SkillInstallPreview[]
   schedulesCreated            Schedule[]                    @relation("ScheduleCreatedBy")
   schedulesUpdated            Schedule[]                    @relation("ScheduleUpdatedBy")
@@ -1543,6 +1544,24 @@ model TelegramLinkCode {
 
   @@index([userId])
   @@map("telegram_link_codes")
+}
+
+/// C-147 (D-16): the chat that redeemed a link code, waiting for its user to
+/// confirm it in the web app. It is not a link: nothing is delivered to it
+/// and its button presses are refused. One per user; it expires with the
+/// code's lifetime and the confirmation moves it into `TelegramLink`.
+model TelegramPendingLink {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  chatId    BigInt
+  username  String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("telegram_pending_links")
 }
 
 /// The single row (`id = 1`) of the notification loops' positions (D4, D7).

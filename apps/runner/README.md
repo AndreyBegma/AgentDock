@@ -73,6 +73,36 @@ launchctl kickstart -k gui/$(id -u)/com.nautelle.runner    # macOS (install-serv
 With Homebrew: `brew upgrade nautelle-runner && brew services restart
 nautelle-runner`. What changed is in [CHANGELOG.md](CHANGELOG.md).
 
+## Update prompt
+
+While a command you type runs (`pair`, `status`, `profiles`, `policy`,
+`install-service`, `setup`, `away`, `version`, `help`), the runner asks npm
+for the latest `nautelle-runner` and for the platform package
+`nautelle-runner-<os>-<arch>`, with a 1.5 s timeout. A version counts only
+when both packages have it. When the command has finished and a newer version
+is ready, it asks:
+
+```text
+Update nautelle-runner 0.14.0 → 0.15.0? [Y/n/never for this version]
+```
+
+Enter or `y` runs the global install with the package manager that installed
+the runner: `npm install -g`, `bun add -g`, `pnpm add -g` or
+`yarn global add` (a runner installed under fnm counts as npm). For a
+Homebrew install it prints `brew upgrade nautelle-runner` instead, and for any
+other binary, whose manager is unknown, the npm command. A failed install prints the error. Either way, the
+exit code is the command's own. After a successful install, when the runner's
+systemd unit or launchd agent is installed and active, it says that the daemon
+still runs the old version and prints the command that restarts it; it never
+restarts the daemon itself. `never` writes the version to
+`~/.config/nautelle/update.json` and asks again only for a newer one.
+
+The check never delays the command or changes its output, and it makes no
+request at all unless stdin and stdout are both a terminal. It stays silent
+under `CI`, in the daemon (`run`), in the MCP server, hooks and the other
+commands Claude Code starts, under `npx`, `bunx` and `pnpm dlx`, and with
+`NAUTELLE_NO_UPDATE_CHECK=1`.
+
 ## Upgrading to 0.13
 
 0.13 adds the runner-local security policy
@@ -150,6 +180,7 @@ unsuccessful exit.
 | What | Where |
 |---|---|
 | Config (mode 0600) | `$XDG_CONFIG_HOME/agentdock/runner.json`, default `~/.config/nautelle/runner.json` |
+| Update prompt | `update.json` beside `runner.json`: the version answered "never" |
 | Event spool | `$XDG_STATE_HOME/agentdock/spool/`, default `~/.local/state/nautelle/spool/` |
 | Transcript offsets | `$XDG_STATE_HOME/agentdock/offsets.json`: how far each agent transcript was read |
 | `events.jsonl` offsets | `$XDG_STATE_HOME/agentdock/events-offsets.json`: byte offset and inode per project ([spec 16](../../docs/specs/16-consume-code-sentinel-events.md)); `fleet.eventsPollSeconds` (default 5) in `runner.json` sets the poll fallback |
@@ -162,6 +193,7 @@ unsuccessful exit.
 | Variable | Effect |
 |---|---|
 | `NAUTELLE_LOG` | `debug` \| `info` (default) \| `warn` \| `error`; logs are JSON lines on stderr, the token redacted |
+| `NAUTELLE_NO_UPDATE_CHECK` | `1` turns the [update prompt](#update-prompt) off; `CI` does too |
 | `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` | where the files above live |
 | `CODEX_HOME` | the codex profile `profiles --detect` proposes |
 

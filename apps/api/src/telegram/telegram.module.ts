@@ -31,6 +31,7 @@ import { TelegramIntakeService } from './telegram-intake.service';
 import { TelegramIntegrationService } from './telegram-integration.service';
 import { TelegramLinkingService } from './telegram-linking.service';
 import { TELEGRAM_OPTIONS, telegramOptionsFromEnv } from './telegram-options';
+import { TelegramPendingLinkExpiryJob } from './telegram-pending-link-expiry.job';
 import { TelegramPoller } from './telegram-poller';
 import { TelegramProjectService } from './telegram-project.service';
 import { TelegramRoutes } from './telegram-routes';
@@ -86,6 +87,7 @@ import { TelegramWebAppService } from './telegram-web-app.service';
     SpeechToText,
     TelegramGuard,
     TelegramLinkingService,
+    TelegramPendingLinkExpiryJob,
     TelegramApprovalService,
     TelegramActionRequestService,
     TelegramSessionMessageService,

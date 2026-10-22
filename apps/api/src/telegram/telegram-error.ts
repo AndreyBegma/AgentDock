@@ -18,6 +18,22 @@ export const telegramNotLinked = (): HttpException =>
     'Link your Telegram account first',
   );
 
+/** C-147: no chat waits for confirmation under that id — expired, declined or replaced. */
+export const telegramLinkRequestNotFound = (): HttpException =>
+  notificationError(
+    404,
+    'telegram_link_request_not_found',
+    'This Telegram chat no longer waits for confirmation. Create a new link.',
+  );
+
+/** C-147: the chat was linked to another account since it redeemed the code. */
+export const telegramChatTaken = (): HttpException =>
+  notificationError(
+    409,
+    'telegram_chat_taken',
+    'This Telegram chat is linked to another Nautelle account',
+  );
+
 /** `getMe` refused the token. */
 export const telegramTokenInvalid = (): HttpException =>
   notificationError(

@@ -26,6 +26,13 @@ signed by the Nautelle release key
 ([`release-key.pub`](https://github.com/AndreyBegma/Nautelle/blob/main/apps/runner/release-key.pub)).
 It refuses a binary that fails either check.
 
+After a command you type finishes, the runner may ask
+`Update nautelle-runner 0.14.0 → 0.15.0? [Y/n/never for this version]` and,
+on yes, update itself with the package manager that installed it. It asks
+only at a terminal, never under CI, `npx`, `bunx` or `pnpm dlx`, or in the
+daemon, and `NAUTELLE_NO_UPDATE_CHECK=1` turns it off. See
+[Update prompt](https://github.com/AndreyBegma/Nautelle/tree/main/apps/runner#update-prompt).
+
 **Upgrading from 0.12 or earlier:** 0.13 watches only projects under a
 folder you allow on the machine, and allows none by default. Run
 `nautelle-runner policy allow-root --watched` (the folders it watched
