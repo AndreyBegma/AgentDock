@@ -1,5 +1,10 @@
 import type { z } from 'zod';
-import { DESIGN_CDN_ALLOWLIST } from '../design/cdn';
+import {
+  cdnPackagePath,
+  DESIGN_CDN_ALLOWLIST,
+  DESIGN_CDN_PACKAGES,
+  isNpmCdnSource,
+} from '../design/cdn';
 import {
   DESIGN_FRAME_NAME_MAX,
   DESIGN_LEGACY_FRAME_NAME,
@@ -791,6 +796,14 @@ const CDN_HOSTS = DESIGN_CDN_ALLOWLIST.map(
   (s) => `\`${s.host}${s.pathPrefix === '/' ? '' : s.pathPrefix}\``,
 ).join(', ');
 
+const NPM_CDN_HOSTS = DESIGN_CDN_ALLOWLIST.filter(isNpmCdnSource)
+  .map((s) => `\`${s.host}${s.pathPrefix === '/' ? '' : s.pathPrefix}\``)
+  .join(' and ');
+
+const CDN_PACKAGES = DESIGN_CDN_PACKAGES.map(
+  (p) => `\`${cdnPackagePath(p)}\``,
+).join(', ');
+
 /**
  * Spec 223 D6, D7: the design action's rules. Part of the v2 text; the API
  * appends it alone to a design turn of a v1 plan, whose contract text does
@@ -821,6 +834,7 @@ The mockup's rules — a frame that breaks one fails the turn:
 
 - At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML per frame, and ${DESIGN_TOTAL_MAX_BYTES / 1024} KiB for all frames together. Inline CSS and JS are allowed.
 - External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS. No other host, and no relative URL: inline it or use a \`data:\` URL (images and fonts only).
+- From ${NPM_CDN_HOSTS}, only a file of one of these packages, at exactly this version: ${CDN_PACKAGES} — for example \`https://unpkg.com/react@18.3.1/umd/react.production.min.js\`. Any other package fails the turn; inline it instead.
 - Every script or package URL names an exact version: \`react@18.3.1\`, never \`react@18\` or \`latest\`.
 - No network calls (\`fetch\`, \`XMLHttpRequest\`, \`WebSocket\`, \`EventSource\`, \`sendBeacon\`), no form that submits, no navigation of the top or parent window, no \`window.open\`, no \`<iframe>\`, \`<object>\`, \`<embed>\` or \`<base>\`, no link to another site.
 - Wrap inline scripts in an IIFE; never declare a top-level name after a window global (\`top\`, \`window\`, \`self\`, \`name\`, …).
