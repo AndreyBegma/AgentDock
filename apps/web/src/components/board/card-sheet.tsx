@@ -19,6 +19,7 @@ import {
   BOARD_CARD_TITLE_MAX,
   type BoardCardDetail,
   type BoardCardKind,
+  type BoardCardView,
   CARD_FEEDBACK_MAX,
   type CardEscalationView,
   type CardPrTarget,
@@ -92,6 +93,7 @@ import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { cardSessionMessenger } from '../../lib/session-message/actions';
 import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
+import { savedLabel } from '../../lib/token-saver/format';
 import { SummaryPanel } from '../ai/summary-panel';
 import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
@@ -107,6 +109,7 @@ import { CardStewardSection } from '../steward/card-steward-section';
 import { NormalizedNote } from '../text/normalized-note';
 import { DescriptionIncompleteBadge } from '../token-saver/description-incomplete-badge';
 import { FilterBreakdown } from '../token-saver/filter-breakdown';
+import { SavedBadge } from '../token-saver/saved-badge';
 import { CardDependenciesSection } from './card-dependencies';
 import { CardDescription } from './card-description';
 import { ApproveRunLink, CardDesignSection } from './card-design';
@@ -489,6 +492,21 @@ export function cardSheetFooter({
 }
 
 /**
+ * The end of the Run row: the card's total cost, then its token saving
+ * (#778); either stands alone, and with neither nothing is drawn.
+ */
+export function RunMoney({ card }: { card: BoardCardView }) {
+  const total = formatCost(card.costUsd);
+  if (!total && !savedLabel(card.tokenSaved)) return null;
+  return (
+    <span className="ml-auto flex items-center gap-2">
+      {total ? <span className="tabular-nums text-ink-2">{total}</span> : null}
+      <SavedBadge saved={card.tokenSaved} />
+    </span>
+  );
+}
+
+/**
  * One card's detail (#273 D17, #431): Run, Design, Rounds, then the Card form.
  * `sheet` is the side sheet's one column with Save pinned; `page` is the full
  * page, two columns at full width with Save in the header. Same sections.
@@ -649,9 +667,7 @@ export function CardDetailBody({
         {pill ? (
           <StatusPill size="sm" status={pill.status} label={pill.label} />
         ) : null}
-        {total ? (
-          <span className="ml-auto tabular-nums text-ink-2">{total}</span>
-        ) : null}
+        <RunMoney card={card} />
       </div>
       <Links card={card} />
       <PullRequestList card={card} />
