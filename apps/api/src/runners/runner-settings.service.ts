@@ -1,10 +1,12 @@
-import { RUNNER_ERROR } from '@nautelle/shared';
+import { type LocalRunner, RUNNER_ERROR } from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { Runner } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { runnerError } from './runner-error';
+import { toLocalRunner } from './runner-mapper';
+import { RunnerReleaseService } from './runner-release.service';
 import { RunnerWatchList } from './runner-watch-list';
 
 /** What spec 201 adds to a runner's settings (D8, D17). */
@@ -28,11 +30,11 @@ export interface RunnerSettingsActor {
   meta?: object;
 }
 
-/** A runner a user is the local user of — what they may set away mode on. */
-export interface LocalRunnerView extends RunnerLocalSettings {
-  id: string;
-  name: string;
-}
+/**
+ * A runner a user is the local user of — what they may set away mode on, and
+ * whether it is older than the latest release (C-328).
+ */
+export type LocalRunnerView = LocalRunner;
 
 const invalidUser = () => {
   const body = {
@@ -57,6 +59,7 @@ export class RunnerSettingsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly watchList: RunnerWatchList,
+    private readonly release: RunnerReleaseService,
   ) {}
 
   async update(
@@ -127,8 +130,20 @@ export class RunnerSettingsService {
     const runners = await this.prisma.runner.findMany({
       where: { localUserId: userId, revokedAt: null },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, name: true, localUserId: true, awayMode: true },
+      select: {
+        id: true,
+        name: true,
+        localUserId: true,
+        awayMode: true,
+        hostname: true,
+        version: true,
+      },
     });
-    return runners;
+    return runners.map((runner) => this.toView(runner));
+  }
+
+  /** The runner as its local user sees it, with the version check (C-328). */
+  toView(runner: Parameters<typeof toLocalRunner>[0]): LocalRunnerView {
+    return toLocalRunner(runner, this.release.latest);
   }
 }

@@ -24,6 +24,7 @@ import {
   toAdminRunner,
 } from './runner-mapper';
 import { RUNNER_OPTIONS, type RunnerOptions } from './runner-options';
+import { RunnerReleaseService } from './runner-release.service';
 import { deriveStatus } from './status';
 
 type Tx = Prisma.TransactionClient;
@@ -56,6 +57,7 @@ export class RunnersService {
     private readonly connections: RunnerConnections,
     private readonly commands: RunnerCommandService,
     private readonly audit: AuditService,
+    private readonly release: RunnerReleaseService,
     @Inject(RUNNER_OPTIONS) private readonly options: RunnerOptions,
   ) {}
 
@@ -126,6 +128,7 @@ export class RunnersService {
         runner,
         this.status(runner, live.get(runner.id)),
         runner._count.profiles,
+        this.release.latest,
       ),
     );
   }
@@ -146,6 +149,7 @@ export class RunnersService {
         runner,
         this.status(runner, live),
         profiles.filter((p) => !p.missing).length,
+        this.release.latest,
       ),
       capabilities: toAdminCapabilities(runner.capabilities),
       profiles,
@@ -167,6 +171,7 @@ export class RunnersService {
       runner,
       this.status(runner, live),
       runner._count.profiles,
+      this.release.latest,
     );
   }
 
@@ -201,6 +206,7 @@ export class RunnersService {
         runner,
         this.status(runner, live),
         runner._count.profiles,
+        this.release.latest,
       );
     } catch (error) {
       if (
@@ -249,6 +255,7 @@ export class RunnersService {
       runner,
       this.status(runner, undefined),
       runner._count.profiles,
+      this.release.latest,
     );
   }
 
@@ -321,6 +328,7 @@ export class RunnersService {
         runner,
         this.status(runner, this.connections.get(runner.id)),
         profilesCount,
+        this.release.latest,
       ),
       pairingCode: code,
       expiresAt: expiresAt.toISOString(),
