@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { card as fixtureCard } from '../../lib/board/fixtures';
 import {
   CardBranchLine,
+  CardHeaderMeta,
   cardSheetFooter,
   cardSheetSide,
   EscalationRow,
@@ -243,5 +244,33 @@ describe('Card sheet Run row saving (#778)', () => {
       }),
     ).toBe('');
     expect(money({ costUsd: null, tokenSaved: null })).toBe('');
+  });
+});
+
+describe('Card sheet header (#836)', () => {
+  const meta = (extra: Parameters<typeof fixtureCard>[2]) =>
+    renderToStaticMarkup(
+      <CardHeaderMeta card={fixtureCard(7, 'in_progress', extra)} />,
+    );
+
+  test('shows the column, the PR with its CI state and the cost on one line', () => {
+    const html = meta({
+      prNumber: 12,
+      prUrl: 'https://github.com/o/r/pull/12',
+      prState: 'open',
+      ciState: 'green',
+      costUsd: '3.18',
+    });
+    expect(html).toContain('In progress');
+    expect(html).toContain('#12');
+    expect(html).toContain('aria-label="Checks passed"');
+    expect(html).toContain('$3.18');
+  });
+
+  test('a card without a PR or cost has only its column', () => {
+    const html = meta({ costUsd: null });
+    expect(html).toContain('In progress');
+    expect(html).not.toContain('Checks');
+    expect(html).not.toContain('$');
   });
 });
