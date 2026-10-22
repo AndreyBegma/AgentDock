@@ -373,6 +373,99 @@ describe('execution history (e2e)', () => {
       expect(detail.planId).toBe(plan.id);
     });
 
+    it('hides a private plan’s turns from every other member, admins too (L-24)', async () => {
+      const member = async (email: string) => {
+        const user = await createUser(ctx.prisma, email, 'viewer');
+        await ctx.prisma.projectMember.create({
+          data: { projectId, userId: user.id },
+        });
+        return { user, session: await login(ctx, email) };
+      };
+      const author = await member('author@example.com');
+      const other = await member('other@example.com');
+      const instructions = await ctx.prisma.plannerInstructions.create({
+        data: { projectId, version: 1, body: 'plan well' },
+      });
+      const planTurn = async (
+        title: string,
+        visibility: 'private' | 'project',
+        minute: number,
+      ) => {
+        const plan = await ctx.prisma.plan.create({
+          data: {
+            projectId,
+            authorId: author.user.id,
+            title,
+            brief: title,
+            mode: 'batch',
+            visibility,
+            status: 'drafting',
+            sessionId: '6f1c1d0e-5b7a-4c1e-9a52-1f3a7c9d2e10',
+            instructionsId: instructions.id,
+            contractVersion: 1,
+            profileKey: 'claude-main',
+            model: 'opus',
+          },
+        });
+        const run = await ctx.prisma.run.create({
+          data: {
+            kind: 'plan',
+            projectId,
+            title,
+            status: 'succeeded',
+            triggeredByType: 'user',
+            triggeredById: author.user.id,
+            startedAt: at(minute),
+            endedAt: at(minute + 1),
+            updatedAt: at(minute + 1),
+          },
+        });
+        await ctx.prisma.planTurn.create({
+          data: {
+            planId: plan.id,
+            runId: run.id,
+            authorId: author.user.id,
+            action: 'decompose',
+            input: {},
+            phase: 'succeeded',
+          },
+        });
+        return run;
+      };
+      const secret = await planTurn('Secret plan', 'private', 5);
+      const shared = await planTurn('Shared plan', 'project', 3);
+      await slot('i21');
+      await projector.tick();
+
+      const titles = async (session: Session, query = '') =>
+        (
+          (await session.get(`/projects/${projectId}/runs${query}`).expect(200))
+            .body as RunPage
+        ).items.map((r) => r.title ?? r.slot);
+      const url = (run: { id: string }) =>
+        `/projects/${projectId}/runs/${run.id}`;
+
+      expect(await titles(other.session, '?kind=plan')).toEqual([
+        'Shared plan',
+      ]);
+      expect(await titles(other.session)).toEqual(['Shared plan', 'i21']);
+      const counts = (
+        (await other.session.get(`/projects/${projectId}/runs`).expect(200))
+          .body as RunPage
+      ).counts;
+      expect(counts.succeeded).toBe(1);
+      await other.session.get(url(secret)).expect(404);
+      await other.session.get(url(shared)).expect(200);
+      // A private plan is its author's alone, site admins included (D12).
+      await admin.get(url(secret)).expect(404);
+
+      expect(await titles(author.session, '?kind=plan')).toEqual([
+        'Secret plan',
+        'Shared plan',
+      ]);
+      await author.session.get(url(secret)).expect(200);
+    });
+
     it('answers 404 for a run of another project', async () => {
       const other = await seedProject(ctx.prisma, '/srv/dev/other', runnerId);
       const row = await ctx.prisma.slot.create({

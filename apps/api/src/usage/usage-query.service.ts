@@ -224,7 +224,17 @@ export class UsageQueryService {
     user: Caller,
     query: UsageBreakdownDto,
   ): Promise<UsageBreakdownResponse> {
-    const where = await this.where(user, query);
+    const range = await this.where(user, query);
+    // A turn of a private plan is its author's alone (`readableRunWhere`,
+    // L-24): its row is left out of the per-run list, never out of totals.
+    const where =
+      query.dimension === 'run'
+        ? Prisma.sql`${range} AND NOT EXISTS (
+            SELECT 1 FROM plan_turns pt JOIN plans p ON p.id = pt."planId"
+            WHERE pt."runId" = usage_rollups."runId"
+              AND p.visibility = 'private'
+              AND p."authorId" IS DISTINCT FROM ${user.id})`
+        : range;
     const key = DIMENSION_COLUMN[query.dimension];
     const perProject = PER_PROJECT.has(query.dimension);
     const project = perProject

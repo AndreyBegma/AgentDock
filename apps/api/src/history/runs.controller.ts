@@ -1,5 +1,6 @@
 import type { RunDetail, RunPage } from '@nautelle/shared';
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { type AuthUser, CurrentUser } from '../auth';
 import {
   ProjectAccess,
   ProjectAccessGuard,
@@ -20,16 +21,18 @@ export class RunsController {
   @Get()
   list(
     @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
     @Query() query: RunListQueryDto,
   ): Promise<RunPage> {
-    return this.runs.list(access.projectId, query);
+    return this.runs.list(user.id, access.projectId, query);
   }
 
   @Get(':runId')
   detail(
     @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
     @Param('runId') runId: string,
   ): Promise<RunDetail> {
-    return this.runs.detail(access.projectId, runId);
+    return this.runs.detail(user.id, access.projectId, runId);
   }
 }

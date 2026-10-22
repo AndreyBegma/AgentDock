@@ -18,6 +18,7 @@ import {
   encodeKeyset,
 } from '../activity';
 import { PrismaService } from '../database/prisma.service';
+import { readableRunWhere } from '../planner/plan-access';
 import type { RunListQueryDto } from './dto';
 import { EMPTY_USAGE, usageByRun, usageBySession } from './run-usage';
 
@@ -57,7 +58,10 @@ const toSummary = (row: RunRow, usage: RunUsage): RunSummary => ({
 
 const runNotFound = () => activityError(404, 'not_found', 'Run not found');
 
-/** History reads (spec 21 "API", D8, D11); the guard already checked membership. */
+/**
+ * History reads (spec 21 "API", D8, D11); the guard already checked membership.
+ * A turn of a private plan is the author's alone, as the plan is (L-24).
+ */
 @Injectable()
 export class RunsQueryService {
   constructor(
@@ -66,9 +70,16 @@ export class RunsQueryService {
   ) {}
 
   /** Runs of a project, newest first, with tokens and cost (D8). */
-  async list(projectId: string, query: RunListQueryDto): Promise<RunPage> {
+  async list(
+    userId: string,
+    projectId: string,
+    query: RunListQueryDto,
+  ): Promise<RunPage> {
     const limit = query.limit ?? RUN_PAGE_DEFAULT;
-    const scope: Prisma.RunWhereInput[] = [{ projectId }];
+    const scope: Prisma.RunWhereInput[] = [
+      { projectId },
+      readableRunWhere(userId),
+    ];
     if (query.kind) scope.push({ kind: query.kind });
     if (query.issue) scope.push({ issue: query.issue });
     if (query.from) scope.push({ startedAt: { gte: new Date(query.from) } });
@@ -121,9 +132,13 @@ export class RunsQueryService {
   }
 
   /** One run: its slot's checkpoints, sessions with their usage, and activity. */
-  async detail(projectId: string, runId: string): Promise<RunDetail> {
+  async detail(
+    userId: string,
+    projectId: string,
+    runId: string,
+  ): Promise<RunDetail> {
     const row = await this.prisma.run.findFirst({
-      where: { id: runId, projectId },
+      where: { AND: [{ id: runId, projectId }, readableRunWhere(userId)] },
       include: runInclude,
     });
     if (!row) throw runNotFound();

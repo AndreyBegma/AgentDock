@@ -285,9 +285,13 @@ export class SkillRunService {
     return this.view(projectId, runId);
   }
 
-  async detail(projectId: string, runId: string): Promise<SkillRunDetail> {
+  async detail(
+    userId: string,
+    projectId: string,
+    runId: string,
+  ): Promise<SkillRunDetail> {
     const view = await this.view(projectId, runId);
-    return { ...view, run: await this.runs.detail(projectId, runId) };
+    return { ...view, run: await this.runs.detail(userId, projectId, runId) };
   }
 
   /** A run of this project, by id; another project's run is 404. */
