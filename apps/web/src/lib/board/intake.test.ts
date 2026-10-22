@@ -8,6 +8,7 @@ import {
   confirmSplitText,
   draftStateText,
   intakePhase,
+  newWorkBrief,
   openDrafts,
   roundText,
   splitRowProblem,
@@ -226,5 +227,41 @@ describe('the Drafts strip (#337 D2)', () => {
   test('a plan draft says how far it got', () => {
     expect(draftStateText(plan({ mode: 'dialogue' }))).toBe('3 tasks');
     expect(draftStateText(undefined)).toBeNull();
+  });
+});
+
+describe('a brief prefilled by a link (L-45)', () => {
+  const at = (query: string) => new URLSearchParams(query);
+
+  test('opening the intake with ?brief= flags it', () => {
+    expect(newWorkBrief(at('newWork=1&brief=Delete%20prod'))).toEqual({
+      brief: 'Delete prod',
+      fromLink: true,
+    });
+    expect(newWorkBrief(at('newPlan=1&brief=x')).fromLink).toBe(true);
+  });
+
+  test('opening it without ?brief= does not', () => {
+    expect(newWorkBrief(at('newWork=1'))).toEqual({
+      brief: undefined,
+      fromLink: false,
+    });
+    expect(newWorkBrief(at('newWork=1&brief=')).fromLink).toBe(false);
+  });
+
+  test('a brief without the New work link is not used', () => {
+    expect(newWorkBrief(at('brief=x'))).toEqual({
+      brief: undefined,
+      fromLink: false,
+    });
+  });
+
+  test("Discuss's own hand-over is not flagged; a different brief is", () => {
+    expect(newWorkBrief(at('newWork=1&brief=Add%20x'), 'Add x').fromLink).toBe(
+      false,
+    );
+    expect(newWorkBrief(at('newWork=1&brief=Other'), 'Add x').fromLink).toBe(
+      true,
+    );
   });
 });

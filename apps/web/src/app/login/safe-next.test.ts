@@ -28,6 +28,17 @@ describe('safeNext', () => {
     expect(safeNext('/login')).toBe('/');
     expect(safeNext('/login?next=/x')).toBe('/');
   });
+
+  test('only a page: no API route or Next.js asset', () => {
+    expect(safeNext('/api/admin/x')).toBe('/');
+    expect(safeNext('/api')).toBe('/');
+    expect(safeNext('/api?x=1')).toBe('/');
+    expect(safeNext('/_next/static/x')).toBe('/');
+    expect(safeNext('/./api/admin/x')).toBe('/');
+    expect(safeNext('/projects/../api/admin/x')).toBe('/');
+    expect(safeNext('/projects/p/board')).toBe('/projects/p/board');
+    expect(safeNext('/apis')).toBe('/apis');
+  });
 });
 
 describe('signedInRedirect', () => {

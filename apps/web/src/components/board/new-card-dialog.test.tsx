@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { FullScreenLayerFrame } from '../design/full-screen-layer';
-import { NewWorkScreenBody, newWorkLayer } from './new-card-dialog';
+import {
+  NewWorkScreenBody,
+  newWorkLayer,
+  PrefilledBriefNotice,
+} from './new-card-dialog';
 
 const render = (open: boolean, drafted: boolean) =>
   renderToStaticMarkup(
@@ -46,5 +50,13 @@ describe('New work on a phone (#678)', () => {
     });
     props.onClose();
     expect(closed).toBe(1);
+  });
+});
+
+describe('a brief prefilled by a link (L-45)', () => {
+  test('the notice asks the person to check it', () => {
+    expect(renderToStaticMarkup(<PrefilledBriefNotice />)).toContain(
+      'Pre-filled from a link — check before sending.',
+    );
   });
 });

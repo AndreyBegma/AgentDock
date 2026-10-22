@@ -64,6 +64,7 @@ import {
   parseCardParam,
   parseLinkedPlans,
 } from '../../../../../lib/board/format';
+import { newWorkBrief } from '../../../../../lib/board/intake';
 import {
   boardItems,
   fetchPlanTasks,
@@ -110,6 +111,10 @@ function BoardScreen() {
   const { intakeId, planPanelId, discussionId } = parseLinkedPlans(params);
   const planPanelOpen = planPanelId !== undefined;
   const newWorkLinked = params.has('newWork') || params.has('newPlan');
+  // L-45: a `?brief=` someone else wrote is flagged; Discuss's own hand-over
+  // is remembered here so it is not.
+  const [ownBrief, setOwnBrief] = useState<string>();
+  const linkedBrief = newWorkBrief(params, ownBrief);
   const [discussing, setDiscussing] = useState(false);
   const user = useCurrentUser();
   /** Bumped by a live push or a mutation; the board and the sheet depend on it. */
@@ -436,9 +441,8 @@ function BoardScreen() {
             project={project}
             open={creating || newWorkLinked || intakeId !== undefined}
             planId={intakeId}
-            initialBrief={
-              newWorkLinked ? (params.get('brief') ?? undefined) : undefined
-            }
+            initialBrief={linkedBrief.brief}
+            briefFromLink={linkedBrief.fromLink}
             board={board.data}
             onOpenChange={(open) => {
               setCreating(open);
@@ -476,6 +480,7 @@ function BoardScreen() {
               // ADR-0037 §5: New work, What to do prefilled; the
               // discussion stays in Drafts.
               setDiscussing(false);
+              setOwnBrief(brief);
               setParams({ discussion: undefined, newWork: '1', brief });
             }}
             onDiscarded={() => {
