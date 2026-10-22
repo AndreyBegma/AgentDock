@@ -1,22 +1,104 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Readable } from 'node:stream';
+import { type Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { ATTACHMENT_MAX_BYTES } from '@nautelle/shared';
+import { TextDecoder } from 'node:util';
+import {
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_SIGNATURE_BYTES,
+  type AttachmentScan,
+} from '@nautelle/shared';
 import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 import type { AttachmentStore } from './attachment-store';
 
+/** What the service needs of an upload, learned while it streamed (#156). */
+export interface ScannedUpload extends AttachmentScan {
+  size: number;
+  sha256: string;
+}
+
+/**
+ * #156: hashes an upload, keeps its first bytes for the signature and checks
+ * it is `isAttachmentText` — one chunk at a time, so the whole file is never
+ * in memory.
+ */
+export class UploadScanner {
+  private readonly hash = createHash('sha256');
+  private head = new Uint8Array(0);
+  private size = 0;
+  // Fatal: invalid UTF-8 throws; `null` once the file is known not to be text.
+  private decoder: TextDecoder | null = new TextDecoder('utf-8', {
+    fatal: true,
+  });
+
+  update(chunk: Uint8Array): void {
+    this.hash.update(chunk);
+    this.size += chunk.byteLength;
+    if (this.head.byteLength < ATTACHMENT_SIGNATURE_BYTES) {
+      const head = new Uint8Array(
+        Math.min(
+          ATTACHMENT_SIGNATURE_BYTES,
+          this.head.byteLength + chunk.byteLength,
+        ),
+      );
+      head.set(this.head);
+      head.set(
+        chunk.subarray(0, head.byteLength - this.head.byteLength),
+        this.head.byteLength,
+      );
+      this.head = head;
+    }
+    if (this.decoder === null) return;
+    if (chunk.includes(0)) {
+      this.decoder = null;
+      return;
+    }
+    try {
+      this.decoder.decode(chunk, { stream: true });
+    } catch {
+      this.decoder = null;
+    }
+  }
+
+  result(): ScannedUpload {
+    let text = false;
+    if (this.decoder !== null) {
+      try {
+        // Flushes: a multi-byte sequence cut off at the end is not UTF-8.
+        this.decoder.decode();
+        text = true;
+      } catch {
+        text = false;
+      }
+    }
+    return {
+      size: this.size,
+      sha256: this.hash.digest('hex'),
+      head: this.head,
+      text,
+    };
+  }
+}
+
+/** `UploadScanner` of bytes already in memory — a Telegram photo (#594). */
+export const scanBytes = (bytes: Uint8Array): ScannedUpload => {
+  const scanner = new UploadScanner();
+  scanner.update(bytes);
+  return scanner.result();
+};
+
 type Done = (
   error: Error | null,
-  info?: { path: string; size: number },
+  info?: { path: string } & ScannedUpload,
 ) => void;
 
 /**
  * D12: a multer storage engine that streams the upload to a temporary file
  * in the store's temp directory under a random name — never the client's.
- * The service hashes, sniffs and moves it into place.
+ * It hashes and scans the bytes on the way (#156); the service sniffs the
+ * type from that and moves the file into place.
  */
 export class TempFileStorage {
   constructor(private readonly store: AttachmentStore) {}
@@ -41,14 +123,17 @@ export class TempFileStorage {
 
   private async write(
     stream: Readable,
-  ): Promise<{ path: string; size: number }> {
+  ): Promise<{ path: string } & ScannedUpload> {
     const path = join(
       await this.store.tempDir(),
       randomBytes(16).toString('hex'),
     );
-    let size = 0;
-    stream.on('data', (chunk: Buffer) => {
-      size += chunk.length;
+    const scanner = new UploadScanner();
+    const scan = new Transform({
+      transform(chunk: Buffer, _encoding, callback) {
+        scanner.update(chunk);
+        callback(null, chunk);
+      },
     });
     // Over the limit busboy truncates the stream and multer refuses the
     // request; the partial file is removed here, not left for the sweep.
@@ -57,13 +142,13 @@ export class TempFileStorage {
       truncated = true;
     });
     try {
-      await pipeline(stream, createWriteStream(path, { flags: 'wx' }));
+      await pipeline(stream, scan, createWriteStream(path, { flags: 'wx' }));
     } catch (error) {
       await rm(path, { force: true });
       throw error;
     }
     if (truncated) await rm(path, { force: true });
-    return { path, size };
+    return { path, ...scanner.result() };
   }
 }
 

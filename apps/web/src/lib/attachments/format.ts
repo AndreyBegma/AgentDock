@@ -32,6 +32,8 @@ export const REFUSAL_TEXT: Record<AttachmentRefusal, string> = {
   [ATTACHMENT_REFUSAL.tooMany]: `A card holds at most ${ATTACHMENTS_PER_CARD_MAX} attachments, feedback included.`,
   [ATTACHMENT_REFUSAL.quotaExceeded]:
     'This project has used up its attachment storage. Remove some attachments first.',
+  [ATTACHMENT_REFUSAL.pendingExceeded]:
+    'You have too many uploads not yet attached to a card. Attach or remove them first.',
   [ATTACHMENT_REFUSAL.notClaimable]:
     'That upload can no longer be attached. Upload it again.',
 };

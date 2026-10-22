@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto';
 import { existsSync, utimesSync, writeFileSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   ATTACHMENT_PENDING_TTL_MS,
@@ -27,20 +28,30 @@ import {
 
 const DIR = useTempAttachmentsDir();
 
+// #156: an upload is scanned while it streams; the spy proves it is never
+// read back whole.
+jest.mock('node:fs/promises', () => {
+  const actual = jest.requireActual('node:fs/promises');
+  return { ...actual, readFile: jest.fn(actual.readFile) };
+});
+
 describe('attachments (e2e, #309)', () => {
   const w = new BoardWorld();
   let options: AttachmentsOptions;
   let quota: number;
+  let pendingCap: number;
 
   beforeAll(async () => {
     await w.init();
     options = w.ctx.app.get(ATTACHMENTS_OPTIONS);
     quota = options.projectQuotaBytes;
+    pendingCap = options.userPendingBytes;
   });
   afterAll(() => w.close());
   beforeEach(() => w.reset());
   afterEach(async () => {
     options.projectQuotaBytes = quota;
+    options.userPendingBytes = pendingCap;
     await w.work.settled();
   });
 
@@ -127,6 +138,47 @@ describe('attachments (e2e, #309)', () => {
       const response = await upload(w, 'third.png');
       expect(response.status).toBe(422);
       expect(response.body.code).toBe('quota_exceeded');
+    });
+
+    it('never reads an upload whole into memory, and stores its hash', async () => {
+      const read = jest.mocked(readFile);
+      read.mockClear();
+      const big = Buffer.alloc(5 * 1024 * 1024, 0x61);
+      const view = await uploaded(w, 'big.log', big);
+      expect(view).toMatchObject({ mime: 'text/plain', size: big.length });
+      const uploadReads = read.mock.calls.filter(([path]) =>
+        String(path).startsWith(DIR),
+      );
+      expect(uploadReads).toEqual([]);
+      const row = await w.ctx.prisma.attachment.findUniqueOrThrow({
+        where: { id: view.id },
+      });
+      expect(row.sha256).toBe(createHash('sha256').update(big).digest('hex'));
+    });
+
+    it("refuses with 413 pending_exceeded past the user's pending cap; others still upload", async () => {
+      options.userPendingBytes = FILES.png.length * 2;
+      const first = await uploaded(w);
+      await uploaded(w);
+
+      const refused = await upload(w, 'third.png');
+      expect(refused.status).toBe(413);
+      expect(refused.body).toMatchObject({
+        error: 'attachment_error',
+        code: 'pending_exceeded',
+      });
+      expect(
+        await w.ctx.prisma.attachment.count({
+          where: { uploaderId: w.operatorId },
+        }),
+      ).toBe(2);
+
+      // Another member of the same project is not held by this one's uploads.
+      await uploaded(w, 'admin.png', FILES.png, w.admin);
+
+      // A claimed upload no longer counts as pending.
+      await w.createCard({ attachmentIds: [first.id] });
+      await uploaded(w, 'fourth.png');
     });
 
     it('is 400 without the file field', async () => {

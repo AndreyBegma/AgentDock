@@ -24,6 +24,7 @@ import {
   ATTACHMENT_MIMES,
   attachmentDisposition,
   detectAttachmentMime,
+  detectScannedAttachmentMime,
 } from './types';
 
 const bytesOf = (...parts: (number[] | string)[]): Uint8Array =>
@@ -54,6 +55,7 @@ describe('limits (#309 D4)', () => {
       unsupportedType: 'unsupported_type',
       tooMany: 'too_many',
       quotaExceeded: 'quota_exceeded',
+      pendingExceeded: 'pending_exceeded',
       notClaimable: 'not_claimable',
     });
   });
@@ -111,6 +113,25 @@ describe('detectAttachmentMime — the allowlist by content (#309 D5)', () => {
   it('does not take a truncated signature for a file', () => {
     expect(detectAttachmentMime(bytesOf('RIFF'), 'x.webp')).toBeNull();
     expect(detectAttachmentMime(new Uint8Array(), 'x.png')).toBeNull();
+  });
+});
+
+describe('detectScannedAttachmentMime — a streamed upload (#156)', () => {
+  it('decides by the head and the scanned text flag, as for whole bytes', () => {
+    const head = PNG.slice(0, 12);
+    expect(detectScannedAttachmentMime({ head, text: false }, 'a.txt')).toBe(
+      'image/png',
+    );
+    const text = bytesOf('hello');
+    expect(
+      detectScannedAttachmentMime({ head: text, text: true }, 'a.md'),
+    ).toBe('text/markdown');
+    expect(
+      detectScannedAttachmentMime({ head: text, text: false }, 'a.md'),
+    ).toBeNull();
+    expect(
+      detectScannedAttachmentMime({ head: text, text: true }, 'run.sh'),
+    ).toBeNull();
   });
 });
 
