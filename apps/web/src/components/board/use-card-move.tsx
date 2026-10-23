@@ -6,6 +6,7 @@ import { DialogContent, DialogRoot } from '@andrewbehma/glass-ui/dialog';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import type { BoardCardView } from '@nautelle/shared';
 import { type ReactNode, useState } from 'react';
+import { notLandedReason } from '../../lib/board/accept';
 import { moveCard } from '../../lib/board/actions';
 import {
   type DropDecision,
@@ -54,24 +55,36 @@ export function useCardMove({
 }): CardMove {
   const [asking, setAsking] = useState<Asking>();
   const [busy, setBusy] = useState(false);
+  // #847: Completed means landed — the API refused, the person decides.
+  const [unlanded, setUnlanded] = useState<{
+    move: DropMove;
+    card: BoardCardView;
+    reason: string;
+  }>();
 
   /** Resolves `true` when the move landed. */
   const send = async (
     move: DropMove,
-    number: number,
-    options: { stopWorker?: boolean } = {},
+    card: BoardCardView,
+    options: { stopWorker?: boolean; confirmUnlanded?: boolean } = {},
   ): Promise<boolean> => {
     onStart?.(move);
     setBusy(true);
     try {
       await moveCard(
         projectId,
-        number,
-        moveRequest(move, options.stopWorker === true),
+        card.number,
+        moveRequest(
+          move,
+          options.stopWorker === true,
+          options.confirmUnlanded === true,
+        ),
       );
       return true;
     } catch (err) {
-      toast.error(describeBoardError(err, runnerName));
+      const reason = notLandedReason(err);
+      if (reason !== null) setUnlanded({ move, card, reason });
+      else toast.error(describeBoardError(err, runnerName));
       return false;
     } finally {
       setBusy(false);
@@ -91,7 +104,7 @@ export function useCardMove({
         setAsking(decision);
         return;
       case 'move':
-        void send(decision.move, decision.card.number);
+        void send(decision.move, decision.card);
     }
   };
 
@@ -115,7 +128,7 @@ export function useCardMove({
     const { move, card } = asking;
     setAsking(undefined);
     // Run goes through the card actions, which hold it for an open dependency (#638).
-    void send(move, card.number).then((moved) => {
+    void send(move, card).then((moved) => {
       if (moved && run) void actions.run(card);
     });
   };
@@ -124,7 +137,14 @@ export function useCardMove({
     if (asking?.kind !== 'confirm-stop') return;
     const { move, card } = asking;
     setAsking(undefined);
-    void send(move, card.number, { stopWorker: true });
+    void send(move, card, { stopWorker: true });
+  };
+
+  const confirmUnlanded = () => {
+    if (!unlanded) return;
+    const { move, card } = unlanded;
+    setUnlanded(undefined);
+    void send(move, card, { confirmUnlanded: true });
   };
 
   // #638: an open dependency holds the dialog's Run too; the move is free.
@@ -182,6 +202,18 @@ export function useCardMove({
         verb="Stop worker and move"
         tone="danger"
         onConfirm={confirmStop}
+      />
+
+      <ConfirmDialog
+        open={unlanded !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setUnlanded(undefined);
+        }}
+        title={`Complete ${unlanded?.card.label ?? 'the card'} without landing it?`}
+        consequence={`${unlanded?.reason ?? ''}. Completing it leaves that work out of the base.`}
+        verb="Complete anyway"
+        tone="danger"
+        onConfirm={confirmUnlanded}
       />
     </>
   );
