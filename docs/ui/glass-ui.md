@@ -87,7 +87,7 @@ process state.
 | activity / agents | `Timeline`, `LogViewer`, `TraceTree`, `CodeBlock`, `Terminal`, `CronInput` |
 | forms | `Field`, `Input`, `Select`, `Combobox`, `Toggle`, `Checkbox`, `RadioGroup`, `NumberInput`, `DateInput`, `Textarea` |
 | overlays | `DialogRoot`, `SheetRoot`, `Menu*`, `ContextMenu*`, `Popover*`, `Tooltip`, `toast`, `FloatingWindow` (0.35.0: a non-modal window dragged by its bar, resized from every edge and corner, minimized by Escape, its geometry persisted under `storageKey`; a bottom `Sheet` below `md`), `Launcher` (0.35.0: the round floating button with a badge that opens it, above the `BottomCapsule` below `lg`) |
-| misc | `Card` (`hue`), `Tabs`, `SegmentedControl`, `Disclosure`, `Tree`, `Avatar`, `KeyHint`, `Separator`, `SplitPane`, `ResizableFrame` (0.30.0: a controlled-width frame with splitter edges — the design viewer's mockup) |
+| misc | `Card` (`hue`), `Tabs`, `SegmentedControl`, `Disclosure`, `Tree`, `Avatar`, `KeyHint`, `Separator`, `SplitPane`, `ResizableFrame` (0.30.0: a controlled-width frame with splitter edges; the design viewer drew its mockup in it until the device canvas, #886) |
 
 ## Added in 0.29.0
 
@@ -178,6 +178,7 @@ like Figma. It is composed here until glass-ui ships the primitive (see
 | `zoom`, `onZoomChange` | the `Zoom` of `lib/design/zoom.ts`: `'fit'` is Fit all, a number is the scale. The range (25–200 %), the whole-percent steps and the wheel curve are the viewer's (spec 335), reused, not copied. |
 | `pan`, `onPanChange` | where the world's origin sits, in stage px; ignored while `zoom` is `'fit'`. Every gesture reports both values, so a viewer can keep them in the URL (debounce the URL write: a drag reports on every move). |
 | `tools` | a glass group in the top-left corner, for a tool switch. |
+| `focus`, `onFocused` | #886: `{ frameId, point }`, a point in a frame's own px to bring to the middle of the stage, at 50 % or more, once the stage is measured — the design viewer centres a selected comment's pin this way. It is applied once per value; `onFocused` tells the owner to drop it. |
 | `label`, `className` | the stage's accessible name (default "Canvas"); the stage's size comes from `className`. |
 
 Gestures:

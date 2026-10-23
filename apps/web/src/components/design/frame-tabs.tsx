@@ -4,11 +4,12 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Tab, TabList } from '@andrewbehma/glass-ui/tabs';
 import type { DesignFrameView } from '@nautelle/shared';
-import { ChevronLeft, ChevronRight, Columns2 } from 'lucide-react';
+import { Columns2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { framePath } from '../../lib/design/frames';
 import { frameKindLabel } from '../../lib/design/templates';
 
-/** The keys the strip turns into a frame: the tablist's own, which only move focus. */
+/** The keys the tabs turn into a frame: the tablist's own, which only move focus. */
 const STEP: Record<string, (at: number, last: number) => number> = {
   ArrowLeft: (at, last) => (at === 0 ? last : at - 1),
   ArrowRight: (at, last) => (at === last ? 0 : at + 1),
@@ -17,14 +18,18 @@ const STEP: Record<string, (at: number, last: number) => number> = {
 };
 
 /**
- * #441: the frames of the revision in view, between the toolbar and the
- * mockup — a glass-ui `TabList` inside the viewer's `TabGroup`. Each tab
- * shows its position, the frame's name, its open comments and a dot when it
- * holds an open pin. The arrows, Home and End switch frames as they move
- * focus; `[` and `]` do it from anywhere on the stage. A revision stored
- * before frames shows its one frame, "Mockup".
+ * #886: the frames of the revision in view as tabs above the device canvas —
+ * a glass-ui `TabList` inside the viewer's `TabGroup`. A tab is named by its
+ * frame (Screen, Breakdown, States…), with the kind beside it when the name
+ * does not already say it, its open comments and a dot when it holds an open
+ * pin. The arrows, Home and End switch tabs as they move focus; `[` and `]` do
+ * it from the canvas. A revision stored before frames shows its one frame,
+ * "Mockup", and a legacy `mobile` frame is one more tab.
+ *
+ * `tools` sit at the end of the row (theme, variant, revision); Compare comes
+ * after them while there is more than one variant to see.
  */
-export function FrameStrip({
+export function FrameTabs({
   frames,
   frame,
   variant,
@@ -33,12 +38,9 @@ export function FrameStrip({
   onFrame,
   templateName = null,
   compare,
+  tools,
 }: {
   frames: readonly DesignFrameView[];
-  /** #833 D11: the template the revision was drawn by, named once above the tabs; null for a legacy one. */
-  templateName?: string | null;
-  /** #833 D11: the Compare toggle; left out while there is one variant to see. */
-  compare?: { on: boolean; onToggle: () => void };
   /** The position of the frame in view. */
   frame: number;
   variant: number;
@@ -47,30 +49,26 @@ export function FrameStrip({
   /** Frames with an open pin, by position. */
   pinned: ReadonlySet<number>;
   onFrame: (frame: number) => void;
+  /** #833 D11: the template the revision was drawn by; null for a legacy one. */
+  templateName?: string | null;
+  /** #833 D11: the Compare toggle; left out while there is one variant to see. */
+  compare?: { on: boolean; onToggle: () => void };
+  tools?: ReactNode;
 }) {
   const last = frames.length - 1;
   const current = frames[frame];
   return (
     <div className="flex shrink-0 flex-col gap-1">
-      {templateName ? (
-        <p className="text-xs text-ink-3">
-          Template ·{' '}
-          <span className="font-semibold text-ink">{templateName}</span>
-        </p>
-      ) : null}
-      <div className="flex min-w-0 items-center gap-2">
-        <span id="design-frames-label" className="shrink-0 text-xs text-ink-3">
-          Frames · {frames.length}
-        </span>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
         {/* biome-ignore lint/a11y/noStaticElementInteractions: the tabs inside take the keys; this turns their focus moves into a frame change */}
         <div
           className="min-w-0 flex-1 overflow-x-auto"
           onKeyDown={(event) => {
             const step = STEP[event.key];
-            if (step) onFrame(step(frame, last));
+            if (step && last > 0) onFrame(step(frame, last));
           }}
         >
-          <TabList aria-labelledby="design-frames-label" className="w-max">
+          <TabList aria-label="Frames" className="w-max">
             {frames.map((f) => {
               const open = comments.get(f.position) ?? 0;
               const kind = frameKindLabel(f);
@@ -81,11 +79,8 @@ export function FrameStrip({
                   className="flex-none"
                 >
                   <span className="inline-flex items-center gap-2">
-                    <span className="text-ink-3 tabular-nums">
-                      {f.position + 1}
-                    </span>
                     <span className="max-w-48 truncate">{f.name}</span>
-                    {kind ? (
+                    {kind && !f.name.startsWith(kind) ? (
                       <span className="text-xs text-ink-3">{kind}</span>
                     ) : null}
                     {open > 0 ? (
@@ -103,28 +98,7 @@ export function FrameStrip({
             })}
           </TabList>
         </div>
-        <Button
-          size="sm"
-          icon
-          variant="ghost"
-          aria-label="Previous frame"
-          title="Previous frame ( [ )"
-          disabled={frames.length < 2}
-          onClick={() => onFrame(STEP.ArrowLeft(frame, last))}
-        >
-          <ChevronLeft aria-hidden="true" className="size-4" />
-        </Button>
-        <Button
-          size="sm"
-          icon
-          variant="ghost"
-          aria-label="Next frame"
-          title="Next frame ( ] )"
-          disabled={frames.length < 2}
-          onClick={() => onFrame(STEP.ArrowRight(frame, last))}
-        >
-          <ChevronRight aria-hidden="true" className="size-4" />
-        </Button>
+        {tools}
         {compare ? (
           <Button
             size="sm"
@@ -140,8 +114,15 @@ export function FrameStrip({
       </div>
       {current ? (
         <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-ink-3">
-          <span className="font-semibold text-ink">{current.name}</span>
-          <span aria-hidden="true">·</span>
+          {templateName ? (
+            <>
+              <span>
+                Template ·{' '}
+                <span className="font-semibold text-ink">{templateName}</span>
+              </span>
+              <span aria-hidden="true">·</span>
+            </>
+          ) : null}
           <span className="font-mono">{framePath(variant, current)}</span>
           <span aria-hidden="true">·</span>
           <span className="tabular-nums">
@@ -153,7 +134,7 @@ export function FrameStrip({
   );
 }
 
-/** `[` and `]` on the stage: the previous and the next frame, wrapping. */
+/** `[` and `]` on the canvas: the previous and the next tab, wrapping. */
 export function frameKey(
   event: { key: string },
   frame: number,

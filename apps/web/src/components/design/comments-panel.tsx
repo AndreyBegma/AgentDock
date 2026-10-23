@@ -4,7 +4,7 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Checkbox } from '@andrewbehma/glass-ui/checkbox';
 import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
-import { Textarea } from '@andrewbehma/glass-ui/field';
+import { Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import {
   SegmentedControl,
@@ -34,6 +34,8 @@ function CommentItem({
   frameName,
   notes,
   canOperate,
+  selected,
+  onSelect,
 }: {
   comment: DesignCommentView;
   pinNumber?: number;
@@ -41,11 +43,14 @@ function CommentItem({
   frameName: string | null;
   notes: TextNotes;
   canOperate: boolean;
+  selected: boolean;
+  /** #886: open the comment where it was left — its tab, device and pin. */
+  onSelect?: (comment: DesignCommentView) => void;
 }) {
   const anchor = anchorLabel(comment, pinNumber);
-  return (
-    <li className="flex flex-col gap-1 rounded-md border border-line p-3">
-      <div className="flex flex-wrap items-baseline gap-x-2 text-xs text-ink-3">
+  const content = (
+    <>
+      <span className="flex flex-wrap items-baseline gap-x-2 text-xs text-ink-3">
         <span className="font-medium text-ink-2">
           {comment.author?.name ?? 'Former member'}
         </span>
@@ -54,8 +59,31 @@ function CommentItem({
         {frameName ? (
           <Badge label={frameName} aria-label={`Frame: ${frameName}`} />
         ) : null}
-      </div>
-      <p className="text-sm whitespace-pre-wrap break-words">{comment.body}</p>
+      </span>
+      <span className="block text-sm whitespace-pre-wrap break-words">
+        {comment.body}
+      </span>
+    </>
+  );
+  return (
+    <li
+      className={`flex flex-col gap-1 rounded-md border p-3 ${
+        selected ? 'border-accent' : 'border-line'
+      }`}
+    >
+      {onSelect ? (
+        <button
+          type="button"
+          aria-current={selected || undefined}
+          title="Show where it was left"
+          className="flex flex-col gap-1 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-accent"
+          onClick={() => onSelect(comment)}
+        >
+          {content}
+        </button>
+      ) : (
+        <div className="flex flex-col gap-1">{content}</div>
+      )}
       <NormalizedNote
         view={notes.view('design_comment', comment.id, 'body')}
         canOperate={canOperate}
@@ -87,6 +115,10 @@ export function CommentsPanel({
   writeBlock,
   busy,
   onComment,
+  selected = null,
+  onSelect,
+  devices = [],
+  onDevice,
 }: {
   /** With `owner`: where the translation notes under each comment come from (#271). */
   projectId?: string;
@@ -101,7 +133,7 @@ export function CommentsPanel({
   frame?: number;
   /** #441: the name of the frame a comment was left on, in its revision. */
   frameNameOf?: (comment: DesignCommentView) => string | null;
-  /** The screen in view, for a `screen` comment. */
+  /** The screen in view — #886: the device in view — for a `screen` comment. */
   screen: { viewport: string; theme: 'light' | 'dark' };
   /** Why the person cannot comment now, or null. */
   writeBlock: string | null;
@@ -109,6 +141,12 @@ export function CommentsPanel({
   onComment: (
     body: Omit<DesignCommentRequest, 'revisionId' | 'frame'>,
   ) => Promise<void>;
+  /** #886: the comment shown on the canvas, by id. */
+  selected?: string | null;
+  onSelect?: (comment: DesignCommentView) => void;
+  /** #886: the devices on the canvas, to pick the one a screen comment names. */
+  devices?: readonly string[];
+  onDevice?: (device: string) => void;
 }) {
   const [allRevisions, setAllRevisions] = useState(false);
   const [scope, setScope] = useState<FrameScope>('frame');
@@ -201,6 +239,8 @@ export function CommentsPanel({
               frameName={frameNameOf(c)}
               notes={notes}
               canOperate={canOperate}
+              selected={c.id === selected}
+              onSelect={onSelect}
             />
           ))}
         </ul>
@@ -221,6 +261,8 @@ export function CommentsPanel({
                 frameName={frameNameOf(c)}
                 notes={notes}
                 canOperate={canOperate}
+                selected={c.id === selected}
+                onSelect={onSelect}
               />
             ))}
           </ul>
@@ -254,11 +296,27 @@ export function CommentsPanel({
             }}
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Checkbox
-              label={`Only this screen (${screenLabel})`}
-              checked={onScreen}
-              onChange={(e) => setOnScreen(e.target.checked)}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Checkbox
+                label={`Only this screen (${screenLabel})`}
+                checked={onScreen}
+                onChange={(e) => setOnScreen(e.target.checked)}
+              />
+              {onScreen && onDevice && devices.length > 1 ? (
+                <Select
+                  aria-label="Device"
+                  className="h-8 w-auto text-xs"
+                  value={screen.viewport}
+                  onChange={(e) => onDevice(e.target.value)}
+                >
+                  {devices.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </Select>
+              ) : null}
+            </div>
             <Button
               size="sm"
               variant="glass"

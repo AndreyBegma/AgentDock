@@ -21,6 +21,7 @@ import { designApi } from '../../../../../../../../../lib/design/href';
 import { useDesign } from '../../../../../../../../../lib/design/use-design';
 import {
   applyViewerChange,
+  devicesOf,
   resolveViewerState,
 } from '../../../../../../../../../lib/design/viewer-state';
 import { useStepBack } from '../../../../../../../../../lib/navigation/step-back';
@@ -161,7 +162,7 @@ function DesignViewerScreen({
                 state={resolveViewerState(
                   search,
                   design.revisions,
-                  design.viewports,
+                  devicesOf(design),
                 )}
                 canOperate={canOperate}
                 busy={section.busy}

@@ -1,14 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  DEFAULT_VIEWPORTS,
-  DESIGN_VIEWPORT_MAX_PX,
-  DESIGN_VIEWPORT_MIN_PX,
-} from '@nautelle/shared';
+import { DEFAULT_VIEWPORTS } from '@nautelle/shared';
 import { design, framesOf, revision } from './fixtures';
 import {
   applyViewerChange,
-  clampWidth,
+  devicesOf,
   frameOf,
+  parsePan,
   parseZoom,
   resolveViewerState,
   revisionsOf,
@@ -20,14 +17,15 @@ const resolve = (query: string) =>
   resolveViewerState(new URLSearchParams(query), revisions, viewports);
 
 describe('resolveViewerState', () => {
-  test('defaults: the latest revision of the first variant, the first preset in light', () => {
+  test('defaults: the latest revision of the first variant, the first device in light', () => {
     const state = resolve('');
     expect(state.variant).toBe(1);
     expect(state.revision?.id).toBe('rev-1-2');
-    expect(state.viewport.name).toBe('Desktop');
+    expect(state.devices).toEqual(viewports);
+    expect(state.device.name).toBe('Desktop');
     expect(state.theme).toBe('light');
-    expect(state.width).toBe(1440);
-    expect(state.customWidth).toBe(false);
+    expect(state.zoom).toBe('fit');
+    expect(state.pan).toEqual({ x: 0, y: 0 });
   });
 
   test('a named revision fixes its variant', () => {
@@ -36,38 +34,73 @@ describe('resolveViewerState', () => {
     expect(state.revision?.id).toBe('rev-2-1');
   });
 
-  test('an unknown variant, preset, theme or width falls back', () => {
-    const state = resolve('variant=7&vp=Watch&theme=sepia&w=abc');
+  test('an unknown variant, device or theme falls back', () => {
+    const state = resolve('variant=7&device=Watch&theme=sepia');
     expect(state.variant).toBe(1);
-    expect(state.viewport.name).toBe('Desktop');
+    expect(state.device.name).toBe('Desktop');
     expect(state.theme).toBe('light');
-    expect(state.width).toBe(1440);
   });
 
-  test('a typed width is clamped and marked custom', () => {
-    expect(resolve('w=10').width).toBe(DESIGN_VIEWPORT_MIN_PX);
-    expect(resolve('w=99999').width).toBe(DESIGN_VIEWPORT_MAX_PX);
-    expect(resolve('vp=Mobile&w=412').customWidth).toBe(true);
+  test('a named device is the one in view', () => {
+    expect(resolve('device=Phone').device.name).toBe('Phone');
   });
 
-  test("a preset's own theme is its default", () => {
-    const state = resolveViewerState(
-      new URLSearchParams('vp=Night'),
-      revisions,
-      [{ name: 'Night', width: 800, height: 600, theme: 'dark' }],
-    );
+  test("#886: the single-frame viewer's preset and width are ignored", () => {
+    const state = resolve('vp=Phone&w=412');
+    expect(state.device.name).toBe('Desktop');
+    expect(state.devices).toEqual(viewports);
+  });
+
+  test("the first device's own theme is the default", () => {
+    const state = resolveViewerState(new URLSearchParams(''), revisions, [
+      { name: 'Night', width: 800, height: 600, theme: 'dark' },
+    ]);
     expect(state.theme).toBe('dark');
   });
 
-  test('no presets: the defaults', () => {
+  test('no devices: the built-in ones', () => {
     const state = resolveViewerState(new URLSearchParams(''), revisions, []);
-    expect(state.viewport).toEqual(DEFAULT_VIEWPORTS[0]);
+    expect(state.devices).toEqual(DEFAULT_VIEWPORTS);
+    expect(state.device).toEqual(DEFAULT_VIEWPORTS[0]);
   });
 
   test('a design without revisions has none in view', () => {
     const state = resolveViewerState(new URLSearchParams(''), [], viewports);
     expect(state.revision).toBeNull();
     expect(state.variant).toBe(1);
+  });
+});
+
+describe('devicesOf (#886)', () => {
+  const presets = [{ name: 'Wide', width: 1920, height: 1080 }];
+  const stored = [{ name: 'Kiosk', width: 1080, height: 1920 }];
+
+  test('the devices stored on the design win', () => {
+    expect(devicesOf({ devices: stored, viewports: presets })).toBe(stored);
+  });
+
+  test("a design with no stored devices uses the project's presets", () => {
+    expect(devicesOf({ devices: null, viewports: presets })).toBe(presets);
+    expect(devicesOf({ devices: [], viewports: presets })).toBe(presets);
+  });
+
+  test('nothing at all: the built-in devices', () => {
+    expect(devicesOf({ devices: null, viewports: [] })).toBe(DEFAULT_VIEWPORTS);
+  });
+
+  test('an earlier revision with a mobile frame opens as one more tab', () => {
+    const legacy = revision({
+      id: 'old',
+      frames: framesOf('old', ['Mockup', 'Mobile']),
+    });
+    const state = resolveViewerState(
+      new URLSearchParams('frame=1'),
+      [legacy],
+      devicesOf({ devices: null, viewports: presets }),
+    );
+    expect(state.frame).toBe(1);
+    expect(frameOf(state)?.name).toBe('Mobile');
+    expect(state.devices).toEqual(presets);
   });
 });
 
@@ -132,69 +165,87 @@ describe('variants and revisions', () => {
 });
 
 describe('applyViewerChange', () => {
-  const params = new URLSearchParams('variant=1&rev=rev-1-1&vp=Mobile&w=500');
+  const params = new URLSearchParams('variant=1&rev=rev-1-1');
 
   test('a variant drops the revision', () => {
     expect(applyViewerChange(params, { kind: 'variant', variant: 2 })).toBe(
-      '?variant=2&vp=Mobile&w=500',
+      '?variant=2',
     );
   });
 
-  test('a preset drops the typed width and takes its theme', () => {
+  test('a device and a theme are kept beside the rest', () => {
+    expect(applyViewerChange(params, { kind: 'device', device: 'Phone' })).toBe(
+      '?variant=1&rev=rev-1-1&device=Phone',
+    );
+    expect(applyViewerChange(params, { kind: 'theme', theme: 'dark' })).toBe(
+      '?variant=1&rev=rev-1-1&theme=dark',
+    );
+  });
+
+  test('#886: any change drops the legacy vp and w', () => {
+    const legacy = new URLSearchParams('vp=Mobile&w=500&frame=1');
+    expect(applyViewerChange(legacy, { kind: 'theme', theme: 'dark' })).toBe(
+      '?frame=1&theme=dark',
+    );
+  });
+
+  test('a view keeps its zoom and pan, and Fit all leaves the URL', () => {
     expect(
       applyViewerChange(params, {
-        kind: 'viewport',
-        viewport: { name: 'Night', width: 1, height: 1, theme: 'dark' },
+        kind: 'view',
+        zoom: 0.5,
+        pan: { x: 120.4, y: -40.6 },
       }),
-    ).toBe('?variant=1&rev=rev-1-1&vp=Night&theme=dark');
-  });
-
-  test('a preset with fit goes back to Fit, as on a phone', () => {
-    const zoomed = new URLSearchParams('vp=Desktop&zoom=2');
+    ).toBe('?variant=1&rev=rev-1-1&zoom=0.5&pan=120%2C-41');
+    const zoomed = new URLSearchParams('frame=1&zoom=0.5&pan=1,2');
     expect(
       applyViewerChange(zoomed, {
-        kind: 'viewport',
-        viewport: { name: 'Mobile', width: 390, height: 844 },
-        fit: true,
+        kind: 'view',
+        zoom: 'fit',
+        pan: { x: 1, y: 2 },
       }),
-    ).toBe('?vp=Mobile');
-  });
-
-  test('a width is clamped', () => {
-    const empty = new URLSearchParams();
-    expect(applyViewerChange(empty, { kind: 'width', width: 1 })).toBe(
-      `?w=${DESIGN_VIEWPORT_MIN_PX}`,
-    );
-    expect(clampWidth(412.6)).toBe(413);
-  });
-
-  test('a zoom is kept next to the rest, and Fit leaves the URL', () => {
-    expect(applyViewerChange(params, { kind: 'zoom', zoom: 0.5 })).toBe(
-      '?variant=1&rev=rev-1-1&vp=Mobile&w=500&zoom=0.5',
-    );
-    const zoomed = new URLSearchParams('vp=Mobile&zoom=0.5');
-    expect(applyViewerChange(zoomed, { kind: 'zoom', zoom: 'fit' })).toBe(
-      '?vp=Mobile',
-    );
+    ).toBe('?frame=1');
   });
 
   test('a zoom is clamped on the way out', () => {
-    const empty = new URLSearchParams();
-    expect(applyViewerChange(empty, { kind: 'zoom', zoom: 9 })).toBe('?zoom=2');
+    expect(
+      applyViewerChange(new URLSearchParams(), {
+        kind: 'view',
+        zoom: 9,
+        pan: { x: 0, y: 0 },
+      }),
+    ).toBe('?zoom=2&pan=0%2C0');
   });
 
-  test('choosing a preset keeps the zoom', () => {
-    const next = applyViewerChange(new URLSearchParams('zoom=0.75'), {
-      kind: 'viewport',
-      viewport: { name: 'Mobile', width: 390, height: 844 },
-    });
-    expect(next).toBe('?zoom=0.75&vp=Mobile');
+  test("a comment's place names its revision, tab, device and theme", () => {
+    expect(
+      applyViewerChange(new URLSearchParams('variant=2&frame=1'), {
+        kind: 'place',
+        revisionId: 'rev-1-1',
+        frame: 2,
+        device: 'Tablet',
+        theme: 'dark',
+      }),
+    ).toBe('?frame=2&rev=rev-1-1&device=Tablet&theme=dark');
+  });
+
+  test('a place without a device or theme keeps the ones in view', () => {
+    expect(
+      applyViewerChange(new URLSearchParams('device=Phone&theme=dark'), {
+        kind: 'place',
+        revisionId: 'rev-1-1',
+        frame: 0,
+        device: null,
+        theme: null,
+      }),
+    ).toBe('?device=Phone&theme=dark&rev=rev-1-1');
   });
 });
 
-describe('zoom in the URL', () => {
-  test('defaults to Fit', () => {
+describe('zoom and pan in the URL', () => {
+  test('defaults to Fit all at the origin', () => {
     expect(resolve('').zoom).toBe('fit');
+    expect(resolve('pan=10,10').pan).toEqual({ x: 0, y: 0 });
   });
 
   test('fit and a number parse', () => {
@@ -228,18 +279,28 @@ describe('zoom in the URL', () => {
     expect(performance.now() - started).toBeLessThan(50);
   });
 
-  test('round-trips through the URL', () => {
-    for (const zoom of [0.25, 0.4, 0.5, 0.75, 1, 1.25, 2] as const) {
-      const query = applyViewerChange(new URLSearchParams(), {
-        kind: 'zoom',
-        zoom,
-      });
-      expect(resolve(query.slice(1)).zoom).toBe(zoom);
+  test('a pan is two whole numbers, negatives allowed', () => {
+    expect(parsePan('120,-40')).toEqual({ x: 120, y: -40 });
+    expect(parsePan('-0,0')).toEqual({ x: -0, y: 0 });
+  });
+
+  test('a garbled or far-off pan is the origin', () => {
+    for (const raw of ['', '1', '1,2,3', '1.5,2', 'a,b', '200000,0', '1, 2']) {
+      expect(parsePan(raw)).toEqual({ x: 0, y: 0 });
     }
-    const fit = applyViewerChange(new URLSearchParams('zoom=0.5'), {
-      kind: 'zoom',
-      zoom: 'fit',
-    });
-    expect(resolve(fit.slice(1)).zoom).toBe('fit');
+    expect(parsePan(`${'1'.repeat(100_000)},1`)).toEqual({ x: 0, y: 0 });
+  });
+
+  test('a view round-trips through the URL', () => {
+    for (const zoom of [0.25, 0.4, 0.5, 0.75, 1, 1.25, 2] as const) {
+      const query = applyViewerChange(new URLSearchParams('frame=1'), {
+        kind: 'view',
+        zoom,
+        pan: { x: -320, y: 48 },
+      });
+      const state = resolve(query.slice(1));
+      expect(state.zoom).toBe(zoom);
+      expect(state.pan).toEqual({ x: -320, y: 48 });
+    }
   });
 });

@@ -36,6 +36,7 @@ import {
 } from '../../../../../../../../lib/design/use-design';
 import {
   applyViewerChange,
+  devicesOf,
   resolveViewerState,
 } from '../../../../../../../../lib/design/viewer-state';
 import { useLive } from '../../../../../../../../lib/live/use-live';
@@ -191,7 +192,7 @@ export default function CardDesignViewerPage() {
                 state={resolveViewerState(
                   search,
                   design.revisions,
-                  design.viewports,
+                  devicesOf(design),
                 )}
                 canOperate={canOperate}
                 busy={section.busy}

@@ -1,17 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
   anchorAt,
-  boxSize,
   clampZoom,
-  dragStep,
-  effectiveZoom,
-  type FrameDrag,
   fitZoom,
-  frameZoom,
-  layoutWidth,
   stepZoom,
   wheelZoom,
-  type Zoom,
   zoomKey,
   zoomPercent,
 } from './zoom';
@@ -29,11 +22,6 @@ describe('fitZoom', () => {
     expect(fitZoom(100, 1440)).toBe(0.25);
     expect(fitZoom(0, 1440)).toBe(1);
     expect(fitZoom(1000, 0)).toBe(1);
-  });
-
-  test('effectiveZoom: fit is measured, a number is itself', () => {
-    expect(effectiveZoom('fit', 1000, 1440)).toBe(0.69);
-    expect(effectiveZoom(0.5, 1000, 1440)).toBe(0.5);
   });
 });
 
@@ -75,89 +63,6 @@ describe('clampZoom and zoomPercent', () => {
     expect(clampZoom(9)).toBe(2);
     expect(clampZoom(0.756)).toBe(0.76);
     expect(zoomPercent(0.72)).toBe('72 %');
-  });
-});
-
-describe('edge drag (D5)', () => {
-  test('at 50 %, 100 screen px on the box are 200 layout px', () => {
-    const start = 800;
-    const box = boxSize(start, 0.5) + 100;
-    expect(layoutWidth(box, 0.5) - start).toBe(200);
-  });
-
-  test('at 100 % the box width is the layout width', () => {
-    expect(layoutWidth(1024, 1)).toBe(1024);
-  });
-
-  test('the result is a clamped layout width', () => {
-    expect(layoutWidth(1, 0.5)).toBeGreaterThanOrEqual(1);
-    expect(layoutWidth(10_000_000, 0.5)).toBeLessThan(10_000_000);
-  });
-});
-
-describe('a drag holds its zoom (#394)', () => {
-  const AVAILABLE = 976;
-
-  /**
-   * One drag, replayed the way the viewer runs it: `ResizableFrame` reports
-   * the box it started from plus `factor·dx`; the viewer turns that into a
-   * layout width and redraws the box at the zoom in effect. Returns how far
-   * the redrawn box moved for each pointer step, and the committed width.
-   */
-  function replay(zoom: Zoom, start: number, factor: 1 | 2, steps: number[]) {
-    let drag: FrameDrag | null = null;
-    let z = frameZoom(zoom, AVAILABLE, start, drag);
-    const startBox = boxSize(start, z);
-    const moved: number[] = [];
-    let last = startBox;
-    for (const dx of steps) {
-      last = startBox + factor * dx;
-      const next: FrameDrag = dragStep(drag, last, z);
-      drag = next;
-      z = frameZoom(zoom, AVAILABLE, next.width, next);
-      moved.push(boxSize(next.width, z) - startBox);
-    }
-    const shown = drag === null ? start : drag.width;
-    return { moved, committed: dragStep(drag, last, z).width, shown };
-  }
-
-  const steps = [5, 10, 20, 40, 80, -20, -60];
-  const zooms: Zoom[] = ['fit', 0.5, 0.75, 1];
-
-  for (const zoom of zooms) {
-    for (const factor of [2, 1] as const) {
-      test(`at ${zoom}, ${factor === 2 ? 'centred' : 'left-aligned'}: the box moves by ${factor}·dx`, () => {
-        const { moved } = replay(zoom, 1440, factor, steps);
-        moved.forEach((px, i) => {
-          expect(Math.abs(px - factor * (steps[i] ?? 0))).toBeLessThanOrEqual(
-            1,
-          );
-        });
-      });
-    }
-  }
-
-  test('in Fit the layout width changes by 2·dx/z, not faster', () => {
-    const z = frameZoom('fit', AVAILABLE, 1440, null);
-    const { committed } = replay('fit', 1440, 2, [40]);
-    expect(Math.abs(committed - (1440 + (2 * 40) / z))).toBeLessThanOrEqual(1);
-  });
-
-  test('the committed width is the width the edge shows, drag after drag', () => {
-    let width = 1440;
-    for (const dx of [37, -51, 23, -9, 64]) {
-      const { committed, shown } = replay('fit', width, 2, [dx]);
-      expect(committed).toBe(shown);
-      width = committed;
-    }
-  });
-
-  test('without a drag the zoom is the one in effect', () => {
-    expect(frameZoom('fit', AVAILABLE, 1440, null)).toBe(0.67);
-    expect(frameZoom(0.5, AVAILABLE, 1440, null)).toBe(0.5);
-    expect(frameZoom('fit', AVAILABLE, 2400, { width: 2400, zoom: 0.67 })).toBe(
-      0.67,
-    );
   });
 });
 
