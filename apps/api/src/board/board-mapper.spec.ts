@@ -10,6 +10,7 @@ import {
   recommendationOf,
   restartOf,
   stewardChipOf,
+  takenOf,
 } from './board-mapper';
 
 const now = new Date('2026-10-16T12:00:00.000Z');
@@ -293,5 +294,44 @@ describe('escalationOf (#750 D9)', () => {
       note: 'Needs a schema decision.',
       at: now.toISOString(),
     });
+  });
+});
+
+describe('takenOf (#845 D2, D10)', () => {
+  const alive = { alive: new Set(['ses_live']) };
+
+  it("is a bound card's session, its liveness and the branch it left", () => {
+    expect(
+      takenOf(
+        card({
+          source: 'manual',
+          trackedSessionId: 'ses_live',
+          takenBranch: 'feat/42-login',
+        }),
+        alive,
+      ),
+    ).toEqual({ sessionId: 'ses_live', alive: true, branch: 'feat/42-login' });
+    expect(
+      takenOf(
+        card({
+          source: 'captured',
+          trackedSessionId: 'ses_gone',
+          takenBranch: null,
+        }),
+        alive,
+      ),
+    ).toEqual({ sessionId: 'ses_gone', alive: false, branch: null });
+  });
+
+  it("is null for a session's own terminal card and an unbound card", () => {
+    expect(
+      takenOf(
+        card({ source: 'terminal', trackedSessionId: 'ses_live' }),
+        alive,
+      ),
+    ).toBeNull();
+    expect(
+      takenOf(card({ source: 'manual', trackedSessionId: null }), alive),
+    ).toBeNull();
   });
 });

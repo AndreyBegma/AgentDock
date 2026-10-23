@@ -314,6 +314,20 @@ export class BoardRoundsService {
         'A suggestion runs once it is accepted',
       );
     }
+    // #845 D10 (ADR-0083 §8): a live taking session is the card's worker.
+    const takenBy = card.source !== 'terminal' ? card.trackedSessionId : null;
+    if (takenBy !== null) {
+      const live = await this.prisma.agentSession.count({
+        where: { id: takenBy, endedAt: null },
+      });
+      if (live > 0) {
+        throw boardError(
+          409,
+          BOARD_ERROR.cardRunning,
+          `${cardLabel(card.number)} is taken by a live session`,
+        );
+      }
+    }
     // #480 (ADR-0044): no card of a stack runs before its design is approved.
     await this.stacks.assertStackApproved(card.id);
     // #638 (ADR-0065): an open dependency refuses the Run; nothing overrides
@@ -331,6 +345,14 @@ export class BoardRoundsService {
       autoRunAfter,
       stacked,
     );
+    if (takenBy !== null) {
+      // The Run is the card's worker now; `takenBranch` stays recorded.
+      await this.prisma.boardCard.updateMany({
+        where: { id: card.id, trackedSessionId: takenBy },
+        data: { trackedSessionId: null },
+      });
+      this.work.publish(projectId, card.id);
+    }
     return this.board.detail(projectId, number);
   }
 

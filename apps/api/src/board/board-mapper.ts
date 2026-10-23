@@ -22,6 +22,7 @@ import {
   type CardRoundBrief,
   type CardRoundView,
   type CardStackRef,
+  type CardTakenView,
   type CardTrackingView,
   cardAutoMergeDefault,
   cardCiChecksOf,
@@ -225,6 +226,23 @@ const trackingOf = (
     ? {
         sessionId: card.trackedSessionId,
         alive: facts.alive.has(card.trackedSessionId),
+      }
+    : null;
+
+/**
+ * #845 D2, D10: a card a manual session took (`card.take`) — any bound card
+ * that is not the session's own `terminal` one. "Session ended" once
+ * `alive` is false.
+ */
+export const takenOf = (
+  card: BoardCard,
+  facts: Pick<CardFacts, 'alive'>,
+): CardTakenView | null =>
+  card.source !== 'terminal' && card.trackedSessionId !== null
+    ? {
+        sessionId: card.trackedSessionId,
+        alive: facts.alive.has(card.trackedSessionId),
+        branch: card.takenBranch,
       }
     : null;
 
@@ -471,6 +489,8 @@ export const toCardView = (
   readiness: cardReadiness(card.column, facts.dependencies.get(card.id) ?? []),
   stack: facts.stacks?.get(card.id) ?? null,
   tracking: trackingOf(card, facts),
+  taken: takenOf(card, facts),
+  queuedForSessionId: card.queuedForSessionId,
   fleet: fleetOf(card),
   autoCollect: card.autoCollect,
   movedAt: card.movedAt.toISOString(),

@@ -7,7 +7,6 @@ import {
 import {
   API_EVENT_SOURCE,
   type LocalMethodArgs,
-  type LocalMethodName,
   type LocalMethodResult,
   MANUAL_HANDOFF_EVENT,
   MANUAL_NOTE_EVENT,
@@ -20,6 +19,7 @@ import {
   BoardRoundsService,
   CardNotEscalatable,
 } from '../board/board-rounds.service';
+import { BoardSessionService } from '../board/board-session.service';
 import {
   BoardTerminalService,
   NotAManualSession,
@@ -32,6 +32,10 @@ import { RunnerSettingsService } from '../runners/runner-settings.service';
 import { recordServerEvent } from '../server-events/server-events';
 import { TokenSaverService } from '../token-saver/token-saver.service';
 import { ActionRequestsService } from './action-requests.service';
+import {
+  LocalBoardHandlers,
+  type LocalBoardMethod,
+} from './local-board-handlers';
 import {
   type LocalCall,
   type LocalHandlerTable,
@@ -96,16 +100,6 @@ const budgetLine = (budgets: BudgetRemaining[]): string => {
   return `Budget — ${parts.join('; ')}.`;
 };
 
-/**
- * #845: the Board methods' contract lands before their handlers; until the
- * API's #845 change serves them, they answer `unknown_method`, as a server
- * without them would.
- */
-const notServedYet = (method: LocalMethodName): Promise<never> =>
-  Promise.reject(
-    new LocalError('unknown_method', `${method} is not served yet`),
-  );
-
 const TOOLS_LINE =
   'The agentdock MCP tools read the fleet, queue, budget, approvals, activity and sessions; create and queue issues; post notes; hand work off to the fleet; and request actions a person approves.';
 
@@ -127,9 +121,16 @@ export class LocalHandlers {
     private readonly terminal: BoardTerminalService,
     private readonly tokenSaver: TokenSaverService,
     private readonly rounds: BoardRoundsService,
-  ) {}
+    private readonly sessions: BoardSessionService,
+    boardHandlers: LocalBoardHandlers,
+  ) {
+    // #845: the Board methods have their own handlers.
+    this.table = { ...this.own, ...boardHandlers.table };
+  }
 
-  readonly table: LocalHandlerTable = {
+  readonly table: LocalHandlerTable;
+
+  private readonly own: Omit<LocalHandlerTable, LocalBoardMethod> = {
     'context.sessionStart': (args, call) => this.sessionStart(args, call),
     'fleet.status': (_args, call) => this.fleetStatus(call),
     'queue.list': (args, call) => this.queueList(args.limit, call),
@@ -144,50 +145,51 @@ export class LocalHandlers {
     'handoff.create': (args, call) => this.handoff(args, call),
     'action.request': (args, call) => this.actionRequest(args, call),
     'away.set': (args, call) => this.awaySet(args.on, call),
-    'card.finish': (args, call) =>
-      this.cardFinish(args.summary, args.artifactIncomplete === true, call),
+    'card.finish': (args, call) => this.cardFinish(args, call),
     'card.escalate': (args, call) => this.cardEscalate(args, call),
     'card.track': (args, call) => this.cardTrack(args, call),
-    'board.list': () => notServedYet('board.list'),
-    'board.card': () => notServedYet('board.card'),
-    'board.wait': () => notServedYet('board.wait'),
-    'card.create': () => notServedYet('card.create'),
-    'card.run': () => notServedYet('card.run'),
-    'card.move': () => notServedYet('card.move'),
-    'card.feedback': () => notServedYet('card.feedback'),
-    'card.message': () => notServedYet('card.message'),
-    'card.stop': () => notServedYet('card.stop'),
-    'card.take': () => notServedYet('card.take'),
-    'card.release': () => notServedYet('card.release'),
   };
 
   /**
    * Issue #242 D6: the card worker's `finish_card`. The card is the one whose
    * Claude session asks, in the asking runner's project — never an argument.
+   * #845: a person's session that took a card finishes it, naming the pull
+   * request it opened, and takes its next queued card.
    * #282 D2: a person's session that tracks a card finishes that card.
    * #445 D8: a finish the runner's artifact guard accepted incomplete marks
    * the round's run first, while the round is still active.
    */
   private async cardFinish(
-    summary: string,
-    artifactIncomplete: boolean,
+    args: LocalMethodArgs<'card.finish'>,
     call: LocalCall,
   ): Promise<LocalMethodResult<'card.finish'>> {
     const project = projectOf(call);
     const session = call.session;
     const target = { id: project.id, runnerId: call.runnerId };
-    if (artifactIncomplete && session && session.runtime === 'claude') {
-      await this.tokenSaver.markArtifactIncomplete(target, session.id);
-    }
-    const finished =
-      session && session.runtime === 'claude'
-        ? ((await this.board.finishByWorker(target, session.id, summary)) ??
-          (await this.terminal.finishBySession(target, session.id)))
-        : null;
-    if (!finished) {
+    if (!session || session.runtime !== 'claude') {
       throw new LocalError('not_a_card_session', 'not a board card session');
     }
-    return { number: finished.number, finished: true };
+    if (args.artifactIncomplete === true) {
+      await this.tokenSaver.markArtifactIncomplete(target, session.id);
+    }
+    const worker = await this.board.finishByWorker(
+      target,
+      session.id,
+      args.summary,
+    );
+    if (worker) return { number: worker.number, finished: true };
+    const taken = await this.sessions.finishTaken(
+      { ...target, repo: project.repo },
+      session.id,
+      args.pullRequestUrl,
+      { userId: call.user.id, role: call.role, ctx: call.ctx },
+    );
+    if (taken) return taken;
+    const tracked = await this.terminal.finishBySession(target, session.id);
+    if (!tracked) {
+      throw new LocalError('not_a_card_session', 'not a board card session');
+    }
+    return { number: tracked.number, finished: true };
   }
 
   /**

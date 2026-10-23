@@ -2,6 +2,9 @@ import {
   type ActionRequestKind,
   type ActionRequestSummary,
   boundPrOf,
+  type CardAcceptBoundArgs,
+  cardAcceptArgsOf,
+  cardLabel,
   issueQueueArgsOf,
   type PrApproveBoundArgs,
   prDiffUrl,
@@ -94,8 +97,24 @@ export const actionRequestTitle = (
   if (kind === 'issue_queue' && typeof args.issue === 'number') {
     return `A session asks to queue issue #${args.issue} for the fleet`;
   }
+  // #845: "Accept C-<n> <title>", the card as the API bound it.
+  const card = cardAcceptArgsOf({ kind, args });
+  if (card) {
+    return `Accept ${cardLabel(card.card)} ${card.title.slice(0, 120)}`;
+  }
   return KIND_TITLE[kind];
 };
+
+/**
+ * #845: a `card_accept` request's pull request link, and "and merge #<pr>"
+ * when the approval also merges it.
+ */
+export const cardAcceptLines = (card: CardAcceptBoundArgs): string[] => [
+  ...(card.prUrl ? [card.prUrl] : []),
+  ...(card.merge === true && card.prNumber !== null
+    ? [`and merge #${card.prNumber}`]
+    : []),
+];
 
 /**
  * The notification's body: a `pr_approve` request's PR title and diff come
@@ -112,6 +131,8 @@ export const actionRequestBody = (
   const issue = issueQueueArgsOf({ kind, args });
   if (issue)
     return `#${issue.issue} ${issue.title.slice(0, 120)} · ${issue.url} · ${summary}`;
+  const card = cardAcceptArgsOf({ kind, args });
+  if (card) return [...cardAcceptLines(card), summary].join(' · ');
   return summary;
 };
 

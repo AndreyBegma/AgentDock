@@ -20,9 +20,11 @@ import {
   CARD_BACKGROUND_STALL_MINUTES_MIN,
   CARD_EFFORTS,
   CARD_FEEDBACK_MAX,
+  CARD_MERGE_POLICIES,
   type CaptureModel,
   type CardEffort,
   type CardFeedbackRequest,
+  type CardMergePolicy,
   type CreateBoardCardRequest,
   type CreateBoardStackRequest,
   DESIGN_TEMPLATE_KEY_MAX,
@@ -365,6 +367,11 @@ export class UpdateBoardSettingsDto implements UpdateBoardSettingsRequest {
   @Min(CARD_BACKGROUND_STALL_MINUTES_MIN)
   @Max(CARD_BACKGROUND_STALL_MINUTES_MAX)
   backgroundStallMinutes?: number;
+
+  /** #845 D4: who merges a finished card's pull request. */
+  @IsOptional()
+  @IsIn(CARD_MERGE_POLICIES)
+  cardMergePolicy?: CardMergePolicy;
 }
 
 /** #273 D13: the head the person saw in the accept dialog. */

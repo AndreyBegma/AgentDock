@@ -16,12 +16,14 @@ import { BoardInboxService } from './board-inbox.service';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
 import { BoardRoundsService } from './board-rounds.service';
+import { BoardSessionService } from './board-session.service';
 import { BoardSessionMessages } from './board-session-message.service';
 import { BoardShipping } from './board-shipping';
 import { BoardSink } from './board-sink';
 import { BoardStackRuns } from './board-stack-runs';
 import { BoardStacks } from './board-stacks';
 import { BoardTerminalService } from './board-terminal.service';
+import { BoardWaitService } from './board-wait.service';
 import { BoardWork } from './board-work';
 import { CollectRetryTimer } from './collect-retry-timer';
 
@@ -60,6 +62,9 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardService,
     // #489: a person's message to a card's running session.
     BoardSessionMessages,
+    // #845: a person's session works the Board through MCP.
+    BoardSessionService,
+    BoardWaitService,
     // #359: a card ships itself — CI watched, fixed, merged.
     BoardShipping,
     BoardSink,
@@ -84,8 +89,10 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardRoundsService,
     BoardSessionMessages,
     BoardService,
+    BoardSessionService,
     BoardStacks,
     BoardTerminalService,
+    BoardWaitService,
     BoardWork,
     FleetCardEditsRef,
   ],
