@@ -132,9 +132,59 @@ describe('track-work skill (#282)', () => {
     expect(skill).toContain('not_a_manual_session');
   });
 
-  test('plugin version is bumped for the absolute runner path (C-162)', () => {
+  test('points at take_card for a card that already exists (#845)', () => {
+    expect(skill).toContain('take_card');
+  });
+
+  test('plugin version is bumped for the board skill (#845)', () => {
     const p = readJson(join(pluginDir, '.claude-plugin/plugin.json'));
-    expect(p.version).toBe('0.5.0');
+    expect(p.version).toBe('0.6.0');
+  });
+});
+
+describe('board skill (#845)', () => {
+  const skill = readFileSync(join(pluginDir, 'skills/board/SKILL.md'), 'utf8');
+
+  test('has frontmatter naming the skill, with a description', () => {
+    expect(skill.startsWith('---\n')).toBe(true);
+    const front = skill.split('---')[1] ?? '';
+    expect(front).toContain('name: board');
+    expect(front).toContain('description:');
+  });
+
+  test('states the decisions D1-D7', () => {
+    for (const needle of [
+      'take_card', // D1, D2
+      'maxRunning', // D3
+      'dependency_open',
+      'cardMergePolicy', // D4
+      '.woodpecker/**',
+      'completed_needs_person', // D5
+      'card_accept',
+      'candidate: true', // D6
+      'card_message', // D7
+      'board_wait',
+      'cursor',
+    ]) {
+      expect(skill).toContain(needle);
+    }
+  });
+
+  test('names every Board tool', () => {
+    const tools = [
+      'board_list',
+      'board_card',
+      'board_wait',
+      'card_create',
+      'card_run',
+      'card_move',
+      'card_feedback',
+      'card_message',
+      'card_stop',
+      'take_card',
+      'release_card',
+    ];
+    for (const tool of tools) expect(skill).toContain(tool);
   });
 });
 
