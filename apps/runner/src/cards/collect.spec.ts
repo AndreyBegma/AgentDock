@@ -179,6 +179,31 @@ describe('card.collect (#242 D8)', () => {
     writeFileSync(join(record.worktree, 'notes.md'), 'left over\n');
     expect((await collectCard(deps, record, args)).pushed).toBe(true);
   });
+
+  it('#895: pushes a round whose only new commit merges the base, and reports it as the head', async () => {
+    const { f, record, deps, args, originHead } = await setup();
+    f.write(record.worktree, { 'src/export.ts': 'export const csv = 1;\n' });
+    const pushed = await f.commitAll(record.worktree, 'feat: export as CSV');
+    await collectCard(deps, record, args);
+    expect(await originHead()).toBe(pushed);
+    // The base moves on; the next round only merges it into the branch.
+    f.write(f.root, { 'src/app.txt': 'v2\n' });
+    await f.commitAll(f.root, 'feat: v2');
+    await f.run(f.root, 'push', '-q', 'origin', 'main');
+    await f.run(record.worktree, 'fetch', '-q', 'origin', 'main');
+    await f.run(record.worktree, 'merge', '-q', '--no-edit', 'origin/main');
+    const merge = await f.run(record.worktree, 'rev-parse', 'HEAD');
+    expect(merge).not.toBe(pushed);
+
+    const result = await collectCard(
+      deps,
+      { ...record, pushedHead: pushed },
+      args,
+    );
+
+    expect(result).toMatchObject({ pushed: true, headSha: merge, ahead: 2 });
+    expect(await originHead()).toBe(merge);
+  });
 });
 
 describe('card.collect after the worker rewrote a pushed commit (#630)', () => {
