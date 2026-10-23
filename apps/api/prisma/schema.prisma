@@ -522,6 +522,7 @@ model Project {
   aiSummaries            AiSummary[]
   handoffNotes           HandoffNote[]
   rules                  ProjectRule[]
+  reviewSteps            ProjectReviewStep[]
   telegramLinks          TelegramLink[]
   telegramIntakes        TelegramIntake[]
 
@@ -3794,6 +3795,11 @@ model BoardSettings {
   /// #390: minutes in `background` before `card.background_stalled`; 5–1440,
   /// checked by the DTO.
   backgroundStallMinutes Int             @default(30)
+  /// #862, ADR-0084: a card passes its review steps before Finished. Off for
+  /// every project until a person turns it on.
+  reviewEnabled          Boolean         @default(false)
+  /// #862: mirror review findings as GitHub PR comments; opt-in.
+  publishReviewComments  Boolean         @default(false)
   updatedById            String?
   updatedAt              DateTime        @updatedAt
 
@@ -4433,6 +4439,43 @@ model ProjectRule {
   @@map("project_rules")
 }
 
+// ─── Review steps (issue #862, ADR-0084) ────────────────────────────────────
+
+/// Mirrors `REVIEW_STEP_TYPES` of the shared contract.
+enum ReviewStepType {
+  peer_review
+  skill
+}
+
+/// One step a card's PR passes before Finished, in `position` order. A project
+/// has at most one `peer_review` step (a partial unique index in the
+/// migration): created when review is first enabled, never deleted.
+model ProjectReviewStep {
+  id                      String         @id @default(cuid())
+  projectId               String
+  position                Int
+  enabled                 Boolean        @default(true)
+  /// At most `REVIEW_STEP_NAME_MAX` characters, checked by the DTO.
+  name                    String
+  type                    ReviewStepType
+  /// `peer_review` only: Markdown, at most `REVIEW_INSTRUCTIONS_MAX` characters.
+  instructions            String?
+  /// `skill` only: an invocation of the project's skill inventory.
+  skillName               String?
+  /// When the instructions were last generated from the repository; null
+  /// while they are the built-in default.
+  instructionsGeneratedAt DateTime?
+  /// When a person last edited the instructions.
+  instructionsEditedAt    DateTime?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, position])
+  @@map("project_review_steps")
+}
+
 // ─── LLM gateway (ADR-0059, #598) ───────────────────────────────────────────
 
 /// Mirrors `LLM_PROVIDERS` of the shared contract.
@@ -4452,6 +4495,7 @@ enum LlmFeature {
   triage
   title
   assistant_summary
+  review_instructions
 }
 
 enum LlmCallOutcome {

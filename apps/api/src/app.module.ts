@@ -36,6 +36,7 @@ import { ProjectRulesModule } from './project-rules';
 import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
 import { ReadinessModule } from './readiness';
+import { ReviewModule } from './review';
 import { RunnersModule } from './runners/runners.module';
 import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
@@ -127,6 +128,8 @@ import { WorkflowsModule } from './workflows';
     BudgetsModule,
     // Issue #528: per-project coding rules and their Markdown import.
     ProjectRulesModule,
+    // Issue #862: per-project review steps and generated peer review.
+    ReviewModule,
     // Issue #447: the Steward digest. Global, and here alone: its conditional
     // queue must not be registered while the graph loads.
     StewardDigestModule,

@@ -5,6 +5,7 @@ import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
+import { Disclosure } from '@andrewbehma/glass-ui/disclosure';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
 import { SectionHeader } from '@andrewbehma/glass-ui/section-header';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
@@ -111,7 +112,7 @@ import { useRemoveAttachment } from '../attachments/use-remove-attachment';
 import { PageHeader } from '../page-header/page-header';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { SessionMessageLine } from '../session/session-message-line';
-import { useNarrow } from '../shell/narrow';
+import { useNarrow, useWide } from '../shell/narrow';
 import { PhoneBackBar } from '../shell/phone-back-bar';
 import { useCurrentUser } from '../shell/user-context';
 import { CardStewardSection } from '../steward/card-steward-section';
@@ -167,11 +168,37 @@ interface RoundAttachments {
   onRemove: (attachment: AttachmentView) => void;
 }
 
+/**
+ * A long block of a round on the card page (#874): open at first, and the
+ * person can fold it away.
+ */
+function RoundBlock({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <Disclosure
+      className="w-full"
+      trigger={label}
+      open={open}
+      onOpenChange={setOpen}
+    >
+      {children}
+    </Disclosure>
+  );
+}
+
 function roundItems(
   rounds: CardRoundView[],
   notes: TextNotes,
   canOperate: boolean,
   files: RoundAttachments,
+  /** The card page folds the summary and the breakdown; the sheet shows them bare. */
+  foldable = false,
 ): TimelineItem[] {
   return rounds.map((round) => {
     const cost = formatCost(round.costUsd);
@@ -225,9 +252,17 @@ function roundItems(
             onRemove={files.onRemove}
           />
           {round.summary ? (
-            <span className="whitespace-pre-wrap break-words">
-              {round.summary}
-            </span>
+            foldable ? (
+              <RoundBlock label="Summary">
+                <p className="whitespace-pre-wrap break-words">
+                  {round.summary}
+                </p>
+              </RoundBlock>
+            ) : (
+              <span className="whitespace-pre-wrap break-words">
+                {round.summary}
+              </span>
+            )
           ) : null}
           {round.error ? <PolicyRefusalText text={round.error} /> : null}
           {round.blockingDialog ? (
@@ -251,7 +286,13 @@ function roundItems(
           ) : null}
           {cost ? <span className="tabular-nums">{cost}</span> : null}
           <DescriptionIncompleteBadge incomplete={round.artifactIncomplete} />
-          <FilterBreakdown filters={round.tokenSaverFilters} />
+          {foldable && round.tokenSaverFilters?.length ? (
+            <RoundBlock label="Token saver breakdown">
+              <FilterBreakdown filters={round.tokenSaverFilters} />
+            </RoundBlock>
+          ) : foldable ? null : (
+            <FilterBreakdown filters={round.tokenSaverFilters} />
+          )}
         </span>
       ),
     };
@@ -638,6 +679,7 @@ export function CardDetailBody({
   onClose,
   tab: tabProp,
   onTabChange,
+  wide: wideProp,
 }: {
   layout?: 'sheet' | 'page';
   sheetTitle: string;
@@ -656,8 +698,12 @@ export function CardDetailBody({
    */
   tab?: CardTab;
   onTabChange?: (tab: CardTab) => void;
+  /** Page only: the wide layout. Without it the viewport decides (≥ 1280 px). */
+  wide?: boolean;
 }) {
   const narrow = useNarrow();
+  const viewportWide = useWide();
+  const wide = layout === 'page' && (wideProp ?? viewportWide);
   const [ownTab, setOwnTab] = useState<CardTab>(DEFAULT_CARD_TAB);
   const tab = tabProp ?? ownTab;
   const setTab = onTabChange ?? setOwnTab;
@@ -1134,17 +1180,24 @@ export function CardDetailBody({
         onChanged={onSaved}
       />
     ) : null;
+  const page = layout === 'page';
   const roundsSection = (
     <section aria-label="Rounds" className="flex flex-col gap-2">
       <SectionHeader title="Rounds" headingLevel={3} />
       <Timeline
-        items={roundItems(card.rounds, notes, canOperate, {
-          byRound,
-          user,
-          canRemove: filesEditable,
-          removing,
-          onRemove: (a) => void remove(a),
-        })}
+        items={roundItems(
+          card.rounds,
+          notes,
+          canOperate,
+          {
+            byRound,
+            user,
+            canRemove: filesEditable,
+            removing,
+            onRemove: (a) => void remove(a),
+          },
+          page,
+        )}
         empty={<p className="text-sm text-ink-3">No worker has run yet.</p>}
       />
     </section>
@@ -1376,42 +1429,68 @@ export function CardDetailBody({
   );
 
   if (layout === 'page') {
+    const header = (
+      <PageHeader
+        className="mb-0"
+        eyebrow={`Board card · ${card.label} · ${KIND_LABEL[card.kind]}`}
+        title={card.title}
+        status={
+          pill ? (
+            <StatusPill status={pill.status} label={pill.label} />
+          ) : undefined
+        }
+        meta={
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
+            <span>{COLUMN_TITLE[card.column]}</span>
+            {card.round ? <span>Round {card.rounds.length}</span> : null}
+            <CardPrChip card={card} />
+            {total ? <span className="tabular-nums">{total} spent</span> : null}
+            <span>
+              Created <Time value={card.createdAt} />
+            </span>
+          </div>
+        }
+        actions={
+          canOperate ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {moveButton}
+              {runActions}
+              {actionButtons}
+            </div>
+          ) : (
+            <Badge tone="neutral" label="Read-only · viewer" />
+          )
+        }
+      />
+    );
+    if (wide) {
+      // #874: no tabs. Rounds are the main column, the card's facts sit beside
+      // them, and the edit form closes the page.
+      return (
+        <div className="flex min-w-0 flex-col gap-6">
+          {header}
+          <div
+            data-layout="wide"
+            className="grid min-w-0 grid-cols-[minmax(0,1fr)_22rem] items-start gap-8"
+          >
+            <div className="flex min-w-0 flex-col gap-8">
+              {card.rounds.length > 0 ? roundsSection : null}
+              {cardForm}
+            </div>
+            <aside
+              aria-label="Card facts"
+              className="sticky top-4 flex min-w-0 flex-col gap-6"
+            >
+              {overview}
+              {hasFiles ? attachmentsSection : null}
+            </aside>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex min-w-0 flex-col gap-6">
-        <PageHeader
-          className="mb-0"
-          eyebrow={`Board card · ${card.label} · ${KIND_LABEL[card.kind]}`}
-          title={card.title}
-          status={
-            pill ? (
-              <StatusPill status={pill.status} label={pill.label} />
-            ) : undefined
-          }
-          meta={
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
-              <span>{COLUMN_TITLE[card.column]}</span>
-              {card.round ? <span>Round {card.rounds.length}</span> : null}
-              <CardPrChip card={card} />
-              {total ? (
-                <span className="tabular-nums">{total} spent</span>
-              ) : null}
-              <span>
-                Created <Time value={card.createdAt} />
-              </span>
-            </div>
-          }
-          actions={
-            canOperate ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {moveButton}
-                {runActions}
-                {actionButtons}
-              </div>
-            ) : (
-              <Badge tone="neutral" label="Read-only · viewer" />
-            )
-          }
-        />
+        {header}
         {tabs}
       </div>
     );
@@ -1440,7 +1519,7 @@ export function CardDetailBody({
               <NextLink
                 href={pageHref}
                 className={buttonClassName({
-                  variant: 'ghost',
+                  variant: 'glass',
                   size: 'sm',
                   className: 'ms-auto',
                 })}

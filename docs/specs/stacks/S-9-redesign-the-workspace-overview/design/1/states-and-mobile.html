@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overview · States and mobile</title>
+<style>
+:root{color-scheme:dark;--font-sans:'SF Pro Text','SF Pro Display','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--dur-fast:100ms}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240 / 0.16);--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246 / 0.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / 0.18);--color-hue-2-ink:#7ee0c0;--color-hue-4:#e69f00;--color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110 / 0.18);--color-hue-6-ink:#ff9da5;--color-hue-7:#a68bfa;--color-hue-8:#cc79a7;--canvas-glow:18%;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-clear:rgb(0 0 0 / 0.15)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154 / 0.12);--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214 / 0.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / 0.12);--color-hue-2-ink:#006a4e;--color-hue-4:#b36b00;--color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62 / 0.12);--color-hue-6-ink:#ad1f31;--color-hue-7:#7244e0;--color-hue-8:#b0457f;--canvas-glow:10%;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-clear:rgb(0 0 0 / 0.08)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground)}
+body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:20px;color:var(--color-ink);-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--font-mono);font-size:0.92em}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+svg.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;height:28px;padding:0 14px;border-radius:6px;border:0;font:inherit;font-size:14px;font-weight:600}
+.btn-glass{background:var(--color-raised);color:var(--color-ink);border:1px solid var(--color-line-strong)}
+.btn-sm{height:24px;padding:0 10px;font-size:12px;border-radius:4px}
+.btn-link{height:auto;padding:0;background:none;color:var(--color-accent-ink);font-weight:500;font-size:13px}
+.badge{display:inline-flex;align-items:center;justify-content:center;font-weight:600;line-height:1;border-radius:999px;height:20px;min-width:20px;padding:0 6px;font-size:12px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.pill{--s:var(--color-ink-3);--s-soft:var(--color-hover);--s-ink:var(--color-ink-2);display:inline-flex;flex-shrink:0;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;background:var(--s-soft);color:var(--s-ink);border:1px solid color-mix(in oklab,var(--s) 45%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--s)}
+.pill-running{--s:var(--color-hue-2);--s-soft:var(--color-hue-2-soft);--s-ink:var(--color-hue-2-ink)}
+.pill-waiting{--s:var(--color-hue-1);--s-soft:var(--color-hue-1-soft);--s-ink:var(--color-hue-1-ink)}
+.pill-error{--s:var(--color-hue-6);--s-soft:var(--color-hue-6-soft);--s-ink:var(--color-hue-6-ink)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;flex-shrink:0;background:var(--color-ink-3)}
+.skeleton{display:block;border-radius:6px;background:linear-gradient(90deg,var(--color-hover) 25%,color-mix(in oklab,var(--color-ink) 10%,transparent) 50%,var(--color-hover) 75%);background-size:200% 100%;animation:sk 1.4s ease-in-out infinite}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skeleton{animation:none}}
+.wrap{display:grid;grid-template-columns:375px minmax(0,1fr);gap:32px;padding:24px;align-items:start}
+.cap{font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-ink-3);margin:0 0 8px}
+.phone{position:relative;width:375px;height:812px;overflow:hidden;border-radius:32px;border:1px solid var(--color-line-strong);background:var(--color-ground)}
+.phone-scroll{height:100%;overflow-y:auto;padding:8px 16px 96px;display:flex;flex-direction:column;gap:14px}
+.ptop{display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 12px;border-radius:8px;flex-shrink:0}
+.ptop b{flex:1;font-size:15px}
+.ph1{font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.02em;margin:4px 0 0}
+.mstrip{display:flex;gap:0;overflow-x:auto;border-radius:8px;scrollbar-width:none;flex-shrink:0}
+.mstrip div{flex:0 0 auto;min-width:104px;padding:8px 12px;border-left:1px solid var(--color-line);display:flex;flex-direction:column}
+.mstrip div:first-child{border-left:0}
+.mstrip .l{font-size:11px;color:var(--color-ink-3)}.mstrip .v{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.sec{display:flex;flex-direction:column;gap:6px}
+.sh{display:flex;align-items:center;justify-content:space-between}
+.sh h2{margin:0;font-size:16px;line-height:24px;font-weight:600;display:flex;align-items:center;gap:8px}
+.box{border-radius:8px;overflow:hidden}
+.gh{padding:5px 12px;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-ink-3);background:color-mix(in oklab,var(--color-ink) 3%,transparent);display:flex;align-items:center;gap:6px;border-top:1px solid var(--color-line)}
+.gh:first-child{border-top:0}
+.r{display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 12px;border-top:1px solid var(--color-line)}
+.r .m{flex:1;min-width:0}
+.r .t{font-weight:500;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r .s{font-size:12px;color:var(--color-ink-3);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}
+.capsule{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:2px;padding:6px;border-radius:999px}
+.capsule a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;border-radius:999px;font-size:11px;color:var(--color-ink-2);text-decoration:none}
+.capsule a[aria-current="page"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.fab{position:absolute;right:16px;bottom:22px;width:44px;height:44px;border-radius:999px;display:grid;place-items:center;background:var(--color-accent);color:var(--color-on-accent);box-shadow:0 8px 24px var(--glass-shadow)}
+.states{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.state{display:flex;flex-direction:column;gap:6px}
+.empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:32px 20px;text-align:center;border-radius:8px}
+.empty svg{width:20px;height:20px;color:var(--color-ink-3)}
+.empty .tt{margin:0;font-size:14px;font-weight:500}
+.empty .dd{margin:0;max-width:22rem;font-size:13px;color:var(--color-ink-2)}
+.unav{display:flex;align-items:flex-start;gap:10px;padding:14px;border-radius:8px}
+.strip5{display:grid;grid-template-columns:repeat(5,1fr);border-radius:8px;overflow:hidden}
+.strip5 div{padding:8px 12px;border-left:1px solid var(--color-line);display:flex;flex-direction:column;gap:3px}
+.strip5 div:first-child{border-left:0}
+.strip5 .l{font-size:11px;color:var(--color-ink-3)}.strip5 .v{font-size:18px;font-weight:600}.strip5 .h{font-size:11px;color:var(--color-ink-2)}
+.wide{grid-column:1 / -1}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="wrap">
+  <div>
+    <p class="cap">Phone · 375px</p>
+    <div class="phone">
+      <div class="phone-scroll">
+        <header class="ptop glass"><b>Overview</b><span class="dot" style="background:var(--color-ok)"></span><span class="btn" style="width:32px;padding:0" aria-label="Search"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span><span class="btn" style="width:32px;padding:0" aria-label="Notifications"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span></header>
+        <div><h1 class="ph1">Overview</h1><div class="ink-2" style="font-size:13px">5 projects · 9 slots running</div></div>
+        <div class="mstrip surface-content" aria-label="Today, scrolls sideways">
+          <div><span class="l">Waiting on you</span><span class="v" style="color:var(--color-warn)">4</span></div>
+          <div><span class="l">Running</span><span class="v">9</span></div>
+          <div><span class="l">Ready</span><span class="v">3</span></div>
+          <div><span class="l">Cost today</span><span class="v">$38.40</span></div>
+          <div><span class="l">Merged</span><span class="v">6</span></div>
+        </div>
+        <section class="sec"><div class="sh"><h2>Needs you <span class="badge badge-warn">9</span></h2><a class="btn btn-link" href="#">All</a></div>
+          <div class="box surface-content">
+            <div class="gh"><span class="dot" style="background:var(--color-danger)"></span>Blocking · 2</div>
+            <div class="r"><div class="m"><div class="t">CI failing on develop</div><div class="s"><span class="swatch" style="background:var(--color-hue-1)"></span>Nautelle · 14 min</div></div><span class="btn btn-glass btn-sm" style="height:32px">Open run</span></div>
+            <div class="r"><div class="m"><div class="t">Orchestrator stopped</div><div class="s"><span class="swatch" style="background:var(--color-hue-7)"></span>glass-ui · 41 min</div></div><span class="btn btn-glass btn-sm" style="height:32px">Restart</span></div>
+            <div class="gh"><span class="dot" style="background:var(--color-warn)"></span>Waiting on you · 2</div>
+            <div class="r"><div class="m"><div class="t">Approve: run migration on staging</div><div class="s"><span class="swatch" style="background:var(--color-hue-1)"></span>Nautelle · slot-4 · 6 min</div></div><span class="btn btn-glass btn-sm" style="height:32px">Review</span></div>
+            <div class="gh"><span class="dot" style="background:var(--color-info)"></span>Setup · 5</div>
+            <div class="r"><div class="m"><div class="t">Terminal not set up in 4 projects</div><div class="s">glass-ui, landing, code-sentinel, wiki</div></div><span class="btn btn-glass btn-sm" style="height:32px">Set up</span></div>
+          </div>
+        </section>
+        <section class="sec"><div class="sh"><h2>Live sessions <span class="badge">9</span></h2><a class="btn btn-link" href="#">Fleet</a></div>
+          <div class="box surface-content">
+            <div class="r" style="border-top:0"><span class="dot" style="background:var(--color-hue-1)"></span><div class="m"><div class="t"><span class="mono ink-3">C-341</span> Live sessions on Overview</div><div class="s">Nautelle · Claude Code · 18 min</div></div><span class="pill pill-running">Running</span></div>
+            <div class="r"><span class="dot" style="background:var(--color-hue-4)"></span><div class="m"><div class="t"><span class="mono ink-3">C-337</span> Roll usage up by day</div><div class="s">Nautelle · Claude Code · 1 h 4</div></div><span class="pill pill-waiting">Approval</span></div>
+          </div>
+        </section>
+        <section class="sec"><div class="sh"><h2>Projects <span class="badge">5</span></h2><a class="btn btn-link" href="#">All</a></div>
+          <div class="box surface-content">
+            <div class="r" style="border-top:0"><span class="swatch" style="background:var(--color-hue-1)"></span><div class="m"><div class="t">Nautelle</div><div class="s">5 live · $124 / 7 d</div></div><span class="pill pill-running">Running</span></div>
+            <div class="r"><span class="swatch" style="background:var(--color-hue-7)"></span><div class="m"><div class="t">glass-ui</div><div class="s">1 live · $41 / 7 d</div></div><span class="pill pill-error">Stopped</span></div>
+          </div>
+        </section>
+      </div>
+      <nav class="capsule glass" aria-label="Main">
+        <a href="#" aria-current="page"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Overview</a>
+        <a href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3"/></svg>Projects</a>
+        <a href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Activity</a>
+        <a href="#"><svg class="icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>More</a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="states">
+    <div class="state wide"><p class="cap">Loading · first paint, strip and blocks</p>
+      <div class="strip5 surface-content">
+        <div><span class="l">Waiting on you</span><span class="skeleton" style="height:22px;width:32px"></span><span class="skeleton" style="height:10px;width:70%"></span></div>
+        <div><span class="l">Running slots</span><span class="skeleton" style="height:22px;width:32px"></span><span class="skeleton" style="height:10px;width:60%"></span></div>
+        <div><span class="l">Ready issues</span><span class="skeleton" style="height:22px;width:32px"></span><span class="skeleton" style="height:10px;width:50%"></span></div>
+        <div><span class="l">Cost today</span><span class="skeleton" style="height:22px;width:64px"></span><span class="skeleton" style="height:10px;width:80%"></span></div>
+        <div><span class="l">PRs merged today</span><span class="skeleton" style="height:22px;width:32px"></span><span class="skeleton" style="height:10px;width:50%"></span></div>
+      </div>
+    </div>
+    <div class="state"><p class="cap">Needs you · empty</p>
+      <div class="empty surface-content"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><p class="tt">Nothing needs you</p><p class="dd">No blockers, approvals or setup steps right now. New ones show up here as they arrive.</p><span class="btn btn-glass">Open Activity</span></div>
+    </div>
+    <div class="state"><p class="cap">Live sessions · loading</p>
+      <div class="box surface-content">
+        <div class="r" style="border-top:0"><span class="skeleton" style="width:8px;height:8px;border-radius:999px"></span><div class="m" style="display:flex;flex-direction:column;gap:6px"><span class="skeleton" style="height:12px;width:70%"></span><span class="skeleton" style="height:10px;width:40%"></span></div><span class="skeleton" style="height:20px;width:64px;border-radius:999px"></span></div>
+        <div class="r"><span class="skeleton" style="width:8px;height:8px;border-radius:999px"></span><div class="m" style="display:flex;flex-direction:column;gap:6px"><span class="skeleton" style="height:12px;width:60%"></span><span class="skeleton" style="height:10px;width:35%"></span></div><span class="skeleton" style="height:20px;width:64px;border-radius:999px"></span></div>
+        <div class="r"><span class="skeleton" style="width:8px;height:8px;border-radius:999px"></span><div class="m" style="display:flex;flex-direction:column;gap:6px"><span class="skeleton" style="height:12px;width:75%"></span><span class="skeleton" style="height:10px;width:45%"></span></div><span class="skeleton" style="height:20px;width:64px;border-radius:999px"></span></div>
+      </div>
+    </div>
+    <div class="state"><p class="cap">Live sessions · empty</p>
+      <div class="empty surface-content"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><p class="tt">No agents running</p><p class="dd">3 issues are ready. Start an orchestrator to pick them up.</p><span class="btn btn-glass">Open Queue</span></div>
+    </div>
+    <div class="state"><p class="cap">Recent activity · error (section unavailable)</p>
+      <div class="unav surface-content" role="status"><svg class="icon" viewBox="0 0 24 24" style="color:var(--color-warn);margin-top:2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg><div style="flex:1"><div style="font-weight:500">Activity is not answering</div><div class="ink-2" style="font-size:13px">The rest of the Overview is live. Retrying in 30 s.</div></div><span class="btn btn-glass btn-sm">Retry</span></div>
+    </div>
+    <div class="state"><p class="cap">Projects · partial (one project not answering)</p>
+      <div class="box surface-content">
+        <div class="r" style="border-top:0"><span class="swatch" style="background:var(--color-hue-1)"></span><div class="m"><div class="t">Nautelle</div><div class="s">5 live · $124 / 7 d</div></div><span class="pill pill-running">Running</span></div>
+        <div class="r"><span class="swatch" style="background:var(--color-hue-4)"></span><div class="m"><div class="t">landing</div><div class="s">Fleet is not answering · spend —</div></div><span class="pill">Unknown</span></div>
+      </div>
+    </div>
+    <div class="state"><p class="cap">Projects · empty workspace</p>
+      <div class="empty surface-content"><svg class="icon" viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3"/></svg><p class="tt">No projects yet</p><p class="dd">Connect a repository and a runner to start a fleet.</p><span class="btn btn-glass">Add project</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
