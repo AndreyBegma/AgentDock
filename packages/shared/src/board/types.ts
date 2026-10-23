@@ -66,13 +66,15 @@ export const isMirroredCardSource = (
 /**
  * D4: what started a round. `ci_fix` (#359 D6) is Nautelle's own round for a
  * red check or a merge conflict on the card's PR; `escalation` (#750 D9) is
- * the relaunch on Opus after the worker's `escalate_card`.
+ * the relaunch on Opus after the worker's `escalate_card`; `review_fix`
+ * (#884, ADR-0084) is Nautelle's own round for blocking review findings.
  */
 export const CARD_ROUND_TRIGGERS = [
   'run',
   'feedback',
   'ci_fix',
   'escalation',
+  'review_fix',
 ] as const;
 export type CardRoundTrigger = (typeof CARD_ROUND_TRIGGERS)[number];
 
@@ -199,7 +201,9 @@ export const CARD_CI_MISSING_MS = 5 * 60_000;
  * the base (#709): `forward_conflict` when that PR conflicts with the base,
  * `forward_failed` when it could not be opened. Auto-merge refuses a head
  * whose checks are not all passed — none, cancelled or skipped ones —
- * with `ci_not_green` (C-182).
+ * with `ci_not_green` (C-182). A review step still reports blocking
+ * findings after the review fix budget (`review_still_blocking`), or a step
+ * could not run or never reported (`review_failed`) (#884, ADR-0084).
  */
 export const CARD_NEEDS_PERSON_REASONS = [
   'ci_still_failing',
@@ -211,6 +215,8 @@ export const CARD_NEEDS_PERSON_REASONS = [
   'branch_diverged',
   'forward_conflict',
   'forward_failed',
+  'review_still_blocking',
+  'review_failed',
 ] as const;
 export type CardNeedsPersonReason = (typeof CARD_NEEDS_PERSON_REASONS)[number];
 

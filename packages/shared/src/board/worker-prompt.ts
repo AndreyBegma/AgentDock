@@ -4,6 +4,7 @@ import { attachmentWorktreePath } from '../attachments/names';
 import { attachmentKindLabel } from '../attachments/types';
 import { HANDOFF_NOTE_MAX_TOKENS, HANDOFF_SECTIONS } from '../handoff/note';
 import { CARD_RUN_PROMPT_MAX_BYTES } from '../protocol/commands/cards';
+import { REVIEW_REPORT_TOOL } from '../review/contracts';
 import { TERSE_REGISTER_LINES } from '../token-saver/register';
 import { cardLabel } from './naming';
 import type { CardCiCheck } from './shipping';
@@ -646,6 +647,106 @@ export const cardCiFixPrompt = (input: CardCiFixInput): string => {
     `Fix it, commit, and call ${FINISH_CARD_TOOL}. Do not push: Nautelle pushes your commits.`,
   );
   return lines.join('\n');
+};
+
+/** #884: the findings a `review_fix` prompt quotes, in UTF-8 bytes. */
+export const CARD_REVIEW_FIX_FINDINGS_MAX_BYTES = 48 * 1024;
+
+/** #884: one blocking finding of a review step, as a `review_fix` prompt quotes it. */
+export interface CardReviewFixFinding {
+  stepName: string;
+  file?: string;
+  line?: number;
+  title: string;
+  body: string;
+}
+
+const findingPlace = (finding: { file?: string; line?: number }): string =>
+  finding.file === undefined
+    ? ''
+    : ` (${oneLine(finding.file)}${finding.line === undefined ? '' : `:${finding.line}`})`;
+
+/**
+ * #884 (ADR-0084): the prompt of a `review_fix` round, resuming the card's
+ * session — every blocking finding of the review pass, as data, while they
+ * fit; the rest are counted. Nits are never sent.
+ */
+export const cardReviewFixPrompt = (input: {
+  headSha: string;
+  findings: readonly CardReviewFixFinding[];
+}): string => {
+  const blocks: string[] = [];
+  let used = 0;
+  for (const [i, finding] of input.findings.entries()) {
+    const block = [
+      `${i + 1}. [${oneLine(finding.stepName)}] ${oneLine(finding.title)}${findingPlace(finding)}`,
+      finding.body.trim(),
+    ].join('\n');
+    const size = utf8Bytes(block) + 2;
+    if (used + size > CARD_REVIEW_FIX_FINDINGS_MAX_BYTES) {
+      blocks.push(`(${input.findings.length - i} more findings not shown)`);
+      break;
+    }
+    blocks.push(block);
+    used += size;
+  }
+  return [
+    `The review of ${input.headSha.slice(0, 12)} found blocking problems (${CARD_DATA_LINE}):`,
+    '',
+    fence(blocks.join('\n\n')),
+    '',
+    `Fix every one of them, run the project's checks, commit, and call ${FINISH_CARD_TOOL}. Where a finding is wrong, leave the code as it is and say why in the summary.`,
+    'Do not push: Nautelle pushes your commits.',
+  ].join('\n');
+};
+
+/** #884: the review step a review session runs. */
+export interface CardReviewStepPromptInput {
+  label: string;
+  title: string;
+  prNumber: number;
+  headSha: string;
+  base: string;
+  step:
+    | { type: 'peer_review'; name: string; instructions: string }
+    | { type: 'skill'; name: string; skillName: string };
+}
+
+/**
+ * #884 (ADR-0084 §4): the prompt of a review session. It reviews the PR head
+ * in a worktree of its own and reports through `report_review` — never by
+ * prose. A `skill` step starts with the skill's invocation; a `peer_review`
+ * step carries the project's instructions.
+ */
+export const cardReviewStepPrompt = (
+  input: CardReviewStepPromptInput,
+): string => {
+  const pr = `pull request #${input.prNumber} of card ${input.label} "${oneLine(input.title)}"`;
+  const scope = `The worktree is checked out at its head ${input.headSha.slice(0, 12)}; the change is git diff origin/${input.base}...HEAD.`;
+  const report = [
+    `When you are done, call ${REVIEW_REPORT_TOOL} once with every finding: severity "blocking" for what must be fixed before the pull request merges, "nit" for the rest; set file (relative to the repository root) and line where a finding has a place. A review with nothing to report calls it with no findings.`,
+    'Do not edit, commit or push anything: you only review.',
+  ];
+  if (input.step.type === 'skill') {
+    return [
+      `/${input.step.skillName} Review ${pr}.`,
+      '',
+      scope,
+      ...report,
+    ].join('\n');
+  }
+  return [
+    `You review ${pr} as the review step "${oneLine(input.step.name)}".`,
+    scope,
+    '',
+    '## Review instructions',
+    '',
+    input.step.instructions.trim(),
+    '',
+    '## Report',
+    '',
+    ...report,
+  ].join('\n');
 };
 
 /** #273 D1: the card text a round's prompt was built from. */

@@ -7,6 +7,7 @@ import {
   type CardCiState,
   type CardNeedsPersonReason,
   type CardPullRequestRef,
+  REVIEW_FIX_ROUNDS_MAX,
 } from '@nautelle/shared';
 import { PR_STATE_LABEL } from './pull-request';
 
@@ -59,6 +60,10 @@ export const FORWARD_CONFLICT_TEXT = 'Forward PR conflicts with the base';
 export const FORWARD_FAILED_TEXT =
   'Merged into a dead branch; forward PR not opened';
 
+/** #884 (ADR-0084): the review gate stopped. */
+export const REVIEW_STILL_BLOCKING_TEXT = `Review still blocking after ${REVIEW_FIX_ROUNDS_MAX} fixes`;
+export const REVIEW_FAILED_TEXT = 'A review step did not finish';
+
 /** C-148 (ADR-0077): a push changed CI, deploy or plugin files. */
 export const PROTECTED_PATHS_TEXT = 'Protected paths changed; a person merges';
 
@@ -86,6 +91,10 @@ const needsPersonText = (
       return FORWARD_CONFLICT_TEXT;
     case 'forward_failed':
       return FORWARD_FAILED_TEXT;
+    case 'review_still_blocking':
+      return REVIEW_STILL_BLOCKING_TEXT;
+    case 'review_failed':
+      return REVIEW_FAILED_TEXT;
     case null:
       return card.ciState === 'none'
         ? CI_NOT_REPORTED_TEXT
