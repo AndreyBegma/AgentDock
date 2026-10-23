@@ -1,12 +1,19 @@
 import {
   ACTION_REQUEST_SUMMARY_MAX,
+  CARD_EFFORTS,
   CARD_ESCALATION_NOTE_MAX,
   CARD_ESCALATION_REASONS,
+  CARD_RECOMMENDABLE_MODELS,
   ESCALATE_CARD_TOOL,
   requestableActionRequestKindSchema,
 } from '@nautelle/shared';
 import {
+  BOARD_WAIT_TIMEOUT_MAX_SEC,
+  LOCAL_BOARD_COLUMNS,
+  LOCAL_BOARD_WAIT_CARDS_MAX,
+  LOCAL_BOARD_WAIT_CURSOR_MAX,
   LOCAL_CARD_BODY_MAX,
+  LOCAL_CARD_FEEDBACK_MAX,
   LOCAL_CARD_KINDS,
   LOCAL_CARD_SUMMARY_MAX,
   LOCAL_CARD_TITLE_MAX,
@@ -41,6 +48,16 @@ const limit = z
   .max(50)
   .optional()
   .describe('How many items, 1–50 (default 10).');
+
+const cardNumber = z
+  .number()
+  .int()
+  .positive()
+  .describe('The card’s per-project number: C-42 is 42.');
+
+/** #845 D9: said by every control tool. */
+const MANUAL_ONLY =
+  'Only for a person’s own terminal session and an operator or better; a card session is refused not_a_manual_session, a viewer forbidden.';
 
 export const MCP_TOOLS = [
   {
@@ -123,14 +140,14 @@ export const MCP_TOOLS = [
   {
     name: 'request_action',
     description:
-      'Ask a person to approve something you may not do yourself: starting or stopping the orchestrator, or approving a pull request. Returns a request; poll it with action_status.',
+      'Ask a person to approve something you may not do yourself: starting or stopping the orchestrator, approving a pull request, or accepting a Finished board card into Completed (card_accept). Returns a request; poll it with action_status.',
     method: 'action.request',
     input: {
       kind: requestableActionRequestKindSchema,
       args: z
         .record(z.string(), z.unknown())
         .describe(
-          'orchestrator_start: {mode?: "start"|"next"}; orchestrator_stop: {}; pr_approve: {pr: number}; tool_use: {toolName: string}.',
+          'orchestrator_start: {mode?: "start"|"next"}; orchestrator_stop: {}; pr_approve: {pr: number}; tool_use: {toolName: string}; card_accept: {card: number, merge?: boolean} — merge also merges the card’s pull request while it is open.',
         ),
       summary: z.string().min(1).max(ACTION_REQUEST_SUMMARY_MAX),
     },
@@ -144,7 +161,7 @@ export const MCP_TOOLS = [
   {
     name: 'finish_card',
     description:
-      'Only for the worker of a Nautelle board card: report the card done, with a summary of what changed. Nautelle then opens or updates the pull request. Any other session is refused (not_a_card_session).',
+      'For the worker of a Nautelle board card: report the card done, with a summary of what changed. Nautelle then opens or updates the pull request. For a manual session that took a card (take_card): you pushed and opened the pull request yourself, so pass pullRequestUrl; the card moves to Finished with it recorded and the answer carries the next queued card, if any. Any other session is refused (not_a_card_session).',
     method: 'card.finish',
     input: {
       summary: z
@@ -152,7 +169,158 @@ export const MCP_TOOLS = [
         .min(1)
         .max(LOCAL_CARD_SUMMARY_MAX)
         .describe('What was done on the card, for the pull request body.'),
+      pullRequestUrl: z
+        .url({ protocol: /^https$/ })
+        .optional()
+        .describe(
+          'Only for a card you took with take_card: the https GitHub URL of the pull request you opened. A card worker’s finish ignores it.',
+        ),
     },
+  },
+  {
+    name: 'board_list',
+    description:
+      'The Board of this project: its settings (merge policy, maxRunning, active rounds) and the cards in board order, with number, title, kind, column, running round, pull request state and CI state. Optional column filter. Read tool: any session of the project may call it.',
+    method: 'board.list',
+    untrusted: true,
+    input: {
+      column: z
+        .enum(LOCAL_BOARD_COLUMNS)
+        .optional()
+        .describe('Only the cards of this column.'),
+    },
+  },
+  {
+    name: 'board_card',
+    description:
+      'One board card in full: body, dependencies, a summary of its rounds, pull request, CI and the question its session is waiting on, if any. Read tool: any session of the project may call it.',
+    method: 'board.card',
+    untrusted: true,
+    input: { card: cardNumber },
+  },
+  {
+    name: 'board_wait',
+    description: `Wait for the board to change. Returns the events after cursor — a card changed column, a round ended, CI changed, a pull request merged, a card session waits on a question (with its text and options) — on the first event, or empty at timeoutSec (up to ${BOARD_WAIT_TIMEOUT_MAX_SEC}; reaching it is not an error), always with the next cursor. Without a cursor it starts from now. Pass the returned cursor to the next call; it survives a context compaction. Read tool: any session of the project may call it.`,
+    method: 'board.wait',
+    untrusted: true,
+    input: {
+      cursor: z
+        .string()
+        .min(1)
+        .max(LOCAL_BOARD_WAIT_CURSOR_MAX)
+        .optional()
+        .describe('The cursor of the previous board_wait; omit to start now.'),
+      cards: z
+        .array(cardNumber)
+        .min(1)
+        .max(LOCAL_BOARD_WAIT_CARDS_MAX)
+        .optional()
+        .describe(
+          'Only these cards; default every card outside Inbox and Completed.',
+        ),
+      timeoutSec: z
+        .number()
+        .int()
+        .min(0)
+        .max(BOARD_WAIT_TIMEOUT_MAX_SEC)
+        .optional()
+        .describe(
+          `Seconds to wait in total, 0–${BOARD_WAIT_TIMEOUT_MAX_SEC} (default ${BOARD_WAIT_TIMEOUT_MAX_SEC}).`,
+        ),
+    },
+  },
+  {
+    name: 'card_create',
+    description: `Create a board card. On the person’s explicit request it goes to the top of To Do; with candidate: true (a card you propose on your own) it goes to the Inbox. ${MANUAL_ONLY}`,
+    method: 'card.create',
+    input: {
+      title: z
+        .string()
+        .trim()
+        .min(1)
+        .max(LOCAL_CARD_TITLE_MAX)
+        .describe('A short title, like an issue title.'),
+      body: z
+        .string()
+        .max(LOCAL_CARD_BODY_MAX)
+        .optional()
+        .describe('What and why; markdown.'),
+      kind: z.enum(LOCAL_CARD_KINDS).optional(),
+      candidate: z
+        .boolean()
+        .optional()
+        .describe('True to put the card in the Inbox as a proposal.'),
+    },
+  },
+  {
+    name: 'card_run',
+    description: `Start a Board Run of a card: a dedicated worktree and card session. The Board’s refusals come back unchanged — dependency_open, design_not_approved, stack_design_not_approved, budget_exceeded, max_running — obey them, never work around them. ${MANUAL_ONLY}`,
+    method: 'card.run',
+    input: {
+      card: cardNumber,
+      model: z.enum(CARD_RECOMMENDABLE_MODELS).optional(),
+      effort: z.enum(CARD_EFFORTS).optional(),
+    },
+  },
+  {
+    name: 'card_move',
+    description: `Move a card to a column, at index (0 is the top; default the bottom). Moving to completed is refused completed_needs_person: only a person accepts a card — use request_action with card_accept. Other board refusals (move_refused) come back with the Board’s message. ${MANUAL_ONLY}`,
+    method: 'card.move',
+    input: {
+      card: cardNumber,
+      column: z.enum(LOCAL_BOARD_COLUMNS),
+      index: z.number().int().min(0).optional(),
+    },
+  },
+  {
+    name: 'card_feedback',
+    description: `Send feedback on a Finished card (red CI, review findings): starts a feedback round of its session. ${MANUAL_ONLY}`,
+    method: 'card.feedback',
+    input: {
+      card: cardNumber,
+      text: z.string().trim().min(1).max(LOCAL_CARD_FEEDBACK_MAX),
+    },
+  },
+  {
+    name: 'card_message',
+    description: `Message a card’s running session: kind text sends text; kind option answers its question selector by option index, kind other by free text — both need the questionKey from board_wait or board_card. The outcome says what became of it (sent, answered, no_session, question, question_changed, not_at_input, no_option). ${MANUAL_ONLY}`,
+    method: 'card.message',
+    input: {
+      card: cardNumber,
+      kind: z.enum(['text', 'option', 'other']),
+      text: z.string().optional().describe('For kind text and other.'),
+      questionKey: z
+        .string()
+        .optional()
+        .describe('For kind option and other: the key of the question.'),
+      index: z
+        .number()
+        .int()
+        .min(1)
+        .max(99)
+        .optional()
+        .describe('For kind option: the option’s number on screen, 1-based.'),
+    },
+  },
+  {
+    name: 'card_stop',
+    description: `Stop a card’s running round. ${MANUAL_ONLY}`,
+    method: 'card.stop',
+    input: { card: cardNumber },
+  },
+  {
+    name: 'take_card',
+    description: `Take a card to work on yourself, in your current checkout: a To Do card (or an In progress one whose taking session ended) moves to In progress, bound to this session. You push and open the pull request yourself, then call finish_card with pullRequestUrl. If you already hold a card, this one is queued for you and the answer says so (state: queued). card_taken: another live session holds it or a Board Run is active. ${MANUAL_ONLY}`,
+    method: 'card.take',
+    untrusted: true,
+    input: { card: cardNumber },
+  },
+  {
+    name: 'release_card',
+    description: `Give a card you took or queued back: it returns to To Do and its binding and queue marker are cleared; releasing the held card takes the next queued one. not_taken: this session neither holds nor queued it. ${MANUAL_ONLY}`,
+    method: 'card.release',
+    untrusted: true,
+    input: { card: cardNumber },
   },
   {
     name: 'track_card',
