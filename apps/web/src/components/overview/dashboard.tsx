@@ -40,7 +40,7 @@ export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
         <div className="flex min-w-0 flex-col gap-6">
           <NeedsYou facts={facts} waiting={waiting} setup={setup} />
           <LiveSessions />
-          <RecentActivity />
+          <RecentActivity projects={projects} recent={dashboard.recent} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
           <ProjectsPanel
@@ -48,7 +48,7 @@ export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
             facts={facts}
             needsByProject={needsByProject}
           />
-          <SpendTrend />
+          <SpendTrend spend={dashboard.spend} />
         </div>
       </div>
     </div>
