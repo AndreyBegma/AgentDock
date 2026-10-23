@@ -92,6 +92,44 @@ describe('board collect (e2e, #329)', () => {
     expect(w.retries).toEqual([]);
   });
 
+  it('#895: a round whose only new commit merges the base reports its head; a round with none reports nothing new', async () => {
+    const FIRST = 'a'.repeat(40);
+    const MERGE = 'c'.repeat(40);
+    const collected = (headSha: string) => {
+      w.handlers['card.collect'] = () =>
+        ok({ ahead: 2, pushed: true, headSha, prNumber: 77, prUrl: PR_URL });
+    };
+    const round = async () => {
+      expect((await post(1, 'finish')).status).toBe(200);
+      await w.work.settled();
+    };
+    collected(FIRST);
+    await w.createCard();
+    expect((await w.runCard(1)).status).toBe(200);
+    await round();
+
+    // The next round only merges the base: the merge is its head.
+    collected(MERGE);
+    expect((await post(1, 'feedback', { text: 'Merge develop.' })).status).toBe(
+      200,
+    );
+    await round();
+    let card = await w.card(1);
+    expect(card).toMatchObject({ collectState: 'ok', prUrl: PR_URL });
+    expect(card.rounds.map((r) => [r.headSha, r.headAhead])).toEqual([
+      [FIRST, 2],
+      [MERGE, 2],
+    ]);
+
+    // A round that adds no commit leaves the head as it found it.
+    expect((await post(1, 'feedback', { text: 'Look again.' })).status).toBe(
+      200,
+    );
+    await round();
+    card = await w.card(1);
+    expect(card.rounds[2]).toMatchObject({ headSha: null });
+  });
+
   it('retries once after two minutes, then on the next hello, three attempts in all', async () => {
     await failedCard();
     expect(w.retries).toHaveLength(1);

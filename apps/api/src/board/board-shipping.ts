@@ -3,6 +3,7 @@ import {
   CARD_CI_FIX_ATTEMPTS_MAX,
   CARD_CI_MISSING_MS,
   CARD_CI_POLL_MS,
+  CARD_PR_HEAD_LAG_MS,
   CARD_ROUND_AT_ONCE_MS,
   type CardCiFixInput,
   type CardCiState,
@@ -92,6 +93,28 @@ export const roundUnshippable = (
   }
   return null;
 };
+
+/**
+ * #895: whether the PR GitHub reports is behind the latest round's push — it
+ * still shows the head the round started from, though the round pushed
+ * another (`headSha`, #837). Its checks and mergeability are the old head's,
+ * so nothing is decided on them. A PR still behind `CARD_PR_HEAD_LAG_MS`
+ * after the round ended is taken as it is: the branch was moved back.
+ */
+export const prHeadBehind = (
+  round: Pick<
+    CardWithRounds['rounds'][number],
+    'startHeadSha' | 'headSha' | 'finishedAt'
+  > | null,
+  headSha: string,
+  now: number = Date.now(),
+): boolean =>
+  round !== null &&
+  round.headSha !== null &&
+  round.headSha !== headSha &&
+  round.startHeadSha === headSha &&
+  (round.finishedAt === null ||
+    now - round.finishedAt.getTime() < CARD_PR_HEAD_LAG_MS);
 
 /**
  * #359 D6: the project's own checks, as the fix prompt names them —
@@ -382,6 +405,17 @@ export class BoardShipping
         { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
       ),
     );
+    // #895: GitHub has not moved the PR to the round's push yet; the next
+    // poll reads it again.
+    if (
+      (result.state === 'open' || result.state === 'draft') &&
+      prHeadBehind(card.rounds[0] ?? null, result.headSha)
+    ) {
+      this.logger.log(
+        `PR #${prNumber} of ${cardLabel(card.number)} still shows ${result.headSha.slice(0, 8)}, not the pushed ${card.rounds[0]?.headSha?.slice(0, 8)}`,
+      );
+      return;
+    }
     const state = cardCiStateOf(result.checks);
     // A head with no checks is "no checks" only on its second read: CI
     // registers its checks a moment after a push.

@@ -1,4 +1,4 @@
-import type { BoardCardDetail } from '@nautelle/shared';
+import { type BoardCardDetail, CARD_PR_HEAD_LAG_MS } from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { BoardService } from './board.service';
 import { BoardShipping } from './board-shipping';
@@ -694,6 +694,44 @@ describe('a card ships itself (e2e, #359)', () => {
       );
     });
 
+    it('#895: a fix round whose merge GitHub does not show yet is not fixed again, nor finished on the old head', async () => {
+      const MERGE_HEAD = 'c'.repeat(40);
+      checksAnswer({ mergeable: 'CONFLICTING' });
+      await started();
+      await ended();
+      expect((await latest()).round).toMatchObject({
+        trigger: 'ci_fix',
+        startHeadSha: HEAD_SHA,
+      });
+      // The fix round merges the base and pushes it; GitHub still shows the
+      // PR at the old head, conflicting.
+      await pushed({ headSha: MERGE_HEAD });
+      await ended();
+      await shipping.poll();
+      await w.work.settled();
+      let card = await w.card(1);
+      expect(card).toMatchObject({
+        column: 'in_progress',
+        ciFixAttempts: 1,
+        needsPerson: false,
+      });
+      expect(card.rounds).toHaveLength(2);
+
+      // An old head that went green would not finish the card either.
+      checksAnswer({});
+      await shipping.poll();
+      await w.work.settled();
+      expect((await w.card(1)).column).toBe('in_progress');
+
+      // GitHub shows the merge: its own checks decide.
+      checksAnswer({ headSha: MERGE_HEAD });
+      await shipping.poll();
+      await w.work.settled();
+      card = await w.card(1);
+      expect(card).toMatchObject({ column: 'finished', ciHeadSha: MERGE_HEAD });
+      expect(card.rounds).toHaveLength(2);
+    });
+
     it('red during the round waits for the round to be over', async () => {
       checksAnswer({
         checks: [{ name: 'ci/check', bucket: 'pending', link: null }],
@@ -952,6 +990,55 @@ describe('a card ships itself (e2e, #359)', () => {
       expect(merge).toMatchObject({ pr: 77, headSha: NEW_HEAD });
       expect(await w.card(1)).toMatchObject({ needsPerson: false });
       expect((await w.card(1)).mergedAt).not.toBeNull();
+    });
+
+    it('#895: a pushed head GitHub does not show yet is waited for, not refused as pushed nothing', async () => {
+      await finishedUnmerged();
+      await pushed({ headSha: NEW_HEAD });
+      // GitHub still shows the PR at the head the round started from.
+      checksAnswer({});
+      await ended();
+      await shipping.poll();
+      await w.work.settled();
+      expect(await w.card(1)).toMatchObject({
+        column: 'in_progress',
+        needsPerson: false,
+        mergedAt: null,
+      });
+      expect(w.sent('card.merge')).toEqual([]);
+      expect(await w.audit('card.auto_run_failed')).toEqual([]);
+
+      // GitHub catches up: the pushed head is merged.
+      checksAnswer({ headSha: NEW_HEAD });
+      await shipping.poll();
+      await w.work.settled();
+      const [merge] = w.sent('card.merge');
+      expect(merge).toMatchObject({ pr: 77, headSha: NEW_HEAD });
+      expect((await w.card(1)).mergedAt).not.toBeNull();
+    });
+
+    it('#895: a PR still at the old head past the lag is taken as it is', async () => {
+      await finishedUnmerged();
+      await pushed({ headSha: NEW_HEAD });
+      checksAnswer({});
+      await ended();
+      expect((await w.card(1)).column).toBe('in_progress');
+      const { round } = await latest();
+      await w.ctx.prisma.boardCardRound.update({
+        where: { id: round.id },
+        data: {
+          startedAt: new Date(Date.now() - CARD_PR_HEAD_LAG_MS - 120_000),
+          finishedAt: new Date(Date.now() - CARD_PR_HEAD_LAG_MS - 60_000),
+        },
+      });
+      await shipping.poll();
+      await w.work.settled();
+      expect(await w.card(1)).toMatchObject({
+        column: 'finished',
+        needsPerson: true,
+        needsPersonReason: 'round_pushed_nothing',
+      });
+      expect(w.sent('card.merge')).toEqual([]);
     });
   });
 
