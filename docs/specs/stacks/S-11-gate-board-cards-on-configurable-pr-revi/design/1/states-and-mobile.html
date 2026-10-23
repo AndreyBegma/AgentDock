@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>States and mobile · PR review stage</title>
+<style>
+:root{color-scheme:dark;--font-sans:'SF Pro Text','SF Pro Display','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-hue-1:#5b9cf6;--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / 0.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-3-soft:rgb(124 201 90 / 0.18);--color-hue-3-ink:#ade58f;--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0 / 0.18);--color-hue-4-ink:#f5c25c;--color-hue-5:#e8743b;--color-hue-5-soft:rgb(232 116 59 / 0.18);--color-hue-5-ink:#f9a77c;--color-hue-7:#a68bfa;--canvas-glow:18%;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-scrim-strong:rgb(9 9 12 / 0.64);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-strong:rgb(0 0 0 / 0.45);--glass-shadow-clear:rgb(0 0 0 / 0.15)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-hue-1:#1f64d6;--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / 0.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-3-soft:rgb(58 125 28 / 0.12);--color-hue-3-ink:#2f6617;--color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0 / 0.12);--color-hue-4-ink:#8a5200;--color-hue-5:#c24e00;--color-hue-5-soft:rgb(194 78 0 / 0.12);--color-hue-5-ink:#9c3d00;--color-hue-7:#7244e0;--canvas-glow:10%;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-scrim-strong:rgb(255 255 255 / 0.64);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-strong:rgb(0 0 0 / 0.16);--glass-shadow-clear:rgb(0 0 0 / 0.08)}
+:root{--color-status-running:var(--color-hue-2);--color-status-running-soft:var(--color-hue-2-soft);--color-status-running-ink:var(--color-hue-2-ink);--color-status-paused:var(--color-hue-4);--color-status-paused-soft:var(--color-hue-4-soft);--color-status-paused-ink:var(--color-hue-4-ink);--color-status-blocked:var(--color-hue-5);--color-status-blocked-soft:var(--color-hue-5-soft);--color-status-blocked-ink:var(--color-hue-5-ink);--color-status-done:var(--color-hue-3);--color-status-done-soft:var(--color-hue-3-soft);--color-status-done-ink:var(--color-hue-3-ink)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground)}
+body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:20px;color:var(--color-ink);-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--font-mono);font-size:0.92em}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+a{color:var(--color-accent-ink);text-underline-offset:4px}
+svg.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+svg.i12{width:12px;height:12px}svg.i14{width:14px;height:14px}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.glass-strong{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim-strong);backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 24px 64px var(--glass-shadow-strong)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.wrap{max-width:1440px;margin:0 auto;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:24px;align-items:start}
+.left{display:flex;flex-direction:column;gap:20px}
+.blk-title{margin:0 0 8px;font-size:16px;line-height:24px;font-weight:600}
+.blk-sub{margin:-6px 0 10px;font-size:13px;color:var(--color-ink-2)}
+.grid5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.cap{font-size:12px;font-weight:500;color:var(--color-ink-3);margin-bottom:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;height:28px;padding:0 14px;border-radius:var(--radius-control);border:0;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);color:var(--color-ink);border:1px solid var(--color-line-strong)}
+.btn-ghost{background:transparent;color:var(--color-ink-2)}
+.btn-sm{height:26px;padding:0 10px;font-size:12px;border-radius:4px}
+.btn-icon{padding:0;aspect-ratio:1}
+.badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;border-radius:999px;height:20px;min-width:20px;padding:0 7px;font-size:12px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-sm{height:18px;padding:0 5px;font-size:10px}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.badge-danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:var(--color-ink-3)}
+.dot-ok{background:var(--color-ok)}.dot-warn{background:var(--color-warn)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.pill{--s:var(--color-ink-3);--s-soft:var(--color-hover);--s-ink:var(--color-ink-2);display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;background:var(--s-soft);color:var(--s-ink);border:1px solid color-mix(in oklab,var(--s) 45%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--s)}
+.pill-running{--s:var(--color-status-running);--s-soft:var(--color-status-running-soft);--s-ink:var(--color-status-running-ink)}
+.pill-paused{--s:var(--color-status-paused);--s-soft:var(--color-status-paused-soft);--s-ink:var(--color-status-paused-ink)}
+.pill-blocked{--s:var(--color-status-blocked);--s-soft:var(--color-status-blocked-soft);--s-ink:var(--color-status-blocked-ink)}
+.pill-done{--s:var(--color-status-done);--s-soft:var(--color-status-done-soft);--s-ink:var(--color-status-done-ink)}
+.board-card{padding:10px 12px;border-radius:var(--radius-surface);display:flex;flex-direction:column;gap:7px}
+.c-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-ink-2)}
+.c-head .pill{margin-left:auto}
+.c-title{margin:0;font-size:14px;font-weight:500;line-height:19px}
+.c-foot{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-ink-3)}
+.rv{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:var(--radius-control);background:var(--color-hover);font-size:12px;line-height:16px;color:var(--color-ink-2)}
+.rv b{font-weight:500;color:var(--color-ink)}
+.rv .rv-end{margin-left:auto}
+.rv.warn{background:color-mix(in oklab,var(--color-warn) 10%,transparent)}
+.rv.danger{background:color-mix(in oklab,var(--color-danger) 10%,transparent)}
+.rv.ok{background:color-mix(in oklab,var(--color-ok) 10%,transparent)}
+.steps{display:inline-flex;gap:3px}
+.steps i{display:block;width:12px;height:4px;border-radius:2px;background:var(--color-line-strong)}
+.steps i.ok{background:var(--color-ok)}.steps i.run{background:var(--color-status-running)}.steps i.fix{background:var(--color-warn)}.steps i.bad{background:var(--color-danger)}
+.panel{border-radius:var(--radius-surface);padding:14px;min-height:220px;display:flex;flex-direction:column;gap:10px}
+.skeleton{display:block;border-radius:var(--radius-control);background:linear-gradient(90deg,var(--color-hover) 25%,color-mix(in oklab,var(--color-ink) 10%,transparent) 50%,var(--color-hover) 75%);background-size:200% 100%;animation:sk 1.4s ease-in-out infinite}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skeleton{animation:none}}
+.banner{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--radius-surface);font-size:14px;border:1px solid var(--color-line)}
+.banner-danger{background:color-mix(in oklab,var(--color-danger) 12%,transparent);border-color:color-mix(in oklab,var(--color-danger) 30%,transparent)}
+.banner-warn{background:color-mix(in oklab,var(--color-warn) 12%,transparent);border-color:color-mix(in oklab,var(--color-warn) 30%,transparent)}
+.banner svg{margin-top:2px}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:16px}
+.empty svg{width:20px;height:20px;color:var(--color-ink-3)}
+.empty-title{margin:0;font-weight:500}
+.empty-desc{margin:0;color:var(--color-ink-2);max-width:24rem}
+.settings{border-radius:var(--radius-surface);overflow:hidden}
+.set-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border-bottom:1px solid var(--color-line)}
+.set-head h3{margin:0;font-size:16px;line-height:24px;font-weight:600}
+.set-head p{margin:2px 0 0;font-size:13px;color:var(--color-ink-2)}
+.step{display:grid;grid-template-columns:20px 1fr auto auto;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--color-line)}
+.step .grip{color:var(--color-ink-3)}
+.step .n{font-weight:500}
+.step .m{font-size:12px;color:var(--color-ink-3)}
+.toggle{position:relative;display:inline-block;width:34px;height:20px;border-radius:999px;background:var(--color-line-strong);border:0;cursor:pointer}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.3)}
+.toggle[aria-checked="true"]{background:var(--color-accent)}
+.toggle[aria-checked="true"]::after{transform:translateX(14px)}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border-bottom:1px solid var(--color-line)}
+.set-row:last-child{border-bottom:0}
+.phone{width:390px;height:844px;border-radius:36px;border:1px solid var(--color-line-strong);overflow:hidden;position:relative;background:var(--color-ground);box-shadow:0 24px 64px var(--glass-shadow-strong)}
+.phone .canvas{position:absolute}
+.ph-top{display:flex;align-items:center;gap:8px;margin:12px 16px 0;height:48px;padding:0 12px;border-radius:var(--radius-surface)}
+.ph-top b{font-size:15px;flex:1}
+.ph-body{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.ph-col{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:var(--color-ink-2);padding:4px 2px}
+.ph-sheet{position:absolute;left:0;right:0;bottom:0;height:470px;border-radius:18px 18px 0 0;display:flex;flex-direction:column}
+.grabber{width:36px;height:5px;border-radius:999px;background:var(--color-line-strong);margin:8px auto 4px}
+.ph-sheet .tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--color-line)}
+.ph-sheet .tab{position:relative;display:inline-flex;align-items:center;gap:4px;height:40px;padding:0 9px;font-size:14px;font-weight:500;color:var(--color-ink-2)}
+.ph-sheet .tab.on{color:var(--color-ink)}
+.ph-sheet .tab.on::after{content:'';position:absolute;left:6px;right:6px;bottom:-1px;height:2px;border-radius:2px;background:var(--color-accent)}
+.g{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;min-height:44px;padding:6px 12px;border-bottom:1px solid var(--color-line)}
+.g:last-child{border-bottom:0}
+.gi{display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--color-hover);color:var(--color-ink-3)}
+.gi.ok{background:color-mix(in oklab,var(--color-ok) 16%,transparent);color:var(--color-ok)}
+.gi.warn{background:color-mix(in oklab,var(--color-warn) 16%,transparent);color:var(--color-warn)}
+.capsule{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:4px;padding:6px;border-radius:999px;z-index:3}
+.capsule a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 14px;border-radius:999px;font-size:11px;color:var(--color-ink-2);text-decoration:none}
+.capsule a[aria-current="page"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="wrap">
+  <div class="left">
+    <section>
+      <h2 class="blk-title">Review strip, every state</h2>
+      <p class="blk-sub">One card, from green CI to Finished. A project with review off shows no strip.</p>
+      <div class="grid5">
+        <div><div class="cap">Queued</div><article class="board-card surface-content"><div class="c-head"><span class="mono">C-409</span><span class="pill pill-running">Running</span></div><p class="c-title">Retry runner heartbeat</p><div class="rv"><svg class="icon i12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><b>Review</b><span class="steps"><i></i><i></i><i></i></span><span class="rv-end">After CI</span></div><div class="c-foot"><span class="mono">PR #728</span><span class="dot dot-warn"></span></div></article></div>
+        <div><div class="cap">Reviewing</div><article class="board-card surface-content"><div class="c-head"><span class="mono">C-411</span><span class="pill pill-running">Reviewing</span></div><p class="c-title">Budget rollover at midnight</p><div class="rv"><b>Review</b><span class="steps"><i class="ok"></i><i class="run"></i><i></i></span><span class="rv-end">2/3</span></div><div class="c-foot"><span class="mono">PR #730</span><span class="dot dot-ok"></span></div></article></div>
+        <div><div class="cap">Fixing</div><article class="board-card surface-content"><div class="c-head"><span class="mono">C-412</span><span class="pill pill-paused">Fixing</span></div><p class="c-title">Rate-limit token endpoint</p><div class="rv warn"><b>Review</b><span class="steps"><i class="ok"></i><i class="fix"></i><i></i></span><span class="rv-end">Fix 1/3</span></div><div class="c-foot"><span class="mono">PR #731</span><span class="dot dot-ok"></span></div></article></div>
+        <div><div class="cap">Needs you</div><article class="board-card surface-content"><div class="c-head"><span class="mono">C-407</span><span class="pill pill-blocked">Needs you</span></div><p class="c-title">Signed webhook payloads</p><div class="rv danger"><b>Review</b><span class="steps"><i class="ok"></i><i class="bad"></i><i></i></span><span class="rv-end">3 fixes used</span></div><div class="c-foot"><span class="mono">PR #724</span><span class="dot dot-ok"></span></div></article></div>
+        <div><div class="cap">Passed</div><article class="board-card surface-content"><div class="c-head"><span class="mono">C-405</span><span class="pill pill-done">Merged</span></div><p class="c-title">Empty states for Queue</p><div class="rv ok"><b>Passed</b><span class="steps"><i class="ok"></i><i class="ok"></i><i class="ok"></i></span><span class="rv-end">4 nits</span></div><div class="c-foot"><span class="mono">PR #722</span><span class="dot dot-ok"></span></div></article></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="blk-title">Review tab: loading, error, review off</h2>
+      <div class="grid3">
+        <div class="panel surface-content" aria-busy="true">
+          <span class="skeleton" style="height:14px;width:40%"></span>
+          <span class="skeleton" style="height:40px;width:100%"></span>
+          <span class="skeleton" style="height:40px;width:100%"></span>
+          <span class="skeleton" style="height:40px;width:100%"></span>
+          <span class="skeleton" style="height:12px;width:70%"></span>
+        </div>
+        <div class="panel surface-content">
+          <div class="banner banner-danger" role="alert"><svg class="icon" viewBox="0 0 24 24" style="color:var(--color-danger)"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><div><div style="font-weight:500">Couldn't load review results</div><div class="ink-2" style="font-size:13px">The card still won't finish until review passes.</div></div></div>
+          <div class="banner banner-warn" role="status"><svg class="icon" viewBox="0 0 24 24" style="color:var(--color-warn)"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3"/><path d="M12 9v4M12 17h.01"/></svg><div><div style="font-weight:500">Security review failed to run</div><div class="ink-2" style="font-size:13px">Skill <span class="mono">cs-security</span> is no longer installed.</div></div></div>
+          <div style="display:flex;gap:8px;margin-top:auto"><button class="btn btn-glass btn-sm">Retry</button><button class="btn btn-ghost btn-sm">Open Skills</button></div>
+        </div>
+        <div class="panel surface-content">
+          <div class="empty">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.5 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+            <p class="empty-title">Review is off for this project</p>
+            <p class="empty-desc">Cards finish on green CI alone. Turn on Peer review to gate merges on findings.</p>
+            <button class="btn btn-glass">Open review settings</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="blk-title">Settings › Review</h2>
+      <div class="settings surface-content">
+        <div class="set-head"><div><h3>Review steps</h3><p>Run in this order after a card's CI is green. Blocking findings get up to 3 fix rounds per PR.</p></div><button class="btn btn-glass btn-sm"><svg class="icon i14" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add step</button></div>
+        <div class="step"><svg class="icon grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg><div><div class="n">Peer review <span class="badge badge-sm">Built-in</span></div><div class="m">Instructions generated from the repository · edited 2 days ago</div></div><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm">Edit instructions</button><button class="btn btn-ghost btn-sm">Regenerate</button></div><button class="toggle" role="switch" aria-checked="true" aria-label="Peer review"></button></div>
+        <div class="step"><svg class="icon grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg><div><div class="n">Security review</div><div class="m">Skill <span class="mono">cs-security</span></div></div><button class="btn btn-ghost btn-sm">Edit</button><button class="toggle" role="switch" aria-checked="true" aria-label="Security review"></button></div>
+        <div class="step"><svg class="icon grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg><div><div class="n">Accessibility review</div><div class="m">Skill <span class="mono">web-design-guidelines</span></div></div><button class="btn btn-ghost btn-sm">Edit</button><button class="toggle" role="switch" aria-checked="true" aria-label="Accessibility review"></button></div>
+        <div class="set-row"><div><div style="font-weight:500">Publish findings as GitHub PR comments</div><div class="ink-2" style="font-size:13px">Findings are always kept in Nautelle. Nits are posted as comments only.</div></div><button class="toggle" role="switch" aria-checked="false" aria-label="Publish findings as PR comments"></button></div>
+      </div>
+    </section>
+  </div>
+
+  <div>
+    <h2 class="blk-title">Phone, 390px</h2>
+    <div class="phone">
+      <div class="canvas" aria-hidden="true"></div>
+      <header class="ph-top glass"><b>Board</b><span class="dot dot-ok"></span><button class="btn btn-ghost btn-icon" aria-label="Search"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button></header>
+      <div class="ph-body">
+        <div class="ph-col"><span>In progress</span><span class="badge badge-sm">4</span></div>
+        <article class="board-card surface-content"><div class="c-head"><span class="mono">C-411</span><span class="swatch" style="background:var(--color-hue-7)"></span>web<span class="pill pill-running">Reviewing</span></div><p class="c-title">Budget rollover at midnight UTC</p><div class="rv"><b>Review</b><span class="steps"><i class="ok"></i><i class="run"></i><i></i></span><span class="rv-end">Security · 2/3</span></div></article>
+        <article class="board-card surface-content" style="border-color:var(--color-accent)"><div class="c-head"><span class="mono">C-412</span><span class="swatch" style="background:var(--color-hue-2)"></span>api<span class="pill pill-paused">Fixing</span></div><p class="c-title">Rate-limit the public runner token endpoint</p></div>
+      </div>
+      <section class="ph-sheet glass-strong" role="dialog" aria-label="C-412">
+        <div class="grabber"></div>
+        <div style="padding:4px 16px 8px;display:flex;flex-direction:column;gap:4px"><div class="c-head"><span class="mono">C-412</span><span class="pill pill-paused" style="margin-left:4px">Fixing review findings</span></div><div style="font-weight:600;font-size:15px;line-height:22px">Rate-limit the public runner token endpoint</div></div>
+        <div class="tabs"><span class="tab">Overview</span><span class="tab on">Review <span class="badge badge-sm badge-warn">2</span></span><span class="tab">Rounds</span><span class="tab">Files</span></div>
+        <div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;overflow:auto">
+          <div class="surface-content" style="border-radius:var(--radius-surface);overflow:hidden">
+            <div class="g"><span class="gi ok"><svg class="icon i14" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><span>CI checks</span><span class="badge badge-ok">Passed</span></div>
+            <div class="g"><span class="gi ok"><svg class="icon i14" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><span>Peer review</span><span class="badge badge-ok">Passed</span></div>
+            <div class="g"><span class="gi warn"><svg class="icon i14" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></svg></span><span>Security review<br><span class="ink-3" style="font-size:12px">2 blocking · fix 1 of 3</span></span><span class="badge badge-warn">Fixing</span></div>
+            <div class="g"><span class="gi"><svg class="icon i14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><span>Accessibility review</span><span class="badge">Waiting</span></div>
+          </div>
+        </div>
+      </section>
+      <nav class="capsule glass" aria-label="Main" style="display:none"></nav>
+    </div>
+  </div>
+</div>
+</body>
+</html>
