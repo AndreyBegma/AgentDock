@@ -12,7 +12,7 @@ import { DESIGN_FRAME_NAME_MAX, DESIGN_FRAMES_MAX } from './frames';
 
 /**
  * Every kind a frame can have; `legacy` is a frame stored before #833.
- * `mobile` is no built-in frame since #863 (ADR-0084): every frame is one
+ * `mobile` is no built-in frame since #863 (ADR-0085): every frame is one
  * responsive page drawn for the design's devices. It stays so revisions and
  * project templates stored with it still parse.
  */
@@ -295,7 +295,7 @@ const FORMER_INSTRUCTIONS: Readonly<Record<string, string>> = {
  * override lacks is put back at its built-in position: the override may
  * change it, never remove it. Null when neither exists.
  *
- * #863 (ADR-0084): an override saved while the built-in had a frame it has
+ * #863 (ADR-0085): an override saved while the built-in had a frame it has
  * since dropped (`mobile`) reads without that frame, and a built-in frame
  * takes the built-in's current name, which an override may not change. An
  * instruction still the built-in's former text takes its current one.

@@ -272,7 +272,7 @@ export interface TaskDesignView extends TaskDesignSummary {
   /** The viewer's presets: the project's settings, or the defaults. */
   viewports: ViewportPreset[];
   /**
-   * #863 (ADR-0084): the devices the design is drawn for, copied at its
+   * #863 (ADR-0085): the devices the design is drawn for, copied at its
    * latest Generate; a later edit of the presets leaves them. Null on a
    * design not generated since devices were stored.
    */
@@ -370,7 +370,7 @@ export interface CardDesignLaunchRequest {
 }
 
 /**
- * #863 (ADR-0084): `POST …/design/generate` of a plan task or a stack. The
+ * #863 (ADR-0085): `POST …/design/generate` of a plan task or a stack. The
  * devices the design is drawn for, at most `DESIGN_VIEWPORTS_MAX`, with
  * unique names (`viewportPresetsSchema`); left out, the project's presets,
  * or `DEFAULT_VIEWPORTS` without any. The design keeps a copy.

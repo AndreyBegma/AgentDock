@@ -583,7 +583,7 @@ export class DesignService implements OnModuleInit {
   }
 
   /**
-   * #863 (ADR-0084): the devices a Generate draws for — the request's, with
+   * #863 (ADR-0085): the devices a Generate draws for — the request's, with
    * unique names; else the project's presets, or the built-in devices.
    */
   private async devicesFor(

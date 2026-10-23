@@ -162,7 +162,7 @@ describe('design templates API (e2e, #833)', () => {
     expect((await h.auditOf('design.template_deleted')).length).toBe(1);
   });
 
-  // #863 (ADR-0084): an override stored while flow still had a mobile frame.
+  // #863 (ADR-0085): an override stored while flow still had a mobile frame.
   it('lists an older flow override without its mobile frame, and saves it back', async () => {
     const flow = BUILTIN_DESIGN_TEMPLATES[2];
     const mobile: DesignTemplateFrame = {

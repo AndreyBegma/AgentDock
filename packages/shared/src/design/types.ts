@@ -61,7 +61,7 @@ export const viewportPresetsSchema = z
   });
 
 /**
- * D11, #863 (ADR-0084): the built-in devices — what a project without a
+ * D11, #863 (ADR-0085): the built-in devices — what a project without a
  * `design_settings` row offers, and what a Generate without devices draws
  * for. The viewer offers light and dark on each when the profile reports a
  * dark theme.

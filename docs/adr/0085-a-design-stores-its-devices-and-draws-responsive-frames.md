@@ -1,4 +1,4 @@
-# ADR-0084: A design stores its devices, and every frame is one responsive page
+# ADR-0085: A design stores its devices, and every frame is one responsive page
 
 Status: accepted · Date: 2026-10-23 ·
 Issue: [#863](https://github.com/AndreyBegma/Nautelle/issues/863) ·

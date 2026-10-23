@@ -928,7 +928,7 @@ describe('design stage (e2e)', () => {
     );
   });
 
-  // #863 (ADR-0084): a page revision drawn before the mobile frame left the
+  // #863 (ADR-0085): a page revision drawn before the mobile frame left the
   // template keeps its stored check; nothing reads its frames again.
   it('loads a revision with a mobile frame as it was stored (#863)', async () => {
     const plan = await drawn(1);

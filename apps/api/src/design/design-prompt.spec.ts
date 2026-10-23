@@ -187,7 +187,7 @@ describe('design turn prompt (D8)', () => {
     expect(prompt).toContain('# Devices');
   });
 
-  // #863 (ADR-0084): one responsive page per frame, for every chosen device.
+  // #863 (ADR-0085): one responsive page per frame, for every chosen device.
   it('lists every chosen device with its size and asks for one responsive page per frame', () => {
     const text = designSections(
       context({

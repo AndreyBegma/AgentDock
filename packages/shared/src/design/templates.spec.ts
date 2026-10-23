@@ -38,7 +38,7 @@ describe('BUILTIN_DESIGN_TEMPLATES', () => {
     }
   });
 
-  // #863 (ADR-0084): every frame is one responsive page; no device frame.
+  // #863 (ADR-0085): every frame is one responsive page; no device frame.
   it('draw no mobile frame in page and flow, and still parse the mobile kind', () => {
     expect(page.frames.map((fr) => fr.key)).toEqual([
       'screen',
@@ -128,7 +128,7 @@ describe('resolveDesignTemplate', () => {
     ).toEqual(['screen', 'breakdown', 'states']);
   });
 
-  // #863 (ADR-0084): an override saved before page and flow lost `mobile`.
+  // #863 (ADR-0085): an override saved before page and flow lost `mobile`.
   it('reads an older override without the mobile frame and with current names', () => {
     const notes = {
       key: 'notes',

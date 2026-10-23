@@ -79,7 +79,7 @@ export interface DesignPromptContext {
   /** #833 (ADR-0082): the template the turn draws by, resolved for the project. */
   template: DesignTemplate;
   /**
-   * #863 (ADR-0084): the devices the design is drawn for; every frame is one
+   * #863 (ADR-0085): the devices the design is drawn for; every frame is one
    * responsive page that works at each of their widths.
    */
   devices: readonly ViewportPreset[];
@@ -356,7 +356,7 @@ const previousSections = (
 };
 
 /**
- * #863 (ADR-0084): the devices the design is drawn for, each with its size.
+ * #863 (ADR-0085): the devices the design is drawn for, each with its size.
  * A frame is one responsive page the viewer renders once per device; the
  * turn never draws a frame per device. Like "Frames to draw", no fitting
  * step trims it.
