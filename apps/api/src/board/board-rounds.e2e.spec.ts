@@ -5,8 +5,7 @@ import {
   cardFeedbackPrompt,
 } from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
-import { Feed } from '../budgets/testing/budgets-e2e';
-import { seedPrices } from '../prices/seed-prices';
+import { Feed, seedSnapshotPrices } from '../budgets/testing/budgets-e2e';
 import { capabilities } from '../runners/testing/runner-e2e';
 import { ingest } from '../usage/testing/usage-e2e';
 import { BoardWorld, failed, ROOT_A } from './testing/board-e2e';
@@ -139,7 +138,7 @@ describe('board rounds (e2e)', () => {
     });
 
     it('counts a round toward the operator who started it, and refuses their next one once their user budget is spent (D-10)', async () => {
-      await seedPrices(w.ctx.prisma);
+      await seedSnapshotPrices(w.ctx.prisma);
       await w.createCard();
       await w.createCard();
       expect((await w.runCard(1)).status).toBe(200);
@@ -177,7 +176,7 @@ describe('board rounds (e2e)', () => {
       });
       expect((await w.card(2)).rounds).toEqual([]);
       expect(w.sent('card.run')).toHaveLength(1);
-    }, 60_000);
+    });
 
     it('a 4th concurrent run → 409 max_running', async () => {
       for (let i = 0; i < 4; i += 1) await w.createCard();
