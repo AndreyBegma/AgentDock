@@ -2915,6 +2915,10 @@ model TaskDesign {
   /// card's design reads `BoardCard.designTemplate` instead.
   templateKey        String?
   templateSource     DesignTemplateChoice @default(auto)
+  /// #863 (ADR-0084): the devices the design is drawn for,
+  /// `[{ name, width, height, theme? }]` (shared `viewportPresetsSchema`),
+  /// copied at each Generate. Null until the first Generate since #863.
+  devices            Json?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 

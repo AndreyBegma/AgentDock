@@ -75,7 +75,7 @@ export class StackDesignTurnService {
     });
     const design = await this.prisma.taskDesign.findUnique({
       where: { stackId: stack.id },
-      select: { id: true, variantCount: true, skills: true },
+      select: { id: true, variantCount: true, skills: true, devices: true },
     });
     if (!design) {
       throw plannerError(

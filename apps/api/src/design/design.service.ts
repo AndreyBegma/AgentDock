@@ -1,13 +1,17 @@
 import {
   type CardAutoRun,
+  type CardDesignGenerateRequest,
   type CardDesignLaunchRequest,
   DESIGN_COMMENTS_PER_TURN_MAX,
   DESIGN_ERROR,
   type DesignCommentRequest,
+  type DesignGenerateRequest,
   PLANNER_ERROR,
   type Role,
   type TaskDesignPatchRequest,
   type TaskDesignView,
+  type ViewportPreset,
+  viewportPresetsSchema,
 } from '@nautelle/shared';
 import { RUNNER_FEATURE_COMMANDS } from '@nautelle/shared/protocol';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
@@ -16,8 +20,10 @@ import type {
   BoardStack,
   Plan,
   PlanTask,
+  Prisma,
   TaskDesign,
 } from '@prisma/client';
+import { z } from 'zod';
 import { CardAssessor } from '../assess/card-assessor';
 import { AuditService } from '../audit/audit.service';
 import { autoRunFailureOf, cardNotFound } from '../board/board-error';
@@ -52,6 +58,7 @@ import {
   designWhere,
   followsDefaultSkills,
   projectDesignTemplateKeys,
+  projectViewports,
 } from './design-store';
 import { loadDesignView } from './design-view';
 import { UiProfileLearner } from './learn/ui-profile-learner';
@@ -168,8 +175,18 @@ export class DesignService implements OnModuleInit {
   }
 
   /** `POST …/design/generate` (D4, D13). */
-  async generate(plan: Plan, key: string, actor: PlanActor): Promise<void> {
-    await this.generateOf(await this.taskOwner(plan, key, 'change'), actor);
+  async generate(
+    plan: Plan,
+    key: string,
+    actor: PlanActor,
+    request: DesignGenerateRequest = {},
+  ): Promise<void> {
+    const owner = await this.taskOwner(plan, key, 'change');
+    await this.generateOf(
+      owner,
+      actor,
+      await this.devicesFor(owner.projectId, request),
+    );
   }
 
   /** `POST …/design/revise` (D10). */
@@ -252,12 +269,13 @@ export class DesignService implements OnModuleInit {
     projectId: string,
     number: number,
     actor: PlanActor,
-    launch: CardDesignLaunchRequest = {},
+    launch: CardDesignGenerateRequest = {},
   ): Promise<void> {
     const owner = await this.cardOwner(projectId, number);
     await this.stacks.assertStackApproved(owner.target.id);
+    const devices = await this.devicesFor(projectId, launch);
     await this.rememberLaunch(owner, projectId, number, launch);
-    await this.generateOf(owner, actor);
+    await this.generateOf(owner, actor, devices);
   }
 
   async cardRevise(
@@ -363,8 +381,14 @@ export class DesignService implements OnModuleInit {
     projectId: string,
     number: number,
     actor: PlanActor,
+    request: DesignGenerateRequest = {},
   ): Promise<void> {
-    await this.generateOf(await this.stackOwner(projectId, number), actor);
+    const owner = await this.stackOwner(projectId, number);
+    await this.generateOf(
+      owner,
+      actor,
+      await this.devicesFor(projectId, request),
+    );
   }
 
   async stackRevise(
@@ -528,6 +552,7 @@ export class DesignService implements OnModuleInit {
   private async generateOf(
     owner: DesignOwner,
     actor: PlanActor,
+    devices: ViewportPreset[],
   ): Promise<void> {
     const drawable = await this.drawable(owner);
     const revisions = await this.prisma.designRevision.findMany({
@@ -542,16 +567,40 @@ export class DesignService implements OnModuleInit {
       );
     }
     // #604: a design that follows the default takes today's default; its
-    // turns, and every later one, read that copy.
-    const design = followsDefaultSkills(drawable, revisions.length > 0)
-      ? await this.prisma.taskDesign.update({
-          where: { id: drawable.id },
-          data: {
-            skills: await defaultSkillsOf(this.prisma, owner.projectId),
-          },
-        })
-      : drawable;
+    // turns, and every later one, read that copy. #863: so do the devices —
+    // a later edit of the project's presets leaves them.
+    const design = await this.prisma.taskDesign.update({
+      where: { id: drawable.id },
+      data: {
+        devices: devices as Prisma.InputJsonValue,
+        ...(followsDefaultSkills(drawable, revisions.length > 0)
+          ? { skills: await defaultSkillsOf(this.prisma, owner.projectId) }
+          : {}),
+      },
+    });
     await this.start(owner, design, 'generate', [], actor);
+  }
+
+  /**
+   * #863 (ADR-0084): the devices a Generate draws for — the request's, with
+   * unique names; else the project's presets, or the built-in devices.
+   */
+  private async devicesFor(
+    projectId: string,
+    request: DesignGenerateRequest,
+  ): Promise<ViewportPreset[]> {
+    if (request.devices === undefined) {
+      return projectViewports(this.prisma, projectId);
+    }
+    const devices = viewportPresetsSchema.safeParse(request.devices);
+    if (!devices.success) {
+      throw designError(
+        400,
+        DESIGN_ERROR.invalidArgs,
+        z.prettifyError(devices.error),
+      );
+    }
+    return devices.data;
   }
 
   /** Revise (D10): every variant in play, with every open comment. */

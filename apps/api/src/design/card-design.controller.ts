@@ -26,6 +26,7 @@ import {
 import { DesignService } from './design.service';
 import { DesignStopService } from './design-stop.service';
 import {
+  CardDesignGenerateDto,
   CardDesignLaunchDto,
   DesignApproveDto,
   DesignCommentDto,
@@ -91,7 +92,7 @@ export class CardDesignController {
     @CurrentUser() user: AuthUser,
     @AuditCtx() ctx: AuditContext,
     @Param('number') number: string,
-    @Body() dto: CardDesignLaunchDto,
+    @Body() dto: CardDesignGenerateDto,
   ): Promise<TaskDesignView> {
     const n = cardNumber(number);
     await this.designs.cardGenerate(

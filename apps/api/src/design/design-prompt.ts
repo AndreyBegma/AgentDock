@@ -13,6 +13,7 @@ import {
   type UiProfileScreen,
   type UiProfileSnippet,
   type UiProfileStyleRule,
+  type ViewportPreset,
 } from '@nautelle/shared';
 import { PLAN_TURN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
 
@@ -77,6 +78,11 @@ export interface DesignPromptContext {
   } | null;
   /** #833 (ADR-0082): the template the turn draws by, resolved for the project. */
   template: DesignTemplate;
+  /**
+   * #863 (ADR-0084): the devices the design is drawn for; every frame is one
+   * responsive page that works at each of their widths.
+   */
+  devices: readonly ViewportPreset[];
   /**
    * #833 D7: on a repair turn, how the previous revision is off its
    * template; null on any other turn.
@@ -350,6 +356,25 @@ const previousSections = (
 };
 
 /**
+ * #863 (ADR-0084): the devices the design is drawn for, each with its size.
+ * A frame is one responsive page the viewer renders once per device; the
+ * turn never draws a frame per device. Like "Frames to draw", no fitting
+ * step trims it.
+ */
+export const devicesSections = (
+  devices: readonly ViewportPreset[],
+): string[] => [
+  '# Devices',
+  [
+    'Draw every frame as one responsive page that works at each of these widths. Do not draw a separate frame or a separate page per device: the viewer renders each frame once per device, side by side.',
+    ...devices.map(
+      (d) =>
+        `- ${d.name}: ${d.width} × ${d.height} px${d.theme ? `, ${d.theme} theme` : ''}`,
+    ),
+  ].join('\n'),
+];
+
+/**
  * #833 (ADR-0082): the template's enabled frames, numbered, each with its
  * name, kind, whether it is required, and what to draw; the step limit of a
  * repeated frame; and D4's rule that service frames share the screen's kit.
@@ -442,6 +467,7 @@ export const designTurnSections = (
       .filter((l): l is string => l !== null)
       .join('\n'),
     ...framesToDrawSections(ctx.template),
+    ...devicesSections(ctx.devices),
     ...repairSections(ctx.repair, previous),
     ...previousSections(ctx, withHtml),
   ];

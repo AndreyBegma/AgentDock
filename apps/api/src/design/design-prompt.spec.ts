@@ -1,5 +1,6 @@
 import {
   BUILTIN_DESIGN_TEMPLATES,
+  DEFAULT_VIEWPORTS,
   type DesignTemplate,
   designBytes,
 } from '@nautelle/shared';
@@ -45,6 +46,7 @@ const context = (
   },
   skills: ['frontend-design'],
   template: page,
+  devices: DEFAULT_VIEWPORTS,
   comments: [
     {
       id: 'c1',
@@ -109,7 +111,7 @@ describe('design turn prompt (D8)', () => {
       '1. Screen — kind `screen`, required. The finished page',
     );
     expect(text).toContain('2. Breakdown — kind `breakdown`, required.');
-    expect(text).toContain('3. States and mobile — kind `states`, optional.');
+    expect(text).toContain('3. States — kind `states`, optional.');
     // D4: service frames are drawn in the project's kit.
     expect(text).toContain(
       'Service frames (Breakdown) use the same kit and custom properties as the screen',
@@ -135,7 +137,7 @@ describe('design turn prompt (D8)', () => {
       ],
     };
     const text = designSections(context({ template: own })).join('\n\n');
-    expect(text).not.toContain('States and mobile');
+    expect(text).not.toContain('States — kind');
     expect(text).toContain(
       '2. Hero copy — kind `custom`, named exactly "Hero copy", required. The hero headline variants.',
     );
@@ -182,6 +184,34 @@ describe('design turn prompt (D8)', () => {
     });
     expect(prompt).toContain('# Frames to draw');
     expect(prompt).toContain('2. Breakdown — kind `breakdown`, required.');
+    expect(prompt).toContain('# Devices');
+  });
+
+  // #863 (ADR-0084): one responsive page per frame, for every chosen device.
+  it('lists every chosen device with its size and asks for one responsive page per frame', () => {
+    const text = designSections(
+      context({
+        mode: 'generate',
+        previous: null,
+        devices: [
+          { name: 'Wide', width: 1920, height: 1080 },
+          { name: 'Kiosk', width: 1080, height: 1920, theme: 'dark' },
+        ],
+      }),
+    ).join('\n\n');
+    expect(text).toContain('# Devices');
+    expect(text).toContain('one responsive page that works at each of these widths');
+    expect(text).toContain('Do not draw a separate frame or a separate page per device');
+    expect(text).toContain('- Wide: 1920 × 1080 px');
+    expect(text).toContain('- Kiosk: 1080 × 1920 px, dark theme');
+    expect(text).not.toContain('- Desktop:');
+  });
+
+  it('lists the built-in devices when the design has the defaults', () => {
+    const text = designSections(context()).join('\n\n');
+    expect(text).toContain('- Desktop: 1440 × 900 px');
+    expect(text).toContain('- Tablet: 834 × 1194 px');
+    expect(text).toContain('- Phone: 390 × 844 px');
   });
 
   // #628: a revise sends the frames the comments point at, and a summary of the rest.
