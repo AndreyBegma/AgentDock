@@ -997,6 +997,19 @@ export class BoardService implements OnModuleInit {
   ): Promise<BoardCardDetail> {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
+    // #847 (ADR-0064): Completed means landed, whichever route gets there.
+    // A fleet card keeps its own rule (#282 D4).
+    if (
+      dto.column === 'completed' &&
+      card.column !== 'completed' &&
+      card.source !== 'fleet' &&
+      dto.confirmUnlanded !== true
+    ) {
+      const missing = await this.work.missingLanding(project, card.id);
+      if (missing !== null) {
+        throw boardError(409, BOARD_ERROR.notLanded, missing);
+      }
+    }
     await this.work.move(
       project,
       card,

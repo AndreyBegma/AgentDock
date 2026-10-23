@@ -133,15 +133,24 @@ export function clampDropIndex(view: BoardView, move: DropMove): DropMove {
   return move.index <= cards ? move : { ...move, index: cards };
 }
 
-/** The body of `POST /board/cards/:number/move`. */
+/**
+ * The body of `POST /board/cards/:number/move`. #847: `confirmUnlanded`
+ * is what it is on Accept — the person leaves unlanded work out of the base.
+ */
+export type MoveCardBody = MoveBoardCardRequest & {
+  confirmUnlanded?: boolean;
+};
+
 export function moveRequest(
   move: DropMove,
   stopWorker = false,
-): MoveBoardCardRequest {
+  confirmUnlanded = false,
+): MoveCardBody {
   return {
     column: move.toColumnId as BoardColumn,
     index: move.index,
     ...(stopWorker ? { stopWorker: true } : {}),
+    ...(confirmUnlanded ? { confirmUnlanded: true } : {}),
   };
 }
 

@@ -20,13 +20,13 @@ import type {
   CreateBoardCardRequest,
   CreateBoardStackRequest,
   DismissAllResult,
-  MoveBoardCardRequest,
   RunBoardCardRequest,
   UpdateBoardCardRequest,
   UpdateBoardSettingsRequest,
   UpdateBoardStackRequest,
 } from '@nautelle/shared';
 import { api } from '../api';
+import type { MoveCardBody } from './board-state';
 
 /**
  * The Board's routes (issue #242 "API"); a card is addressed by its number.
@@ -64,7 +64,7 @@ export const deleteCard = (projectId: string, number: number) =>
 export const moveCard = (
   projectId: string,
   number: number,
-  body: MoveBoardCardRequest,
+  body: MoveCardBody,
 ) => api(`${cardPath(projectId, number)}/move`, { method: 'POST', body });
 
 /** #452: one action for up to `BULK_CARDS_MAX` cards; each card's outcome is in the answer. */

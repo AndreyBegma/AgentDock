@@ -208,6 +208,11 @@ export class MoveBoardCardDto implements MoveBoardCardRequest {
   @IsOptional()
   @IsBoolean()
   stopWorker?: boolean;
+
+  /** #847: as on Accept — a move to Completed leaves unlanded work out. */
+  @IsOptional()
+  @IsBoolean()
+  confirmUnlanded?: boolean;
 }
 
 /** `POST /board/cards/bulk` (#452): distinct card numbers, one action. */
