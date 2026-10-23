@@ -67,6 +67,31 @@ export function runningSlots(fleets: Iterable<FleetView>): number {
   return count;
 }
 
+export interface LiveSession {
+  project: ProjectSummary;
+  slot: SlotSummary;
+}
+
+/**
+ * Every alive slot of every project whose fleet answered — the ones the
+ * Running slots tile counts — longest running first. A project without a
+ * fleet contributes nothing here; the block names it instead.
+ */
+export function liveSessions(
+  projects: readonly ProjectSummary[],
+  fleets: ReadonlyMap<string, FleetView>,
+): LiveSession[] {
+  const sessions: LiveSession[] = [];
+  for (const project of projects) {
+    for (const slot of fleets.get(project.id)?.slots ?? []) {
+      if (isAlive(slot)) sessions.push({ project, slot });
+    }
+  }
+  return sessions.sort(
+    (a, b) => Date.parse(a.slot.startedAt) - Date.parse(b.slot.startedAt),
+  );
+}
+
 /**
  * `ApprovalsView.waiting` holds a PR's *current* row, which is `approved` once
  * somebody decided and the merge has not happened; only `waiting` asks a person.
