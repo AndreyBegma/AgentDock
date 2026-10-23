@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { card } from '../../lib/board/fixtures';
 import { ReviewSection } from './review-section';
 
+type Card = Parameters<typeof ReviewSection>[0]['card'];
+
 const detail = () => ({
   ...card(1, 'in_progress', {
     ciState: 'green',
@@ -41,8 +43,10 @@ const detail = () => ({
 describe('ReviewSection (#891)', () => {
   test('lists CI, each step and Finished with counts, findings and fix rounds', () => {
     const html = renderToStaticMarkup(
-      // biome-ignore lint/suspicious/noExplicitAny: a detail fixture
-      <ReviewSection card={detail() as any} onOpenRound={() => {}} />,
+      <ReviewSection
+        card={detail() as unknown as Card}
+        onOpenRound={() => {}}
+      />,
     );
     for (const text of [
       'CI',
@@ -60,10 +64,9 @@ describe('ReviewSection (#891)', () => {
   });
   test('renders nothing without review', () => {
     const c = { ...detail(), review: null };
-    // biome-ignore lint/suspicious/noExplicitAny: a detail fixture
     expect(
       renderToStaticMarkup(
-        <ReviewSection card={c as any} onOpenRound={() => {}} />,
+        <ReviewSection card={c as unknown as Card} onOpenRound={() => {}} />,
       ),
     ).toBe('');
   });
