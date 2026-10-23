@@ -544,7 +544,7 @@ function Composer({
 
   return (
     <form
-      className="sticky bottom-0 flex flex-col gap-1.5 bg-inherit pb-[env(safe-area-inset-bottom)]"
+      className="sticky bottom-0 z-10 flex flex-col gap-1.5 border-t border-line bg-raised pt-3 pb-[env(safe-area-inset-bottom)]"
       onSubmit={(e) => {
         e.preventDefault();
         void send();
