@@ -20,6 +20,7 @@ import {
   type CardPullRequestRef,
   type CardRecommendationView,
   type CardRoundBrief,
+  type CardRoundCiState,
   type CardRoundView,
   type CardStackRef,
   type CardTakenView,
@@ -29,6 +30,7 @@ import {
   cardLabel,
   cardReadiness,
   cardRecommendationOf,
+  commitChecksUrl,
   FLEET_STAGES,
   type FleetStage,
   isActiveRoundPhase,
@@ -61,6 +63,7 @@ import {
   type BoardCardPullRequest,
   type BoardCardRound,
   type BoardSettings,
+  type CardCiState,
   Prisma,
 } from '@prisma/client';
 import type { TokenSaverCardFacts } from '../token-saver/token-saver-facts';
@@ -524,10 +527,85 @@ const evidenceOf = (
       }))
     : null;
 
+/** #837: what a round pushed, as `CardRoundView` shows it. */
+export type CardRoundPush = Pick<
+  CardRoundView,
+  'pullRequest' | 'headSha' | 'commits' | 'ci'
+>;
+
+const NO_PUSH: CardRoundPush = {
+  pullRequest: null,
+  headSha: null,
+  commits: null,
+  ci: null,
+};
+
+/** #837: a head with no checks (`none`) shows none. */
+const ROUND_CI_STATE: Record<Exclude<CardCiState, 'none'>, CardRoundCiState> = {
+  pending: 'pending',
+  green: 'passed',
+  red: 'failed',
+};
+
+/**
+ * #837: each round's pull request, head, commits and checks, for `rounds`
+ * oldest first. A round's commits are its head's `headAhead` less the one
+ * the round before it on the same PR left — unknown when either is. A round
+ * recorded before #837, or one that pushed nothing, has no head: all null.
+ */
+export const roundPushesOf = (
+  rounds: readonly Pick<
+    BoardCardRound,
+    | 'prNumber'
+    | 'prUrl'
+    | 'headSha'
+    | 'headAhead'
+    | 'ciState'
+    | 'ciPassed'
+    | 'ciTotal'
+  >[],
+): CardRoundPush[] => {
+  const aheadByPr = new Map<number, number | null>();
+  return rounds.map((round) => {
+    const { headSha, prNumber, prUrl } = round;
+    if (headSha === null || prNumber === null || prUrl === null) {
+      return { ...NO_PUSH, headSha };
+    }
+    const before = aheadByPr.has(prNumber) ? aheadByPr.get(prNumber) : 0;
+    aheadByPr.set(prNumber, round.headAhead);
+    const commits =
+      round.headAhead !== null &&
+      before !== null &&
+      before !== undefined &&
+      round.headAhead >= before
+        ? round.headAhead - before
+        : null;
+    const state =
+      round.ciState === null || round.ciState === 'none'
+        ? null
+        : ROUND_CI_STATE[round.ciState];
+    return {
+      pullRequest: { number: prNumber, url: prUrl },
+      headSha,
+      commits,
+      ci:
+        state === null
+          ? null
+          : {
+              state,
+              passed: round.ciPassed ?? 0,
+              total: round.ciTotal ?? 0,
+              url: commitChecksUrl(prUrl, headSha),
+            },
+    };
+  });
+};
+
 const toRoundView = (
   card: BoardCard,
   round: BoardCardRound & { author: BoardUserRef | null },
   facts: CardFacts,
+  push: CardRoundPush = NO_PUSH,
 ): CardRoundView => ({
   id: round.id,
   round: round.round,
@@ -562,6 +640,7 @@ const toRoundView = (
   restartEstimate: restartEstimateOf(round.restartEstimate),
   warmupTokens: round.warmupTokens,
   warmupMs: round.warmupMs,
+  ...push,
 });
 
 /**
@@ -606,6 +685,13 @@ export const escalationOf = (
       }
     : null;
 
+/** The card's rounds, oldest first, each with what it pushed (#837). */
+const roundsOf = (card: CardWithPeople, facts: CardFacts): CardRoundView[] => {
+  const rounds = [...card.rounds].sort((a, b) => a.round - b.round);
+  const pushes = roundPushesOf(rounds);
+  return rounds.map((round, i) => toRoundView(card, round, facts, pushes[i]));
+};
+
 /** `attachments`: the card's and its rounds', oldest first (#309). */
 export const toCardDetail = (
   card: CardWithPeople,
@@ -644,9 +730,7 @@ export const toCardDetail = (
   movedBy: card.movedBy,
   completedBy: card.completedBy,
   createdAt: card.createdAt.toISOString(),
-  rounds: [...card.rounds]
-    .sort((a, b) => a.round - b.round)
-    .map((round) => toRoundView(card, round, facts)),
+  rounds: roundsOf(card, facts),
   pullRequests: pullRequestsOf(card.pullRequests),
   evidence: evidenceOf(card.evidence),
   attachments,

@@ -120,6 +120,12 @@ export const cardRunPushedDataSchema = z
     prState: z.enum(['open', 'draft']).optional(),
     /** C-148 (D-12): as `card.collect`'s — the protected paths the branch changes. */
     protectedPaths: protectedPathsSchema.optional(),
+    /**
+     * #837: commits on `branch` ahead of `origin/<base>` at this push — the
+     * API counts a round's commits from it. Absent from a runner older than
+     * the field.
+     */
+    ahead: z.number().int().nonnegative().optional(),
   })
   .refine((d) => (d.prNumber === undefined) === (d.prUrl === undefined), {
     message: 'prNumber and prUrl go together',
