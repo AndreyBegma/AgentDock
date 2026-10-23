@@ -191,6 +191,14 @@ export const CARD_CI_POLL_MS = 60_000;
 export const CARD_CI_MISSING_MS = 5 * 60_000;
 
 /**
+ * #895: how long after a round ends the API waits for GitHub to show the
+ * head the round pushed as its PR's head. GitHub can take minutes to move a
+ * PR's head after a push; until then the PR still shows the head the round
+ * started from, with that old head's checks and mergeability.
+ */
+export const CARD_PR_HEAD_LAG_MS = 30 * 60_000;
+
+/**
  * Why a card is marked `needsPerson` — nothing is automated until a person
  * acts: CI still red after the fix budget (#359 D6), CI never reported on
  * the head (#484), or auto-merge refused the head the latest round left
