@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { builtinOverrideProblems } from './template-api';
 import {
   BUILTIN_DESIGN_TEMPLATES,
   builtinDesignTemplate,
@@ -125,6 +126,62 @@ describe('resolveDesignTemplate', () => {
     expect(
       resolveDesignTemplate(page, lacking)?.frames.map((fr) => fr.key),
     ).toEqual(['screen', 'breakdown', 'states']);
+  });
+
+  // #863 (ADR-0084): an override saved before page and flow lost `mobile`.
+  it('reads an older override without the mobile frame and with current names', () => {
+    const notes = {
+      key: 'notes',
+      kind: 'custom' as const,
+      name: 'Notes',
+      instruction: 'What changed.',
+      required: false,
+      enabled: true,
+    };
+    const oldFlow = {
+      ...flow,
+      frames: [
+        ...flow.frames,
+        {
+          key: 'mobile',
+          kind: 'mobile' as const,
+          name: 'Mobile',
+          instruction: 'The steps at the narrow width.',
+          required: false,
+          enabled: true,
+        },
+        notes,
+      ],
+    };
+    expect(
+      resolveDesignTemplate(flow, oldFlow)?.frames.map((fr) => fr.key),
+    ).toEqual(['flow_map', 'flow_step', 'breakdown', 'notes']);
+
+    const oldPage = {
+      ...page,
+      frames: page.frames.map((fr) =>
+        fr.key === 'states'
+          ? {
+              ...fr,
+              name: 'States and mobile',
+              instruction:
+                'The empty, loading and error states, and the page at the narrow width.',
+            }
+          : fr.key === 'screen'
+            ? { ...fr, instruction: 'Our own words.' }
+            : fr,
+      ),
+    };
+    const resolved = resolveDesignTemplate(page, oldPage);
+    const states = resolved?.frames.find((fr) => fr.key === 'states');
+    expect(states?.name).toBe('States');
+    expect(states?.instruction).toBe('The empty, loading and error states.');
+    expect(resolved?.frames.find((fr) => fr.key === 'screen')?.instruction).toBe(
+      'Our own words.',
+    );
+    expect(builtinOverrideProblems(page, resolved as DesignTemplate)).toEqual(
+      [],
+    );
   });
 
   it("is a project's own template alone", () => {

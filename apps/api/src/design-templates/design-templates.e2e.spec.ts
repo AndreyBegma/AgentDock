@@ -161,6 +161,40 @@ describe('design templates API (e2e, #833)', () => {
     expect((await h.auditOf('design.template_deleted')).length).toBe(1);
   });
 
+  // #863 (ADR-0084): an override stored while flow still had a mobile frame.
+  it('lists an older flow override without its mobile frame, and saves it back', async () => {
+    const flow = BUILTIN_DESIGN_TEMPLATES[2];
+    const mobile: DesignTemplateFrame = {
+      key: 'mobile',
+      kind: 'mobile',
+      name: 'Mobile',
+      instruction: 'The steps at the narrow width.',
+      required: false,
+      enabled: true,
+    };
+    await h.ctx.prisma.designTemplate.create({
+      data: {
+        projectId: h.projectId,
+        key: 'flow',
+        name: flow.name,
+        definition: { frames: [...flow.frames, mobile, custom()] },
+      },
+    });
+    const listed = (await list()).templates.find((t) => t.key === 'flow');
+    expect(listed?.overridden).toBe(true);
+    expect(listed?.frames.map((f) => f.key)).toEqual([
+      'flow_map',
+      'flow_step',
+      'breakdown',
+      'notes',
+    ]);
+    const saved = await h.admin.send('put', url('flow'), {
+      name: listed?.name,
+      frames: listed?.frames,
+    });
+    expect(saved.status).toBe(200);
+  });
+
   it('keeps the templates of one project from another’s members, and from an operator’s writes', async () => {
     expect((await h.outsider.get(url())).status).toBe(404);
     expect(
