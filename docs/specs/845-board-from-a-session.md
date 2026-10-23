@@ -1,6 +1,6 @@
 # Work the Board from a Claude Code session
 
-Issue: [#845](https://github.com/AndreyBegma/Nautelle/issues/845) · ADR: [ADR-0077](../adr/0077-a-persons-session-may-work-the-board-through-mcp.md)
+Issue: [#845](https://github.com/AndreyBegma/Nautelle/issues/845) · ADR: [ADR-0083](../adr/0083-a-persons-session-may-work-the-board-through-mcp.md)
 
 ## Summary
 A person's own Claude Code session can drive the Nautelle Board through the
@@ -22,7 +22,7 @@ app, or a Playwright driver holding a CSRF cookie — the fleet runs of
 - A new action-request kind `card_accept` (Finished → Completed, optional merge) that a person approves.
 - A project Board setting `cardMergePolicy` (`ask` | `agent` | `person`, default `ask`).
 - A plugin skill `nautelle:board` with the conductor's instructions.
-- ADR-0077.
+- ADR-0083.
 
 ### Out of scope
 - Any agent path to Completed without a person's approval.
@@ -71,7 +71,7 @@ Local-request methods (packages/shared/src/protocol/local.ts method table, `need
 
 `finish_card` gains an optional `pullRequestUrl` for a taken card: it records the pull request, moves the card to Finished, and promotes the session's next queued card. `request_action` gains kind `card_accept` (packages/shared/src/action-requests/contracts.ts).
 
-`board.wait` holds the request until an event or the timeout. [Unknown: the runner's local relay timeout for one request — the lead measures it and caps `timeoutSec` below it.] [Unknown: whether board changes are already published on an in-process bus the handler can subscribe to (apps/api/src/live, server-events) or must be diffed from `updated_at`; the lead decides and records it in ADR-0077.]
+`board.wait` holds the request until an event or the timeout. [Unknown: the runner's local relay timeout for one request — the lead measures it and caps `timeoutSec` below it.] [Unknown: whether board changes are already published on an in-process bus the handler can subscribe to (apps/api/src/live, server-events) or must be diffed from `updated_at`; the lead decides and records it in ADR-0083.]
 
 ## UI
 - Project settings → Board: a "Merge pull requests of finished cards" select — Ask at the start of each run / The agent merges / A person merges.
@@ -121,4 +121,4 @@ Merge order: contract → api, runner, plugin → web after api (a UI must not c
 - **Low — a taken card and a Board Run on the same card.** Mitigation: `card.take` refuses a running card; Run is refused while the taking session is alive (`trackingAlive`).
 
 ## Open questions
-- Whether `board_wait` diffs `updated_at` or subscribes to a bus — default: the lead picks the bus if one exists, else the diff, and records why in ADR-0077.
+- Whether `board_wait` diffs `updated_at` or subscribes to a bus — default: the lead picks the bus if one exists, else the diff, and records why in ADR-0083.

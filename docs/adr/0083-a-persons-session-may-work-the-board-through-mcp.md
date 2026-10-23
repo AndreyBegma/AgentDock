@@ -1,4 +1,4 @@
-# ADR-0077: A person's own Claude Code session may work the Board through MCP; Completed stays a person's
+# ADR-0083: A person's own Claude Code session may work the Board through MCP; Completed stays a person's
 
 Status: accepted · Date: 2026-10-23 ·
 Issue: [#845](https://github.com/AndreyBegma/Nautelle/issues/845) ·
