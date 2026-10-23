@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breakdown · Device canvas</title>
+<style>
+:root{color-scheme:dark;--font-sans:'SF Pro Text','SF Pro Display','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--size-control:28px;--size-control-sm:32px;--size-field:28px;--size-chip:28px;--focus-width:3px;--focus-offset:4px;--dur-fast:100ms;--dur-base:150ms;--glass-blur:26px;--glass-blur-strong:40px}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-paper:#1b2647;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-focus:#b4b2ff;--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240 / 0.16);--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246 / 0.18);--color-hue-1-ink:#a4c8ff;--color-hue-2:#2fbf94;--color-hue-4:#e69f00;--color-hue-4-soft:rgb(230 159 0 / 0.18);--color-hue-4-line:rgb(230 159 0 / 0.5);--color-hue-4-ink:#f5c25c;--color-hue-7:#a68bfa;--canvas-glow:18%;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-scrim-strong:rgb(9 9 12 / 0.64);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-strong:rgb(0 0 0 / 0.45);--glass-shadow-clear:rgb(0 0 0 / 0.15);--glass-brightness:0.85}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-paper:#ffffff;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-focus:#4f46e5;--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154 / 0.12);--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214 / 0.12);--color-hue-1-ink:#1550b0;--color-hue-2:#00805e;--color-hue-4:#b36b00;--color-hue-4-soft:rgb(179 107 0 / 0.12);--color-hue-4-line:rgb(179 107 0 / 0.45);--color-hue-4-ink:#8a5200;--color-hue-7:#7244e0;--canvas-glow:10%;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-scrim-strong:rgb(255 255 255 / 0.64);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-strong:rgb(0 0 0 / 0.16);--glass-shadow-clear:rgb(0 0 0 / 0.08);--glass-brightness:1.15}
+:root{--color-status-waiting:var(--color-hue-1);--color-status-waiting-soft:var(--color-hue-1-soft);--color-status-waiting-ink:var(--color-hue-1-ink)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground)}
+body{margin:0;min-height:100vh;font-family:var(--font-sans);font-size:14px;line-height:20px;color:var(--color-ink);-webkit-font-smoothing:antialiased}
+code,.mono{font-family:var(--font-mono);font-size:0.92em}
+.num{font-variant-numeric:tabular-nums}
+td.num,th.num{text-align:right}
+svg.icon{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.text-display{font-size:28px;line-height:32px;letter-spacing:-0.02em;font-weight:600;margin:0}
+.text-heading{font-size:20px;line-height:28px;letter-spacing:-0.01em;font-weight:600;margin:0}
+.text-section{font-size:15px;line-height:22px;font-weight:600;margin:0}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.shell{display:flex;gap:12px;padding:12px}
+.rail{width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:var(--radius-surface);height:900px}
+.rail-group-label{padding:8px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--color-ink-3)}
+.rail-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-control);font-size:14px;color:var(--color-ink-2);text-decoration:none}
+.rail-item.primary{min-height:38px;padding:6px 8px;border:1px solid color-mix(in oklab,var(--color-accent) 40%,transparent);background:color-mix(in oklab,var(--color-accent) 8%,transparent);color:var(--color-ink);font-weight:600}
+.rail-item.primary .rail-glyph{display:grid;place-items:center;width:24px;height:24px;border-radius:var(--radius-control);background:var(--color-accent);color:var(--color-on-accent)}
+.main-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.topbar{height:56px;display:flex;align-items:center;gap:12px;padding:0 12px 0 16px;border-radius:var(--radius-surface)}
+.crumbs{display:flex;align-items:center;gap:6px;flex:1;font-size:14px;color:var(--color-ink-2)}
+.crumbs [aria-current="page"]{color:var(--color-ink);font-size:15px;font-weight:600}
+.page{width:100%;max-width:80rem;margin:0 auto;padding:8px 4px 24px;display:flex;flex-direction:column;gap:24px}
+.kbd{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:4px;border:1px solid var(--color-line-strong);font-family:var(--font-mono);font-size:10px;color:var(--color-ink-3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;height:28px;padding:0 16px;border-radius:var(--radius-control);border:0;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent)}
+.btn-glass{background:var(--color-raised);color:var(--color-ink);border:1px solid var(--color-line-strong)}
+.btn-ghost{background:transparent;color:var(--color-ink-2)}
+.btn-icon{padding:0;aspect-ratio:1}
+.badge{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:600;line-height:1;border-radius:999px;height:20px;min-width:20px;padding:0 6px;font-size:12px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-sm{height:18px;min-width:18px;padding:0 4px;font-size:10px}
+.badge-ok{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.badge-danger{background:color-mix(in oklab,var(--color-danger) 14%,transparent);color:var(--color-danger)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:3px}
+.hue-2{background:var(--color-hue-2)}.hue-4{background:var(--color-hue-4)}.hue-7{background:var(--color-hue-7)}
+.pill{display:inline-flex;align-items:center;gap:8px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;background:var(--color-status-waiting-soft);color:var(--color-status-waiting-ink);border:1px solid color-mix(in oklab,var(--color-status-waiting) 45%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--color-status-waiting)}
+.select{height:28px;padding:0 28px 0 10px;background:var(--color-surface);color:var(--color-ink);border:1px solid var(--color-line-strong);border-radius:var(--radius-control);font:inherit;font-size:13px;appearance:none}
+.segmented{display:inline-flex;gap:2px;padding:2px;border-radius:var(--radius-control);background:var(--color-hover);border:1px solid var(--color-line)}
+.segmented button{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border:0;border-radius:4px;background:none;font:inherit;font-size:12px;font-weight:500;color:var(--color-ink-2)}
+.segmented button[aria-pressed="true"],.segmented button[aria-checked="true"]{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.tab{position:relative;display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:0;background:none;font:inherit;font-size:14px;font-weight:500;color:var(--color-ink-2)}
+.tab[aria-selected="true"]{color:var(--color-ink)}
+.tab[aria-selected="true"]::after{content:'';position:absolute;left:8px;right:8px;bottom:-1px;height:2px;border-radius:2px;background:var(--color-accent)}
+.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.page-header-text{display:flex;flex-direction:column;gap:4px}
+.page-header-eyebrow{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.page-header-title{display:flex;align-items:center;gap:12px}
+.page-header-desc{margin:0;font-size:14px;color:var(--color-ink-2)}
+.meta-bar{position:relative;display:flex;gap:16px;font-size:12px;color:var(--color-ink-3)}
+.meta-bar b{color:var(--color-ink);font-weight:600}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.stat-tile{border-radius:var(--radius-surface);padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.stat-label{font-size:12px;font-weight:500;color:var(--color-ink-3)}
+.stat-value{font-size:24px;line-height:28px;font-weight:600}
+.stat-delta{font-size:12px;color:var(--color-ink-2)}
+.table-wrap{border-radius:var(--radius-surface);overflow:hidden}
+.table{width:100%;border-collapse:collapse;font-size:14px}
+.table thead{border-bottom:1px solid var(--color-line);font-size:12px;color:var(--color-ink-3)}
+.table th{font-weight:500}
+.table th,.table td{padding:10px 12px;text-align:left}
+.table tbody tr{border-bottom:1px solid var(--color-line)}
+.avatar{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--color-accent-soft);color:var(--color-accent-ink);font-size:11px;font-weight:600}
+.separator-v{width:1px;height:16px;background:var(--color-line)}
+.viewer{display:flex;flex-direction:column;gap:12px}
+.viewer-bar{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:1px solid var(--color-line)}
+.viewer-tools{position:relative;display:flex;gap:8px;align-items:center;padding-bottom:6px}
+.viewer-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px}
+.stage{position:relative;height:640px;border-radius:var(--radius-surface);overflow:hidden;background-color:var(--color-surface);background-image:radial-gradient(var(--color-line-strong) 1px,transparent 1.2px);background-size:20px 20px;border:1px solid var(--color-line)}
+.world{position:absolute;left:0;top:0;width:2824px;height:1112px;transform-origin:0 0}
+.dev{position:absolute;top:0}
+.dev-label{position:absolute;left:0;bottom:100%;margin-bottom:calc(8px / var(--z));display:flex;align-items:center;gap:calc(6px / var(--z));font-size:calc(12px / var(--z));color:var(--color-ink-2);white-space:nowrap}
+.dev-label svg{width:calc(13px / var(--z));height:calc(13px / var(--z))}
+.dev-label b{color:var(--color-ink);font-weight:600}
+.dev.is-active .dev-label b,.dev.is-active .dev-label svg{color:var(--color-accent-ink)}
+.dev-screen{position:relative;width:100%;height:100%;overflow:hidden;background:var(--color-ground);box-shadow:0 0 0 calc(1px / var(--z)) var(--color-line-strong),0 calc(12px / var(--z)) calc(40px / var(--z)) var(--glass-shadow)}
+.dev.is-active .dev-screen{box-shadow:0 0 0 calc(2px / var(--z)) var(--color-accent)}
+.dev-desktop .dev-screen{border-radius:12px}.dev-tablet .dev-screen{border-radius:28px}.dev-phone .dev-screen{border-radius:52px}
+.pin{position:absolute;display:grid;place-items:center;width:calc(24px / var(--z));height:calc(24px / var(--z));transform:translate(-2px,-100%);border-radius:999px 999px 999px 3px;background:var(--color-accent);color:var(--color-on-accent);font-size:calc(11px / var(--z));font-weight:700;border:calc(2px / var(--z)) solid var(--color-ground)}
+.pin.is-active{box-shadow:0 0 0 calc(4px / var(--z)) color-mix(in oklab,var(--color-accent) 40%,transparent)}
+.float{position:absolute;z-index:4;display:flex;align-items:center;gap:2px;padding:4px;border-radius:var(--radius-surface)}
+.float.tl{top:12px;left:12px}.float.bl{bottom:12px;left:12px}
+.float .btn{height:28px;padding:0 8px;font-size:12px}
+.float .btn-icon{width:28px;padding:0}
+.comments{position:relative;border-radius:var(--radius-surface);display:flex;flex-direction:column;height:640px;overflow:hidden}
+.c-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--color-line)}
+.c-head h2{margin:0;font-size:16px;line-height:24px;font-weight:600;display:flex;gap:8px;align-items:center}
+.c-list{flex:1;padding:6px;display:flex;flex-direction:column;gap:2px;margin:0;list-style:none}
+.c-item{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:10px;border-radius:var(--radius-control)}
+.c-item[aria-current="true"]{background:var(--color-accent-soft)}
+.c-num{width:22px;height:22px;border-radius:999px 999px 999px 3px;background:var(--color-accent);color:var(--color-on-accent);display:grid;place-items:center;font-size:11px;font-weight:700}
+.c-meta{display:flex;gap:6px;font-size:12px;color:var(--color-ink-3)}
+.c-meta b{color:var(--color-ink);font-weight:500}
+.c-text{margin:4px 0 6px;font-size:13px;line-height:18px}
+.c-where{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--color-ink-2)}
+.c-where svg{width:12px;height:12px}
+.c-foot{border-top:1px solid var(--color-line);padding:12px 14px;display:flex;gap:8px;font-size:12px;color:var(--color-ink-3)}
+.mk{position:absolute;inset:0;display:flex;gap:12px;padding:12px;background:var(--color-ground);overflow:hidden}
+.mk>*{position:relative}
+.mk-rail{width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:var(--radius-surface);background:var(--color-surface);border:1px solid var(--color-line)}
+.mk-rail-c{width:64px;align-items:center}
+.mk-brand{display:flex;align-items:center;gap:10px;height:40px;padding:0 10px;margin-bottom:8px}
+.mk-logo{width:20px;height:20px;border-radius:6px;background:var(--color-accent)}
+.mk-ri{display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:var(--radius-control);color:var(--color-ink-2)}
+.mk-ri i{width:16px;height:16px;border-radius:4px;border:2px solid currentColor;opacity:.7}
+.mk-ri.on{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.mk-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:20px}
+.mk-top{height:56px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 16px;border-radius:var(--radius-surface);background:var(--color-surface);border:1px solid var(--color-line)}
+.mk-search{display:flex;align-items:center;gap:8px;width:220px;height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--color-line);font-size:13px}
+.mk-h{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:4px 4px 0}
+.mk-phone{flex-direction:column;padding:56px 16px 16px;gap:12px}
+.mk-phone .mk-top{height:48px}
+.mk-card{border-radius:var(--radius-surface);padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.mk-cap{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);display:flex;gap:4px;padding:6px;border-radius:999px}
+.mk-cap span{padding:8px 14px;border-radius:999px;font-size:11px;color:var(--color-ink-2)}
+.mk-cap span.on{background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.mk-fab{position:absolute;right:20px;bottom:30px;width:48px;height:48px;border-radius:999px;background:var(--color-accent);color:var(--color-on-accent);display:grid;place-items:center;font-size:24px}
+
+/* Breakdown markers and legend */
+.mark{position:absolute;z-index:9;display:grid;place-items:center;width:26px;height:26px;border-radius:999px;background:var(--color-hue-4);color:var(--color-ground);font-size:13px;font-weight:700;box-shadow:0 0 0 3px var(--color-ground),0 0 0 5px var(--color-hue-4-line)}
+.zone{position:absolute;z-index:8;border:2px dashed var(--color-hue-4-line);border-radius:10px;pointer-events:none}
+.legend{padding:8px 16px 48px 268px;display:flex;flex-direction:column;gap:16px;max-width:1440px}
+.legend-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.lg{border-radius:var(--radius-surface);padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.lg-head{display:flex;align-items:center;gap:10px}
+.lg-head .mark{position:static;box-shadow:none;flex-shrink:0}
+.lg-tag{margin-left:auto}
+.lg-comp{font-family:var(--font-mono);font-size:11.5px;color:var(--color-accent-ink)}
+.lg p{margin:0;font-size:13px;line-height:19px;color:var(--color-ink-2)}
+.lg p b{color:var(--color-ink);font-weight:600}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="shell">
+  <aside class="rail glass" aria-label="Main">
+    <div class="rail-group-label">Workspace</div>
+    <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Overview</a>
+    <div class="rail-group-label">Nautelle</div>
+    <a class="rail-item primary" href="#"><span class="rail-glyph"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg></span>Work</a>
+    <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Activity</a>
+    <div class="rail-group-label">More · 2</div>
+    <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Fleet</a>
+    <a class="rail-item" href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Queue</a>
+  </aside>
+  <div class="main-col">
+    <header class="topbar glass">
+      <nav class="crumbs" aria-label="Breadcrumb"><span>Nautelle</span><span>/</span><span>Work</span><span>/</span><span class="mono">C-301</span><span>/</span><span aria-current="page">Design</span></nav>
+      <span class="avatar">AB</span>
+    </header>
+    <main class="page">
+      <header class="page-header">
+        <div class="page-header-text">
+          <div class="page-header-eyebrow"><span class="mono">C-301</span> · Design</div>
+          <div class="page-header-title"><h1 class="text-display">Schedules page</h1><span class="pill">In review</span></div>
+          <p class="page-header-desc">Variant 1 of 2 · Revision 2 · Page template</p>
+          <div class="meta-bar"><span class="mark" style="left:-34px;top:-4px">9</span><span>Devices <b>Desktop 1440</b> · <b>Tablet 834</b> · <b>Phone 390</b></span><span><b>3</b> frames</span><span><b>3</b> open comments</span></div>
+        </div>
+        <div style="display:flex;gap:8px"><button class="btn btn-glass">Revise</button><button class="btn btn-solid">Approve</button></div>
+      </header>
+      <div class="viewer">
+        <div class="viewer-bar">
+          <span class="mark" style="left:-34px;top:4px">1</span>
+          <div style="display:flex;gap:4px">
+            <button class="tab" aria-selected="true">Screen <span class="badge badge-sm">3</span></button>
+            <button class="tab" aria-selected="false">Breakdown</button>
+            <button class="tab" aria-selected="false">States and mobile</button>
+          </div>
+          <div class="viewer-tools">
+            <span class="mark" style="left:-34px;top:0">8</span>
+            <div class="segmented"><button aria-pressed="false">Light</button><button aria-pressed="true">Dark</button></div>
+            <select class="select" aria-label="Variant"><option>Variant 1</option></select>
+            <select class="select" aria-label="Revision"><option>Revision 2 · today</option></select>
+          </div>
+        </div>
+        <div class="viewer-grid">
+          <section class="stage" aria-label="Device canvas">
+            <span class="zone" style="inset:6px"></span>
+            <span class="mark" style="right:16px;top:16px">2</span>
+            <div class="world" style="transform:translate(48px,190px) scale(.258);--z:.258">
+              <div class="dev dev-desktop" style="left:0;width:1440px;height:900px"><div class="dev-label"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><b>Desktop</b><span>1440 × 900</span></div><div class="dev-screen"><div data-mock="desktop"></div></div></div>
+              <div class="dev dev-tablet is-active" style="left:1520px;width:834px;height:1112px"><div class="dev-label"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/></svg><b>Tablet</b><span>834 × 1112</span></div><div class="dev-screen"><div data-mock="tablet"></div></div></div>
+              <div class="dev dev-phone" style="left:2434px;width:390px;height:844px"><div class="dev-label"><svg class="icon" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg><b>Phone</b><span>390 × 844</span></div><div class="dev-screen"><div data-mock="phone"></div></div></div>
+              <span class="pin" style="left:1240px;top:150px">1</span>
+              <span class="pin is-active" style="left:2180px;top:420px">2</span>
+              <span class="pin" style="left:2700px;top:180px">3</span>
+            </div>
+            <span class="mark" style="left:330px;top:138px">3</span>
+            <span class="mark" style="left:612px;top:262px">6</span>
+            <div class="float tl glass">
+              <div class="segmented" style="border:0;background:none"><button aria-checked="true">Move <span class="kbd">V</span></button><button aria-checked="false">Comment <span class="kbd">C</span></button></div>
+            </div>
+            <span class="mark" style="left:232px;top:16px">4</span>
+            <div class="float bl glass">
+              <button class="btn btn-ghost btn-icon" aria-label="Zoom out"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M5 12h14"/></svg></button>
+              <button class="btn btn-ghost">26%</button>
+              <button class="btn btn-ghost btn-icon" aria-label="Zoom in"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M5 12h14M12 5v14"/></svg></button>
+              <span class="separator-v" style="margin:0 4px"></span>
+              <button class="btn btn-ghost">Fit</button><button class="btn btn-ghost">100%</button>
+            </div>
+            <span class="mark" style="left:298px;bottom:18px">5</span>
+          </section>
+          <aside class="comments surface-content" aria-label="Comments">
+            <span class="mark" style="right:12px;top:58px">7</span>
+            <div class="c-head"><h2>Comments <span class="badge">3 open</span></h2><div class="segmented"><button aria-checked="true">Open</button><button aria-checked="false">All</button></div></div>
+            <ul class="c-list">
+              <li class="c-item"><span class="c-num">1</span><span><span class="c-meta"><b>Andrew B.</b>· 12 min</span><p class="c-text">The header crowds New schedule at 1440 — give it 24px more air above the stat tiles.</p><span class="c-where"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>Screen · Desktop</span></span></li>
+              <li class="c-item" aria-current="true"><span class="c-num">2</span><span><span class="c-meta"><b>Andrew B.</b>· 8 min</span><p class="c-text">With the rail folded, Status should keep its badge; drop the project line under the name first.</p><span class="c-where"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/></svg>Screen · Tablet</span></span></li>
+              <li class="c-item"><span class="c-num">3</span><span><span class="c-meta"><b>Mira K.</b>· 3 min</span><p class="c-text">Put the status badge on the name line and keep the cron mono on the phone card.</p><span class="c-where"><svg class="icon" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/></svg>Screen · Phone</span></span></li>
+            </ul>
+            <div class="c-foot"><span class="kbd">C</span><span>then click a device to pin a comment</span></div>
+          </aside>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<section class="legend" aria-label="Legend">
+  <h2 class="text-heading">What changes</h2>
+  <div class="legend-grid">
+    <article class="lg surface-content"><div class="lg-head"><span class="mark">1</span><h3 class="text-section">Frame tabs</h3><span class="badge badge-warn lg-tag">Changed</span></div><div class="lg-comp">glass-ui/tabs · TabList, Tab, Badge</div><p><b>Behaviour.</b> One tab per frame of the revision, in template order. The open-comment count is shown as a badge, and the tab lives in <code>?frame=</code>. ←/→ move between tabs.</p><p><b>Why.</b> Replaces the frame strip; a frame is now a whole canvas, not one picture.</p></article>
+    <article class="lg surface-content"><div class="lg-head"><span class="mark">2</span><h3 class="text-section">Device canvas</h3><span class="badge badge-ok lg-tag">New</span></div><div class="lg-comp">glass-ui · ZoomCanvas (new, C-345)</div><p><b>Behaviour.</b> Drag or scroll pans. ⌘/Ctrl + scroll and pinch zoom around the pointer, from 8% to 400%. The dot grid moves with the pan so motion reads.</p><p><b>Why.</b> Comparing three widths side by side beats toggling one viewport.</p></article>
+    <article class="lg surface-content"><div class="lg-head"><span class="mark">3</span><h3 class="text-section">Device frame</h3><span class="badge badge-ok lg-tag">New</span></div><div class="lg-comp">sandboxed iframe per device · icon + name + size label</div><p><b>Behaviour.</b> The frame's one HTML is rendered at each device's width × height, in the order the devices were chosen. The label stays 12px at any zoom. Double-clicking a label zooms to that device.</p><p><b>Why.</b> A single responsive HTML, many widths — the phone is a device, not a frame.</p></article>
+    <article class="lg surface-content"><div class="lg-head"><span class="mark">4</span><h3 class="text-section">Canvas tools</h3><span class="badge badge-warn lg-tag">Changed</span></div><div class="lg-comp">glass-ui/segmented-control · KeyHint</div><p><b>Behaviour.</b> Move (V) pans. In Comment mode (C), a click pins on the device under the pointer and opens the pin composer. Esc returns to Move.</p><p><b>Why.</b> Dragging to pan and clicking to pin are the same gesture; a mode keeps them apart.</p></article>
+    <article class="lg surface-content"><div class="lg-head"><span class="mark">5</span><h3 class="text-section">Zoom controls</h3><span class="badge badge-ok lg-tag">New</span></div><div class="lg-comp">glass-ui/button ghost · glass group</div><p><b>Behaviour.</b> − / % / + step by 25%. Fit frames every device and is the default on open. 100% shows true pixels. ⌘0 fits, ⌘1 sets 100%.</p><p><b>Why.</b> A visible reset for people who do not know the gestures.</p></article>
+    <article class="lg surface-content"><div class="lg-head"><span class="mark">6</span><h3 class="text-section">Pins on devices</h3><span class="badge badge-warn lg-tag">Changed</span></div><div class="lg-comp">pin · frame + device + x/y in device pixels</div><p><b>Behaviour.</b> A pin is anchored to a device's own coordinates, so it moves and scales with the canvas while its marker keeps a fixed size. The selected pin rings, and its device gets an accent outline.</p><p><b>Why.</b> "The tablet header" is a different comment from "the desktop header".</p></article>
+    <article class="lg surface-content"><div class="lg-head"><span class="mark">7</span><h3 class="text-section">Comments</h3><span class="badge badge-warn lg-tag">Changed</span></div><div class="lg-comp">comments-panel · Open / All segmented</div><p><b>Behaviour.</b> Each comment shows its frame and device. Selecting a comment switches to its tab and pans to its pin, at 50% zoom or more. Resolved comments sit under All.</p><p><b>Why.</b> Revise reads these comments, so the agent knows which width each note is about.</p></article>
+    <article class="lg surface-content"><div class="lg-head"><span class="mark">8</span><h3 class="text-section">Review toolbar</h3><span class="badge badge-danger lg-tag">Removed switch</span></div><div class="lg-comp">segmented-control · select × 2</div><p><b>Behaviour.</b> Only theme, variant and revision are left. The Mobile/Desktop viewport switch is removed, and the typed width is gone with it.</p><p><b>Why.</b> The devices on the canvas replace both.</p></article>
+    <article class="lg surface-content"><div class="lg-head"><span class="mark">9</span><h3 class="text-section">Devices of the revision</h3><span class="badge badge-ok lg-tag">New</span></div><div class="lg-comp">page-header meta · stored on the design (C-344)</div><p><b>Behaviour.</b> Lists the devices this revision was drawn for. They are chosen in the generate panel's Devices group (C-347, see States). Earlier revisions show "as drawn".</p><p><b>Why.</b> The reviewer needs to know which widths were asked for, not only which are shown.</p></article>
+  </div>
+</section>
+<script>
+(function(){
+  var R=[['Nightly dependency sweep','0 3 * * *','ok','Active','2 h ago',2,'api'],['Weekly flaky-test triage','0 9 * * 1','ok','Active','3 d ago',7,'web'],['Release notes draft','0 16 * * 5','warn','Paused','6 d ago',2,'api'],['Prune stale branches','30 2 * * *','ok','Active','1 d ago',4,'runner'],['Token budget report','0 8 1 * *','ok','Active','21 d ago',2,'api'],['Docs link check','0 4 * * 0','danger','Failed','5 d ago',7,'web']];
+  function badge(r){return '<span class="badge badge-'+r[2]+'">'+r[3]+'</span>'}
+  function rail(c){var it=['Overview','Work','Activity','Fleet','Queue','Schedules','Settings'];return '<div class="mk-rail'+(c?' mk-rail-c':'')+'"><div class="mk-brand"><span class="mk-logo"></span>'+(c?'':'<b>Nautelle</b>')+'</div>'+it.map(function(t){return '<div class="mk-ri'+(t==='Schedules'?' on':'')+'"><i></i>'+(c?'':'<span>'+t+'</span>')+'</div>'}).join('')+'</div>'}
+  function table(full){return '<div class="table-wrap surface-content"><table class="table"><thead><tr><th>Schedule</th><th>Cron</th><th>Status</th>'+(full?'<th class="num">Last run</th>':'')+'</tr></thead><tbody>'+R.map(function(r){return '<tr><td><div style="font-weight:500">'+r[0]+'</div><div class="ink-3" style="font-size:12px;display:flex;align-items:center;gap:6px"><span class="swatch hue-'+r[5]+'"></span>nautelle-'+r[6]+'</div></td><td class="mono">'+r[1]+'</td><td>'+badge(r)+'</td>'+(full?'<td class="num ink-2">'+r[4]+'</td>':'')+'</tr>'}).join('')+'</tbody></table></div>'}
+  function head(){return '<div class="mk-h"><div class="page-header-text"><div class="page-header-eyebrow">Nautelle</div><h1 class="text-display">Schedules</h1><p class="page-header-desc">Issues the fleet queues on a cron.</p></div><button class="btn btn-solid">New schedule</button></div>'}
+  function stats(){return '<div class="stat-grid"><div class="stat-tile surface-content"><span class="stat-label">Active</span><span class="stat-value">4</span><span class="stat-delta">of 6 schedules</span></div><div class="stat-tile surface-content"><span class="stat-label">Next run</span><span class="stat-value">in 3 h</span><span class="stat-delta">Nightly dependency sweep</span></div><div class="stat-tile surface-content"><span class="stat-label">Failed this week</span><span class="stat-value">1</span><span class="stat-delta">Docs link check</span></div></div>'}
+  function top(){return '<div class="mk-top"><span class="ink-2">Nautelle</span><span class="ink-3">/</span><b>Schedules</b><span style="flex:1"></span><span class="mk-search ink-3">Search…<span style="flex:1"></span><span class="kbd">⌘K</span></span><span class="avatar">AB</span></div>'}
+  function mock(k){
+    if(k==='desktop')return '<div class="mk">'+rail(false)+'<div class="mk-main">'+top()+head()+stats()+table(true)+'</div></div>';
+    if(k==='tablet')return '<div class="mk">'+rail(true)+'<div class="mk-main">'+top()+head()+stats()+table(false)+'</div></div>';
+    return '<div class="mk mk-phone"><div class="mk-top"><b>Schedules</b><span style="flex:1"></span><span class="avatar">AB</span></div><div class="page-header-text"><h1 class="text-display">Schedules</h1><p class="page-header-desc">Issues the fleet queues on a cron.</p></div>'+R.slice(0,5).map(function(r){return '<div class="mk-card surface-content"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="font-weight:500">'+r[0]+'</b>'+badge(r)+'</div><div class="mono ink-2" style="font-size:12px">'+r[1]+'</div><div class="ink-3" style="font-size:12px">Last run '+r[4]+'</div></div>'}).join('')+'<nav class="mk-cap glass"><span>Work</span><span>Fleet</span><span class="on">Schedules</span><span>More</span></nav><span class="mk-fab">+</span></div>';
+  }
+  document.querySelectorAll('[data-mock]').forEach(function(el){el.outerHTML=mock(el.getAttribute('data-mock'))});
+})();
+</script>
+</body>
+</html>
