@@ -8,6 +8,7 @@ import type {
   RunSummary,
   SlotSummary,
 } from '@nautelle/shared';
+import { formatUsd } from '../usage/format';
 import {
   approvalsHref,
   costByProject,
@@ -21,6 +22,7 @@ import {
   roundLabel,
   runningSlots,
   slotTitle,
+  spendDays,
   startOfToday,
   waitingApprovals,
 } from './dashboard';
@@ -382,6 +384,41 @@ describe('labels', () => {
       ),
     ).toBe('Round Oct 13, 14:05 · up to 5 slots');
     expect(roundLabel(null, () => '')).toBeNull();
+  });
+});
+
+describe('spendDays', () => {
+  const point = (costUsd: string, requests = 1, unpricedRequests = 0) => ({
+    t: 'x',
+    costUsd,
+    tokens: 0,
+    requests,
+    unpricedRequests,
+  });
+
+  test('keeps the last 7 days and today as the figure', () => {
+    const days = spendDays({
+      series: [
+        {
+          key: null,
+          label: null,
+          points: ['9', '1', '2', '3', '4', '5', '6', '7'].map((c) => point(c)),
+        },
+      ],
+    });
+    expect(days.values).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(days.today).toBe(formatUsd('7'));
+  });
+
+  test('a day of only unpriced requests has no figure, not $0', () => {
+    const days = spendDays({
+      series: [{ key: null, label: null, points: [point('0', 2, 2)] }],
+    });
+    expect(days.today).toBe('');
+  });
+
+  test('no series is no days', () => {
+    expect(spendDays({ series: [] })).toEqual({ values: [], today: '' });
   });
 });
 

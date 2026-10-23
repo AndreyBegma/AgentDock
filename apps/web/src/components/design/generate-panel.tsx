@@ -8,7 +8,7 @@ import {
 } from '@andrewbehma/glass-ui/segmented-control';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import {
-  type CardDesignLaunchRequest,
+  type CardDesignGenerateRequest,
   claudeModelLabel,
   DESIGN_VARIANTS_MAX,
   DESIGN_VARIANTS_MIN,
@@ -18,6 +18,7 @@ import {
   type TaskDesignPatchRequest,
   type TaskDesignView,
   type UiProfileView,
+  type ViewportPreset,
 } from '@nautelle/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { api, errorText } from '../../lib/api';
@@ -31,6 +32,7 @@ import {
   launchSavedNote,
   NO_RECOMMENDATION_TEXT,
 } from '../../lib/board/launch';
+import { deviceOptions } from '../../lib/design/devices';
 import {
   describeDesignError,
   generateProfileNote,
@@ -53,6 +55,7 @@ import { LaunchSelects } from '../board/launch-popover';
 import { DisabledReason } from '../prerequisites/disabled-reason';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { DesignSkillsGroup } from './design-skills-group';
+import { DevicePicker } from './device-picker';
 import { TemplateSelect } from './template-select';
 
 const VARIANT_COUNTS = Array.from(
@@ -87,7 +90,7 @@ export function GeneratePanel({
   stackHref?: string;
   busy: boolean;
   onPatch: (body: TaskDesignPatchRequest) => Promise<unknown>;
-  onGenerate: (body?: CardDesignLaunchRequest) => Promise<unknown>;
+  onGenerate: (body: CardDesignGenerateRequest) => Promise<unknown>;
   /** A card's design (#322 D1): the inline "Runs on" group, sent with Generate. */
   launch?: LaunchCard;
 }) {
@@ -104,6 +107,10 @@ export function GeneratePanel({
     [design.skills, design.skillsEdited],
   );
   const [savingDefault, setSavingDefault] = useState(false);
+  // #887: the devices the picker has chosen; it reports them on every change.
+  const [devices, setDevices] = useState<ViewportPreset[]>(() =>
+    deviceOptions(design.viewports),
+  );
 
   const installed = useSection(
     () => api<InstalledSkillsView>(installedSkillsApi(projectId)),
@@ -155,7 +162,8 @@ export function GeneratePanel({
     writeBlock !== null ||
     stackBlock !== null ||
     runnerCopy !== null ||
-    notReady;
+    notReady ||
+    devices.length === 0;
   const describedBy =
     writeBlock !== null
       ? undefined
@@ -170,7 +178,10 @@ export function GeneratePanel({
   const generate = async () => {
     try {
       if (changed) await onPatch({ variantCount: count, ...skillsChange });
-      await onGenerate(launch ? launchRequest(runsOn) : undefined);
+      await onGenerate({
+        ...(launch ? launchRequest(runsOn) : {}),
+        devices,
+      });
     } catch {
       // Toasted by the caller.
     }
@@ -258,6 +269,14 @@ export function GeneratePanel({
           ))}
         </SegmentedControl>
       </Field>
+
+      <DevicePicker
+        projectId={projectId}
+        presets={design.viewports}
+        isAdmin={isAdmin}
+        disabled={writeBlock !== null}
+        onChange={setDevices}
+      />
 
       <DesignSkillsGroup
         owner={design.owner.kind}
