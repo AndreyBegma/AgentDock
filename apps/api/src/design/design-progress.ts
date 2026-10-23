@@ -51,18 +51,25 @@ export interface ProgressDesign {
 const batchModeOf = (status: TaskDesignStatus): DesignBatchMode =>
   status === 'revising' ? 'revise' : 'generate';
 
+/** A design turn the runner has not finished: queued or running. */
+export const isActiveTurn = <T extends Pick<ProgressTurn, 'phase'>>(
+  turn: T | null,
+): turn is T & { phase: 'queued' | 'running' } =>
+  turn !== null && (turn.phase === 'queued' || turn.phase === 'running');
+
 /**
  * D1: the queued or running turn first — once it exists the build is done —
  * then the running build. Busy with neither is the gap between two variants
- * of a batch: `null`, read as "Starting the next variant…".
+ * of a batch: `null`, read as "Starting the next variant…". #840: a turn
+ * not finished yet is progress whatever the status says — the design is busy
+ * until the turn's end settles it.
  */
 export const progressOf = (
   design: ProgressDesign,
   active: { turn: ProgressTurn | null; build: ProgressBuild | null },
 ): DesignProgressView | null => {
-  if (!BUSY.includes(design.status)) return null;
   const { turn, build } = active;
-  if (turn && (turn.phase === 'queued' || turn.phase === 'running')) {
+  if (isActiveTurn(turn)) {
     const plan = designTurnPlanOf(turn.run.args);
     const mode = plan?.mode ?? batchModeOf(design.status);
     return {
@@ -76,6 +83,7 @@ export const progressOf = (
       startedAt: (design.busySince ?? turn.run.startedAt).toISOString(),
     };
   }
+  if (!BUSY.includes(design.status)) return null;
   if (build && build.status === 'running') {
     return {
       // A build's queued phase is not stored (`uiprofile_build.phase_changed`
@@ -129,7 +137,7 @@ const buildFailure = (
 };
 
 /**
- * D6: only at rest, the newer of the owner's latest design turn and the
+ * D6: only at rest — not busy, no design turn queued or running — the newer of the owner's latest design turn and the
  * latest build that held the design — when it failed or was cancelled, and
  * only when it is newer than the latest revision and the last approval.
  */
@@ -137,7 +145,7 @@ export const lastFailureOf = (
   design: ProgressDesign,
   last: { turn: ProgressTurn | null; build: ProgressBuild | null },
 ): DesignFailureView | null => {
-  if (BUSY.includes(design.status)) return null;
+  if (BUSY.includes(design.status) || isActiveTurn(last.turn)) return null;
   const since = Math.max(
     0,
     design.approvedAt?.getTime() ?? 0,
@@ -225,10 +233,7 @@ export const loadDesignProgress = async (
   ]);
   const found = { turn, build };
   return {
-    activeTurnId:
-      turn && (turn.phase === 'queued' || turn.phase === 'running')
-        ? turn.id
-        : null,
+    activeTurnId: isActiveTurn(turn) ? turn.id : null,
     progress: progressOf(design, found),
     lastFailure: lastFailureOf(design, found),
   };
