@@ -39,6 +39,8 @@ export const RUN_KINDS = [
   'rules_compress',
   /** An overlay proposal for one prefix part (issue #751 B8). */
   'prefix_propose',
+  /** A review step's session on a card's pull request (issue #884). */
+  'card_review',
 ] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 

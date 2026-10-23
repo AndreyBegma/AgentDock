@@ -15,6 +15,7 @@ import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
+import { BoardReview } from './board-review';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardSessionService } from './board-session.service';
 import { BoardSessionMessages } from './board-session-message.service';
@@ -58,6 +59,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardPlanCards,
     // C-181: whom an automatic round runs as.
     BoardPrincipals,
+    // #884: review steps gate Finished on a card's green PR.
+    BoardReview,
     BoardRoundsService,
     BoardService,
     // #489: a person's message to a card's running session.
@@ -82,10 +85,12 @@ import { CollectRetryTimer } from './collect-retry-timer';
   // `BoardPlanCards`: a card intake and Create cards make cards (#337 D6, D7).
   // `BoardSessionMessages`: Telegram answers a card's question (#489).
   // `BoardStacks`: a confirmed intake makes a stack (#480).
+  // `BoardReview`: a review session's `report_review` (#884).
   exports: [
     // #578: the Telegram bot accepts and dismisses suggestions.
     BoardInboxService,
     BoardPlanCards,
+    BoardReview,
     BoardRoundsService,
     BoardSessionMessages,
     BoardService,

@@ -22,6 +22,8 @@ const OTHER_ROOT = '/srv/dev/gadget';
 const ISSUE_URL = 'https://github.com/acme/widget/issues';
 /** A board card worker's Claude session (issue #242 D6). */
 const CARD_SESSION = '0b7e7c1e-5d0f-4c1a-9a51-2f3c4d5e6f70';
+/** #884: a review step's Claude session on that card's pull request. */
+const REVIEW_SESSION = '7d0c2a4e-9b1f-4e3a-8c5d-6f7a8b9c0d1e';
 
 /** The args each method is called with in the all-methods sweep. */
 const ARGS: Record<LocalMethodName, unknown> = {
@@ -55,6 +57,18 @@ const ARGS: Record<LocalMethodName, unknown> = {
   'card.escalate': {
     reason: 'misclassified',
     note: 'The card needs a schema decision.',
+  },
+  'card.reviewReport': {
+    findings: [
+      {
+        severity: 'nit',
+        file: 'src/pairing.ts',
+        line: 3,
+        title: 'Name the timeout',
+        body: 'A named constant reads better.',
+      },
+    ],
+    summary: 'One nit.',
   },
   'card.track': { title: 'Track the pairing fix' },
   'board.list': {},
@@ -259,6 +273,38 @@ describe('local requests over the runner socket (e2e)', () => {
   };
 
   /** The sweep's own session `sess-manual-1`, as its hooks made it: manual. */
+  /** #884: a running review step of C-1, started for `REVIEW_SESSION`. */
+  const seedReviewSession = async () => {
+    const card = await ctx.prisma.boardCard.findFirstOrThrow({
+      where: { projectId, number: 1 },
+    });
+    const run = await ctx.prisma.run.create({
+      data: {
+        kind: 'card_review',
+        projectId,
+        status: 'running',
+        model: 'sonnet',
+        triggeredByType: 'user',
+        startedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    await ctx.prisma.boardCardReviewRun.create({
+      data: {
+        cardId: card.id,
+        stepName: 'Peer review',
+        stepType: 'peer_review',
+        position: 0,
+        prNumber: 7,
+        headSha: 'a'.repeat(40),
+        pass: 0,
+        runId: run.id,
+        sessionId: REVIEW_SESSION,
+        startedAt: new Date(),
+      },
+    });
+  };
+
   const seedManualSession = () =>
     ctx.prisma.agentSession.create({
       data: {
@@ -330,6 +376,8 @@ describe('local requests over the runner socket (e2e)', () => {
     let actionId = '';
     // `card.finish` asks from the session of a board card's running worker.
     await seedCardSession();
+    // #884: `card.reviewReport` asks from a review step's session.
+    await seedReviewSession();
     // `card.track` asks from a person's own session (#282 D1).
     const manual = await seedManualSession();
     // #845: the Board's control methods launch a worker and message it — the
@@ -371,7 +419,9 @@ describe('local requests over the runner socket (e2e)', () => {
         localMethods[method].needsProject ? projectId : null,
         method === 'card.finish' || method === 'card.escalate'
           ? CARD_SESSION
-          : undefined,
+          : method === 'card.reviewReport'
+            ? REVIEW_SESSION
+            : undefined,
       );
       expect([method, response.ok, response.error]).toEqual([
         method,
@@ -411,6 +461,12 @@ describe('local requests over the runner socket (e2e)', () => {
     expect(responses.get('card.finish')?.data).toEqual({
       number: 1,
       finished: true,
+    });
+    expect(responses.get('card.reviewReport')?.data).toEqual({
+      number: 1,
+      recorded: true,
+      blocking: 0,
+      nits: 1,
     });
     expect(responses.get('card.track')?.data).toMatchObject({
       number: 2,
@@ -479,6 +535,7 @@ describe('local requests over the runner socket (e2e)', () => {
       ['handoff.create', 'ok', localUserId, 'mcp'],
       ['card.escalate', 'ok', localUserId, 'mcp'],
       ['card.finish', 'ok', localUserId, 'mcp'],
+      ['card.reviewReport', 'ok', localUserId, 'mcp'],
       ['card.track', 'ok', localUserId, 'mcp'],
       ['away.set', 'ok', localUserId, 'mcp'],
       ...BOARD_CONTROL_ORDER.map((method) => [

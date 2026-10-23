@@ -25,6 +25,7 @@ import type {
   QuotaLimit,
 } from '../protocol';
 import type { ProfileSource } from '../readiness';
+import type { CardReviewView } from '../review/contracts';
 import type { PendingQuestion } from '../session-message/contracts';
 import type { StewardCardChip } from '../steward/contracts';
 import type { CardKindSource } from '../text/limits';
@@ -230,6 +231,12 @@ export interface BoardCardView {
   needsPerson: boolean;
   /** #542: why `needsPerson` is set; `null` while it is not, or unknown. */
   needsPersonReason: CardNeedsPersonReason | null;
+  /**
+   * #884 (ADR-0084): the review strip — where the card's review steps stand
+   * on its PR. `null` when review is off for the project or no step is
+   * enabled.
+   */
+  review: CardReviewView | null;
   /**
    * C-148 (ADR-0077): the protected paths (`PROTECTED_PATHS`) the card's
    * latest push changed. Non-empty, the card is never auto-merged — only a

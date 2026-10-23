@@ -56,6 +56,7 @@ import {
   toCardView,
   toSettingsView,
 } from './board-mapper';
+import { reviewFactsFor } from './board-review';
 import { BoardStacks } from './board-stacks';
 import {
   ACTIVE_PHASES,
@@ -439,6 +440,8 @@ export class BoardService implements OnModuleInit {
         cards.flatMap((c) => (c.rounds[0] ? [c.rounds[0].id] : [])),
       ),
       prTargets: await this.prTargets(cards),
+      // #884: the review strip of each card.
+      ...(await reviewFactsFor(this.prisma, cards)),
       now: new Date(),
     };
   }

@@ -11,6 +11,12 @@ import {
   type CardPrOpenResult,
   type CardPrRetargetArgs,
   type CardPrRetargetResult,
+  type CardReviewArgs,
+  type CardReviewPublishArgs,
+  type CardReviewPublishResult,
+  type CardReviewResult,
+  type CardReviewStopArgs,
+  type CardReviewStopResult,
   type CommandErrorCode,
   cardChecksResultSchema,
   cardCiRetriggerResultSchema,
@@ -18,6 +24,9 @@ import {
   cardPrCloseResultSchema,
   cardPrOpenResultSchema,
   cardPrRetargetResultSchema,
+  cardReviewPublishResultSchema,
+  cardReviewResultSchema,
+  cardReviewStopResultSchema,
   type DocsPublishSpecsArgs,
   type DocsPublishSpecsResult,
   docsPublishSpecsResultSchema,
@@ -80,6 +89,9 @@ export class BoardCommands {
       | 'card.prClose'
       | 'card.prRetarget'
       | 'card.prOpen'
+      | 'card.review'
+      | 'card.reviewStop'
+      | 'card.reviewPublish'
       | 'issue.create'
       | 'plan.close'
       | 'pr.inspect'
@@ -283,6 +295,87 @@ export class BoardCommands {
     );
     if (result.status !== 'ok') return result;
     const output = cardPrOpenResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
+  }
+
+  /**
+   * #884: whether the connected runner can run a review step —
+   * `connected`, `unsupported` (an older runner, or the command disabled),
+   * or `offline`.
+   */
+  reviewSupport(runnerId: string): 'connected' | 'unsupported' | 'offline' {
+    if (!this.presence.isConnected(runnerId)) return 'offline';
+    return this.presence.commandSupport(runnerId, 'card.review') === 'supported'
+      ? 'connected'
+      : 'unsupported';
+  }
+
+  /** #884: starts one review step's session on the PR head. */
+  async review(
+    runnerId: string,
+    args: CardReviewArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardReviewResult>> {
+    this.assertReady(runnerId, 'card.review');
+    const result = await this.commands.send(
+      runnerId,
+      'card.review',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = cardReviewResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
+  }
+
+  /** #884: ends the card's review session and removes its worktree. */
+  async stopReview(
+    runnerId: string,
+    args: CardReviewStopArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardReviewStopResult>> {
+    this.assertReady(runnerId, 'card.reviewStop');
+    const result = await this.commands.send(
+      runnerId,
+      'card.reviewStop',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = cardReviewStopResultSchema.safeParse(result.output);
+    return output.success
+      ? { status: 'ok', output: output.data }
+      : {
+          status: 'error',
+          error: { code: 'internal', message: 'malformed result' },
+        };
+  }
+
+  /** #884: posts a review step's findings as a GitHub pull request review. */
+  async publishReview(
+    runnerId: string,
+    args: CardReviewPublishArgs,
+    options: SendOptions,
+  ): Promise<BoardSendResult<CardReviewPublishResult>> {
+    this.assertReady(runnerId, 'card.reviewPublish');
+    const result = await this.commands.send(
+      runnerId,
+      'card.reviewPublish',
+      args,
+      options,
+    );
+    if (result.status !== 'ok') return result;
+    const output = cardReviewPublishResultSchema.safeParse(result.output);
     return output.success
       ? { status: 'ok', output: output.data }
       : {

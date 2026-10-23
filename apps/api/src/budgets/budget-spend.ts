@@ -88,7 +88,8 @@ const userSessions = (userId: string, matchMs: number) => Prisma.sql`
  *   `designSessionId`;
  * - a UI profile build (spec 223 D13): the slot-less session of the
  *   project in a `.wt-<repo>-uiprofile-*` worktree that began in the run's
- *   window — a project runs one build at a time.
+ *   window — a project runs one build at a time;
+ * - a card review step (#884): its own session, `board_card_review_runs.sessionId`.
  * Every subagent session below one carries the same window.
  */
 const userRunSessions = (userId: string) => Prisma.sql`
@@ -96,7 +97,7 @@ const userRunSessions = (userId: string) => Prisma.sql`
     SELECT ru.id, ru.kind, ru."projectId", ru."startedAt", ru."endedAt", p."runnerId"
     FROM runs ru
     JOIN projects p ON p.id = ru."projectId"
-    WHERE ru.kind IN ('card', 'plan', 'ui_profile')
+    WHERE ru.kind IN ('card', 'card_review', 'plan', 'ui_profile')
       AND ru."triggeredByType" = 'user'
       AND ru."triggeredById" = ${userId}
   ),
@@ -129,6 +130,12 @@ const userRunSessions = (userId: string) => Prisma.sql`
       AND s."startedAt" >= st."startedAt"
       AND (st."endedAt" IS NULL OR s."startedAt" <= st."endedAt")
     WHERE st.kind = 'ui_profile'
+    UNION
+    SELECT s.id, st."startedAt", st."endedAt"
+    FROM started st
+    JOIN board_card_review_runs rr ON rr."runId" = st.id
+    JOIN sessions s ON s."runnerId" = st."runnerId" AND s.runtime = 'claude'
+      AND s."externalId" = rr."sessionId"::text
   ),
   run_tree(id, "from", "to") AS (
     SELECT id, "from", "to" FROM run_roots
