@@ -6,6 +6,7 @@ import {
   fitAll,
   fitView,
   frameAt,
+  frameLabel,
   layoutRow,
   pinchOf,
   pinchView,
@@ -33,6 +34,12 @@ describe('layoutRow', () => {
     expect(row.size).toEqual({ width: 2824, height: 1112 });
   });
 
+  test('a label names the frame and its size', () => {
+    expect(frameLabel({ name: 'Phone', width: 390, height: 844 })).toBe(
+      'Phone · 390×844',
+    );
+  });
+
   test('takes its own gap; an empty row has no size', () => {
     expect(layoutRow(devices, 20).size.width).toBe(2704);
     expect(layoutRow([]).size).toEqual({ width: 0, height: 0 });
@@ -54,7 +61,9 @@ describe('fitAll', () => {
 
   test('an unmeasured stage or an empty row draws at 100 %', () => {
     expect(fitAll({ width: 0, height: 0 }, row.size)).toBe(1);
-    expect(fitAll({ width: 800, height: 600 }, { width: 0, height: 0 })).toBe(1);
+    expect(fitAll({ width: 800, height: 600 }, { width: 0, height: 0 })).toBe(
+      1,
+    );
   });
 
   test('Fit all centres the row and its label band in the stage', () => {
@@ -101,7 +110,10 @@ describe('wheelStep', () => {
 
   test('a mouse wheel notch moves it at once, inside the range', () => {
     expect(wheelStep(1, 0, -100).scale).toBeGreaterThan(1);
-    expect(wheelStep(ZOOM_MAX, 0, -100)).toEqual({ scale: ZOOM_MAX, pending: -100 });
+    expect(wheelStep(ZOOM_MAX, 0, -100)).toEqual({
+      scale: ZOOM_MAX,
+      pending: -100,
+    });
   });
 });
 
@@ -136,7 +148,10 @@ describe('pointInFrame', () => {
       clientX: 100 + 10 + (1520 + 30) * 0.5,
       clientY: 50 + 20 + 40 * 0.5,
     };
-    expect(pointInFrame(pointer, stage, view, tablet)).toEqual({ x: 30, y: 40 });
+    expect(pointInFrame(pointer, stage, view, tablet)).toEqual({
+      x: 30,
+      y: 40,
+    });
   });
 
   test('the same screen spot is a different frame point at another scale', () => {

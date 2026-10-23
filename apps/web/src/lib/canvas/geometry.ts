@@ -43,6 +43,10 @@ export const CANVAS_MARGIN_PX = 32;
 /** The band above the row that the labels take, in stage px (labels do not scale). */
 export const CANVAS_LABEL_PX = 28;
 
+/** A frame's label: "Phone · 390×844". */
+export const frameLabel = (frame: Size & { name: string }): string =>
+  `${frame.name} · ${frame.width}×${frame.height}`;
+
 /** The frames side by side, top-aligned, `gap` apart. */
 export function layoutRow(
   frames: readonly CanvasFrameSize[],
@@ -70,7 +74,10 @@ export function layoutRow(
 export function fitAll(stage: Size, world: Size): number {
   return Math.min(
     fitZoom(stage.width - 2 * CANVAS_MARGIN_PX, world.width),
-    fitZoom(stage.height - 2 * CANVAS_MARGIN_PX - CANVAS_LABEL_PX, world.height),
+    fitZoom(
+      stage.height - 2 * CANVAS_MARGIN_PX - CANVAS_LABEL_PX,
+      world.height,
+    ),
   );
 }
 
@@ -160,7 +167,9 @@ export function wheelStep(
 ): { scale: number; pending: number } {
   const travel = pending + deltaY;
   const next = wheelZoom(scale, travel);
-  return next === scale ? { scale, pending: travel } : { scale: next, pending: 0 };
+  return next === scale
+    ? { scale, pending: travel }
+    : { scale: next, pending: 0 };
 }
 
 /** A touch pinch: two pointers, where they started and where they are. */
@@ -175,7 +184,11 @@ export interface Pinch {
  * pinch began, and moved with its centre, so the two fingers stay on the same
  * world points.
  */
-export function pinchView(start: Pinch, centre: Point, distance: number): CanvasView {
+export function pinchView(
+  start: Pinch,
+  centre: Point,
+  distance: number,
+): CanvasView {
   if (!(start.distance > 0)) return start.view;
   const zoomed = zoomAround(
     start.view,
@@ -192,7 +205,10 @@ export function pinchView(start: Pinch, centre: Point, distance: number): Canvas
 }
 
 /** The centre and spread of two pointers. */
-export const pinchOf = (a: Point, b: Point): { centre: Point; distance: number } => ({
+export const pinchOf = (
+  a: Point,
+  b: Point,
+): { centre: Point; distance: number } => ({
   centre: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
   distance: Math.hypot(a.x - b.x, a.y - b.y),
 });
