@@ -24,6 +24,7 @@ import { stackDesignApi } from '../../../../../../../../lib/design/href';
 import { useStackDesign } from '../../../../../../../../lib/design/use-design';
 import {
   applyViewerChange,
+  devicesOf,
   resolveViewerState,
 } from '../../../../../../../../lib/design/viewer-state';
 import { useStepBack } from '../../../../../../../../lib/navigation/step-back';
@@ -138,7 +139,7 @@ export default function StackDesignViewerPage() {
                 state={resolveViewerState(
                   search,
                   design.revisions,
-                  design.viewports,
+                  devicesOf(design),
                 )}
                 canOperate={canOperate}
                 busy={section.busy}

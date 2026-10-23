@@ -2,24 +2,32 @@
 
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { ResizableFrame } from '@andrewbehma/glass-ui/resizable-frame';
 import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
 import { TabGroup, TabPanel } from '@andrewbehma/glass-ui/tabs';
-import {
-  type CardDesignLaunchRequest,
-  type CardStackRef,
-  DESIGN_VIEWPORT_MAX_PX,
-  DESIGN_VIEWPORT_MIN_PX,
-  type DesignCommentRequest,
-  type DesignCommentView,
-  type MockupPinMarker,
-  type TaskDesignPatchRequest,
-  type TaskDesignView,
+import type {
+  CardDesignLaunchRequest,
+  CardStackRef,
+  DesignCommentRequest,
+  DesignCommentView,
+  DesignTheme,
+  MockupPinMarker,
+  TaskDesignPatchRequest,
+  TaskDesignView,
+  ViewportPreset,
 } from '@nautelle/shared';
-import { Crosshair, MessageSquare } from 'lucide-react';
+import {
+  Crosshair,
+  MessageSquare,
+  MessageSquarePlus,
+  Monitor,
+  MousePointer2,
+  Smartphone,
+  Tablet,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LaunchCard } from '../../lib/board/launch';
+import type { Point } from '../../lib/canvas/geometry';
 import {
   approveBlock,
   designWriteBlock,
@@ -36,32 +44,28 @@ import { stackDesignHref } from '../../lib/design/href';
 import { isStarting } from '../../lib/design/progress';
 import { compareColumns } from '../../lib/design/templates';
 import type { DesignBusy } from '../../lib/design/use-design';
-import { useElementWidth } from '../../lib/design/use-element-width';
 import {
   revisionsOf,
   type ViewerChange,
   type ViewerState,
   variantsOf,
 } from '../../lib/design/viewer-state';
-import {
-  boxSize,
-  dragStep,
-  FRAME_GUTTER_PX,
-  type FrameDrag,
-  frameZoom,
-  stepZoom,
-  wheelZoom,
-  zoomKey,
-} from '../../lib/design/zoom';
+import type { Zoom } from '../../lib/design/zoom';
 import { useWide } from '../../lib/slot/use-wide';
 import { LaunchPopover } from '../board/launch-popover';
+import {
+  type CanvasFocus,
+  type CanvasFrame,
+  FrameCanvas,
+  useFrameCanvas,
+} from '../canvas/frame-canvas';
 import { ApproveDialog } from './approve-dialog';
 import { CommentsPanel } from './comments-panel';
 import { CompareGrid } from './compare-grid';
 import { ConformanceBadge } from './conformance-badge';
 import { DesignFailure } from './design-failure';
 import { DesignProgress, DesignStarting } from './design-progress';
-import { FrameStrip, frameKey } from './frame-strip';
+import { FrameTabs, frameKey } from './frame-tabs';
 import { GeneratePanel } from './generate-panel';
 import { MockupBanner } from './mockup-banner';
 import { type FramePin, MockupFrame } from './mockup-frame';
@@ -79,11 +83,99 @@ export interface DesignViewerActions {
   stop: () => Promise<unknown>;
 }
 
+/** The canvas's view, held here while a gesture runs and written to the URL after. */
+interface CanvasViewState {
+  zoom: Zoom;
+  pan: Point;
+}
+
 /**
- * The design viewer's workspace (spec 223 D9–D11, "UI"): the toolbar, the
- * mockup in its frame, and the right panel with the comments, **Revise
- * design** and **Approve**. The page owns loading and the URL; this owns the
- * pin draft and the dialogs.
+ * How long the canvas rests before its zoom and pan go into the URL: a
+ * gesture reports many views, and the link needs only the last.
+ */
+const VIEW_WRITE_MS = 300;
+
+/** A pin being written: where it was dropped, at what scale, on which device. */
+type PinDraft = FramePin & { zoom: number; device: string };
+
+/** A device's icon on its label, by its width. */
+function DeviceIcon({ width }: { width: number }) {
+  if (width < 600) return <Smartphone aria-hidden="true" />;
+  if (width < 1100) return <Tablet aria-hidden="true" />;
+  return <Monitor aria-hidden="true" />;
+}
+
+/**
+ * One device of the frame in view (#886): the mockup at the device's size,
+ * its pins, and the canvas's zoom for a wheel the iframe cannot let bubble
+ * and for the touch-size markers.
+ */
+function DeviceFrame({
+  src,
+  title,
+  theme,
+  pinMode,
+  pins,
+  phone,
+  onPin,
+  onPinOpen,
+}: {
+  src: string;
+  title: string;
+  theme: DesignTheme;
+  pinMode: boolean;
+  pins: MockupPinMarker[];
+  phone: boolean;
+  onPin: (pin: FramePin, scale: number) => void;
+  onPinOpen: () => void;
+}) {
+  const canvas = useFrameCanvas();
+  return (
+    <MockupFrame
+      src={src}
+      title={title}
+      theme={theme}
+      pinMode={pinMode}
+      pins={pins}
+      onWheel={(deltaY) => canvas.zoomByWheel(deltaY)}
+      touchScale={phone ? canvas.scale : undefined}
+      onPinOpen={onPinOpen}
+      onPin={(pin) => onPin(pin, canvas.scale)}
+    />
+  );
+}
+
+/**
+ * Where selecting a comment puts the canvas: its pin on its device, or the
+ * middle of the device it names, or of the device in view.
+ */
+export function commentFocus(
+  comment: DesignCommentView,
+  devices: readonly ViewportPreset[],
+  inView: ViewportPreset,
+): CanvasFocus {
+  const device = devices.find((d) => d.name === comment.viewport);
+  const at = device ?? inView;
+  if (device && comment.x !== null && comment.y !== null) {
+    // A pin below the fold sits in the document, past the device's height:
+    // the bottom edge is as near as the canvas can show it.
+    return {
+      frameId: at.name,
+      point: {
+        x: Math.min(Math.max(comment.x, 0), at.width),
+        y: Math.min(Math.max(comment.y, 0), at.height),
+      },
+    };
+  }
+  return { frameId: at.name, point: { x: at.width / 2, y: at.height / 2 } };
+}
+
+/**
+ * The design viewer's workspace (spec 223 D9–D11, "UI"; #886): the frames
+ * of the revision as tabs, each a canvas with the frame drawn once per
+ * device, and the right panel with the comments, **Revise design** and
+ * **Approve**. The page owns loading and the URL; this owns the pin draft,
+ * the dialogs and the canvas's view between two URL writes.
  */
 export function DesignViewer({
   projectId,
@@ -123,84 +215,54 @@ export function DesignViewer({
 }) {
   // Below `lg` (C-244): the touch layout, with the review controls moved off the toolbar.
   const phone = useWide() === false;
+  // The Comment tool (C): a click on a device drops a pin.
   const [pinMode, setPinMode] = useState(false);
-  // The scale a pin was placed at travels with it: `frame` is the scaled box.
-  const [draft, setDraft] = useState<(FramePin & { zoom: number }) | null>(
-    null,
-  );
+  const [draft, setDraft] = useState<PinDraft | null>(null);
   const [approveOpen, setApproveOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   // #833 D11: the same frame of every variant side by side.
   const [compare, setCompare] = useState(false);
-  // While the frame's edge is dragged the width lives here; the URL takes it
-  // once, on release.
-  const [drag, setDrag] = useState<FrameDrag | null>(null);
-  const view = drag === null ? state : { ...state, width: drag.width };
+  // #886: the comment shown on the canvas, and where the canvas goes for it.
+  const [selected, setSelected] = useState<string | null>(null);
+  const [focus, setFocus] = useState<CanvasFocus | null>(null);
 
-  // Zoom (spec 335): Fit is worked out from the room the stage has; the
-  // frame's gutter is not room for the mockup. A drag holds its zoom (#394).
-  const [measure, stageWidth] = useElementWidth();
-  const zoom = frameZoom(
-    state.zoom,
-    stageWidth - FRAME_GUTTER_PX * 2,
-    view.width,
-    drag,
-  );
-  const stage = useRef<HTMLElement>(null);
-  const hasMockup = state.revision !== null;
-  // The wheel and the keys read the zoom through a ref: several wheel events
-  // land before the URL has taken the first.
-  const live = useRef({ zoom, onChange });
-  useEffect(() => {
-    live.current = { zoom, onChange };
+  // The canvas reports zoom and pan one after the other, many times a
+  // gesture; they live here and reach the URL together once it rests. Every
+  // tab shows the same devices, so one view serves them all.
+  const [view, setView] = useState<CanvasViewState>({
+    zoom: state.zoom,
+    pan: state.pan,
   });
-
-  // Not React's `onWheel`: that listener is passive, and the browser's own
-  // page zoom can only be stopped from an active one (D6).
-  const zoomByWheel = useCallback((deltaY: number) => {
-    const next = wheelZoom(live.current.zoom, deltaY);
-    live.current.zoom = next;
-    live.current.onChange({ kind: 'zoom', zoom: next });
-  }, []);
+  const live = useRef({ view, onChange });
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    const element = stage.current;
-    if (!element || !hasMockup) return;
-    const onWheel = (event: WheelEvent) => {
-      if (!(event.ctrlKey || event.metaKey)) return;
-      event.preventDefault();
-      zoomByWheel(event.deltaY);
-    };
-    element.addEventListener('wheel', onWheel, { passive: false });
-    return () => element.removeEventListener('wheel', onWheel);
-  }, [hasMockup, zoomByWheel]);
-
-  const onStageKeyDown = (event: React.KeyboardEvent) => {
-    if (!hasMockup) return;
-    // A field keeps its own keys (the typed width, a pin's comment).
-    const target = event.target as HTMLElement;
-    if (target.closest('input, textarea, select, [contenteditable="true"]')) {
-      return;
-    }
-    // #441: `[` and `]` step through the frames.
-    const nextFrame = frameKey(
-      event,
-      state.frame,
-      state.revision?.frames.length ?? 0,
-    );
-    if (nextFrame !== null) {
-      event.preventDefault();
-      setDraft(null);
-      onChange({ kind: 'frame', frame: nextFrame });
-      return;
-    }
-    const key = zoomKey(event);
-    if (!key) return;
-    event.preventDefault();
-    onChange({
-      kind: 'zoom',
-      zoom: key === 'fit' ? 'fit' : stepZoom(zoom, key === 'in' ? 1 : -1),
-    });
-  };
+    live.current.onChange = onChange;
+  });
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  const changeView = useCallback((next: Partial<CanvasViewState>) => {
+    const merged = { ...live.current.view, ...next };
+    live.current.view = merged;
+    setView(merged);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      live.current.onChange({ kind: 'view', ...live.current.view });
+    }, VIEW_WRITE_MS);
+  }, []);
+  const onZoomChange = useCallback(
+    (zoom: Zoom) => changeView({ zoom }),
+    [changeView],
+  );
+  const onPanChange = useCallback(
+    (pan: Point) => changeView({ pan }),
+    [changeView],
+  );
+  const onFocused = useCallback(() => setFocus(null), []);
 
   const writeBlock = designWriteBlock(design, canOperate);
   const stackBlock = stackDrawBlock(stack);
@@ -208,7 +270,10 @@ export function DesignViewer({
   const approveReason = approveBlock(design, canOperate);
   const revisionId = state.revision?.id ?? null;
   const frames = state.revision?.frames ?? [];
-  const screen = { viewport: state.viewport.name, theme: state.theme };
+  const pinning = pinMode && writeBlock === null;
+  // A screen comment names the device in view: the one a pin or a selected
+  // comment last put there, or the first.
+  const screen = { viewport: state.device.name, theme: state.theme };
   // #441: a comment's frame is named in its own revision.
   const frameNames = useMemo(
     () =>
@@ -222,6 +287,25 @@ export function DesignViewer({
     // A pin draft belongs to the frame it was placed on.
     setDraft(null);
     onChange({ kind: 'frame', frame: next });
+  };
+  const setTool = (comment: boolean) => {
+    setPinMode(comment);
+    if (!comment) setDraft(null);
+  };
+  const selectComment = (c: DesignCommentView) => {
+    const device = state.devices.find((d) => d.name === c.viewport);
+    setSelected(c.id);
+    setDraft(null);
+    setCompare(false);
+    setSheetOpen(false);
+    onChange({
+      kind: 'place',
+      revisionId: c.revisionId,
+      frame: c.frame,
+      device: device?.name ?? null,
+      theme: c.theme,
+    });
+    setFocus(commentFocus(c, state.devices, state.device));
   };
   const variants = variantsOf(design.revisions);
   const comparing = compare && variants.length > 1;
@@ -240,31 +324,99 @@ export function DesignViewer({
   const openCount = design.comments.filter(isOpen).length;
 
   const draftNumber = pinNumbers(design.comments, revisionId).size + 1;
-  const markers = useMemo<MockupPinMarker[]>(() => {
+  const markersOf = (device: string): MockupPinMarker[] => {
     const saved = pinMarkers(
       design.comments,
       revisionId,
-      state.viewport.name,
+      device,
       state.theme,
       state.frame,
     );
-    return draft
+    return draft?.device === device
       ? [...saved, { n: draftNumber, x: draft.x, y: draft.y }]
       : saved;
-  }, [
-    design.comments,
-    revisionId,
-    state.viewport.name,
-    state.theme,
-    state.frame,
-    draft,
-    draftNumber,
-  ]);
+  };
 
-  const candidates = variants.flatMap((v) => {
-    const latest = revisionsOf(design.revisions, v)[0];
-    return latest ? [latest] : [];
-  });
+  const canvasFrames = (htmlUrl: string, frameName: string): CanvasFrame[] =>
+    state.devices.map((device) => ({
+      id: device.name,
+      name: device.name,
+      width: device.width,
+      height: device.height,
+      icon: <DeviceIcon width={device.width} />,
+      active: device.name === state.device.name,
+      content: (
+        <DeviceFrame
+          src={htmlUrl}
+          title={`Mockup: ${state.revision?.title} · ${frameName} · ${device.name}`}
+          theme={state.theme}
+          pinMode={pinning}
+          pins={markersOf(device.name)}
+          phone={phone}
+          onPinOpen={() => setSheetOpen(true)}
+          onPin={(pin, scale) => {
+            if (!pinning) return;
+            setDraft({ ...pin, zoom: scale, device: device.name });
+            if (device.name !== state.device.name) {
+              onChange({ kind: 'device', device: device.name });
+            }
+          }}
+        />
+      ),
+    }));
+
+  const onStageKeyDown = (event: React.KeyboardEvent) => {
+    if (!state.revision || event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+    // A field keeps its own keys (a pin's comment, the theme).
+    const target = event.target as HTMLElement;
+    if (target.closest('input, textarea, select, [contenteditable="true"]')) {
+      return;
+    }
+    // #441: `[` and `]` step through the frames.
+    const nextFrame = frameKey(event, state.frame, frames.length);
+    if (nextFrame !== null) {
+      event.preventDefault();
+      selectFrame(nextFrame);
+      return;
+    }
+    // #886: V moves, C comments, Escape puts the Comment tool down.
+    const key = event.key.toLowerCase();
+    if (key === 'v' || (key === 'escape' && pinMode)) {
+      event.preventDefault();
+      setTool(false);
+    } else if (key === 'c' && writeBlock === null) {
+      event.preventDefault();
+      setTool(true);
+    }
+  };
+
+  const tools = (
+    <>
+      <Button
+        icon
+        variant="ghost"
+        aria-label="Move (V)"
+        title="Move (V)"
+        aria-pressed={!pinMode}
+        onClick={() => setTool(false)}
+      >
+        <MousePointer2 aria-hidden="true" className="size-3.5" />
+      </Button>
+      <Button
+        icon
+        variant="ghost"
+        aria-label="Comment (C)"
+        title={writeBlock ?? 'Comment (C): click a device to drop a pin'}
+        aria-pressed={pinning}
+        disabled={writeBlock !== null}
+        onClick={() => setTool(!pinMode)}
+      >
+        <MessageSquarePlus aria-hidden="true" className="size-3.5" />
+      </Button>
+    </>
+  );
 
   const panel = (
     <div className="flex flex-col gap-4 p-4">
@@ -371,6 +523,10 @@ export function DesignViewer({
         frame={state.frame}
         frameNameOf={frameNameOf}
         screen={screen}
+        devices={state.devices.map((d) => d.name)}
+        onDevice={(device) => onChange({ kind: 'device', device })}
+        selected={selected}
+        onSelect={selectComment}
         writeBlock={writeBlock}
         busy={busy === 'comment'}
         onComment={async (body) => {
@@ -383,14 +539,11 @@ export function DesignViewer({
 
   return (
     <div className="flex min-h-0 flex-1">
-      {/* The stage: the zoom's shortcuts act here and nowhere else (D6). */}
+      {/* The canvas and the tabs inside take focus; this adds the tab and tool keys to theirs. */}
       <section
-        ref={stage}
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: the stage takes focus so the zoom keys have a place to act
-        tabIndex={0}
         aria-label="Mockup stage"
         onKeyDown={onStageKeyDown}
-        className="flex min-w-0 flex-1 flex-col gap-3 overflow-auto p-4 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className="flex min-w-0 flex-1 flex-col gap-3 overflow-auto p-4"
       >
         <MockupBanner design={design} />
         {design.progress ? (
@@ -426,29 +579,7 @@ export function DesignViewer({
             value={String(state.frame)}
             onValueChange={(value) => selectFrame(Number(value))}
           >
-            <ViewerToolbar
-              state={view}
-              zoom={zoom}
-              viewports={design.viewports}
-              variants={variants}
-              revisions={revisionsOf(design.revisions, state.variant)}
-              pinMode={pinMode}
-              canPin={writeBlock === null}
-              phone={phone}
-              onChange={onChange}
-              onPinMode={(on) => {
-                setPinMode(on);
-                if (!on) setDraft(null);
-              }}
-            />
-            <ConformanceBadge
-              conformance={state.revision.conformance}
-              canComplete={canOperate}
-              completing={busy === 'complete'}
-              disabledReason={completeReason}
-              onComplete={() => void actions.complete().catch(() => {})}
-            />
-            <FrameStrip
+            <FrameTabs
               frames={frames}
               frame={state.frame}
               variant={state.variant}
@@ -461,6 +592,23 @@ export function DesignViewer({
                   ? { on: comparing, onToggle: () => setCompare(!compare) }
                   : undefined
               }
+              tools={
+                phone ? undefined : (
+                  <ViewerToolbar
+                    state={state}
+                    variants={variants}
+                    revisions={revisionsOf(design.revisions, state.variant)}
+                    onChange={onChange}
+                  />
+                )
+              }
+            />
+            <ConformanceBadge
+              conformance={state.revision.conformance}
+              canComplete={canOperate}
+              completing={busy === 'complete'}
+              disabledReason={completeReason}
+              onComplete={() => void actions.complete().catch(() => {})}
             />
             {comparing ? (
               <CompareGrid
@@ -469,7 +617,7 @@ export function DesignViewer({
                   variants,
                   state.frame,
                 )}
-                preset={{ width: view.width, height: state.viewport.height }}
+                preset={state.device}
                 theme={state.theme}
                 position={state.frame}
                 variantInView={state.variant}
@@ -479,68 +627,32 @@ export function DesignViewer({
                 }}
               />
             ) : null}
-            {phone && pinMode && writeBlock === null ? (
-              <p
-                role="status"
-                className="shrink-0 self-start rounded-full border border-line bg-raised px-3 py-1 text-xs text-ink-2"
-              >
-                Tap the mockup to place a pin
-              </p>
-            ) : null}
-            {/* #441: one panel per frame; only the one in view renders its mockup. */}
+            {/* #441: one panel per frame; only the one in view renders its canvas. */}
             {(comparing ? [] : frames).map((f) => (
-              <TabPanel key={f.position} value={String(f.position)}>
-                {/* D1: the box is the scaled size, the mockup inside keeps its layout size. */}
-                <div ref={measure} className="w-full min-w-0 shrink-0">
-                  <ResizableFrame
-                    // The drag edges are pointer-only: gone on a phone, where the presets and zoom size the mockup.
-                    className={`shrink-0 max-lg:[&_[role=separator]]:hidden ${
-                      phone && pinMode
-                        ? 'outline-2 outline-dashed outline-offset-2 outline-accent'
-                        : ''
-                    }`}
-                    width={boxSize(view.width, zoom)}
-                    height={boxSize(state.viewport.height, zoom)}
-                    min={boxSize(DESIGN_VIEWPORT_MIN_PX, zoom)}
-                    max={boxSize(DESIGN_VIEWPORT_MAX_PX, zoom)}
-                    labels={{ resize: 'Resize the mockup' }}
-                    // D5: the box reports scaled px; the width is the layout width.
-                    onWidthChange={(box) =>
-                      setDrag((current) => dragStep(current, box, zoom))
-                    }
-                    onWidthCommit={(box) => {
-                      setDrag(null);
-                      onChange({
-                        kind: 'width',
-                        width: dragStep(drag, box, zoom).width,
-                      });
-                    }}
-                  >
-                    <div
-                      className="origin-top-left"
-                      style={{
-                        width: view.width,
-                        height: state.viewport.height,
-                        transform: `scale(${zoom})`,
-                      }}
-                    >
-                      <MockupFrame
-                        src={f.htmlUrl}
-                        title={`Mockup: ${state.revision?.title} · ${f.name}`}
-                        theme={state.theme}
-                        pinMode={pinMode && writeBlock === null}
-                        pins={markers}
-                        onWheel={zoomByWheel}
-                        touchScale={phone ? zoom : undefined}
-                        onPinOpen={() => setSheetOpen(true)}
-                        onPin={(pin) => {
-                          if (writeBlock === null && pinMode)
-                            setDraft({ ...pin, zoom });
-                        }}
-                      />
-                    </div>
-                  </ResizableFrame>
-                </div>
+              <TabPanel
+                key={f.position}
+                value={String(f.position)}
+                className="flex min-h-0 flex-1 flex-col gap-2"
+              >
+                <FrameCanvas
+                  label={`${f.name} on every device`}
+                  className="min-h-[420px] flex-1"
+                  frames={canvasFrames(f.htmlUrl, f.name)}
+                  zoom={view.zoom}
+                  pan={view.pan}
+                  onZoomChange={onZoomChange}
+                  onPanChange={onPanChange}
+                  tools={tools}
+                  focus={focus}
+                  onFocused={onFocused}
+                />
+                <p role="status" className="shrink-0 text-xs text-ink-3">
+                  {pinning
+                    ? `${phone ? 'Tap' : 'Click'} a device to place a pin.${phone ? '' : ' Esc to stop.'}`
+                    : phone
+                      ? null
+                      : 'C, then click a device to pin a comment · [ and ] switch tabs'}
+                </p>
               </TabPanel>
             ))}
           </TabGroup>
@@ -571,10 +683,7 @@ export function DesignViewer({
               aria-pressed={pinMode}
               disabled={writeBlock !== null}
               title={writeBlock ?? undefined}
-              onClick={() => {
-                setPinMode(!pinMode);
-                if (pinMode) setDraft(null);
-              }}
+              onClick={() => setTool(!pinMode)}
             >
               <Crosshair aria-hidden="true" className="size-4" />
               Pin
@@ -628,20 +737,22 @@ export function DesignViewer({
 
       <PinComposer
         pin={draft}
-        zoom={draft?.zoom ?? zoom}
+        zoom={draft?.zoom ?? 1}
         number={draftNumber}
-        screen={`${screen.viewport} · ${screen.theme}`}
+        screen={`${draft?.device ?? screen.viewport} · ${screen.theme}`}
         busy={busy === 'comment'}
         phone={phone}
         frameName={frames[state.frame]?.name ?? null}
         onCancel={() => setDraft(null)}
         onSave={async (body) => {
           if (!draft || !revisionId) return;
+          // The pin names the device it was dropped on, as `viewport`.
           await actions.comment({
             revisionId,
             frame: state.frame,
             kind: 'pin',
-            ...screen,
+            viewport: draft.device,
+            theme: state.theme,
             x: draft.x,
             y: draft.y,
             selector: draft.selector,
@@ -654,7 +765,7 @@ export function DesignViewer({
       <ApproveDialog
         open={approveOpen}
         onOpenChange={setApproveOpen}
-        candidates={candidates}
+        candidates={candidates(design)}
         inView={state.revision}
         busy={busy === 'approve'}
         consequence={approval?.consequence}
@@ -678,3 +789,10 @@ export function DesignViewer({
     </div>
   );
 }
+
+/** What Approve offers: the latest revision of every variant. */
+const candidates = (design: TaskDesignView) =>
+  variantsOf(design.revisions).flatMap((v) => {
+    const latest = revisionsOf(design.revisions, v)[0];
+    return latest ? [latest] : [];
+  });

@@ -96,6 +96,21 @@ export function fitView(stage: Size, world: Size): CanvasView {
   return { scale, pan: centredPan(stage, world, scale) };
 }
 
+/**
+ * #886: the view at `scale` (clamped) with a world point in the middle of the
+ * stage — a comment's pin brought into view.
+ */
+export function centreOn(stage: Size, point: Point, scale: number): CanvasView {
+  const next = clampZoom(scale);
+  return {
+    scale: next,
+    pan: {
+      x: stage.width / 2 - point.x * next,
+      y: stage.height / 2 - point.y * next,
+    },
+  };
+}
+
 /** A stage point (px from the stage's top-left) in world px. */
 export const toWorld = (view: CanvasView, point: Point): Point => ({
   x: (point.x - view.pan.x) / view.scale,

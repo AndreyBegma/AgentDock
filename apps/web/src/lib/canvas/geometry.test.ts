@@ -3,6 +3,7 @@ import { ZOOM_MAX, ZOOM_MIN } from '../design/zoom';
 import {
   CANVAS_LABEL_PX,
   centredPan,
+  centreOn,
   fitAll,
   fitView,
   frameAt,
@@ -92,6 +93,22 @@ describe('zoomAround', () => {
     expect(zoomAround(view, 10, { x: 0, y: 0 }).scale).toBe(ZOOM_MAX);
     expect(zoomAround(view, 0.01, { x: 0, y: 0 }).scale).toBe(ZOOM_MIN);
     expect(zoomAround(view, 0.3333, { x: 0, y: 0 }).scale).toBe(0.33);
+  });
+});
+
+describe('centreOn (#886)', () => {
+  test('puts the world point in the middle of the stage', () => {
+    const stage = { width: 1200, height: 700 };
+    const point = { x: 1520 + 200, y: 300 };
+    const view = centreOn(stage, point, 0.5);
+    expect(view.scale).toBe(0.5);
+    expect(toWorld(view, { x: 600, y: 350 })).toEqual(point);
+  });
+
+  test('clamps the scale', () => {
+    expect(centreOn({ width: 10, height: 10 }, { x: 0, y: 0 }, 9).scale).toBe(
+      ZOOM_MAX,
+    );
   });
 });
 

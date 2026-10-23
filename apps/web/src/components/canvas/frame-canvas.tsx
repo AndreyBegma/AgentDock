@@ -17,6 +17,7 @@ import {
 import {
   CANVAS_GAP_PX,
   type CanvasView,
+  centreOn,
   fitView,
   frameAt,
   frameLabel,
@@ -68,8 +69,24 @@ export interface FrameCanvasProps {
   label?: string;
   /** A glass group in the stage's top-left corner (a tool switch). */
   tools?: ReactNode;
+  /**
+   * #886: a point of a frame, in that frame's px, to bring to the middle of
+   * the stage once it is measured — a comment's pin. It zooms in to at least
+   * `FOCUS_MIN_SCALE` and is applied once per value.
+   */
+  focus?: CanvasFocus | null;
+  /** Called once `focus` is applied (or names no frame), so the owner can drop it. */
+  onFocused?: () => void;
   className?: string;
 }
+
+export interface CanvasFocus {
+  frameId: string;
+  point: Point;
+}
+
+/** The least scale a focused point is shown at, so a pin is legible. */
+export const FOCUS_MIN_SCALE = 0.5;
 
 /** What a frame's content (pins, a forwarded wheel) can ask the canvas. */
 export interface FrameCanvasApi {
@@ -164,6 +181,8 @@ export function FrameCanvas({
   gap = CANVAS_GAP_PX,
   label = 'Canvas',
   tools,
+  focus = null,
+  onFocused,
   className = '',
 }: FrameCanvasProps) {
   const [stage, stageRef, stageSize] = useElementSize();
@@ -312,6 +331,30 @@ export function FrameCanvas({
     restart();
   };
 
+  const measured = stageSize.width > 0 && stageSize.height > 0;
+
+  // The layout and the stage are read through a ref: a focus is applied once,
+  // when it arrives or the stage is first measured, not on every resize.
+  const placed = useRef({ boxes: layout.boxes, stageSize, onFocused });
+  useEffect(() => {
+    placed.current = { boxes: layout.boxes, stageSize, onFocused };
+  });
+  useEffect(() => {
+    if (!focus || !measured) return;
+    const { boxes, stageSize: size, onFocused: done } = placed.current;
+    const box = boxes.find((b) => b.id === focus.frameId);
+    if (box) {
+      commit(
+        centreOn(
+          size,
+          { x: box.left + focus.point.x, y: box.top + focus.point.y },
+          Math.max(live.current.view.scale, FOCUS_MIN_SCALE),
+        ),
+      );
+    }
+    done?.();
+  }, [focus, measured, commit]);
+
   const zoomTo = (scale: number) => commit(zoomAround(view, scale, centre()));
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -343,7 +386,6 @@ export function FrameCanvas({
     zoomByWheel: (deltaY, at) => zoomByWheel(deltaY, at ? local(at) : centre()),
   };
 
-  const measured = stageSize.width > 0 && stageSize.height > 0;
   const { scale } = view;
   const hairline = 1 / scale;
 
