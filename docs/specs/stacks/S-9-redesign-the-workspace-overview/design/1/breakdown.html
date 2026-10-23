@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overview · Breakdown</title>
+<style>
+:root{color-scheme:dark;--font-sans:'SF Pro Text','SF Pro Display','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;--radius-control:6px;--radius-surface:8px;--radius-sheet:12px;--dur-fast:100ms}
+:root,:root[data-theme="dark"]{color-scheme:dark;--color-ground:#0a1022;--color-surface:#111a33;--color-raised:#18223f;--color-content:rgb(27 38 71 / 0.96);--color-ink:#f2f2f6;--color-ink-2:rgb(242 242 246 / 0.62);--color-ink-3:rgb(242 242 246 / 0.53);--color-line:rgb(255 255 255 / 0.1);--color-line-strong:rgb(255 255 255 / 0.18);--color-hover:rgb(255 255 255 / 0.06);--color-accent:#5b5bf6;--color-on-accent:#ffffff;--color-accent-soft:rgb(91 91 246 / 0.2);--color-accent-ink:#b4b2ff;--color-ok:#5fd3a0;--color-warn:#e3b341;--color-danger:#ff6b60;--color-info:#5fb4f0;--color-info-soft:rgb(95 180 240 / 0.16);--color-hue-1:#5b9cf6;--color-hue-1-soft:rgb(91 156 246 / 0.18);--color-hue-2:#2fbf94;--color-hue-2-soft:rgb(47 191 148 / 0.18);--color-hue-2-ink:#7ee0c0;--color-hue-3:#7cc95a;--color-hue-4:#e69f00;--color-hue-6:#f0606e;--color-hue-6-soft:rgb(240 96 110 / 0.18);--color-hue-6-ink:#ff9da5;--color-hue-7:#a68bfa;--color-hue-7-soft:rgb(166 139 250 / 0.18);--color-hue-8:#cc79a7;--canvas-glow:18%;--glass-sheen:rgb(255 255 255 / 0.06);--glass-scrim:rgb(9 9 12 / 0.55);--glass-edge:rgb(255 255 255 / 0.14);--glass-spec:rgb(255 255 255 / 0.2);--glass-shadow:rgb(0 0 0 / 0.35);--glass-shadow-clear:rgb(0 0 0 / 0.15)}
+:root[data-theme="light"]{color-scheme:light;--color-ground:#ffffff;--color-surface:#f8faff;--color-raised:#f0f4fb;--color-content:rgb(255 255 255 / 0.96);--color-ink:#18181b;--color-ink-2:rgb(24 24 27 / 0.72);--color-ink-3:rgb(24 24 27 / 0.64);--color-line:rgb(0 0 0 / 0.1);--color-line-strong:rgb(0 0 0 / 0.23);--color-hover:rgb(0 0 0 / 0.06);--color-accent:#4f46e5;--color-on-accent:#ffffff;--color-accent-soft:rgb(79 70 229 / 0.12);--color-accent-ink:#4338ca;--color-ok:#0a8156;--color-warn:#b45309;--color-danger:#dc2626;--color-info:#03629a;--color-info-soft:rgb(3 98 154 / 0.12);--color-hue-1:#1f64d6;--color-hue-1-soft:rgb(31 100 214 / 0.12);--color-hue-2:#00805e;--color-hue-2-soft:rgb(0 128 94 / 0.12);--color-hue-2-ink:#006a4e;--color-hue-3:#3a7d1c;--color-hue-4:#b36b00;--color-hue-6:#d02a3e;--color-hue-6-soft:rgb(208 42 62 / 0.12);--color-hue-6-ink:#ad1f31;--color-hue-7:#7244e0;--color-hue-7-soft:rgb(114 68 224 / 0.12);--color-hue-8:#b0457f;--canvas-glow:10%;--glass-sheen:rgb(0 0 0 / 0.06);--glass-scrim:rgb(255 255 255 / 0.52);--glass-edge:rgb(0 0 0 / 0.18);--glass-spec:rgb(0 0 0 / 0.2);--glass-shadow:rgb(0 0 0 / 0.12);--glass-shadow-clear:rgb(0 0 0 / 0.08)}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--color-ground)}
+body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:20px;color:var(--color-ink);-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--font-mono);font-size:0.92em}
+.ink-2{color:var(--color-ink-2)}.ink-3{color:var(--color-ink-3)}
+.canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(60vmax 50vmax at 10% 0%,color-mix(in oklab,var(--color-hue-1) var(--canvas-glow),transparent),transparent 70%),radial-gradient(50vmax 45vmax at 95% 35%,color-mix(in oklab,var(--color-hue-7) var(--canvas-glow),transparent),transparent 70%)}
+.glass{background:linear-gradient(var(--glass-sheen),var(--glass-sheen)),var(--glass-scrim);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-spec),0 12px 32px var(--glass-shadow)}
+.surface-content{background:var(--color-content);border:1px solid var(--color-line);box-shadow:0 1px 2px var(--glass-shadow-clear)}
+.text-display{font-size:28px;line-height:32px;letter-spacing:-0.02em;font-weight:600;margin:0}
+.badge{display:inline-flex;align-items:center;justify-content:center;font-weight:600;line-height:1;border-radius:999px;height:20px;min-width:20px;padding:0 6px;font-size:12px;background:var(--color-hover);color:var(--color-ink-2)}
+.badge-warn{background:color-mix(in oklab,var(--color-warn) 14%,transparent);color:var(--color-warn)}
+.pill{--s:var(--color-ink-3);--s-soft:var(--color-hover);--s-ink:var(--color-ink-2);display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;background:var(--s-soft);color:var(--s-ink);border:1px solid color-mix(in oklab,var(--s) 45%,transparent)}
+.pill::before{content:'';width:6px;height:6px;border-radius:999px;background:var(--s)}
+.pill-running{--s:var(--color-hue-2);--s-soft:var(--color-hue-2-soft);--s-ink:var(--color-hue-2-ink)}
+.pill-error{--s:var(--color-hue-6);--s-soft:var(--color-hue-6-soft);--s-ink:var(--color-hue-6-ink)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:999px;flex-shrink:0}
+.btn{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap}
+.btn-solid{background:var(--color-accent);color:var(--color-on-accent);height:28px;padding:0 14px;font-size:14px;border-radius:6px}
+.btn-glass{background:var(--color-raised);border:1px solid var(--color-line-strong)}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:24px;padding:24px;min-height:100vh}
+.mini{display:flex;flex-direction:column;gap:14px;padding:16px;border-radius:var(--radius-sheet)}
+.zone{position:relative;border-radius:var(--radius-surface);outline:2px dashed color-mix(in oklab,var(--color-accent) 55%,transparent);outline-offset:4px}
+.mk{position:absolute;top:-14px;left:-14px;z-index:2;display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--color-accent);color:var(--color-on-accent);font-size:12px;font-weight:700;box-shadow:0 0 0 3px var(--color-ground)}
+.strip{display:grid;grid-template-columns:repeat(5,1fr);border-radius:8px;overflow:hidden}
+.strip div{padding:8px 12px;border-left:1px solid var(--color-line);display:flex;flex-direction:column}
+.strip div:first-child{border-left:0}
+.strip .l{font-size:11px;color:var(--color-ink-3)}.strip .v{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;align-items:start}
+.col{display:flex;flex-direction:column;gap:18px}
+.sh{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;margin-bottom:6px}
+.box{border-radius:8px;overflow:hidden}
+.gh{padding:4px 12px;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-ink-3);background:color-mix(in oklab,var(--color-ink) 3%,transparent);display:flex;align-items:center;gap:6px;border-top:1px solid var(--color-line)}
+.gh:first-child{border-top:0}
+.r{display:flex;align-items:center;gap:10px;padding:7px 12px;border-top:1px solid var(--color-line);font-size:13px}
+.r .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.r .a{font-size:11px;color:var(--color-ink-3)}
+.legend{display:flex;flex-direction:column;gap:12px}
+.legend h2{margin:0 0 4px;font-size:20px;line-height:28px;font-weight:600}
+.item{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:12px 14px;border-radius:var(--radius-surface)}
+.item .mk{position:static;box-shadow:none}
+.item h3{margin:0;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.item p{margin:4px 0 0;font-size:13px;line-height:19px;color:var(--color-ink-2)}
+.item code{font-family:var(--font-mono);font-size:11.5px;color:var(--color-ink)}
+.tag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:999px;font-size:10px;font-weight:600;background:var(--color-accent-soft);color:var(--color-accent-ink)}
+.tag-new{background:color-mix(in oklab,var(--color-ok) 14%,transparent);color:var(--color-ok)}
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="wrap">
+  <div class="mini glass" aria-label="Overview at 1440px, zoned">
+    <div class="zone" style="display:flex;align-items:flex-end;justify-content:space-between"><span class="mk">1</span><div><h1 class="text-display">Overview</h1><div class="ink-2" style="font-size:13px">What needs you and what the fleet is doing across 5 projects.</div></div><span class="btn btn-solid">New issue</span></div>
+    <div class="zone strip surface-content"><span class="mk">2</span><div><span class="l">Waiting on you</span><span class="v" style="color:var(--color-warn)">4</span></div><div><span class="l">Running slots</span><span class="v">9</span></div><div><span class="l">Ready issues</span><span class="v">3</span></div><div><span class="l">Cost today</span><span class="v">$38.40</span></div><div><span class="l">PRs merged</span><span class="v">6</span></div></div>
+    <div class="zone grid" style="outline-style:dotted"><span class="mk" style="left:auto;right:-14px">7</span>
+      <div class="col">
+        <div class="zone"><span class="mk">3</span><div class="sh">Needs you <span class="badge badge-warn">9</span></div><div class="box surface-content">
+          <div class="gh"><span class="dot" style="background:var(--color-danger)"></span>Blocking · 2</div>
+          <div class="r"><span class="t">CI failing on develop</span><span class="a">14 min</span><span class="btn btn-glass">Open run</span></div>
+          <div class="r"><span class="t">Orchestrator stopped · glass-ui</span><span class="a">41 min</span><span class="btn btn-glass">Restart</span></div>
+          <div class="gh"><span class="dot" style="background:var(--color-warn)"></span>Waiting on you · 2</div>
+          <div class="r"><span class="t">Approve: run migration on staging</span><span class="a">6 min</span><span class="btn btn-glass">Review</span></div>
+          <div class="gh"><span class="dot" style="background:var(--color-info)"></span>Setup · 5</div>
+          <div class="r"><span class="t">Terminal not set up in 4 projects</span><span class="a">2 d</span><span class="btn btn-glass">Set up</span></div>
+        </div></div>
+        <div class="zone"><span class="mk">4</span><div class="sh">Live sessions <span class="badge">9</span></div><div class="box surface-content">
+          <div class="r" style="border-top:0"><span class="dot" style="background:var(--color-hue-1)"></span><span class="mono ink-3">C-341</span><span class="t">Show live agent sessions</span><span class="pill pill-running">Running</span></div>
+          <div class="r"><span class="dot" style="background:var(--color-hue-7)"></span><span class="mono ink-3">C-342</span><span class="t">Recent activity and spend trend</span><span class="pill pill-running">Running</span></div>
+        </div></div>
+        <div class="zone"><span class="mk">5</span><div class="sh">Recent activity</div><div class="box surface-content">
+          <div class="r" style="border-top:0"><span class="dot" style="background:var(--color-hue-3)"></span><span class="t">PR #841 merged · Two-column layout</span><span class="a">14:12</span></div>
+          <div class="r"><span class="dot" style="background:var(--color-hue-6)"></span><span class="t">CI failed on develop</span><span class="a">13:58</span></div>
+        </div></div>
+      </div>
+      <div class="col">
+        <div class="zone"><span class="mk">6</span><div class="sh">Projects <span class="badge">5</span></div><div class="box surface-content">
+          <div class="r" style="border-top:0"><span class="swatch" style="background:var(--color-hue-1)"></span><span class="t">Nautelle</span><span class="pill pill-running">Running</span><svg width="52" height="18" viewBox="0 0 68 24" aria-hidden="true"><polyline points="0,18 11,16 22,17 33,12 45,13 56,7 68,4" fill="none" stroke="var(--color-hue-1)" stroke-width="2"/></svg><span class="a">$124</span></div>
+          <div class="r"><span class="swatch" style="background:var(--color-hue-7)"></span><span class="t">glass-ui</span><span class="pill pill-error">Stopped</span><svg width="52" height="18" viewBox="0 0 68 24" aria-hidden="true"><polyline points="0,14 11,15 22,10 33,12 45,9 56,13 68,16" fill="none" stroke="var(--color-hue-7)" stroke-width="2"/></svg><span class="a">$41</span></div>
+          <div class="r"><span class="swatch" style="background:var(--color-hue-4)"></span><span class="t">landing</span><span class="pill pill-running">Running</span><svg width="52" height="18" viewBox="0 0 68 24" aria-hidden="true"><polyline points="0,20 11,21 22,19 33,20 45,15 56,14 68,11" fill="none" stroke="var(--color-hue-4)" stroke-width="2"/></svg><span class="a">$19</span></div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="legend" aria-label="Legend">
+    <h2>What changes</h2>
+    <div class="item surface-content"><span class="mk">1</span><div><h3>Page header <span class="tag">Changed</span></h3><p><code>PageHeader</code> with one solid primary, New issue. The meta line moves into the strip, so the header takes one line.</p></div></div>
+    <div class="item surface-content"><span class="mk">2</span><div><h3>Stats strip <span class="tag tag-new">New · C-339</span></h3><p>Replaces three tall <code>StatTile</code>s with a single 64px row of five figures. Each cell links to where its figure is explained (<code>OVERVIEW_TILE_HREF</code>). When a figure fails to load it shows a dash and the reason, never a false zero. If glass-ui has no compact <code>stat-strip</code>, it is added there (ADR-0011).</p></div></div>
+    <div class="item surface-content"><span class="mk">3</span><div><h3>Needs you, grouped <span class="tag tag-new">C-340</span></h3><p>Grouped by severity: <b>Blocking</b> (failing CI, a stopped orchestrator, an exceeded budget), <b>Waiting on you</b> (approvals and questions), then <b>Setup</b>. A setup need that repeats across projects collapses into one row with stacked project swatches and a disclosure, which ends the one-row-per-project flood. Setup rows now count toward the 5-row cap (<code>NEEDS_YOU_SHOWN</code>). Within a group, the oldest item comes first. Each row has one verb button.</p></div></div>
+    <div class="item surface-content"><span class="mk">4</span><div><h3>Live sessions <span class="tag tag-new">C-341</span></h3><p>One row per live slot: the slot's hue dot, the issue key and title, the project swatch, the agent, the elapsed time, and a <code>StatusPill</code>. Waiting sessions sort first. Shows 5 rows, then "All sessions" (Fleet).</p></div></div>
+    <div class="item surface-content"><span class="mk">5</span><div><h3>Recent activity <span class="tag tag-new">C-342</span></h3><p>A glass-ui <code>timeline</code> of the latest 5 workspace events, with status-coloured dots and the project swatch.</p></div></div>
+    <div class="item surface-content"><span class="mk">6</span><div><h3>Projects with state <span class="tag tag-new">C-343 · C-342</span></h3><p>A dense list instead of cards. Each row: the square hue swatch, the orchestrator <code>StatusPill</code>, live slots and "need you" (warn), and a 7-day spend <code>sparkline</code> in the project hue with the 7-day total. Projects that need you sort first, then by last activity. A row opens the project's Board.</p></div></div>
+    <div class="item surface-content"><span class="mk">7</span><div><h3>Layout <span class="tag tag-new">C-339</span></h3><p>At <code>desktop:</code> (≥1024px), two columns at 1.6fr / 1fr. Each block is its own component in <code>components/overview/</code>. Below 1024px it is one column in this order: Needs you, Live sessions, Projects, Activity. At 1440px everything above sits above the fold.</p></div></div>
+  </aside>
+</div>
+</body>
+</html>
