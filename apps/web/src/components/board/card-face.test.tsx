@@ -559,3 +559,53 @@ describe('the selection slot (#596)', () => {
     expect(html).not.toContain('invisible');
   });
 });
+
+describe('CardFace review stage (#891)', () => {
+  const rv = (over: Partial<NonNullable<BoardCardView['review']>> = {}) => ({
+    state: 'running' as const,
+    currentStep: 'Security',
+    stepIndex: 1,
+    stepCount: 3,
+    fixRound: 0,
+    fixLimit: 3,
+    steps: [],
+    ...over,
+  });
+  test('running shows the step and position in a truncating chip', () => {
+    const html = render('in_progress', { ciState: 'green', review: rv() });
+    expect(row(html, 'status')).toContain('Reviewing · Security (2/3)');
+    expect(html).toContain('data-review-chip');
+    expect(html).toContain('truncate');
+  });
+  test('fixing shows the round and limit', () => {
+    const html = render('in_progress', {
+      ciState: 'green',
+      review: rv({ state: 'fixing', fixRound: 2 }),
+    });
+    expect(row(html, 'status')).toContain('Fixing review (2/3)');
+  });
+  test('needs-person names the review, not CI', () => {
+    const html = render('in_progress', {
+      ciState: 'green',
+      needsPerson: true,
+      needsPersonReason: 'review_still_blocking',
+      review: rv({ state: 'needs_person', fixRound: 3 }),
+    });
+    expect(row(html, 'status')).toContain(
+      'Review still blocking after 3 fixes',
+    );
+    expect(html).not.toContain('CI still failing');
+  });
+  test('a passed Finished card shows the readiness line', () => {
+    const html = render('finished', {
+      ciState: 'green',
+      review: rv({ state: 'passed', fixRound: 1 }),
+    });
+    expect(html).toContain('CI passed · Review passed · Fixes done');
+  });
+  test('review off looks as before', () => {
+    const html = render('in_progress', { ciState: 'pending', review: null });
+    expect(html).not.toContain('data-review');
+    expect(html).toContain('Checks running');
+  });
+});

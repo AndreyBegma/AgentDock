@@ -25,7 +25,10 @@ import type {
   QuotaLimit,
 } from '../protocol';
 import type { ProfileSource } from '../readiness';
-import type { CardReviewView } from '../review/contracts';
+import type {
+  CardReviewFindingView,
+  CardReviewView,
+} from '../review/contracts';
 import type { PendingQuestion } from '../session-message/contracts';
 import type { StewardCardChip } from '../steward/contracts';
 import type { CardKindSource } from '../text/limits';
@@ -597,6 +600,11 @@ export interface CardRecommendationView {
 export interface BoardCardDetail extends BoardCardView {
   /** Markdown. */
   body: string;
+  /**
+   * #891: the findings of the review pass `review` shows, blocking first. Empty
+   * or absent when review is off or the pass found nothing.
+   */
+  reviewFindings?: CardReviewFindingView[];
   issueOnRun: boolean;
   specOnRun: boolean;
   /**

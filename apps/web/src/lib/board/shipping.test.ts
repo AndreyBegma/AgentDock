@@ -1,12 +1,18 @@
 import { describe, expect, test } from 'bun:test';
+import type { CardReviewView } from '@nautelle/shared';
 import { card } from './fixtures';
 import {
   autoMergeHint,
   ciBanner,
   ciDot,
   effectiveAutoMerge,
+  findingCounts,
+  findingPlace,
   protectedPathsBanner,
   pullRequestRows,
+  readinessLine,
+  reviewFixRounds,
+  reviewTracker,
   shippingBadge,
 } from './shipping';
 
@@ -180,5 +186,115 @@ describe('autoMergeHint (#359 D7)', () => {
     const s = { autoMergeCards: null, autoMergeCardsDefault: true };
     expect(autoMergeHint(s, true, true)).toContain('default for this base: on');
     expect(autoMergeHint(s, false, false)).toContain('waits for Accept');
+  });
+});
+
+const review = (over: Partial<CardReviewView> = {}): CardReviewView => ({
+  state: 'running',
+  currentStep: 'Security',
+  stepIndex: 1,
+  stepCount: 3,
+  fixRound: 0,
+  fixLimit: 3,
+  steps: [
+    {
+      id: 'a',
+      name: 'Peer review',
+      state: 'passed',
+      blockingCount: 0,
+      nitCount: 2,
+    },
+    {
+      id: 'b',
+      name: 'Security',
+      state: 'running',
+      blockingCount: 0,
+      nitCount: 0,
+    },
+    { id: 'c', name: 'Docs', state: 'pending', blockingCount: 0, nitCount: 0 },
+  ],
+  ...over,
+});
+
+describe('review states (#891)', () => {
+  test('a running step names itself and its position', () => {
+    const c = card(1, 'in_progress', { ciState: 'green', review: review() });
+    expect(shippingBadge(c)).toEqual({
+      tone: 'warn',
+      label: 'Reviewing · Security (2/3)',
+      review: true,
+    });
+  });
+  test('a fixing card shows the fix round and limit', () => {
+    const c = card(1, 'in_progress', {
+      ciState: 'green',
+      review: review({ state: 'fixing', fixRound: 1 }),
+    });
+    expect(shippingBadge(c)?.label).toBe('Fixing review (1/3)');
+  });
+  test('an exhausted fix budget is a needs-person badge, not the CI one', () => {
+    const c = card(1, 'in_progress', {
+      ciState: 'green',
+      needsPerson: true,
+      needsPersonReason: 'review_still_blocking',
+      review: review({ state: 'needs_person', fixRound: 3 }),
+    });
+    expect(shippingBadge(c)?.label).toBe('Review still blocking after 3 fixes');
+    expect(shippingBadge(c)?.label).not.toBe('CI still failing after 3 fixes');
+  });
+  test('review off changes nothing', () => {
+    const c = card(1, 'in_progress', { ciState: 'pending', review: null });
+    expect(shippingBadge(c)?.label).toBe('Checks running');
+    expect(readinessLine(card(1, 'finished', { review: null }))).toBeNull();
+  });
+  test('a passed Finished card lists what it passed', () => {
+    const passed = review({ state: 'passed', fixRound: 2 });
+    expect(
+      readinessLine(card(1, 'finished', { ciState: 'green', review: passed })),
+    ).toEqual(['CI passed', 'Review passed', 'Fixes done']);
+    expect(
+      readinessLine(
+        card(1, 'finished', {
+          ciState: 'green',
+          review: { ...passed, fixRound: 0 },
+        }),
+      ),
+    ).toEqual(['CI passed', 'Review passed']);
+    expect(
+      readinessLine(
+        card(1, 'in_progress', { ciState: 'green', review: passed }),
+      ),
+    ).toBeNull();
+  });
+  test('the tracker runs CI, each step, Finished', () => {
+    const steps = reviewTracker(
+      card(1, 'in_progress', { ciState: 'green', review: review() }),
+    );
+    expect(steps.map((s) => [s.label, s.state])).toEqual([
+      ['CI', 'passed'],
+      ['Peer review', 'passed'],
+      ['Security', 'running'],
+      ['Docs', 'pending'],
+      ['Finished', 'pending'],
+    ]);
+    expect(steps[1].nits).toBe(2);
+    expect(reviewTracker(card(1, 'todo', { review: null }))).toEqual([]);
+  });
+  test('finding counts and places', () => {
+    expect(findingCounts(0, 0)).toBeNull();
+    expect(findingCounts(2, 1)).toBe('2 blocking · 1 nit');
+    expect(findingCounts(0, 3)).toBe('3 nits');
+    expect(findingPlace({ file: 'a.ts', line: 4 })).toBe('a.ts:4');
+    expect(findingPlace({ file: 'a.ts' })).toBe('a.ts');
+    expect(findingPlace({})).toBeNull();
+  });
+  test('review fix rounds are numbered in order', () => {
+    expect(
+      reviewFixRounds([
+        { round: 3, trigger: 'review_fix' },
+        { round: 1, trigger: 'run' },
+        { round: 2, trigger: 'review_fix' },
+      ]).map((r) => r.label),
+    ).toEqual(['Review fix 1 · Round 2', 'Review fix 2 · Round 3']);
   });
 });

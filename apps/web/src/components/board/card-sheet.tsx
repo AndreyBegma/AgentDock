@@ -137,6 +137,7 @@ import {
 import { CardHandoffSection } from './handoff/card-handoff-section';
 import { LaunchPopover } from './launch-popover';
 import { MovePicker } from './move-picker';
+import { ReviewSection } from './review-section';
 import { RoundFacts, RoundSummary, RoundTokenSaver } from './round-facts';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import { TriageHints } from './triage-hints';
@@ -210,10 +211,14 @@ function roundItems(
       actor: round.author ? { name: round.author.email } : undefined,
       title: (
         <span className="inline-flex flex-wrap items-center gap-1.5">
-          <span>
+          <span id={`card-round-${round.round}`}>
             Round {round.round} ·{' '}
-            {round.trigger === 'feedback' ? 'feedback' : 'run'} ·{' '}
-            {phaseLabel(round.phase)}
+            {round.trigger === 'feedback'
+              ? 'feedback'
+              : round.trigger === 'review_fix'
+                ? 'review fix'
+                : 'run'}{' '}
+            · {phaseLabel(round.phase)}
           </span>
           {round.autoRunAfter != null ? (
             // #443: Auto-run when ready started it, not a person's Run.
@@ -1414,6 +1419,22 @@ export function CardDetailBody({
       {handoffSection}
     </div>
   );
+  // #891: a tab only while the project reviews this card.
+  const reviewSection =
+    card.review !== null ? (
+      <ReviewSection
+        card={card}
+        onOpenRound={(round) => {
+          setTab('rounds');
+          // The Rounds panel mounts on the next render.
+          requestAnimationFrame(() =>
+            document
+              .getElementById(`card-round-${round}`)
+              ?.scrollIntoView({ block: 'center' }),
+          );
+        }}
+      />
+    ) : null;
   const hasFiles = cardFiles.length > 0 || filesEditable;
   const tabs = (
     <CardTabs
@@ -1422,6 +1443,7 @@ export function CardDetailBody({
       roundCount={card.rounds.length}
       panels={{
         overview,
+        review: reviewSection,
         rounds: card.rounds.length > 0 ? roundsSection : null,
         files: hasFiles ? attachmentsSection : null,
         edit: cardForm,
@@ -1483,6 +1505,7 @@ export function CardDetailBody({
               className="sticky top-4 flex min-w-0 flex-col gap-6"
             >
               {overview}
+              {reviewSection}
               {hasFiles ? attachmentsSection : null}
             </aside>
           </div>

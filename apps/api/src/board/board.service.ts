@@ -56,7 +56,7 @@ import {
   toCardView,
   toSettingsView,
 } from './board-mapper';
-import { reviewFactsFor } from './board-review-facts';
+import { reviewFactsFor, reviewFindingsFor } from './board-review-facts';
 import { BoardStacks } from './board-stacks';
 import {
   ACTIVE_PHASES,
@@ -291,12 +291,17 @@ export class BoardService implements OnModuleInit {
     if (!card || hiddenFrom(card, role)) {
       throw boardError(404, BOARD_ERROR.notFound, 'Card not found');
     }
-    const [facts, attachments, byType] = await Promise.all([
+    const [facts, attachments, byType, findings] = await Promise.all([
       this.facts([card]),
       this.attachments.views(card.id),
       this.modelByTypeOf(card),
+      reviewFindingsFor(this.prisma, card),
     ]);
-    return toCardDetail(card, facts, attachments, byType);
+    const detail = toCardDetail(card, facts, attachments, byType);
+    // #891: only a card with a review strip carries findings.
+    return detail.review === null
+      ? detail
+      : { ...detail, reviewFindings: findings };
   }
 
   /**

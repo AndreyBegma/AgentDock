@@ -155,6 +155,7 @@ describe('a card passes its review steps before Finished (e2e, #884)', () => {
       const card = await detail();
       expect(card).toMatchObject({ column: 'finished', prState: 'merged' });
       expect(card.review).toBeNull();
+      expect(card.reviewFindings).toBeUndefined();
     });
 
     it('review on without an enabled step ships as before', async () => {
@@ -263,6 +264,14 @@ describe('a card passes its review steps before Finished (e2e, #884)', () => {
           { name: 'Style', state: 'passed', blockingCount: 0, nitCount: 1 },
         ],
       });
+      // #891: the detail serves the pass's findings with their step's name.
+      expect(card.reviewFindings).toEqual([
+        expect.objectContaining({
+          stepName: 'Style',
+          severity: 'nit',
+          title: NIT.title,
+        }),
+      ]);
       expect(w.sent('card.merge')).toEqual([
         expect.objectContaining({ pr: 77, headSha: HEAD_SHA }),
       ]);
