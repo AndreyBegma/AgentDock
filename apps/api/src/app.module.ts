@@ -18,6 +18,7 @@ import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { DesignModule } from './design/design.module';
 import { UiProfileLearnModule } from './design/learn/learn.module';
+import { DesignTemplatesModule } from './design-templates/design-templates.module';
 import { FleetModule } from './fleet';
 import { GitHubAppModule } from './github-app';
 import { HandoffModule } from './handoff';
@@ -92,6 +93,8 @@ import { WorkflowsModule } from './workflows';
     ReadinessModule,
     // Spec 223: the design stage, on top of the Planner.
     DesignModule,
+    // Issue #833: a project's design frame templates.
+    DesignTemplatesModule,
     // Issue #242: the project Board and its card workers.
     BoardModule,
     // Issue #244: candidate cards from manual sessions, into the Inbox.
