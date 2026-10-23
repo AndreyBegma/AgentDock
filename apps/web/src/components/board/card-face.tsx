@@ -43,6 +43,7 @@ import {
 } from '../../lib/board/format';
 import { prChipText } from '../../lib/board/pull-request';
 import { ciDot, shippingBadge } from '../../lib/board/shipping';
+import { SESSION_ENDED_TEXT, takenState } from '../../lib/board/taken';
 import { hintsLabel } from '../../lib/board-ai/triage';
 import { formatCost } from '../../lib/format';
 import { githubUrl } from '../../lib/url';
@@ -214,6 +215,7 @@ export function CardFace({
             </Chip>
           ) : null}
           {card.tracking ? <TerminalBadges card={card} /> : null}
+          <TakenBadges card={card} />
           {card.fleet ? <FleetBadges card={card} /> : null}
           {suggestion ? <SuggestionBadges card={card} /> : null}
           <CardFaceDesign card={card} />
@@ -351,6 +353,20 @@ function TerminalBadges({ card }: { card: BoardCardView }) {
         <StatusPill size="sm" status="running" label="Session running" />
       ) : null}
       {card.autoCollect ? <Chip size="sm">Automatic work</Chip> : null}
+    </>
+  );
+}
+
+/** #845 D2, D10: "taken by <session>" / "queued for <session>", and "session ended". */
+function TakenBadges({ card }: { card: BoardCardView }) {
+  const state = takenState(card);
+  if (!state) return null;
+  return (
+    <>
+      <Chip size="sm">{state.text}</Chip>
+      {state.kind === 'taken' && !state.alive ? (
+        <Chip size="sm">{SESSION_ENDED_TEXT}</Chip>
+      ) : null}
     </>
   );
 }

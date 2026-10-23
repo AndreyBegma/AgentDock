@@ -91,6 +91,11 @@ import {
   protectedPathsBanner,
   pullRequestRows,
 } from '../../lib/board/shipping';
+import {
+  SESSION_ENDED_TEXT,
+  takenSessionHref,
+  takenState,
+} from '../../lib/board/taken';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { useReadiness } from '../../lib/readiness/use-readiness';
@@ -321,6 +326,32 @@ function PullRequestList({ card }: { card: BoardCardDetail }) {
         );
       })}
     </ul>
+  );
+}
+
+/** #845 D2, D10: which manual session took or queued the card, and that it ended. */
+function TakenLine({ card }: { card: BoardCardView }) {
+  const state = takenState(card);
+  const href = takenSessionHref(card);
+  if (!state) return null;
+  return (
+    <p className="text-xs text-ink-2">
+      {state.text}
+      {state.kind === 'taken' && !state.alive
+        ? ` · ${SESSION_ENDED_TEXT}`
+        : null}
+      {href ? (
+        <>
+          {' · '}
+          <NextLink
+            href={href}
+            className="text-accent-ink underline-offset-2 hover:underline"
+          >
+            Open the session
+          </NextLink>
+        </>
+      ) : null}
+    </p>
   );
 }
 
@@ -918,6 +949,7 @@ export function CardDetailBody({
           <p>{trackedStatusText(card)}</p>
         </div>
       ) : null}
+      {takenState(card) ? <TakenLine card={card} /> : null}
       {card.fleet ? (
         <div className="flex flex-col gap-1 text-xs text-ink-2">
           <p>

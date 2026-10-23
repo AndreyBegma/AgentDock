@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { ActionRequestSummary } from '@nautelle/shared';
 import { ApiError } from '../api';
 import {
+  cardAcceptMergeText,
   describeActionRequestError,
   formatCountdown,
   pendingRequests,
@@ -117,6 +118,39 @@ describe('prApproveArgs (C-110)', () => {
         }),
       ),
     ).toBeNull();
+  });
+});
+
+describe('card_accept (#845 D5)', () => {
+  const accept = (over: Record<string, unknown> = {}) =>
+    row({
+      kind: 'card_accept',
+      args: {
+        card: 12,
+        title: 'Add the thing',
+        prNumber: 34,
+        prUrl: 'https://github.com/o/r/pull/34',
+        ...over,
+      },
+    });
+
+  test('reads "Accept C-<n> <title>"', () => {
+    expect(requestTitle(accept())).toBe('Accept C-12 Add the thing');
+  });
+
+  test('says "and merge #<pr>" only when merge is set', () => {
+    expect(cardAcceptMergeText(accept())).toBeNull();
+    expect(cardAcceptMergeText(accept({ merge: false }))).toBeNull();
+    expect(cardAcceptMergeText(accept({ merge: true }))).toBe('and merge #34');
+    expect(cardAcceptMergeText(accept({ merge: true, prNumber: null }))).toBe(
+      'and merge',
+    );
+  });
+
+  test('falls back to the kind label for unreadable args', () => {
+    expect(requestTitle(row({ kind: 'card_accept', args: {} }))).toBe(
+      'Accept a card',
+    );
   });
 });
 
