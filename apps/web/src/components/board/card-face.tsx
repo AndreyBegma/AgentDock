@@ -42,7 +42,7 @@ import {
   trackedSessionHref,
 } from '../../lib/board/format';
 import { prChipText } from '../../lib/board/pull-request';
-import { ciDot, shippingBadge } from '../../lib/board/shipping';
+import { ciDot, readinessLine, shippingBadge } from '../../lib/board/shipping';
 import { SESSION_ENDED_TEXT, takenState } from '../../lib/board/taken';
 import { hintsLabel } from '../../lib/board-ai/triage';
 import { formatCost } from '../../lib/format';
@@ -99,6 +99,7 @@ export function CardFace({
   const offer = approveRunOffer(card);
   const pill = roundPill(card.round);
   const badge = shippingBadge(card);
+  const readiness = readinessLine(card);
   // #630: a collect that failed is on the face, not only in the sheet.
   const notPushed = collectFailedBadge(card);
   const cost = formatCost(card.costUsd);
@@ -267,7 +268,19 @@ export function CardFace({
               </span>
             </Tooltip>
           ) : null}
-          {badge ? (
+          {badge?.review ? (
+            // #891: one line; the step name truncates, the position stays.
+            <Tooltip content={badge.label}>
+              <Chip
+                size="sm"
+                tone={badge.tone}
+                data-review-chip=""
+                className="min-w-0 max-w-full"
+              >
+                <span className="truncate">{badge.label}</span>
+              </Chip>
+            </Tooltip>
+          ) : badge ? (
             <Tooltip content={badge.label}>
               <span>
                 <Badge tone={badge.tone} size="md" label={badge.label} />
@@ -292,6 +305,11 @@ export function CardFace({
               <p className="text-xs text-ink-3">{offer.reason}</p>
             ) : null}
           </>
+        ) : null}
+        {readiness ? (
+          <p data-review-readiness="" className={note}>
+            {readiness.join(' · ')}
+          </p>
         ) : null}
         {card.stack ? <p className={note}>part of {card.stack.title}</p> : null}
         {card.fleet ? <p className={note}>{fleetSummary(card.fleet)}</p> : null}

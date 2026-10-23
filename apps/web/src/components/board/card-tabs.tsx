@@ -3,19 +3,26 @@
 import { Tab, TabGroup, TabList, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import { type ReactNode, useState } from 'react';
 
-export type CardTab = 'overview' | 'rounds' | 'files' | 'edit';
+export type CardTab = 'overview' | 'review' | 'rounds' | 'files' | 'edit';
 
 /** Every card opens here: the run state is what a person came to see. */
 export const DEFAULT_CARD_TAB: CardTab = 'overview';
 
 const TAB_LABEL: Record<CardTab, string> = {
   overview: 'Overview',
+  review: 'Review',
   rounds: 'Rounds',
   files: 'Files',
   edit: 'Edit',
 };
 
-const TAB_ORDER: readonly CardTab[] = ['overview', 'rounds', 'files', 'edit'];
+const TAB_ORDER: readonly CardTab[] = [
+  'overview',
+  'review',
+  'rounds',
+  'files',
+  'edit',
+];
 
 /**
  * The selected tab for card `cardId`. It lives above the card body, which is
@@ -47,7 +54,7 @@ export function visibleCardTabs(
 }
 
 /**
- * Overview, Rounds, Files and Edit as ARIA tabs. A section that is empty for
+ * Overview, Review, Rounds, Files and Edit as ARIA tabs. A section that is empty for
  * this card passes `null`, and its tab is not drawn; a selection that is not
  * drawn falls back to Overview. Panels not on screen are unmounted except Edit,
  * which keeps the person's unsaved typing across a switch.
