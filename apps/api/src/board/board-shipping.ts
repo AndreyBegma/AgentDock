@@ -157,6 +157,10 @@ const WATCHED = {
       column: 'finished',
       ciState: { in: ['none', 'red'] },
       protectedPaths: { isEmpty: true },
+      // A stacked card is landed through its dependency, not read here; a
+      // card whose checks were never read has no CI to wait for.
+      prBaseCardId: null,
+      ciCheckedAt: { not: null },
     },
     // #636: stacked on a dependency that merged — still to be retargeted.
     // #709: any stacked PR — its dependency, or the PR itself, may merge on
