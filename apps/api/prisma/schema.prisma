@@ -1743,6 +1743,8 @@ enum RunKind {
   rules_compress
   /// An overlay proposal for one prefix part (#751 B8, ADR-0075).
   prefix_propose
+  /// One review step's session on a card's PR head (#884, ADR-0084).
+  card_review
 }
 
 enum RunStatus {
@@ -1831,6 +1833,8 @@ model Run {
   prefixParts       RunPrefixPart[]
   /// #449 DA-11: the run's handoff note, deleted with the run.
   handoffNotes      HandoffNote[]
+  /// #884: the review step run this `card_review` run is.
+  cardReviewRun     BoardCardReviewRun?
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
@@ -3072,6 +3076,8 @@ enum CardRoundTrigger {
   ci_fix
   /// #750 D9: the relaunch on Opus after the worker's `escalate_card`.
   escalation
+  /// #884 (ADR-0084): started by Nautelle for blocking review findings.
+  review_fix
 }
 
 /// Shared `CARD_ROUND_PHASES` (D4, D6).
@@ -3276,6 +3282,9 @@ model BoardCard {
   ciCheckedAt             DateTime?
   /// #359 D6: `ci_fix` rounds on the current PR (at most 3).
   ciFixAttempts           Int                   @default(0)
+  /// #884 (ADR-0084 §3): `review_fix` rounds on the current PR (at most 3),
+  /// counted apart from `ciFixAttempts`.
+  reviewFixAttempts       Int                   @default(0)
   /// #484: since when `ciHeadSha` has had no checks (`ciState` `none`);
   /// `null` while it has some. Reset when the head is retriggered.
   ciNoneSince             DateTime?
@@ -3408,6 +3417,8 @@ model BoardCard {
   techniqueArms        CardTechniqueArm[]
   /// #449 DA-11: the card's handoff note, deleted with the card.
   handoffNotes         HandoffNote[]
+  /// #884: every review step run on the card's PRs.
+  reviewRuns           BoardCardReviewRun[]
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3718,6 +3729,8 @@ model BoardCardRound {
 
   textNormalizations TextNormalization[]
   attachments        Attachment[]
+  /// #884: the review step runs on the head this round left.
+  reviewRuns         BoardCardReviewRun[]
 
   @@unique([cardId, round])
   @@index([phase])
@@ -4467,9 +4480,66 @@ model ProjectReviewStep {
   updatedAt               DateTime       @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// #884: the runs of this step on cards; kept when the step is deleted.
+  cardRuns BoardCardReviewRun[]
 
   @@index([projectId, position])
   @@map("project_review_steps")
+}
+
+/// Mirrors `CARD_REVIEW_RUN_STATES` of the shared contract (#884).
+enum CardReviewRunState {
+  running
+  passed
+  blocked
+  failed
+}
+
+/// #884 (ADR-0084 §4): one run of one review step on a card's PR head. A pass
+/// is every enabled step once on `(headSha, pass)`; `pass` is the card's
+/// `reviewFixAttempts` when it ran, so a fix round that pushed nothing is
+/// still reviewed again.
+model BoardCardReviewRun {
+  id            String             @id @default(cuid())
+  cardId        String
+  /// The card's latest round when the step started: the round whose head it reviews.
+  roundId       String?
+  /// Null once the step is deleted; `stepName` and `stepType` keep what ran.
+  stepId        String?
+  stepName      String
+  stepType      ReviewStepType
+  /// The step's `position` when it ran.
+  position      Int
+  prNumber      Int
+  headSha       String
+  pass          Int
+  /// The `card_review` run its cost is booked to.
+  runId         String             @unique
+  /// The review session's Claude session; `report_review` is matched by it.
+  sessionId     String             @unique @db.Uuid
+  state         CardReviewRunState @default(running)
+  /// Shared `ReviewFinding[]`; `[]` until the session reports.
+  findings      Json               @default("[]")
+  blockingCount Int                @default(0)
+  nitCount      Int                @default(0)
+  /// The session's one-paragraph summary, at most `REVIEW_SUMMARY_MAX` characters.
+  summary       String?
+  /// Why a `failed` run failed, at most 500 characters.
+  error         String?
+  /// When the findings were posted as a GitHub PR review.
+  publishedAt   DateTime?
+  startedAt     DateTime
+  finishedAt    DateTime?
+
+  card  BoardCard          @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  round BoardCardRound?    @relation(fields: [roundId], references: [id], onDelete: SetNull)
+  step  ProjectReviewStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  run   Run                @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  /// A step runs once per pass on a head; a second start loses the race.
+  @@unique([cardId, headSha, pass, stepId])
+  @@index([state])
+  @@map("board_card_review_runs")
 }
 
 // ─── LLM gateway (ADR-0059, #598) ───────────────────────────────────────────
