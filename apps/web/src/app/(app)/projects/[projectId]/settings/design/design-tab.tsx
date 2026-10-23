@@ -3,6 +3,7 @@
 import { Separator } from '@andrewbehma/glass-ui/separator';
 import { DesignSettingsSection } from './design-settings-section';
 import { ProfileSection } from './profile-section';
+import { TemplatesSection } from './templates-section';
 
 /**
  * Project settings → Design (spec 223 "UI", D11–D15, D17): the UI profile
@@ -28,6 +29,8 @@ export function DesignTab({
       />
       <Separator />
       <DesignSettingsSection projectId={projectId} isAdmin={isAdmin} />
+      <Separator />
+      <TemplatesSection projectId={projectId} isAdmin={isAdmin} />
     </div>
   );
 }
