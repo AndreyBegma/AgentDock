@@ -117,7 +117,6 @@ import { useCurrentUser } from '../shell/user-context';
 import { CardStewardSection } from '../steward/card-steward-section';
 import { NormalizedNote } from '../text/normalized-note';
 import { DescriptionIncompleteBadge } from '../token-saver/description-incomplete-badge';
-import { FilterBreakdown } from '../token-saver/filter-breakdown';
 import { SavedBadge } from '../token-saver/saved-badge';
 import { CardDependenciesSection } from './card-dependencies';
 import { CardDescription } from './card-description';
@@ -136,6 +135,7 @@ import {
 import { CardHandoffSection } from './handoff/card-handoff-section';
 import { LaunchPopover } from './launch-popover';
 import { MovePicker } from './move-picker';
+import { RoundFacts, RoundSummary, RoundTokenSaver } from './round-facts';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import { TriageHints } from './triage-hints';
 import type { CardActions } from './use-card-actions';
@@ -172,9 +172,9 @@ function roundItems(
   notes: TextNotes,
   canOperate: boolean,
   files: RoundAttachments,
+  now: number = Date.now(),
 ): TimelineItem[] {
   return rounds.map((round) => {
-    const cost = formatCost(round.costUsd);
     return {
       id: round.id,
       at: round.startedAt,
@@ -224,11 +224,8 @@ function roundItems(
             removing={files.removing}
             onRemove={files.onRemove}
           />
-          {round.summary ? (
-            <span className="whitespace-pre-wrap break-words">
-              {round.summary}
-            </span>
-          ) : null}
+          <RoundFacts round={round} now={now} />
+          {round.summary ? <RoundSummary text={round.summary} /> : null}
           {round.error ? <PolicyRefusalText text={round.error} /> : null}
           {round.blockingDialog ? (
             <span className="text-warn">
@@ -249,9 +246,8 @@ function roundItems(
             // A round is a runner launch, whatever the card's source.
             <span>{hooksNotice({ source: 'manual' }, round).text}</span>
           ) : null}
-          {cost ? <span className="tabular-nums">{cost}</span> : null}
           <DescriptionIncompleteBadge incomplete={round.artifactIncomplete} />
-          <FilterBreakdown filters={round.tokenSaverFilters} />
+          <RoundTokenSaver round={round} />
         </span>
       ),
     };
