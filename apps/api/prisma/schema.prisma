@@ -827,6 +827,8 @@ model AgentSession {
   cardCaptures         CardCapture[]
   capturedCards        BoardCard[]           @relation("BoardCardSourceSession")
   trackedCard          BoardCard?            @relation("BoardCardTrackedSession")
+  /// #845 D2: the cards this session took while holding another.
+  queuedCards          BoardCard[]           @relation("BoardCardQueuedForSession")
   usageFact            RunUsageFact?
   tokenSaverStats      TokenSaverStat[]
 
@@ -1044,6 +1046,8 @@ enum ActionRequestKind {
   orchestrator_stop
   pr_approve
   issue_queue
+  /// #845 D5: a session asks a person to accept a Finished card.
+  card_accept
 }
 
 enum ActionRequestStatus {
@@ -3143,6 +3147,17 @@ enum CardEscalationReason {
   gave_up
 }
 
+/// Shared `CARD_MERGE_POLICIES` (#845 D4): who merges a finished card's green
+/// pull request when a person's session conducts a Board Run.
+enum CardMergePolicy {
+  /// The conductor asks the person once at the start of a run.
+  ask
+  /// The conductor merges a green, `CLEAN` pull request itself.
+  agent
+  /// Only a person merges.
+  person
+}
+
 /// A work item Nautelle owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
@@ -3318,6 +3333,12 @@ model BoardCard {
   /// #282 D1: the manual session a `terminal` card tracks; unique, so a
   /// second `card.track` of the session updates its card.
   trackedSessionId        String?               @unique
+  /// #845 D2: the manual session this card waits for — it took the card while
+  /// holding another; promoted in board order when that one finishes.
+  queuedForSessionId      String?
+  /// #845 D10: the branch a taken card is worked on, kept after the taking
+  /// session ends so another session or Run can continue it.
+  takenBranch             String?
   /// #282 D3: Automatic work — collect when the tracked session finishes.
   /// Starts from `board_settings.autoCollectTracked`.
   autoCollect             Boolean               @default(false)
@@ -3353,6 +3374,7 @@ model BoardCard {
   plan                 Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
   stage                BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
   trackedSession       AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
+  queuedForSession     AgentSession?          @relation("BoardCardQueuedForSession", fields: [queuedForSessionId], references: [id], onDelete: SetNull)
   createdBy            User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   movedBy              User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
   completedBy          User?                  @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
@@ -3394,6 +3416,7 @@ model BoardCard {
   @@index([planId])
   @@index([stageId])
   @@index([prBaseCardId])
+  @@index([queuedForSessionId])
   @@map("board_cards")
 }
 
@@ -3731,26 +3754,29 @@ model Attachment {
 
 /// A project's board settings (D2, D13). No row: the defaults.
 model BoardSettings {
-  projectId              String   @id
-  issueOnRun             Boolean  @default(false)
-  specOnRun              Boolean  @default(false)
+  projectId              String          @id
+  issueOnRun             Boolean         @default(false)
+  specOnRun              Boolean         @default(false)
   /// 1–10, checked by the DTO.
-  maxRunning             Int      @default(3)
+  maxRunning             Int             @default(3)
   /// #244 D10: on only while the project's `shipSessionContent` is on;
   /// turning content off turns it off.
-  captureEnabled         Boolean  @default(false)
+  captureEnabled         Boolean         @default(false)
   /// Shared `CAPTURE_MODELS`: `haiku` or `sonnet`, checked by the DTO.
-  captureModel           String   @default("haiku")
+  captureModel           String          @default("haiku")
   /// #282 D3: the `autoCollect` a new `terminal` card starts with.
-  autoCollectTracked     Boolean  @default(false)
+  autoCollectTracked     Boolean         @default(false)
   /// #359 D7: merge a card's PR on entering Finished. `null` is the default:
   /// on for a base other than the default branch (shared `cardAutoMergeDefault`).
   autoMergeCards         Boolean?
+  /// #845 D4: who merges a finished card's pull request when a person's
+  /// session conducts the Board.
+  cardMergePolicy        CardMergePolicy @default(ask)
   /// #390: minutes in `background` before `card.background_stalled`; 5–1440,
   /// checked by the DTO.
-  backgroundStallMinutes Int      @default(30)
+  backgroundStallMinutes Int             @default(30)
   updatedById            String?
-  updatedAt              DateTime @updatedAt
+  updatedAt              DateTime        @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)

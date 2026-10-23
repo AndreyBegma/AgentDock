@@ -73,6 +73,7 @@ const KIND_TITLE: Record<ActionRequestKind, string> = {
   orchestrator_stop: 'A session asks to stop the orchestrator',
   pr_approve: 'A session asks to approve a PR',
   issue_queue: 'A session asks to queue an issue for the fleet',
+  card_accept: 'A session asks to accept a card',
 };
 
 /** The notification's title (spec 22 D10: no prompt or code text). */

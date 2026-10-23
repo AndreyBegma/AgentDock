@@ -9,6 +9,7 @@ import {
   CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
   CARD_DECIDING_SIGNALS,
   CARD_HOOKS_GRACE_MS,
+  CARD_MERGE_POLICY_DEFAULT,
   type CardDecidingSignal,
   type CardDependencyRef,
   type CardEscalationView,
@@ -659,6 +660,7 @@ export const toSettingsView = (
         autoMergeCards: row.autoMergeCards,
         autoMergeCardsDefault,
         backgroundStallMinutes: row.backgroundStallMinutes,
+        cardMergePolicy: row.cardMergePolicy,
         isDefault: false,
         updatedAt: row.updatedAt.toISOString(),
       }
@@ -673,6 +675,7 @@ export const toSettingsView = (
         autoMergeCards: null,
         autoMergeCardsDefault,
         backgroundStallMinutes: CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
+        cardMergePolicy: CARD_MERGE_POLICY_DEFAULT,
         isDefault: true,
         updatedAt: null,
       };

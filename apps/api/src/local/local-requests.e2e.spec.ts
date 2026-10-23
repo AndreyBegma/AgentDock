@@ -56,7 +56,36 @@ const ARGS: Record<LocalMethodName, unknown> = {
     note: 'The card needs a schema decision.',
   },
   'card.track': { title: 'Track the pairing fix' },
+  'board.list': {},
+  'board.card': { card: 1 },
+  'board.wait': { timeoutSec: 0 },
+  'card.create': { title: 'Retry the pairing handshake' },
+  'card.run': { card: 1 },
+  'card.move': { card: 1, column: 'todo' },
+  'card.feedback': { card: 1, text: 'Handle the macOS case too.' },
+  'card.message': { card: 1, kind: 'text', text: 'Use the existing helper.' },
+  'card.stop': { card: 1 },
+  'card.take': { card: 1 },
+  'card.release': { card: 1 },
 };
+
+/**
+ * #845: the Board methods whose contract landed before their handlers; the
+ * sweep covers them once the API serves them, and drops this list then.
+ */
+const NOT_SERVED_YET: ReadonlySet<LocalMethodName> = new Set([
+  'board.list',
+  'board.card',
+  'board.wait',
+  'card.create',
+  'card.run',
+  'card.move',
+  'card.feedback',
+  'card.message',
+  'card.stop',
+  'card.take',
+  'card.release',
+]);
 
 /**
  * Spec 201 D6–D8 through the real gateway: a runner socket sends
@@ -281,9 +310,10 @@ describe('local requests over the runner socket (e2e)', () => {
     // `action.request` first: `action.status` asks about the request it made.
     // #750: `card.escalate` just before `card.finish` — it needs the active
     // round, and its `card.stop` takes the place `card.finish`'s had.
+    const served = localMethodNames.filter((m) => !NOT_SERVED_YET.has(m));
     const order = [
       'action.request',
-      ...localMethodNames
+      ...served
         .filter((m) => m !== 'action.request' && m !== 'card.escalate')
         .flatMap((m) =>
           m === 'card.finish' ? (['card.escalate', m] as const) : [m],
@@ -313,7 +343,7 @@ describe('local requests over the runner socket (e2e)', () => {
         actionId = (response.data as { id: string }).id;
       }
     }
-    expect(responses.size).toBe(localMethodNames.length);
+    expect(responses.size).toBe(served.length);
 
     const context = responses.get('context.sessionStart')?.data as {
       text: string;
@@ -408,6 +438,15 @@ describe('local requests over the runner socket (e2e)', () => {
       ['card.track', 'ok', localUserId, 'mcp'],
       ['away.set', 'ok', localUserId, 'mcp'],
     ]);
+
+    // #845: until then they answer as a server without them would.
+    for (const method of NOT_SERVED_YET) {
+      const response = await ask(method, ARGS[method], projectId);
+      expect([method, response.error?.code]).toEqual([
+        method,
+        'unknown_method',
+      ]);
+    }
     const issueAudit = await ctx.prisma.auditRecord.findFirst({
       where: { action: 'issue.create', projectId },
       orderBy: { seq: 'asc' },

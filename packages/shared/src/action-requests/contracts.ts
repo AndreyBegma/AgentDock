@@ -15,6 +15,7 @@ export const actionRequestKindSchema = z.enum([
   'orchestrator_stop',
   'pr_approve',
   'issue_queue',
+  'card_accept',
 ]);
 export type ActionRequestKind = z.infer<typeof actionRequestKindSchema>;
 export const ACTION_REQUEST_KINDS = actionRequestKindSchema.options;
@@ -57,6 +58,8 @@ export const ACTION_REQUEST_TTL_MS: Record<ActionRequestKind, number> = {
   pr_approve: 24 * 60 * 60_000,
   /** Expiring only leaves the issue unqueued; a week covers a weekend away. */
   issue_queue: 7 * 24 * 60 * 60_000,
+  /** Expiring leaves the card in Finished, where a person accepts it anyway. */
+  card_accept: 7 * 24 * 60 * 60_000,
 };
 
 /** The `PermissionRequest` hook polls `action.status` this often… */
@@ -119,6 +122,15 @@ export const actionRequestArgsSchemas = {
     /** The session that filed it (its Nautelle id), when the API knows it. */
     session: z.string().min(1).max(64).nullable(),
   }),
+  /**
+   * #845 D5: Finished → Completed is a person's (ADR-0024 §6, ADR-0030).
+   * Approving runs the Board's `accept`; `merge` also merges the card's PR
+   * while it is still open (merge policy `person`).
+   */
+  card_accept: z.strictObject({
+    card: z.number().int().positive(),
+    merge: z.boolean().optional(),
+  }),
 } as const satisfies Record<ActionRequestKind, z.ZodType>;
 
 export type ActionRequestArgs<K extends ActionRequestKind> = z.infer<
@@ -161,6 +173,34 @@ export const issueQueueArgsOf = (request: {
   return parsed.success ? parsed.data : null;
 };
 
+/** The card title kept on a `card_accept` request (`BOARD_CARD_TITLE_MAX`). */
+export const ACTION_REQUEST_CARD_TITLE_MAX = 200;
+
+/**
+ * The stored `args` of a `card_accept` request: what the session asked for
+ * plus the card as the API read it when it was created — what the approver
+ * is shown ("Accept C-<n> <title>", the PR, "and merge #<pr>"). Never taken
+ * from the session.
+ */
+export const cardAcceptBoundArgsSchema = z.strictObject({
+  card: z.number().int().positive(),
+  merge: z.boolean().optional(),
+  title: z.string().max(ACTION_REQUEST_CARD_TITLE_MAX),
+  prNumber: z.number().int().positive().nullable(),
+  prUrl: z.url({ protocol: /^https?$/ }).nullable(),
+});
+export type CardAcceptBoundArgs = z.infer<typeof cardAcceptBoundArgsSchema>;
+
+/** The bound card of a `card_accept` request; null for another kind or bad args. */
+export const cardAcceptArgsOf = (request: {
+  kind: ActionRequestKind;
+  args: unknown;
+}): CardAcceptBoundArgs | null => {
+  if (request.kind !== 'card_accept') return null;
+  const parsed = cardAcceptBoundArgsSchema.safeParse(request.args);
+  return parsed.success ? parsed.data : null;
+};
+
 /** A commit id as people read it: its first 7 characters. */
 export const shortHeadSha = (sha: string): string => sha.slice(0, 7);
 
@@ -197,7 +237,8 @@ export type ActionRequestDecision = z.infer<typeof actionRequestDecisionSchema>;
  * Whether `userId` may decide a request of `kind` that `requestedById` made.
  * Only operators reach this; a requester cannot approve their own
  * `orchestrator_*` or `pr_approve` request unless they are an admin (D18).
- * `issue_queue` (C-112) only needs a person, not a second one.
+ * `issue_queue` (C-112) and `card_accept` (#845 D5) only need a person, not
+ * a second one.
  */
 export const mayDecideActionRequest = (args: {
   kind: ActionRequestKind;
@@ -208,6 +249,8 @@ export const mayDecideActionRequest = (args: {
   args.kind === 'tool_use' ||
   // The person who would self-approve could have queued it from the web.
   args.kind === 'issue_queue' ||
+  // …or accepted the card on the Board.
+  args.kind === 'card_accept' ||
   args.isAdmin ||
   args.requestedById === null ||
   args.requestedById !== args.userId;

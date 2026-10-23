@@ -15,6 +15,8 @@ import type {
   CardMergeMethod,
   CardRunWiring,
   CardRunWiringReason,
+  LOCAL_BOARD_REFUSALS,
+  LocalCardTaken,
   LocalErrorCode,
   OrchestratorPermissionMode,
   PaneDialog,
@@ -45,6 +47,7 @@ import type {
   CardCiState,
   CardCollectState,
   CardFinishedBy,
+  CardMergePolicy,
   CardNeedsPersonReason,
   CardPrState,
   CardRoundPhase,
@@ -141,6 +144,13 @@ export interface CardTrackingView {
   /** Not ended and not stale (ADR-0024 D6). */
   alive: boolean;
 }
+
+/**
+ * #845 D2, D10: a card a person's manual session took with `take_card` —
+ * "taken by <session>"; "session ended" once `alive` is false, and Run is
+ * offered again.
+ */
+export type CardTakenView = LocalCardTaken;
 
 /** #282 D4: a `fleet` card's slot (ADR-0030 §4). */
 export interface CardFleetView {
@@ -287,6 +297,16 @@ export interface BoardCardView {
   tracking: CardTrackingView | null;
   /** #282 D4: set for a `fleet` card, `null` for any other source. */
   fleet: CardFleetView | null;
+  /**
+   * #845 D2: the manual session that took the card; `null` otherwise.
+   * Optional until the board routes fill it; absent reads as null.
+   */
+  taken?: CardTakenView | null;
+  /**
+   * #845 D2: the manual session the card is queued for — "queued for
+   * <session>"; `null` otherwise. Absent reads as null.
+   */
+  queuedForSessionId?: string | null;
   /**
    * #282 D3: Automatic work — push and open a pull request when the tracked
    * session finishes. Meaningful for a `terminal` card only; `false` otherwise.
@@ -635,6 +655,8 @@ export interface BoardSettingsView {
    * raises `card.background_stalled`.
    */
   backgroundStallMinutes: number;
+  /** #845 D4: who merges a finished card's PR when a session conducts the Board. */
+  cardMergePolicy: CardMergePolicy;
   isDefault: boolean;
   updatedAt: string | null;
 }
@@ -789,6 +811,8 @@ export interface UpdateBoardSettingsRequest {
   autoMergeCards?: boolean | null;
   /** #390. Absent keeps the stored value. */
   backgroundStallMinutes?: number;
+  /** #845 D4. Absent keeps the stored value. */
+  cardMergePolicy?: CardMergePolicy;
 }
 
 /**
@@ -935,6 +959,10 @@ export const BOARD_ERROR = {
   stackRefused: 'stack_refused',
 } as const;
 export type BoardErrorCode = (typeof BOARD_ERROR)[keyof typeof BOARD_ERROR];
+
+/** #845: every refusal a board tool passes through is one of the Board's. */
+type BoardCodes<T extends readonly BoardErrorCode[]> = T[number];
+export type LocalBoardRefusal = BoardCodes<typeof LOCAL_BOARD_REFUSALS>;
 
 export interface BoardErrorBody {
   statusCode: number;

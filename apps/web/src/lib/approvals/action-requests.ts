@@ -28,6 +28,7 @@ export const KIND_LABEL: Record<ActionRequestKind, string> = {
   orchestrator_stop: 'Stop the orchestrator',
   pr_approve: 'Approve a pull request',
   issue_queue: 'Queue an issue for the fleet',
+  card_accept: 'Accept a card',
 };
 
 export const STATUS_LABEL: Record<ActionRequestStatus, string> = {
