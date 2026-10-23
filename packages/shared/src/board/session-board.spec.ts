@@ -178,7 +178,8 @@ describe('diffBoardWatch (#845 D8)', () => {
   it('reports a question once, and a new screen of it again', () => {
     const prior = snapshotOf([card({ question })]);
     expect(diffBoardWatch(prior, [card({ question })])).toEqual([]);
-    const next = { ...question, key: 'fedcba9876543210' };
+    // The diff compares keys only; it never parses the current one.
+    const next = { ...question, key: 'question-2' };
     expect(
       diffBoardWatch(prior, [card({ question: next })]).map((e) => e.type),
     ).toEqual(['question']);
