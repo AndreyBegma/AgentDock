@@ -26,6 +26,13 @@ interface TrackProject {
 /** Why `track` refused: the session is not a person's own manual one. */
 export class NotAManualSession extends Error {}
 
+/** A person's own session, as `manualSession` resolved it. */
+export interface ManualSession {
+  /** `sessions.id`. */
+  id: string;
+  gitBranch: string | null;
+}
+
 /**
  * Terminal work on the Board (issue #282 D1–D3, ADR-0030 §1–§3): the card a
  * person's own Claude Code session tracks with `track_card`. It starts no
@@ -57,23 +64,7 @@ export class BoardTerminalService {
     args: LocalMethodArgs<'card.track'>,
     actor: BoardActor,
   ): Promise<TrackedCardRef> {
-    const session = await this.prisma.agentSession.findUnique({
-      where: {
-        runnerId_runtime_externalId: {
-          runnerId: project.runnerId,
-          runtime: 'claude',
-          externalId: sessionId,
-        },
-      },
-      select: { id: true, origin: true, projectId: true },
-    });
-    if (
-      !session ||
-      session.origin !== 'manual' ||
-      session.projectId !== project.id
-    ) {
-      throw new NotAManualSession();
-    }
+    const session = await this.manualSession(project, sessionId);
     const title = args.title.trim();
     const body = args.body;
     const now = new Date();
@@ -84,6 +75,11 @@ export class BoardTerminalService {
       const existing = await tx.boardCard.findUnique({
         where: { trackedSessionId: session.id },
       });
+      // #845: a card the session took is the person's card, not the
+      // session's notes — `track_card` names it and edits nothing.
+      if (existing && existing.source !== 'terminal') {
+        return { card: existing, before: existing, taken: true };
+      }
       if (existing) {
         const card = await tx.boardCard.update({
           where: { id: existing.id },
@@ -96,7 +92,7 @@ export class BoardTerminalService {
               : {}),
           },
         });
-        return { card, before: existing };
+        return { card, before: existing, taken: false };
       }
       const settings = await tx.boardSettings.findUnique({
         where: { projectId: project.id },
@@ -131,9 +127,10 @@ export class BoardTerminalService {
           movedAt: now,
         },
       });
-      return { card, before: null };
+      return { card, before: null, taken: false };
     });
     const { card, before } = outcome;
+    if (outcome.taken) return this.refOf(project.id, card.number);
     await this.audit(actor, card.id, project.id, before === null, {
       number: card.number,
       title: card.title,
@@ -154,11 +151,45 @@ export class BoardTerminalService {
     if (Object.keys(changed).length > 0) {
       await this.board.normalizeCard(card, changed, actor);
     }
+    return this.refOf(project.id, card.number);
+  }
+
+  /** The card as `card.track` and `card.create` answer it. */
+  refOf(projectId: string, number: number): TrackedCardRef {
     return {
-      number: card.number,
-      label: cardLabel(card.number),
-      url: `${webOrigin()}/projects/${project.id}/board?card=${card.number}`,
+      number,
+      label: cardLabel(number),
+      url: `${webOrigin()}/projects/${projectId}/board?card=${number}`,
     };
+  }
+
+  /**
+   * A person's own Claude Code session of this project on the asking runner
+   * (`origin: manual`), by Claude's session id; anything else throws
+   * `NotAManualSession` (#282 D1, #845 D9).
+   */
+  async manualSession(
+    project: TrackProject,
+    sessionId: string,
+  ): Promise<ManualSession> {
+    const session = await this.prisma.agentSession.findUnique({
+      where: {
+        runnerId_runtime_externalId: {
+          runnerId: project.runnerId,
+          runtime: 'claude',
+          externalId: sessionId,
+        },
+      },
+      select: { id: true, origin: true, projectId: true, gitBranch: true },
+    });
+    if (
+      !session ||
+      session.origin !== 'manual' ||
+      session.projectId !== project.id
+    ) {
+      throw new NotAManualSession();
+    }
+    return { id: session.id, gitBranch: session.gitBranch };
   }
 
   /**
@@ -192,6 +223,7 @@ export class BoardTerminalService {
    * Finished, once. A card a person already moved elsewhere stays there.
    */
   async sessionEnded(runnerId: string, sessionId: string): Promise<void> {
+    await this.keepTakenBranch(runnerId, sessionId);
     const card = await this.prisma.boardCard.findFirst({
       where: {
         source: 'terminal',
@@ -201,6 +233,38 @@ export class BoardTerminalService {
       select: { projectId: true, number: true },
     });
     if (card) await this.toFinished(card.projectId, card.number);
+  }
+
+  /**
+   * #845 D10: a card the session took stays In progress, "session ended",
+   * with the branch the session ended on recorded, so another session or a
+   * Run continues it.
+   */
+  private async keepTakenBranch(
+    runnerId: string,
+    sessionId: string,
+  ): Promise<void> {
+    const session = await this.prisma.agentSession.findUnique({
+      where: {
+        runnerId_runtime_externalId: {
+          runnerId,
+          runtime: 'claude',
+          externalId: sessionId,
+        },
+      },
+      select: { id: true, gitBranch: true },
+    });
+    if (!session?.gitBranch) return;
+    const card = await this.prisma.boardCard.findUnique({
+      where: { trackedSessionId: session.id },
+      select: { id: true, projectId: true, source: true },
+    });
+    if (!card || card.source === 'terminal') return;
+    await this.prisma.boardCard.update({
+      where: { id: card.id },
+      data: { takenBranch: session.gitBranch },
+    });
+    this.work.publish(card.projectId, card.id);
   }
 
   /** In progress → Finished, as the board's own automatic move. */

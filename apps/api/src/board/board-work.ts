@@ -271,6 +271,7 @@ export class BoardWork implements OnModuleInit {
   private roundCollected: RoundCollectedHook | null = null;
   private cardSatisfied: CardSatisfiedHook | null = null;
   private cardChanged: CardChangedHook | null = null;
+  private readonly watchers = new Set<CardChangedHook>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -594,6 +595,18 @@ export class BoardWork implements OnModuleInit {
   /** #652: `BoardStackRuns` registers what follows any change of a card. */
   onChanged(hook: CardChangedHook): void {
     this.cardChanged = hook;
+  }
+
+  /**
+   * #845 (ADR-0083 §7): a held `board.wait` is woken early by any change of
+   * a card on this instance. Best effort — the wait re-diffs on a tick too.
+   * Returns the unsubscribe.
+   */
+  watch(listener: CardChangedHook): () => void {
+    this.watchers.add(listener);
+    return () => {
+      this.watchers.delete(listener);
+    };
   }
 
   /** #359: `BoardShipping` registers what follows a round's collect. */
@@ -2045,6 +2058,7 @@ export class BoardWork implements OnModuleInit {
       );
     }
     this.cardChanged?.(projectId, cardId);
+    for (const watcher of this.watchers) watcher(projectId, cardId);
   }
 
   /** #480: `board.changed` for a stack — its face, its page and its design. */
