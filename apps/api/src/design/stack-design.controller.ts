@@ -22,7 +22,12 @@ import {
 } from '../projects';
 import { DesignService } from './design.service';
 import { DesignStopService } from './design-stop.service';
-import { DesignApproveDto, DesignCommentDto, TaskDesignPatchDto } from './dto';
+import {
+  DesignApproveDto,
+  DesignCommentDto,
+  DesignGenerateDto,
+  TaskDesignPatchDto,
+} from './dto';
 
 const actorOf = (
   access: ResolvedProjectAccess,
@@ -79,12 +84,14 @@ export class StackDesignController {
     @CurrentUser() user: AuthUser,
     @AuditCtx() ctx: AuditContext,
     @Param('number') number: string,
+    @Body() dto: DesignGenerateDto,
   ): Promise<TaskDesignView> {
     const n = stackNumber(number);
     await this.designs.stackGenerate(
       access.projectId,
       n,
       actorOf(access, user, ctx),
+      dto,
     );
     return this.designs.stackView(access.projectId, n);
   }

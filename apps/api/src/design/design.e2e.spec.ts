@@ -928,6 +928,108 @@ describe('design stage (e2e)', () => {
     );
   });
 
+  // #863 (ADR-0085): a page revision drawn before the mobile frame left the
+  // template keeps its stored check; nothing reads its frames again.
+  it('loads a revision with a mobile frame as it was stored (#863)', async () => {
+    const plan = await drawn(1);
+    const [drawnRevision] = (await design(plan.id)).revisions;
+    const stored = await h.ctx.prisma.designRevision.findUniqueOrThrow({
+      where: { id: drawnRevision.id },
+    });
+    const html = (name: string) => MOCKUP.replace('Export', name);
+    const older = await h.ctx.prisma.designRevision.create({
+      data: {
+        designId: stored.designId,
+        variant: 1,
+        revision: 2,
+        title: 'With mobile',
+        rationale: 'A frame per width.',
+        html: html('Screen'),
+        turnId: stored.turnId,
+        templateKey: 'page',
+        conformance: { ok: true, missing: [], extra: [], misplaced: [] },
+        frames: {
+          create: [
+            ['Screen', 'screen', 'screen'],
+            ['Breakdown', 'breakdown', 'breakdown'],
+            ['States and mobile', 'mobile', 'mobile'],
+          ].map(([name, kind, key], position) => ({
+            position,
+            name,
+            slug: name.toLowerCase().replaceAll(' ', '-'),
+            html: html(name),
+            kind: kind as 'screen' | 'breakdown' | 'mobile',
+            templateFrameKey: key,
+          })),
+        },
+      },
+    });
+    const read = (await design(plan.id)).revisions.find(
+      (r) => r.id === older.id,
+    );
+    expect(read?.frames.map((f) => f.kind)).toEqual([
+      'screen',
+      'breakdown',
+      'mobile',
+    ]);
+    expect(read?.conformance).toEqual({
+      ok: true,
+      missing: [],
+      extra: [],
+      misplaced: [],
+    });
+    const frame = await h.author.get(
+      `/design-revisions/${older.id}/frames/2/html`,
+    );
+    expect(frame.status).toBe(200);
+    expect(frame.text).toContain('<button>States and mobile</button>');
+  });
+
+  it('stores the project presets, or the built-in devices, when Generate names none (#863)', async () => {
+    await h.seedProfile();
+    const first = await uiPlan();
+    expect((await generate(first.id)).status).toBe(201);
+    expect((await design(first.id)).devices).toEqual([
+      { name: 'Desktop', width: 1440, height: 900 },
+      { name: 'Tablet', width: 834, height: 1194 },
+      { name: 'Phone', width: 390, height: 844 },
+    ]);
+    const prompt = h.turnPrompts().at(-1) ?? '';
+    expect(prompt).toContain('- Tablet: 834 × 1194 px');
+
+    const presets = [
+      { name: 'Laptop', width: 1280, height: 800 },
+      { name: 'Watch', width: 320, height: 320, theme: 'dark' as const },
+    ];
+    await h.admin.send('put', `/projects/${h.projectId}/design-settings`, {
+      viewports: presets,
+      defaultSkills: [],
+    });
+    const second = await uiPlan();
+    expect((await generate(second.id)).status).toBe(201);
+    expect((await design(second.id)).devices).toEqual(presets);
+    // The first design keeps the built-ins it was generated with.
+    expect((await design(first.id)).devices?.map((d) => d.name)).toEqual([
+      'Desktop',
+      'Tablet',
+      'Phone',
+    ]);
+  });
+
+  it('stores the devices a plan task Generate names (#863)', async () => {
+    await h.seedProfile();
+    const plan = await uiPlan();
+    const devices = [{ name: 'Wide', width: 1920, height: 1080 }];
+    const res = await h.author.send(
+      'post',
+      `${h.designBase(plan.id, 't1')}/generate`,
+      { devices },
+    );
+    expect(res.status).toBe(201);
+    expect((await design(plan.id)).devices).toEqual(devices);
+    expect(h.turnPrompts().at(-1)).toContain('- Wide: 1920 × 1080 px');
+  });
+
   it('publishes every frame of the approved variant into the docs pull request (#441)', async () => {
     await h.ctx.prisma.project.update({
       where: { id: h.projectId },

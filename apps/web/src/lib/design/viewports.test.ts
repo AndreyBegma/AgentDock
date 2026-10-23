@@ -47,11 +47,11 @@ describe('readViewportRows', () => {
   test('duplicate names: the second is wrong', () => {
     const rows = [
       ...toRows(DEFAULT_VIEWPORTS),
-      { ...blankRow(), name: 'Mobile' },
+      { ...blankRow(), name: 'Phone' },
     ];
     const result = readViewportRows(rows);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(Object.keys(result.errors)).toEqual([rows[2].key]);
+    if (!result.ok) expect(Object.keys(result.errors)).toEqual([rows[3].key]);
   });
 
   test('an empty list is refused', () => {
@@ -67,8 +67,8 @@ describe('row editing', () => {
   test('moves within bounds', () => {
     const rows = toRows(DEFAULT_VIEWPORTS);
     const names = (delta: number) => moveRow(rows, 0, delta).map((r) => r.name);
-    expect(names(1)).toEqual(['Mobile', 'Desktop']);
-    expect(names(-1)).toEqual(['Desktop', 'Mobile']);
+    expect(names(1)).toEqual(['Tablet', 'Desktop', 'Phone']);
+    expect(names(-1)).toEqual(['Desktop', 'Tablet', 'Phone']);
   });
 
   test('stops adding at the limit', () => {

@@ -106,7 +106,7 @@ export class CardDesignTurnService {
     });
     const design = await this.prisma.taskDesign.findUnique({
       where: { cardId: card.id },
-      select: { id: true, variantCount: true, skills: true },
+      select: { id: true, variantCount: true, skills: true, devices: true },
     });
     if (!design) {
       throw plannerError(

@@ -10,7 +10,12 @@ import { DESIGN_FRAME_NAME_MAX, DESIGN_FRAMES_MAX } from './frames';
  * prompts the turn with it.
  */
 
-/** Every kind a frame can have; `legacy` is a frame stored before #833. */
+/**
+ * Every kind a frame can have; `legacy` is a frame stored before #833.
+ * `mobile` is no built-in frame since #863 (ADR-0085): every frame is one
+ * responsive page drawn for the design's devices. It stays so revisions and
+ * project templates stored with it still parse.
+ */
 export const DESIGN_FRAME_KINDS = [
   'screen',
   'breakdown',
@@ -136,19 +141,14 @@ export const BUILTIN_DESIGN_TEMPLATES: readonly DesignTemplate[] = [
       frame(
         'screen',
         'Screen',
-        'The finished page at desktop width, with realistic content and no explanatory text.',
+        'The finished page, with realistic content and no explanatory text.',
       ),
       frame(
         'breakdown',
         'Breakdown',
         'The screen again with numbered zones and a legend: what is new or changed, which components it uses, how it behaves, and why.',
       ),
-      frame(
-        'states',
-        'States and mobile',
-        'The empty, loading and error states, and the page at the narrow width.',
-        false,
-      ),
+      frame('states', 'States', 'The empty, loading and error states.', false),
     ],
   },
   {
@@ -196,7 +196,6 @@ export const BUILTIN_DESIGN_TEMPLATES: readonly DesignTemplate[] = [
         'Breakdown',
         'The components, states and logic the steps share.',
       ),
-      frame('mobile', 'Mobile', 'The steps at the narrow width.', false),
     ],
   },
 ];
@@ -282,11 +281,24 @@ export const designTemplateSchema = z
     }
   });
 
+/** #863: built-in instructions as they read before frames became responsive. */
+const FORMER_INSTRUCTIONS: Readonly<Record<string, string>> = {
+  screen:
+    'The finished page at desktop width, with realistic content and no explanatory text.',
+  states:
+    'The empty, loading and error states, and the page at the narrow width.',
+};
+
 /**
  * D9: the template in effect — a project's override of a built-in, or the
  * built-in, or the project's own template. A required built-in frame the
  * override lacks is put back at its built-in position: the override may
  * change it, never remove it. Null when neither exists.
+ *
+ * #863 (ADR-0085): an override saved while the built-in had a frame it has
+ * since dropped (`mobile`) reads without that frame, and a built-in frame
+ * takes the built-in's current name, which an override may not change. An
+ * instruction still the built-in's former text takes its current one.
  */
 export const resolveDesignTemplate = (
   builtin: DesignTemplate | null | undefined,
@@ -294,7 +306,9 @@ export const resolveDesignTemplate = (
 ): DesignTemplate | null => {
   if (!override) return builtin ?? null;
   if (!builtin) return override;
-  const frames = [...override.frames];
+  const frames = override.frames.filter(
+    (f) => f.kind === 'custom' || builtin.frames.some((b) => b.key === f.key),
+  );
   builtin.frames.forEach((f, i) => {
     if (!f.required || frames.some((o) => o.key === f.key)) return;
     frames.splice(Math.min(i, frames.length), 0, f);
@@ -304,7 +318,18 @@ export const resolveDesignTemplate = (
     name: override.name,
     frames: frames.map((f) => {
       const base = builtin.frames.find((b) => b.key === f.key);
-      return base?.required ? { ...f, required: true, enabled: true } : f;
+      if (!base) return f;
+      const current = {
+        ...f,
+        name: base.name,
+        instruction:
+          FORMER_INSTRUCTIONS[base.key] === f.instruction
+            ? base.instruction
+            : f.instruction,
+      };
+      return base.required
+        ? { ...current, required: true, enabled: true }
+        : current;
     }),
   };
 };

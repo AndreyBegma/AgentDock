@@ -93,6 +93,7 @@ export const design = (over: Partial<TaskDesignView> = {}): TaskDesignView => ({
   comments: [],
   warnings: [],
   viewports: [...DEFAULT_VIEWPORTS],
+  devices: null,
   activeTurnId: null,
   busySince: null,
   progress: null,

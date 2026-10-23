@@ -1,4 +1,5 @@
 import {
+  type CardDesignGenerateRequest,
   type CardDesignLaunchRequest,
   DESIGN_COMMENT_KINDS,
   DESIGN_COMMENT_MAX,
@@ -16,6 +17,7 @@ import {
   type DesignApproveRequest,
   type DesignCommentKind,
   type DesignCommentRequest,
+  type DesignGenerateRequest,
   type DesignSettingsUpdateRequest,
   type DesignTheme,
   type TaskDesignPatchRequest,
@@ -91,6 +93,35 @@ export class CardDesignLaunchDto implements CardDesignLaunchRequest {
   @MaxLength(MODEL_MAX_LENGTH)
   @Matches(MODEL_PATTERN, { message: 'model is not a model name' })
   model?: string;
+}
+
+/**
+ * #863: `POST …/tasks/:key/design/generate` and the stack's. The devices are
+ * checked again against `viewportPresetsSchema` (unique names) before they
+ * are stored.
+ */
+export class DesignGenerateDto implements DesignGenerateRequest {
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(DESIGN_VIEWPORTS_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => ViewportPresetDto)
+  devices?: ViewportPresetDto[];
+}
+
+/** #863: `POST …/board/cards/:number/design/generate` — the launch choice and the devices. */
+export class CardDesignGenerateDto
+  extends CardDesignLaunchDto
+  implements CardDesignGenerateRequest
+{
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(DESIGN_VIEWPORTS_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => ViewportPresetDto)
+  devices?: ViewportPresetDto[];
 }
 
 /** `PATCH …/tasks/:key/design`. */

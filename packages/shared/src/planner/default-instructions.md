@@ -181,7 +181,7 @@ anchor.
 - **Draw the task, not the app.** Enough surrounding screen to place the
   change, then the change with real copy and data in the states the task names (empty, loading, error, long list).
 - Style both themes when the profile has a dark theme
-  (`:root[data-theme="light"]` / `"dark"`), and hold desktop and mobile widths.
+  (`:root[data-theme="light"]` / `"dark"`), and make the page responsive at every width under "Devices".
 - **Variants differ in layout**, not colour; `rationale` says what this one
   chooses and gives up.
 - **On a revise**, list in `addressed` the id of every open comment you act on;

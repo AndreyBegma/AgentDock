@@ -37,6 +37,7 @@ import { DesignStopService } from './design-stop.service';
 import {
   DesignApproveDto,
   DesignCommentDto,
+  DesignGenerateDto,
   DesignSettingsDto,
   TaskDesignPatchDto,
   UiProfileUpdateDto,
@@ -180,9 +181,10 @@ export class DesignController {
     @AuditCtx() ctx: AuditContext,
     @Param('planId') planId: string,
     @Param('key') key: string,
+    @Body() dto: DesignGenerateDto,
   ): Promise<TaskDesignView> {
     const plan = await this.store.readable(user.id, access.projectId, planId);
-    await this.designs.generate(plan, key, actorOf(access, user, ctx));
+    await this.designs.generate(plan, key, actorOf(access, user, ctx), dto);
     return this.designs.view(access.projectId, user.id, planId, key);
   }
 

@@ -2,9 +2,9 @@ import { describe, expect, test } from 'bun:test';
 import { mobilePreset, PREVIEW_CROP_PX, previewBox } from './mobile-preview';
 
 describe('mobilePreset', () => {
-  test('the default presets give Mobile at 390', () => {
+  test('the default presets give Phone at 390', () => {
     expect(mobilePreset([])).toEqual({
-      name: 'Mobile',
+      name: 'Phone',
       width: 390,
       height: 844,
     });
