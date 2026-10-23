@@ -200,8 +200,12 @@ describe('design turn prompt (D8)', () => {
       }),
     ).join('\n\n');
     expect(text).toContain('# Devices');
-    expect(text).toContain('one responsive page that works at each of these widths');
-    expect(text).toContain('Do not draw a separate frame or a separate page per device');
+    expect(text).toContain(
+      'one responsive page that works at each of these widths',
+    );
+    expect(text).toContain(
+      'Do not draw a separate frame or a separate page per device',
+    );
     expect(text).toContain('- Wide: 1920 × 1080 px');
     expect(text).toContain('- Kiosk: 1080 × 1920 px, dark theme');
     expect(text).not.toContain('- Desktop:');

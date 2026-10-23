@@ -978,7 +978,9 @@ describe('design stage (e2e)', () => {
       extra: [],
       misplaced: [],
     });
-    const frame = await h.author.get(`/design-revisions/${older.id}/frames/2/html`);
+    const frame = await h.author.get(
+      `/design-revisions/${older.id}/frames/2/html`,
+    );
     expect(frame.status).toBe(200);
     expect(frame.text).toContain('<button>States and mobile</button>');
   });

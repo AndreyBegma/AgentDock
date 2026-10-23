@@ -75,7 +75,12 @@ export const designPromptParts = async (
             where: {
               planId_taskKey: { planId: plan.id, taskKey: spec.task.key },
             },
-            select: { id: true, variantCount: true, skills: true, devices: true },
+            select: {
+              id: true,
+              variantCount: true,
+              skills: true,
+              devices: true,
+            },
           })
         : null;
     if (!design || !spec.design) {

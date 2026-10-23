@@ -219,7 +219,11 @@ describe('card design (e2e, #243)', () => {
       const card = await h.designedCard(1);
       expect((await generate(card.number)).status).toBe(201);
       const stored = (await h.cardDesign(card.number)).devices;
-      expect(stored?.map((d) => d.name)).toEqual(['Desktop', 'Tablet', 'Phone']);
+      expect(stored?.map((d) => d.name)).toEqual([
+        'Desktop',
+        'Tablet',
+        'Phone',
+      ]);
 
       const presets = await h.admin.send(
         'put',

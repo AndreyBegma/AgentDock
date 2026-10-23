@@ -176,9 +176,9 @@ describe('resolveDesignTemplate', () => {
     const states = resolved?.frames.find((fr) => fr.key === 'states');
     expect(states?.name).toBe('States');
     expect(states?.instruction).toBe('The empty, loading and error states.');
-    expect(resolved?.frames.find((fr) => fr.key === 'screen')?.instruction).toBe(
-      'Our own words.',
-    );
+    expect(
+      resolved?.frames.find((fr) => fr.key === 'screen')?.instruction,
+    ).toBe('Our own words.');
     expect(builtinOverrideProblems(page, resolved as DesignTemplate)).toEqual(
       [],
     );

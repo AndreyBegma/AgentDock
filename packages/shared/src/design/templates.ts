@@ -148,12 +148,7 @@ export const BUILTIN_DESIGN_TEMPLATES: readonly DesignTemplate[] = [
         'Breakdown',
         'The screen again with numbered zones and a legend: what is new or changed, which components it uses, how it behaves, and why.',
       ),
-      frame(
-        'states',
-        'States',
-        'The empty, loading and error states.',
-        false,
-      ),
+      frame('states', 'States', 'The empty, loading and error states.', false),
     ],
   },
   {

@@ -55,9 +55,9 @@ describe.each([
     expect(
       errorsFor(dto, { devices: [{ ...device(1), theme: 'sepia' }] }),
     ).toContain('devices');
-    expect(
-      errorsFor(dto, { devices: [{ ...device(1), dpr: 2 }] }),
-    ).toContain('devices');
+    expect(errorsFor(dto, { devices: [{ ...device(1), dpr: 2 }] })).toContain(
+      'devices',
+    );
     expect(errorsFor(dto, { devices: 'Phone' })).toContain('devices');
   });
 });
