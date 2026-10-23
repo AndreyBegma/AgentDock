@@ -46,7 +46,6 @@ import {
   skillsFormOf,
   skillsPatch,
 } from '../../lib/design/skills';
-import type { DesignTemplatePatch } from '../../lib/design/templates';
 import { runnerGateCopy } from '../../lib/planner/runner-support';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { useSection } from '../../lib/section/use-section';
@@ -230,7 +229,7 @@ export function GeneratePanel({
           value={design.template.key}
           disabled={writeBlock !== null || busy}
           onChange={(key) => {
-            const body: TaskDesignPatchRequest & DesignTemplatePatch = {
+            const body: TaskDesignPatchRequest = {
               templateKey: key,
             };
             void onPatch(body).catch(() => {});

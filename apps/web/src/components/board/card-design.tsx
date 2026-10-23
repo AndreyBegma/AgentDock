@@ -40,10 +40,6 @@ import {
   cardDesignHref,
   uiProfileApi,
 } from '../../lib/design/href';
-import type {
-  CardTemplateFields,
-  CardTemplatePatch,
-} from '../../lib/design/templates';
 import { useErrorToast } from '../../lib/section/use-error-toast';
 import { useSection } from '../../lib/section/use-section';
 import { TemplateSelect } from '../design/template-select';
@@ -196,11 +192,10 @@ export function CardDesignSection({
     );
 
   // #833 D8: the template shows once the design is on; the person's pick sticks.
-  const withTemplate: BoardCardView & CardTemplateFields = card;
   const templateEditable =
     canOperate && state !== 'approved' && state !== 'generating';
   const setTemplate = (key: string) => {
-    const body: UpdateBoardCardRequest & CardTemplatePatch = {
+    const body: UpdateBoardCardRequest = {
       designTemplate: key,
     };
     return run(
@@ -290,8 +285,8 @@ export function CardDesignSection({
       {needed || state !== 'off' ? (
         <TemplateSelect
           projectId={projectId}
-          value={withTemplate.designTemplate ?? null}
-          source={withTemplate.designTemplateSource}
+          value={card.designTemplate ?? null}
+          source={card.designTemplateSource}
           disabled={!templateEditable || busy}
           onChange={(key) => void setTemplate(key)}
         />

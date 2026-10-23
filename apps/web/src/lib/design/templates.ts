@@ -5,29 +5,8 @@ import {
   type DesignFrameView,
   type DesignRevisionView,
   type DesignTemplate,
-  type DesignTemplateChoice,
   type DesignTemplatesView,
 } from '@nautelle/shared';
-
-/**
- * #833 D8: what a board card carries about its design template. The API field
- * lands with slot i833-choose; this is the spec's shape, read off a card
- * without widening the shared type here.
- */
-export interface CardTemplateFields {
-  designTemplate?: string | null;
-  designTemplateSource?: DesignTemplateChoice;
-}
-
-/** `PATCH board/cards/:number` with a template; the person's choice (D8). */
-export interface CardTemplatePatch {
-  designTemplate: string;
-}
-
-/** `PATCH …/design` of a plan task or a stack with a template. */
-export interface DesignTemplatePatch {
-  templateKey: string;
-}
 
 /** D11: the tab's kind label; a legacy frame (stored before templates) has none. */
 export function frameKindLabel(
