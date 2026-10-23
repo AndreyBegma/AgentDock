@@ -59,6 +59,11 @@ export const CARD_TIMEOUTS_MS = {
   prRetarget: 45_000,
   /** #709: `gh pr list`, `gh pr create`, then `gh pr view`. */
   prOpen: 60_000,
+  /** #884: fetch, the review worktree, then tmux. */
+  review: 90_000,
+  reviewStop: 30_000,
+  /** #884: `gh api` once, and again without inline comments. */
+  reviewPublish: 60_000,
 } as const;
 
 /** `card.run` prompt: one argv element read from `launch.json`, never a shell string (D5). */
@@ -930,3 +935,150 @@ export const cardPrOpenCommands = {
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CardPrOpenCommandName = keyof typeof cardPrOpenCommands;
+
+// card.review, card.reviewStop, card.reviewPublish
+
+/** #884: a review session's tmux session, beside the card's own. */
+export const CARD_REVIEW_SESSION_PREFIX = 'nautelle-review-';
+
+export const cardReviewTmuxSessionSchema = z
+  .string()
+  .regex(/^nautelle-review-[a-z0-9]{8}$/, 'must be nautelle-review-<shortid>');
+
+export const cardReviewSessionName = (shortId: string): string =>
+  CARD_REVIEW_SESSION_PREFIX + cardShortIdSchema.parse(shortId);
+
+/**
+ * #884 (ADR-0084 §4, ADR-0010, advertised per ADR-0023): starts one review
+ * step on the head of a card's pull request. The runner fetches `branch`,
+ * puts the review worktree `<parent>/.wt-<repo>-review-<shortId>` on
+ * `headSha` (detached; created, or moved there), and starts tmux
+ * `nautelle-review-<shortId>` running `exec-run` with a new Claude session
+ * `session` and `prompt`, wired like a card round, with `report_review`
+ * offered. A review session still open on the card is replaced. The session
+ * outlives the command: it reports through `report_review`
+ * (`card.reviewReport`), and the API stops it with `card.reviewStop`. The
+ * card's own worktree and session are never touched.
+ */
+export const cardReviewArgsSchema = z.strictObject({
+  ...cardTarget,
+  /** The `card_review` Run its cost is booked to. */
+  runId: skillRunIdSchema,
+  root: absolutePathSchema,
+  shortId: cardShortIdSchema,
+  /** The PR's head branch, fetched for `headSha`. */
+  branch: gitRefSchema,
+  headSha: headShaSchema,
+  /** A new session each step: `claude --session-id <session>`. */
+  session: z.uuid(),
+  prompt: cardPromptSchema,
+  profileKey: profileKeySchema,
+  model: orchestratorModelSchema,
+  permissionMode: orchestratorPermissionModeSchema,
+});
+export type CardReviewArgs = z.infer<typeof cardReviewArgsSchema>;
+
+export const cardReviewResultSchema = z.object({
+  phase: z.literal('running'),
+  tmuxSession: cardReviewTmuxSessionSchema,
+});
+export type CardReviewResult = z.infer<typeof cardReviewResultSchema>;
+
+/** #884: kills the review session and removes the review worktree; idempotent. */
+export const cardReviewStopArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  shortId: cardShortIdSchema,
+});
+export type CardReviewStopArgs = z.infer<typeof cardReviewStopArgsSchema>;
+
+export const cardReviewStopResultSchema = z.object({
+  /** A review session was running and is gone now. */
+  stopped: z.boolean(),
+});
+export type CardReviewStopResult = z.infer<typeof cardReviewStopResultSchema>;
+
+/** #884: one inline comment of a published review. */
+export const CARD_REVIEW_COMMENTS_MAX = 50;
+export const CARD_REVIEW_COMMENT_MAX_BYTES = 10 * 1024;
+export const CARD_REVIEW_BODY_MAX_BYTES = 60 * 1024;
+
+const reviewTextSchema = (max: number) =>
+  z
+    .string()
+    .min(1)
+    .refine(noNul, { message: 'must not contain NUL' })
+    .refine((t) => utf8Bytes(t) <= max, {
+      message: `must be at most ${max} bytes`,
+    });
+
+export const cardReviewCommentSchema = z.strictObject({
+  /** Relative to the repository root. */
+  path: skillFilePathSchema,
+  /** 1-based, on the head side of the diff. */
+  line: z.number().int().positive(),
+  body: reviewTextSchema(CARD_REVIEW_COMMENT_MAX_BYTES),
+});
+export type CardReviewComment = z.infer<typeof cardReviewCommentSchema>;
+
+/**
+ * #884 (ADR-0084 §6): posts the findings of a review step as one GitHub pull
+ * request review (`event: COMMENT`) on `headSha` — `comments` inline, `body`
+ * as its summary — through `gh api` with the JSON body in a private
+ * temporary file. GitHub refuses an inline comment on a line outside the
+ * diff: the review is then posted again with every comment folded into the
+ * body (`inline: false`). The control plane never writes to GitHub itself.
+ */
+export const cardReviewPublishArgsSchema = z.strictObject({
+  ...cardTarget,
+  root: absolutePathSchema,
+  prNumber: z.number().int().positive(),
+  headSha: headShaSchema,
+  body: reviewTextSchema(CARD_REVIEW_BODY_MAX_BYTES),
+  comments: z.array(cardReviewCommentSchema).max(CARD_REVIEW_COMMENTS_MAX),
+});
+export type CardReviewPublishArgs = z.infer<typeof cardReviewPublishArgsSchema>;
+
+/** A refusal is a result, not a command error. */
+export const cardReviewPublishResultSchema = z.discriminatedUnion('published', [
+  z.object({
+    published: z.literal(true),
+    /** The comments went inline; `false` when they were folded into the body. */
+    inline: z.boolean(),
+  }),
+  z.object({
+    published: z.literal(false),
+    error: z.literal('gh_failed'),
+    message: stepErrorSchema,
+  }),
+]);
+export type CardReviewPublishResult = z.infer<
+  typeof cardReviewPublishResultSchema
+>;
+
+/**
+ * #884: the review commands, operator commands in the `commands` allowlist
+ * beside `card.prOpen`.
+ */
+export const cardReviewCommands = {
+  'card.review': {
+    args: cardReviewArgsSchema,
+    result: cardReviewResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.review,
+  },
+  'card.reviewStop': {
+    args: cardReviewStopArgsSchema,
+    result: cardReviewStopResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.reviewStop,
+  },
+  'card.reviewPublish': {
+    args: cardReviewPublishArgsSchema,
+    result: cardReviewPublishResultSchema,
+    minRole: 'operator',
+    timeoutMs: CARD_TIMEOUTS_MS.reviewPublish,
+  },
+} as const satisfies Record<string, CommandDefinition>;
+
+export type CardReviewCommandName = keyof typeof cardReviewCommands;

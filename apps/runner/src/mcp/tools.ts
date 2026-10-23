@@ -5,6 +5,12 @@ import {
   CARD_ESCALATION_REASONS,
   CARD_RECOMMENDABLE_MODELS,
   ESCALATE_CARD_TOOL,
+  REVIEW_FINDING_BODY_MAX,
+  REVIEW_FINDING_SEVERITIES,
+  REVIEW_FINDING_TITLE_MAX,
+  REVIEW_FINDINGS_MAX,
+  REVIEW_REPORT_TOOL,
+  REVIEW_SUMMARY_MAX,
   requestableActionRequestKindSchema,
 } from '@nautelle/shared';
 import {
@@ -385,5 +391,86 @@ export const ESCALATE_CARD_MCP_TOOL = {
       .describe(
         'What you found and why you stop: the decision that is open, what you tried, what the next worker needs.',
       ),
+  },
+} as const satisfies McpToolDefinition;
+
+/**
+ * #884: set to `1` in the env of a review session (`card.review`); the MCP
+ * server then offers `report_review` and the read tools only.
+ */
+export const CARD_REVIEW_ENV = 'NAUTELLE_CARD_REVIEW';
+
+/**
+ * #884: the tools a review session keeps besides `report_review` — reading
+ * the fleet and the Board. A review session reviews and reports; it never
+ * finishes, takes, tracks, moves or creates a card, files an issue, hands
+ * off, asks for an action or escalates.
+ */
+export const REVIEW_SESSION_TOOLS: readonly string[] = [
+  'status',
+  'queue',
+  'budget',
+  'approvals',
+  'activity',
+  'sessions',
+  'board_list',
+  'board_card',
+];
+
+const reviewFinding = z.object({
+  severity: z
+    .enum(REVIEW_FINDING_SEVERITIES)
+    .describe(
+      'blocking: must be fixed before the card is Finished (a bug, a broken contract, a missing test the rules require, a security hole). nit: a suggestion that never holds the card back.',
+    ),
+  file: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1_000)
+    .optional()
+    .describe(
+      'The file, relative to the repository root (no leading slash, no ..). Omit for a finding about the change as a whole.',
+    ),
+  line: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('1-based line in file, on the head side of the diff.'),
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .max(REVIEW_FINDING_TITLE_MAX)
+    .describe('One line: what is wrong.'),
+  body: z
+    .string()
+    .trim()
+    .max(REVIEW_FINDING_BODY_MAX)
+    .describe('Why it matters and what to change; markdown.'),
+});
+
+/**
+ * #884 (ADR-0084 §4): a review session reports its findings, the way a card
+ * worker calls `finish_card`. Not in `MCP_TOOLS`: it is listed only in a
+ * review session (`CARD_REVIEW_ENV`).
+ */
+export const REPORT_REVIEW_MCP_TOOL = {
+  name: REVIEW_REPORT_TOOL,
+  description:
+    'Only for a Nautelle review session: report the review of this pull request. Call it once, at the end, with every finding — an empty list when there is nothing to report. blocking findings start a fix round; nit findings never do. Review only: do not edit files, commit or push. Any other session is refused (not_a_review_session).',
+  method: 'card.reviewReport',
+  input: {
+    findings: z
+      .array(reviewFinding)
+      .max(REVIEW_FINDINGS_MAX)
+      .describe(`Every finding, at most ${REVIEW_FINDINGS_MAX}.`),
+    summary: z
+      .string()
+      .trim()
+      .max(REVIEW_SUMMARY_MAX)
+      .optional()
+      .describe('A short overall verdict; markdown.'),
   },
 } as const satisfies McpToolDefinition;

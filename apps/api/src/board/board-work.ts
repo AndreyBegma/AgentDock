@@ -1369,6 +1369,7 @@ export class BoardWork implements OnModuleInit {
         prBaseCardId: null,
         ciState: 'pending',
         ciFixAttempts: 0,
+        reviewFixAttempts: 0,
         needsPerson: false,
         needsPersonReason: null,
       },

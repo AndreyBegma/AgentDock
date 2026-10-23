@@ -45,6 +45,7 @@ export const card = (
   ciState: 'none',
   ciChecks: [],
   ciFixAttempts: 0,
+  review: null,
   needsPerson: false,
   needsPersonReason: null,
   protectedPaths: [],

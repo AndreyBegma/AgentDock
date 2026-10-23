@@ -11,6 +11,13 @@ import {
   CARD_RECOMMENDABLE_MODELS,
 } from '../assess/limits';
 import {
+  REVIEW_FINDING_BODY_MAX,
+  REVIEW_FINDING_SEVERITIES,
+  REVIEW_FINDING_TITLE_MAX,
+  REVIEW_FINDINGS_MAX,
+  REVIEW_SUMMARY_MAX,
+} from '../review/contracts';
+import {
   pendingQuestionSchema,
   sessionMessageInputSchema,
   sessionMessageOutcomeSchema,
@@ -95,6 +102,8 @@ export const localErrorCodeSchema = z.enum([
    * escalated, or in the A arm of `model-by-type`.
    */
   'not_escalatable',
+  /** #884: `card.reviewReport` from a session that is not a running review step. */
+  'not_a_review_session',
   /** `card.track` from a session that is not a person's own `manual` one (issue #282 D1). */
   'not_a_manual_session',
   /**
@@ -323,6 +332,46 @@ export const localCardEscalateResultSchema = z.object({
    * override, and the card waits in Finished with **Run on Opus**.
    */
   relaunched: z.boolean(),
+});
+
+/**
+ * `card.reviewReport` (#884, ADR-0084 §4): a review session's `report_review`
+ * tool, called once with every finding. The review run is resolved from the
+ * request's `session.id` — the uuid the API gave the review session — never
+ * from an argument; any other session is answered `not_a_review_session`.
+ */
+export const localReviewFindingSchema = z.strictObject({
+  severity: z.enum(REVIEW_FINDING_SEVERITIES),
+  /** Relative to the repository root. */
+  file: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1_000)
+    .refine((f) => !f.startsWith('/') && !f.split('/').includes('..'), {
+      message: 'must be relative to the repository root',
+    })
+    .optional(),
+  /** 1-based, in `file`. */
+  line: z.number().int().positive().optional(),
+  title: z.string().trim().min(1).max(REVIEW_FINDING_TITLE_MAX),
+  body: z.string().trim().max(REVIEW_FINDING_BODY_MAX),
+});
+export type LocalReviewFinding = z.infer<typeof localReviewFindingSchema>;
+
+export const localCardReviewReportArgsSchema = z.strictObject({
+  findings: z.array(localReviewFindingSchema).max(REVIEW_FINDINGS_MAX),
+  summary: z.string().trim().max(REVIEW_SUMMARY_MAX).optional(),
+});
+export type LocalCardReviewReportArgs = z.infer<
+  typeof localCardReviewReportArgsSchema
+>;
+export const localCardReviewReportResultSchema = z.object({
+  /** The card's per-project number (`C-<number>`). */
+  number: z.number().int().positive(),
+  recorded: z.literal(true),
+  blocking: z.number().int().nonnegative(),
+  nits: z.number().int().nonnegative(),
 });
 
 /**
@@ -793,6 +842,12 @@ export const localMethods = {
   'card.escalate': {
     args: localCardEscalateArgsSchema,
     result: localCardEscalateResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.reviewReport': {
+    args: localCardReviewReportArgsSchema,
+    result: localCardReviewReportResultSchema,
     minRole: 'operator',
     needsProject: true,
   },

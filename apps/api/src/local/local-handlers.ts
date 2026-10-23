@@ -15,6 +15,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { BoardService } from '../board/board.service';
+import { BoardReview } from '../board/board-review';
 import {
   BoardRoundsService,
   CardNotEscalatable,
@@ -122,6 +123,7 @@ export class LocalHandlers {
     private readonly tokenSaver: TokenSaverService,
     private readonly rounds: BoardRoundsService,
     private readonly sessions: BoardSessionService,
+    private readonly review: BoardReview,
     boardHandlers: LocalBoardHandlers,
   ) {
     // #845: the Board methods have their own handlers.
@@ -147,6 +149,7 @@ export class LocalHandlers {
     'away.set': (args, call) => this.awaySet(args.on, call),
     'card.finish': (args, call) => this.cardFinish(args, call),
     'card.escalate': (args, call) => this.cardEscalate(args, call),
+    'card.reviewReport': (args, call) => this.cardReviewReport(args, call),
     'card.track': (args, call) => this.cardTrack(args, call),
   };
 
@@ -228,6 +231,34 @@ export class LocalHandlers {
       escalated: true,
       relaunched: escalated.relaunched,
     };
+  }
+
+  /**
+   * #884 (ADR-0084 §5): a review session's `report_review`. The run is the
+   * running one the asking Claude session was started for, in the asking
+   * runner's project — never an argument.
+   */
+  private async cardReviewReport(
+    args: LocalMethodArgs<'card.reviewReport'>,
+    call: LocalCall,
+  ): Promise<LocalMethodResult<'card.reviewReport'>> {
+    const project = projectOf(call);
+    const session = call.session;
+    const reported =
+      session && session.runtime === 'claude'
+        ? await this.review.report(
+            { id: project.id, runnerId: call.runnerId },
+            session.id,
+            args,
+          )
+        : null;
+    if (!reported) {
+      throw new LocalError(
+        'not_a_review_session',
+        'not a running review step session',
+      );
+    }
+    return { ...reported, recorded: true };
   }
 
   /**

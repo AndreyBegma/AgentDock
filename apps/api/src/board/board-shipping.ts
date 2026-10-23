@@ -33,12 +33,19 @@ import { PrismaService } from '../database/prisma.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure } from './board-error';
 import type { CardWithRounds } from './board-mapper';
+import { BoardReview } from './board-review';
 import { BoardRoundsService } from './board-rounds.service';
 import { BOARD_SYSTEM_ACTOR, type BoardProject, BoardWork } from './board-work';
 
 /** The poller runs outside tests; a test drives `poll` and `check` itself. */
 export const shippingAutoStart = (env: NodeJS.ProcessEnv = process.env) =>
   env.APP_ENV !== 'test';
+
+/**
+ * #884: how long after a step's report the gate is asked again — the
+ * reporting session's MCP call is answered first.
+ */
+const REVIEW_GATE_DELAY_MS = 2_000;
 
 /** #359 D6: the reason `needsPerson` is audited with. */
 export const CI_STILL_FAILING =
@@ -176,12 +183,28 @@ export class BoardShipping
     private readonly rounds: BoardRoundsService,
     private readonly commands: BoardCommands,
     private readonly audit: AuditService,
+    private readonly review: BoardReview,
   ) {}
 
   onModuleInit(): void {
     this.work.onRoundCollected((cardId, outcome) =>
       this.afterRound(cardId, outcome),
     );
+    // #884: a step that reported moves the gate on without waiting for the
+    // poll; a test drives `check` itself.
+    if (shippingAutoStart()) {
+      this.review.onReported((cardId) => {
+        const timer = setTimeout(() => {
+          void this.check(cardId).catch((error: unknown) =>
+            this.logger.error(
+              `the review gate of ${cardId} failed`,
+              error instanceof Error ? error.stack : String(error),
+            ),
+          );
+        }, REVIEW_GATE_DELAY_MS);
+        timer.unref();
+      });
+    }
   }
 
   onApplicationBootstrap(): void {
@@ -414,7 +437,12 @@ export class BoardShipping
         if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))
           return;
       }
+      // #884 (ADR-0084 §3): the review steps pass the head before Finished;
+      // a card that needs a person goes there, and is never merged.
+      const gate = await this.review.gate(project, card, result.headSha);
+      if (gate === 'wait') return;
       if (!(await this.toFinished(project, card))) return;
+      if (gate === 'needs_person') return;
     } else if (state !== 'green') {
       if (!noChecks) return;
       if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))

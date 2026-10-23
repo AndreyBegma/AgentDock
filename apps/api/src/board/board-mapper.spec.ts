@@ -3,12 +3,14 @@ import type { ProfileAgentdock } from '@nautelle/shared/protocol';
 import type { BoardCard, BoardCardRound } from '@prisma/client';
 import {
   type CardFacts,
+  type CardReviewRunFact,
   type CardWithRounds,
   escalationOf,
   hooksCauseOf,
   quotaWaitOf,
   recommendationOf,
   restartOf,
+  reviewOf,
   roundPushesOf,
   stewardChipOf,
   takenOf,
@@ -404,5 +406,139 @@ describe('takenOf (#845 D2, D10)', () => {
     expect(
       takenOf(card({ source: 'manual', trackedSessionId: null }), alive),
     ).toBeNull();
+  });
+});
+
+describe('reviewOf (#884)', () => {
+  const HEAD = 'a'.repeat(40);
+  const NEXT = 'b'.repeat(40);
+  const steps = [
+    { id: 'peer', name: 'Peer review' },
+    { id: 'sec', name: 'Security review' },
+    { id: 'perf', name: 'Performance' },
+  ];
+  const reviewed = (
+    over: Partial<BoardCard> = {},
+    rounds: BoardCardRound[] = [],
+  ) =>
+    ({
+      ...card({
+        prNumber: 7,
+        ciHeadSha: HEAD,
+        reviewFixAttempts: 0,
+        needsPerson: false,
+        needsPersonReason: null,
+        ...over,
+      }),
+      rounds,
+    }) as CardWithRounds;
+  const run = (over: Partial<CardReviewRunFact>): CardReviewRunFact => ({
+    stepId: 'peer',
+    prNumber: 7,
+    headSha: HEAD,
+    pass: 0,
+    state: 'passed',
+    blockingCount: 0,
+    nitCount: 0,
+    startedAt: new Date(now.getTime() - 60_000),
+    ...over,
+  });
+
+  it('is null while review is off or no step is enabled', () => {
+    expect(reviewOf(reviewed(), undefined, [])).toBeNull();
+    expect(reviewOf(reviewed(), [], [])).toBeNull();
+  });
+
+  it('is idle with every step pending before CI is green', () => {
+    expect(reviewOf(reviewed(), steps, [])).toEqual({
+      state: 'idle',
+      stepIndex: 0,
+      stepCount: 3,
+      fixRound: 0,
+      fixLimit: 3,
+      steps: steps.map((s) => ({
+        id: s.id,
+        name: s.name,
+        state: 'pending',
+        blockingCount: 0,
+        nitCount: 0,
+      })),
+    });
+  });
+
+  it('names the running step and its index', () => {
+    const view = reviewOf(reviewed(), steps, [
+      run({ nitCount: 2 }),
+      run({ stepId: 'sec', state: 'running' }),
+    ]);
+    expect(view).toMatchObject({
+      state: 'running',
+      currentStep: 'Security review',
+      stepIndex: 1,
+    });
+    expect(view?.steps.map((s) => [s.state, s.nitCount])).toEqual([
+      ['passed', 2],
+      ['running', 0],
+      ['pending', 0],
+    ]);
+  });
+
+  it('is passed once every step passed on the head CI checked, nits allowed', () => {
+    const runs = steps.map((s) => run({ stepId: s.id, nitCount: 1 }));
+    expect(reviewOf(reviewed(), steps, runs)).toMatchObject({
+      state: 'passed',
+      stepIndex: 2,
+    });
+    expect(reviewOf(reviewed({ ciHeadSha: NEXT }), steps, runs)?.state).toBe(
+      'idle',
+    );
+  });
+
+  it('shows the blocked pass while its review_fix round works, with the round count', () => {
+    const fixing = reviewed({ reviewFixAttempts: 1 }, [
+      { trigger: 'review_fix', phase: 'running' } as BoardCardRound,
+    ]);
+    const view = reviewOf(fixing, steps, [
+      run({}),
+      run({ stepId: 'sec', state: 'blocked', blockingCount: 2 }),
+      run({ stepId: 'perf' }),
+    ]);
+    expect(view).toMatchObject({ state: 'fixing', fixRound: 1, fixLimit: 3 });
+    expect(view?.steps[1]).toMatchObject({
+      state: 'blocked',
+      blockingCount: 2,
+    });
+  });
+
+  it('reads only the newest pass on the current PR', () => {
+    const view = reviewOf(reviewed({ reviewFixAttempts: 1 }), steps, [
+      run({ state: 'blocked', blockingCount: 1 }),
+      run({ pass: 1, headSha: HEAD, state: 'running' }),
+      run({ prNumber: 6, pass: 3, stepId: 'perf', state: 'failed' }),
+    ]);
+    expect(view?.steps.map((s) => s.state)).toEqual([
+      'running',
+      'pending',
+      'pending',
+    ]);
+  });
+
+  it('needs a person when the fix budget is spent or a step failed', () => {
+    for (const reason of ['review_still_blocking', 'review_failed']) {
+      expect(
+        reviewOf(
+          reviewed({ needsPerson: true, needsPersonReason: reason }),
+          steps,
+          [run({ state: 'failed' })],
+        )?.state,
+      ).toBe('needs_person');
+    }
+    expect(
+      reviewOf(
+        reviewed({ needsPerson: true, needsPersonReason: 'ci_still_failing' }),
+        steps,
+        [],
+      )?.state,
+    ).toBe('idle');
   });
 });

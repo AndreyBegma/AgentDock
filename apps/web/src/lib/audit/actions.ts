@@ -161,6 +161,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
     'Opened a forward pull request for a card merged into a dependency branch that had already merged',
   'card.auto_run_toggled': 'Switched Auto-run when ready on a card',
   'card.message': 'Messaged a card session',
+  'card.review_started': "Started a review step on a card's pull request",
+  'card.review_reported': 'A review step reported its findings',
   'slot.session_message': 'Messaged a worker session',
   'attachment.added': 'Uploaded an attachment',
   'attachment.claimed': 'Attached files to a card',

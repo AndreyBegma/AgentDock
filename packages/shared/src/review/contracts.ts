@@ -169,3 +169,88 @@ export interface ReviewErrorBody {
   error: ReviewErrorCode;
   message: string;
 }
+
+/**
+ * #884 (ADR-0084 §4): the MCP tool a review session calls once, with every
+ * finding, the way a card worker calls `finish_card`.
+ */
+export const REVIEW_REPORT_TOOL = 'report_review';
+
+/** #884: findings one review step may report; more are refused. */
+export const REVIEW_FINDINGS_MAX = 50;
+
+/** #884: the one-paragraph summary a review step reports beside its findings. */
+export const REVIEW_SUMMARY_MAX = 2_000;
+
+/**
+ * #884: how long a review step may run before it counts as failed — the
+ * session never called `report_review`, and the card needs a person.
+ */
+export const REVIEW_STEP_TIMEOUT_MS = 60 * 60_000;
+
+/**
+ * #884: one run of one review step on a card's pull request head.
+ * - `running` — the session is reviewing;
+ * - `passed` — it reported no blocking finding (nits allowed);
+ * - `blocked` — it reported a blocking finding;
+ * - `failed` — it could not start, timed out or ended without a report.
+ * Mirrors the Prisma enum `CardReviewRunState`.
+ */
+export const CARD_REVIEW_RUN_STATES = [
+  'running',
+  'passed',
+  'blocked',
+  'failed',
+] as const;
+export type CardReviewRunState = (typeof CARD_REVIEW_RUN_STATES)[number];
+
+/** #884: a step of the card's current review pass; `pending` has not run yet. */
+export type CardReviewStepState = 'pending' | CardReviewRunState;
+
+/**
+ * #884: where the card's review gate stands.
+ * - `idle` — CI is not green yet, so no step has run on this head;
+ * - `running` — a step is reviewing;
+ * - `fixing` — a `review_fix` round is working on blocking findings;
+ * - `passed` — every enabled step passed on the head;
+ * - `needs_person` — the fix budget is spent or a step failed.
+ */
+export const CARD_REVIEW_STATES = [
+  'idle',
+  'running',
+  'fixing',
+  'passed',
+  'needs_person',
+] as const;
+export type CardReviewState = (typeof CARD_REVIEW_STATES)[number];
+
+export interface CardReviewStepView {
+  /** The `ProjectReviewStep`. */
+  id: string;
+  name: string;
+  state: CardReviewStepState;
+  blockingCount: number;
+  nitCount: number;
+}
+
+/**
+ * #884: the review strip of a board card. `null` on the card when review is
+ * off for the project or no step is enabled.
+ */
+export interface CardReviewView {
+  state: CardReviewState;
+  /** The name of the step that is running; absent when none is. */
+  currentStep?: string;
+  /** 0-based index of the running step, else of the last step that ran. */
+  stepIndex: number;
+  stepCount: number;
+  /** `review_fix` rounds already started on the card's pull request. */
+  fixRound: number;
+  fixLimit: number;
+  steps: CardReviewStepView[];
+}
+
+/** #884: a finding as the card detail serves it, with its step's name. */
+export interface CardReviewFindingView extends ReviewFinding {
+  stepName: string;
+}
