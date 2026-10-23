@@ -7,6 +7,7 @@ import {
 import {
   API_EVENT_SOURCE,
   type LocalMethodArgs,
+  type LocalMethodName,
   type LocalMethodResult,
   MANUAL_HANDOFF_EVENT,
   MANUAL_NOTE_EVENT,
@@ -95,6 +96,16 @@ const budgetLine = (budgets: BudgetRemaining[]): string => {
   return `Budget — ${parts.join('; ')}.`;
 };
 
+/**
+ * #845: the Board methods' contract lands before their handlers; until the
+ * API's #845 change serves them, they answer `unknown_method`, as a server
+ * without them would.
+ */
+const notServedYet = (method: LocalMethodName): Promise<never> =>
+  Promise.reject(
+    new LocalError('unknown_method', `${method} is not served yet`),
+  );
+
 const TOOLS_LINE =
   'The agentdock MCP tools read the fleet, queue, budget, approvals, activity and sessions; create and queue issues; post notes; hand work off to the fleet; and request actions a person approves.';
 
@@ -137,6 +148,17 @@ export class LocalHandlers {
       this.cardFinish(args.summary, args.artifactIncomplete === true, call),
     'card.escalate': (args, call) => this.cardEscalate(args, call),
     'card.track': (args, call) => this.cardTrack(args, call),
+    'board.list': () => notServedYet('board.list'),
+    'board.card': () => notServedYet('board.card'),
+    'board.wait': () => notServedYet('board.wait'),
+    'card.create': () => notServedYet('card.create'),
+    'card.run': () => notServedYet('card.run'),
+    'card.move': () => notServedYet('card.move'),
+    'card.feedback': () => notServedYet('card.feedback'),
+    'card.message': () => notServedYet('card.message'),
+    'card.stop': () => notServedYet('card.stop'),
+    'card.take': () => notServedYet('card.take'),
+    'card.release': () => notServedYet('card.release'),
   };
 
   /**

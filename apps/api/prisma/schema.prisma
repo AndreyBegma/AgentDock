@@ -1046,6 +1046,8 @@ enum ActionRequestKind {
   orchestrator_stop
   pr_approve
   issue_queue
+  /// #845 D5: a session asks a person to accept a Finished card.
+  card_accept
 }
 
 enum ActionRequestStatus {
@@ -3752,18 +3754,18 @@ model Attachment {
 
 /// A project's board settings (D2, D13). No row: the defaults.
 model BoardSettings {
-  projectId              String   @id
-  issueOnRun             Boolean  @default(false)
-  specOnRun              Boolean  @default(false)
+  projectId              String          @id
+  issueOnRun             Boolean         @default(false)
+  specOnRun              Boolean         @default(false)
   /// 1–10, checked by the DTO.
-  maxRunning             Int      @default(3)
+  maxRunning             Int             @default(3)
   /// #244 D10: on only while the project's `shipSessionContent` is on;
   /// turning content off turns it off.
-  captureEnabled         Boolean  @default(false)
+  captureEnabled         Boolean         @default(false)
   /// Shared `CAPTURE_MODELS`: `haiku` or `sonnet`, checked by the DTO.
-  captureModel           String   @default("haiku")
+  captureModel           String          @default("haiku")
   /// #282 D3: the `autoCollect` a new `terminal` card starts with.
-  autoCollectTracked     Boolean  @default(false)
+  autoCollectTracked     Boolean         @default(false)
   /// #359 D7: merge a card's PR on entering Finished. `null` is the default:
   /// on for a base other than the default branch (shared `cardAutoMergeDefault`).
   autoMergeCards         Boolean?
@@ -3772,9 +3774,9 @@ model BoardSettings {
   cardMergePolicy        CardMergePolicy @default(ask)
   /// #390: minutes in `background` before `card.background_stalled`; 5–1440,
   /// checked by the DTO.
-  backgroundStallMinutes Int      @default(30)
+  backgroundStallMinutes Int             @default(30)
   updatedById            String?
-  updatedAt              DateTime @updatedAt
+  updatedAt              DateTime        @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)

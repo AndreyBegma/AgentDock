@@ -12,6 +12,7 @@ export * from './moves';
 export * from './naming';
 export * from './positions';
 export * from './recommendation';
+export * from './session-board';
 export * from './shipping';
 export * from './stacks';
 export * from './types';

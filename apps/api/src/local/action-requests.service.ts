@@ -143,6 +143,15 @@ export class ActionRequestsService {
         `args: ${z.prettifyError(parsed.error)}`,
       );
     }
+    if (input.kind === 'card_accept') {
+      // #845: the kind's contract lands before its execution; nothing is
+      // filed that no approval could carry out.
+      throw actionRequestError(
+        400,
+        ACTION_REQUEST_ERROR.invalidArgs,
+        'card_accept is not served yet',
+      );
+    }
     const args =
       input.kind === 'pr_approve'
         ? await this.bindPr(input, parsed.data as { pr: number }, auditor)
@@ -494,6 +503,15 @@ export class ActionRequestsService {
         }
         case 'tool_use':
           return { ok: true, result: {} };
+        case 'card_accept':
+          // #845: never created yet (see `create`).
+          return {
+            ok: false,
+            result: {
+              error: ACTION_REQUEST_ERROR.invalidArgs,
+              message: 'card_accept is not served yet',
+            },
+          };
       }
     } catch (error) {
       if (error instanceof HttpException) {

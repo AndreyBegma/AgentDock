@@ -3,6 +3,7 @@ import {
   ACTION_REQUEST_KINDS,
   ACTION_REQUEST_TOOL_INPUT_MAX,
   actionRequestArgsSchemas,
+  cardAcceptArgsOf,
   mayDecideActionRequest,
 } from '../action-requests';
 import {
@@ -12,8 +13,12 @@ import {
   HOOK_EVENT_TYPES,
   hookEventDataSchemas,
   hookEventHasContent,
+  LOCAL_BOARD_REFUSALS,
+  LOCAL_BOARD_WAIT_HOLD_MAX_SEC,
+  LOCAL_REQUEST_TIMEOUT_MS,
   LOCAL_ROLE_CAP,
   localActionRequestArgsSchema,
+  localErrorCodeSchema,
   localMethodNames,
   localMethods,
   localResponseMessageSchema,
@@ -354,6 +359,161 @@ describe('action requests (spec 201 D18)', () => {
         args: { issue: 1, title: 't', url: 'https://x/1', session: null },
         summary: 'queue it',
       }).success,
+    ).toBe(false);
+  });
+
+  describe('card_accept (#845 D5)', () => {
+    it('lets a session ask a person to accept a card, merging or not', () => {
+      expect(
+        localActionRequestArgsSchema.safeParse({
+          kind: 'card_accept',
+          args: { card: 42, merge: true },
+          summary: 'Accept C-42',
+        }).success,
+      ).toBe(true);
+      const args = actionRequestArgsSchemas.card_accept;
+      expect(args.safeParse({ card: 42 }).success).toBe(true);
+      expect(args.safeParse({ card: 0 }).success).toBe(false);
+      // The project and the card's title are the API's, never the session's.
+      expect(args.safeParse({ card: 42, title: 'x' }).success).toBe(false);
+    });
+
+    it('may be decided by the person whose session asked', () => {
+      expect(
+        mayDecideActionRequest({
+          kind: 'card_accept',
+          requestedById: 'u1',
+          userId: 'u1',
+          isAdmin: false,
+        }),
+      ).toBe(true);
+    });
+
+    it('reads the bound card back, and nothing from another kind', () => {
+      const bound = {
+        card: 42,
+        merge: true,
+        title: 'Fix login',
+        prNumber: 7,
+        prUrl: 'https://github.com/acme/widget/pull/7',
+      };
+      expect(cardAcceptArgsOf({ kind: 'card_accept', args: bound })).toEqual(
+        bound,
+      );
+      expect(
+        cardAcceptArgsOf({ kind: 'card_accept', args: { card: 42 } }),
+      ).toBeNull();
+      expect(cardAcceptArgsOf({ kind: 'pr_approve', args: bound })).toBeNull();
+    });
+  });
+});
+
+describe('the Board from a session (#845)', () => {
+  const READS = ['board.list', 'board.card', 'board.wait'] as const;
+  const CONTROLS = [
+    'card.create',
+    'card.run',
+    'card.move',
+    'card.feedback',
+    'card.message',
+    'card.stop',
+    'card.take',
+    'card.release',
+  ] as const;
+
+  it('reads at viewer and controls at operator, always in a project (D9)', () => {
+    for (const name of READS) {
+      expect(localMethods[name].minRole).toBe('viewer');
+      expect(localMethods[name].needsProject).toBe(true);
+    }
+    for (const name of CONTROLS) {
+      expect(localMethods[name].minRole).toBe('operator');
+      expect(localMethods[name].needsProject).toBe(true);
+    }
+  });
+
+  it('names a card by its number', () => {
+    expect(parseLocalRequest('card.take', { card: 42 })).toEqual({
+      ok: true,
+      method: 'card.take',
+      args: { card: 42 },
+    });
+    expect(parseLocalRequest('card.take', { card: 'C-42' }).ok).toBe(false);
+    expect(parseLocalRequest('card.release', { card: 0 }).ok).toBe(false);
+  });
+
+  it('accepts a move to completed, so the server can refuse it by name (D5)', () => {
+    expect(
+      parseLocalRequest('card.move', { card: 1, column: 'completed' }).ok,
+    ).toBe(true);
+    expect(
+      localErrorCodeSchema.safeParse('completed_needs_person').success,
+    ).toBe(true);
+  });
+
+  it('passes the Board refusals through as local error codes (D3)', () => {
+    for (const code of LOCAL_BOARD_REFUSALS) {
+      expect(localErrorCodeSchema.safeParse(code).success).toBe(true);
+    }
+    expect(LOCAL_BOARD_REFUSALS).toContain('dependency_open');
+  });
+
+  it('holds board.wait below the relay deadline (ADR-0083)', () => {
+    expect(LOCAL_BOARD_WAIT_HOLD_MAX_SEC * 1_000).toBeLessThan(
+      LOCAL_REQUEST_TIMEOUT_MS,
+    );
+    expect(parseLocalRequest('board.wait', {})).toEqual({
+      ok: true,
+      method: 'board.wait',
+      args: { timeoutSec: LOCAL_BOARD_WAIT_HOLD_MAX_SEC },
+    });
+    expect(
+      parseLocalRequest('board.wait', {
+        timeoutSec: LOCAL_BOARD_WAIT_HOLD_MAX_SEC + 1,
+      }).ok,
+    ).toBe(false);
+  });
+
+  it('answers a card session question with the selector answer kinds (D7)', () => {
+    expect(
+      parseLocalRequest('card.message', {
+        card: 3,
+        kind: 'option',
+        questionKey: '0123456789abcdef',
+        index: 2,
+      }).ok,
+    ).toBe(true);
+    expect(
+      parseLocalRequest('card.message', { card: 3, kind: 'text', text: 'Go' })
+        .ok,
+    ).toBe(true);
+    expect(
+      parseLocalRequest('card.message', { kind: 'text', text: 'Go' }).ok,
+    ).toBe(false);
+  });
+
+  it('creates a card in To Do, or proposes one with candidate (D6)', () => {
+    expect(
+      parseLocalRequest('card.create', { title: 'Fix login', candidate: true })
+        .ok,
+    ).toBe(true);
+    expect(parseLocalRequest('card.create', { title: 'two\nlines' }).ok).toBe(
+      false,
+    );
+  });
+
+  it('lets a taken card finish with its pull request', () => {
+    expect(
+      parseLocalRequest('card.finish', {
+        summary: 'Done.',
+        pullRequestUrl: 'https://github.com/acme/widget/pull/7',
+      }).ok,
+    ).toBe(true);
+    expect(
+      parseLocalRequest('card.finish', {
+        summary: 'Done.',
+        pullRequestUrl: 'http://example.com/pull/7',
+      }).ok,
     ).toBe(false);
   });
 });
