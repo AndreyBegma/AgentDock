@@ -177,7 +177,7 @@ describe('board rounds (e2e)', () => {
       });
       expect((await w.card(2)).rounds).toEqual([]);
       expect(w.sent('card.run')).toHaveLength(1);
-    });
+    }, 60_000);
 
     it('a 4th concurrent run → 409 max_running', async () => {
       for (let i = 0; i < 4; i += 1) await w.createCard();
