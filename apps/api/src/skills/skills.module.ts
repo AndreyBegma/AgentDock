@@ -25,7 +25,8 @@ import {
 /**
  * Skills (docs/specs/24): the skills.sh catalog through the runner, inspect
  * and install, the inventory, skill runs and their live log.
- * `SkillRunService` is exported for schedules (#25) and webhooks (#26).
+ * `SkillRunService` is exported for schedules (#25) and webhooks (#26),
+ * `SkillInventoryService` for review steps that name a skill (#862).
  *
  * `CommandRunsService` (#17) and `RunsQueryService` (#21) are stateless and
  * not exported by their modules, so this module provides its own instances.
@@ -47,7 +48,7 @@ import {
     SkillRunProjector,
     SkillRunService,
   ],
-  exports: [SkillRunService],
+  exports: [SkillRunService, SkillInventoryService],
 })
 export class SkillsModule implements OnModuleInit {
   constructor(

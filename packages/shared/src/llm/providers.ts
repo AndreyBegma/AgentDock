@@ -64,6 +64,7 @@ export const LLM_FEATURES = [
   'triage',
   'title',
   'assistant_summary',
+  'review_instructions',
 ] as const;
 export type LlmFeature = (typeof LLM_FEATURES)[number];
 

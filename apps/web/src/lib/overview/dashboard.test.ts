@@ -13,6 +13,7 @@ import {
   approvalsHref,
   costByProject,
   lastSevenDays,
+  liveSessions,
   mergedPullRequests,
   mergedTodayHref,
   needsYou,
@@ -184,6 +185,33 @@ describe('figures', () => {
       fleet('p2', [slot({ status: 'quota' })]),
     ];
     expect(runningSlots(fleets)).toBe(3);
+  });
+
+  test('live sessions are the slots the tile counts, longest running first', () => {
+    const projects = [project('p1'), project('p2'), project('p3')];
+    const fleets = new Map([
+      [
+        'p1',
+        fleet('p1', [
+          slot({
+            id: 'a',
+            status: 'running',
+            startedAt: '2026-10-13T09:00:00Z',
+          }),
+          slot({ id: 'b', status: 'stale' }),
+        ]),
+      ],
+      [
+        'p2',
+        fleet('p2', [
+          slot({ id: 'c', status: 'quota', startedAt: '2026-10-13T07:00:00Z' }),
+        ]),
+      ],
+    ]);
+    const sessions = liveSessions(projects, fleets);
+    expect(sessions.map((s) => s.slot.id)).toEqual(['c', 'a']);
+    expect(sessions.length).toBe(runningSlots(fleets.values()));
+    expect(sessions[0]?.project.id).toBe('p2');
   });
 
   test('approvals waiting leave out the approved-but-unmerged row', () => {

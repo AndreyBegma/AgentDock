@@ -39,7 +39,7 @@ export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
       <div className="grid grid-cols-1 items-start gap-6 desktop:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
           <NeedsYou facts={facts} waiting={waiting} setup={setup} />
-          <LiveSessions />
+          <LiveSessions projects={projects} facts={facts} />
           <RecentActivity projects={projects} recent={dashboard.recent} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
