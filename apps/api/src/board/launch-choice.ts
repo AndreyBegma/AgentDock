@@ -5,7 +5,11 @@ import {
   type CardWorkClass,
   modelByType,
 } from '@nautelle/shared';
-import { ORCHESTRATOR_DEFAULTS } from '@nautelle/shared/protocol';
+import {
+  type CardStartBranchSkip,
+  cardBranchSchema,
+  ORCHESTRATOR_DEFAULTS,
+} from '@nautelle/shared/protocol';
 
 /**
  * #322 D2: a card's model when nothing on the card overrides it — the
@@ -64,3 +68,48 @@ export const rememberedChoice = <T extends string>(
   fallback: T | null,
 ): T | null | undefined =>
   sent === undefined ? undefined : sent === fallback ? null : sent;
+
+/**
+ * #854: why the API itself did not send a taken card's branch — not a card
+ * branch (C-148: `card/`, `feat/`, `fix/`), a runner without
+ * `cardStartBranch`, or the #359 D8 follow-up of a merged card.
+ */
+export type StartBranchApiSkip =
+  | 'not_a_card_branch'
+  | 'runner_outdated'
+  | 'follow_up';
+
+export type StartBranchChoice =
+  | { kind: 'send'; branch: string }
+  | { kind: 'skip'; reason: StartBranchApiSkip };
+
+/**
+ * #854 D1: whether a Run of a session-gone taken card sends its `takenBranch`
+ * as `card.run`'s `startBranch`. `null` — nothing to choose: no taken branch,
+ * or it is the card's branch already.
+ */
+export const startBranchChoice = (
+  taken: string | null,
+  branch: string,
+  followUp: boolean,
+  runnerTakesIt: boolean,
+): StartBranchChoice | null => {
+  if (taken === null || taken === branch) return null;
+  if (followUp) return { kind: 'skip', reason: 'follow_up' };
+  if (!cardBranchSchema.safeParse(taken).success) {
+    return { kind: 'skip', reason: 'not_a_card_branch' };
+  }
+  if (!runnerTakesIt) return { kind: 'skip', reason: 'runner_outdated' };
+  return { kind: 'send', branch: taken };
+};
+
+/** #854: the launch event's word on the taken branch — why it was not used. */
+export const startBranchOutcome = (
+  choice: StartBranchChoice | null,
+  runnerSkip: CardStartBranchSkip | undefined,
+): { startBranchSkipped?: StartBranchApiSkip | CardStartBranchSkip } =>
+  choice?.kind === 'skip'
+    ? { startBranchSkipped: choice.reason }
+    : choice?.kind === 'send' && runnerSkip !== undefined
+      ? { startBranchSkipped: runnerSkip }
+      : {};

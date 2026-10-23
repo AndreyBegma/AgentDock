@@ -257,6 +257,12 @@ export const capabilitiesSchema = z.object({
    */
   cardEscalate: z.boolean().optional(),
   /**
+   * #854: the runner takes `startBranch` on `card.run` and puts the card's
+   * worktree on it when origin has it. Absent means `false` — the API sends
+   * no `startBranch` and the round launches on the card's own branch.
+   */
+  cardStartBranch: z.boolean().optional(),
+  /**
    * #751 B1: the runner sends `prefix.measured` on every launch. Absent means
    * `false` — the Prefix section then has nothing from this runner.
    */
@@ -320,6 +326,10 @@ export const cardFreshStartAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `card.run`'s `escalate` (#750); absent is `false`. */
 export const cardEscalateAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardEscalate === true;
+
+/** Whether the API may send `card.run`'s `startBranch` (#854); absent is `false`. */
+export const cardStartBranchAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardStartBranch === true;
 
 /** Whether the API may send `tokenSaver.prefix` on `card.run` (#751); absent is `false`. */
 export const prefixOverlaysAvailable = (capabilities: Capabilities): boolean =>

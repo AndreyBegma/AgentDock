@@ -254,6 +254,14 @@ export const cardRunArgsSchema = z
      * to a runner that advertises `cardEscalate`.
      */
     escalate: z.literal(true).optional(),
+    /**
+     * #854 D1: the branch a session-gone taken card was worked on. When origin
+     * has it, the runner puts the card's worktree on it — from
+     * `origin/<startBranch>` — and the round works there instead of `branch`;
+     * otherwise it launches on `branch` as without it, and says why in the
+     * result. Sent only to a runner that advertises `cardStartBranch`.
+     */
+    startBranch: cardBranchSchema.optional(),
   })
   .refine(
     (a) =>
@@ -261,6 +269,14 @@ export const cardRunArgsSchema = z
       (a.files ?? []).length,
     { message: 'file paths must be distinct', path: ['files'] },
   )
+  .refine((a) => a.startBranch === undefined || a.startBranch !== a.branch, {
+    message: 'startBranch must differ from branch',
+    path: ['startBranch'],
+  })
+  .refine((a) => a.startBranch === undefined || a.newBranch !== true, {
+    message: 'startBranch does not go with newBranch',
+    path: ['startBranch'],
+  })
   .refine((a) => a.newBranch !== true || a.session.resume, {
     message: 'newBranch needs a resumed session',
     path: ['newBranch'],
@@ -281,9 +297,32 @@ export const cardRunArgsSchema = z
   );
 export type CardRunArgs = z.infer<typeof cardRunArgsSchema>;
 
+/**
+ * #854: why a round with `startBranch` launched on `branch` instead — the
+ * branch is not on origin, the fetch failed, the card's existing worktree has
+ * uncommitted changes, a local branch of that name is checked out elsewhere,
+ * or it and origin have diverged.
+ */
+export const CARD_START_BRANCH_SKIPS = [
+  'not_on_origin',
+  'fetch_failed',
+  'worktree_dirty',
+  'branch_checked_out',
+  'branch_diverged',
+] as const;
+export const cardStartBranchSkipSchema = z.enum(CARD_START_BRANCH_SKIPS);
+export type CardStartBranchSkip = z.infer<typeof cardStartBranchSkipSchema>;
+
 export const cardRunResultSchema = z.object({
   phase: z.enum(['starting', 'running']),
   tmuxSession: cardTmuxSessionSchema,
+  /**
+   * #854: the branch the round works on — `startBranch` when the runner took
+   * it, else `branch`. Absent from an older runner, which is `branch`.
+   */
+  branch: gitRefSchema.optional(),
+  /** #854: with `startBranch` not taken only. */
+  startBranchSkipped: cardStartBranchSkipSchema.optional(),
 });
 export type CardRunResult = z.infer<typeof cardRunResultSchema>;
 

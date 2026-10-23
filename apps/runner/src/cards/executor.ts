@@ -19,6 +19,7 @@ import {
   type CardRunPhase,
   type CardRunPhaseChangedData,
   type CardRunResult,
+  type CardStartBranchSkip,
   type CardStopArgs,
   type CardStopResult,
   cardRunDialogDataSchema,
@@ -68,6 +69,7 @@ import {
   excludeFromGit,
   removeCardWorktree,
   startFollowUpBranch,
+  takeStartBranch,
 } from './git';
 import { cardLaunchSpec, cardTokenSaver, cardWorktreePath } from './launch';
 import { type PushStep, pushCardHead } from './push';
@@ -318,7 +320,33 @@ export class CardExecutor {
       this.setPhase(record, 'starting');
       let wiring: CardWiring;
       let prepared: PreparedRound | null = null;
+      let startBranchSkipped: CardStartBranchSkip | null = null;
       try {
+        // #854 D1: a taken card's branch, when origin has it; else `branch`.
+        if (args.startBranch) {
+          startBranchSkipped = await takeStartBranch(
+            deps,
+            record,
+            args.startBranch,
+          );
+          if (startBranchSkipped === null) {
+            // The push state follows the branch the round works on.
+            Object.assign(
+              record,
+              { pushedHead: undefined, pushPr: undefined },
+              { previousBranches: undefined },
+              pushStateOf(previous, { ...args, branch: args.startBranch }),
+              { branch: args.startBranch },
+            );
+          } else {
+            this.options.log.info('cards: the round keeps its own branch', {
+              cardId: record.cardId,
+              runId: record.runId,
+              startBranch: args.startBranch,
+              reason: startBranchSkipped,
+            });
+          }
+        }
         // #359 D8: the follow-up branch, from the updated base, first.
         if (args.newBranch) await startFollowUpBranch(deps, record);
         await ensureWorktree(deps, record);
@@ -408,7 +436,12 @@ export class CardExecutor {
         ...(wiring.wiringReason ? { wiringReason: wiring.wiringReason } : {}),
       });
       if (prepared) this.options.handoff?.reportRestart(record, prepared);
-      return { phase: 'running', tmuxSession };
+      return {
+        phase: 'running',
+        tmuxSession,
+        branch: record.branch,
+        ...(startBranchSkipped ? { startBranchSkipped } : {}),
+      };
     });
   }
 
