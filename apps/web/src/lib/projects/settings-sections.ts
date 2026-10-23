@@ -1,7 +1,7 @@
 /**
  * The project settings page's four sections (#704, stack S-7 mockup). Each
  * section is one page of stacked blocks; each block is one of the thirteen
- * former tabs and keeps that tab's id as its anchor.
+ * former tabs (Review, #890, is new) and keeps that tab's id as its anchor.
  */
 export const SETTINGS_SECTIONS = [
   {
@@ -20,6 +20,7 @@ export const SETTINGS_SECTIONS = [
     items: [
       { id: 'orchestrator', label: 'Orchestrator' },
       { id: 'board', label: 'Board' },
+      { id: 'review', label: 'Review' },
       { id: 'sessions', label: 'Sessions' },
       { id: 'steward', label: 'Steward' },
     ],
