@@ -4,6 +4,7 @@ import {
   type DesignTemplatesView,
   type DesignTemplateView,
 } from '@nautelle/shared';
+import type { Prisma } from '@prisma/client';
 import { CardDesignHarness } from '../design/testing/card-design-e2e';
 
 const custom = (
@@ -177,7 +178,9 @@ describe('design templates API (e2e, #833)', () => {
         projectId: h.projectId,
         key: 'flow',
         name: flow.name,
-        definition: { frames: [...flow.frames, mobile, custom()] },
+        definition: {
+          frames: [...flow.frames, mobile, custom()],
+        } as unknown as Prisma.InputJsonValue,
       },
     });
     const listed = (await list()).templates.find((t) => t.key === 'flow');
