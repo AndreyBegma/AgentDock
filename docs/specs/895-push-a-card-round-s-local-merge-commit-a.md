@@ -17,5 +17,11 @@ The runner's `card.collect` handling (`apps/runner`) and the API side that inter
 - [ ] Runner tests cover merge-only, normal and nothing-new rounds; the API e2e `board-collect` covers the merge-only report.
 - [ ] `bun run check` passes.
 
+## Findings
+The runner does push a merge-only round. It pushed C-346's merge commit `881c209e` at 17:18:20Z, 15 seconds after the commit, and both the mid-round push and `card.collect` count `origin/<base>..HEAD`, where a merge commit counts. GitHub's PR #889 kept showing `d97806dc` until about 17:32, and the orchestrator's hand push at 17:31 changed nothing. Nautelle read the lagging PR at about 17:21 and finished the card on the old head's green checks. The person rescoped the card to that defect: the API waits while GitHub shows the head the round started from instead of the head it pushed ([ADR-0086](../adr/0086-a-card-pr-is-read-only-once-github-shows-the-pushed-head.md)).
+
+## Added acceptance criteria
+- [ ] While GitHub shows a card's PR at the head its latest round started from, and the round pushed another head, the API does not fix, finish or merge the card on that PR's checks or mergeability. API e2e tests cover it.
+
 ## Out of scope
 - Force-pushing or rewriting history.
