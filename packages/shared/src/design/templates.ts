@@ -10,7 +10,12 @@ import { DESIGN_FRAME_NAME_MAX, DESIGN_FRAMES_MAX } from './frames';
  * prompts the turn with it.
  */
 
-/** Every kind a frame can have; `legacy` is a frame stored before #833. */
+/**
+ * Every kind a frame can have; `legacy` is a frame stored before #833.
+ * `mobile` is no built-in frame since #863 (ADR-0084): every frame is one
+ * responsive page drawn for the design's devices. It stays so revisions and
+ * project templates stored with it still parse.
+ */
 export const DESIGN_FRAME_KINDS = [
   'screen',
   'breakdown',
@@ -136,7 +141,7 @@ export const BUILTIN_DESIGN_TEMPLATES: readonly DesignTemplate[] = [
       frame(
         'screen',
         'Screen',
-        'The finished page at desktop width, with realistic content and no explanatory text.',
+        'The finished page, with realistic content and no explanatory text.',
       ),
       frame(
         'breakdown',
@@ -145,8 +150,8 @@ export const BUILTIN_DESIGN_TEMPLATES: readonly DesignTemplate[] = [
       ),
       frame(
         'states',
-        'States and mobile',
-        'The empty, loading and error states, and the page at the narrow width.',
+        'States',
+        'The empty, loading and error states.',
         false,
       ),
     ],
@@ -196,7 +201,6 @@ export const BUILTIN_DESIGN_TEMPLATES: readonly DesignTemplate[] = [
         'Breakdown',
         'The components, states and logic the steps share.',
       ),
-      frame('mobile', 'Mobile', 'The steps at the narrow width.', false),
     ],
   },
 ];

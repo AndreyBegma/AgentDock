@@ -36,6 +36,32 @@ describe('BUILTIN_DESIGN_TEMPLATES', () => {
       for (const frame of t.frames) expect(frame.key).toBe(frame.kind);
     }
   });
+
+  // #863 (ADR-0084): every frame is one responsive page; no device frame.
+  it('draw no mobile frame in page and flow, and still parse the mobile kind', () => {
+    expect(page.frames.map((fr) => fr.key)).toEqual([
+      'screen',
+      'breakdown',
+      'states',
+    ]);
+    expect(flow.frames.map((fr) => fr.key)).toEqual([
+      'flow_map',
+      'flow_step',
+      'breakdown',
+    ]);
+    for (const t of [page, flow]) {
+      for (const frame of t.frames) {
+        expect(frame.instruction.toLowerCase()).not.toContain('mobile');
+        expect(frame.instruction.toLowerCase()).not.toContain('narrow');
+      }
+    }
+    const old = {
+      key: 'x',
+      name: 'X',
+      frames: [{ ...page.frames[2], key: 'mobile', kind: 'mobile' }],
+    };
+    expect(designTemplateSchema.safeParse(old).success).toBe(true);
+  });
 });
 
 describe('designTemplateSchema', () => {
@@ -184,6 +210,17 @@ describe('checkConformance', () => {
     expect(seven.ok).toBe(false);
     expect(seven.reason).toBe('too_many_steps');
     expect(seven.missing).toEqual([]);
+  });
+
+  it('reads a mobile frame of an older revision as extra (#863)', () => {
+    const result = checkConformance(flow, [
+      f('flow_map'),
+      ...steps(2),
+      f('breakdown'),
+      f('mobile', 'Mobile'),
+    ]);
+    expect(result.extra).toEqual(['Mobile']);
+    expect(result.missing).toEqual([]);
   });
 
   it('matches a custom frame by its name', () => {
