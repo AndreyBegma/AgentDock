@@ -80,3 +80,32 @@ describe('action-request mapper (C-112)', () => {
     );
   });
 });
+
+describe('action-request mapper (#845 card_accept)', () => {
+  const CARD_ARGS = {
+    card: 42,
+    title: 'Add login',
+    prNumber: 77,
+    prUrl: 'https://github.com/acme/widget/pull/77',
+  };
+
+  it('reads "Accept C-<n> <title>", with the PR link and the merge when asked', () => {
+    expect(actionRequestTitle('card_accept', CARD_ARGS)).toBe(
+      'Accept C-42 Add login',
+    );
+    expect(actionRequestBody('card_accept', CARD_ARGS, 'Green.')).toBe(
+      'https://github.com/acme/widget/pull/77 · Green.',
+    );
+    expect(
+      actionRequestBody('card_accept', { ...CARD_ARGS, merge: true }, 'Green.'),
+    ).toBe('https://github.com/acme/widget/pull/77 · and merge #77 · Green.');
+  });
+
+  it('says nothing of a PR the card has not, and falls back on unbound args', () => {
+    const noPr = { ...CARD_ARGS, merge: true, prNumber: null, prUrl: null };
+    expect(actionRequestBody('card_accept', noPr, 'Done.')).toBe('Done.');
+    expect(actionRequestTitle('card_accept', { card: 42 })).toBe(
+      'A session asks to accept a card',
+    );
+  });
+});

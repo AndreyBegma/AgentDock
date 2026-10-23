@@ -9,6 +9,7 @@ import {
 import { seedProject } from '../fleet/testing/fleet-e2e';
 import {
   adminSession,
+  capabilities,
   createRunnerE2eApp,
   pairedRunner,
   type RunnerE2eContext,
@@ -59,33 +60,46 @@ const ARGS: Record<LocalMethodName, unknown> = {
   'board.list': {},
   'board.card': { card: 1 },
   'board.wait': { timeoutSec: 0 },
+  // #845: C-1 is Finished by now, C-2 the session's tracked card, C-3 new.
   'card.create': { title: 'Retry the pairing handshake' },
   'card.run': { card: 1 },
-  'card.move': { card: 1, column: 'todo' },
+  'card.move': { card: 3, column: 'todo', index: 0 },
   'card.feedback': { card: 1, text: 'Handle the macOS case too.' },
   'card.message': { card: 1, kind: 'text', text: 'Use the existing helper.' },
   'card.stop': { card: 1 },
-  'card.take': { card: 1 },
-  'card.release': { card: 1 },
+  // The session holds C-2, so C-3 is queued for it — and released.
+  'card.take': { card: 3 },
+  'card.release': { card: 3 },
 };
 
 /**
- * #845: the Board methods whose contract landed before their handlers; the
- * sweep covers them once the API serves them, and drops this list then.
+ * #845: the Board's control methods, in the order the sweep calls them —
+ * feedback on the Finished C-1 starts a round the message reaches and Stop
+ * ends, then a Run starts the next.
  */
-const NOT_SERVED_YET: ReadonlySet<LocalMethodName> = new Set([
-  'board.list',
-  'board.card',
-  'board.wait',
+const BOARD_CONTROL_ORDER: readonly LocalMethodName[] = [
   'card.create',
-  'card.run',
   'card.move',
   'card.feedback',
   'card.message',
   'card.stop',
+  'card.run',
   'card.take',
   'card.release',
-]);
+];
+
+/** What the runner answers the card commands the Board methods send. */
+const CARD_COMMAND_OUTPUTS: Record<
+  string,
+  ((args: Record<string, unknown>) => unknown) | undefined
+> = {
+  'card.run': (args) => ({
+    phase: 'starting',
+    tmuxSession: `nautelle-card-${String(args.shortId)}`,
+  }),
+  'card.stop': () => ({ stopped: true }),
+  'session.message': () => ({ outcome: 'sent' }),
+};
 
 /**
  * Spec 201 D6–D8 through the real gateway: a runner socket sends
@@ -152,6 +166,17 @@ describe('local requests over the runner socket (e2e)', () => {
       const args = command.args as Record<string, unknown>;
       commands.push({ name: command.name, args });
       number += 1;
+      // #845: a card worker's launch, stop and session message.
+      const card = CARD_COMMAND_OUTPUTS[command.name];
+      if (card) {
+        socket.send({
+          type: 'command.result',
+          id: command.id,
+          ok: true,
+          output: card(args),
+        });
+        continue;
+      }
       if (command.name === 'plan.queue_issues') {
         socket.send({
           type: 'command.result',
@@ -307,17 +332,36 @@ describe('local requests over the runner socket (e2e)', () => {
     await seedCardSession();
     // `card.track` asks from a person's own session (#282 D1).
     const manual = await seedManualSession();
+    // #845: the Board's control methods launch a worker and message it — the
+    // runner's Claude profile, and a runner that takes session messages.
+    const profile = await ctx.prisma.runtimeProfile.findFirstOrThrow({
+      where: { runnerId, key: 'claude-main' },
+    });
+    await ctx.prisma.project.update({
+      where: { id: projectId },
+      data: { defaultProfileId: profile.id },
+    });
+    await ctx.prisma.runner.update({
+      where: { id: runnerId },
+      data: { capabilities: { ...capabilities, sessionMessage: true } },
+    });
     // `action.request` first: `action.status` asks about the request it made.
     // #750: `card.escalate` just before `card.finish` — it needs the active
     // round, and its `card.stop` takes the place `card.finish`'s had.
-    const served = localMethodNames.filter((m) => !NOT_SERVED_YET.has(m));
+    // #845: the Board's control methods last, in their own order.
     const order = [
       'action.request',
-      ...served
-        .filter((m) => m !== 'action.request' && m !== 'card.escalate')
+      ...localMethodNames
+        .filter(
+          (m) =>
+            m !== 'action.request' &&
+            m !== 'card.escalate' &&
+            !BOARD_CONTROL_ORDER.includes(m),
+        )
         .flatMap((m) =>
           m === 'card.finish' ? (['card.escalate', m] as const) : [m],
         ),
+      ...BOARD_CONTROL_ORDER,
     ] as LocalMethodName[];
     for (const method of order) {
       const args = method === 'action.status' ? { id: actionId } : ARGS[method];
@@ -343,7 +387,7 @@ describe('local requests over the runner socket (e2e)', () => {
         actionId = (response.data as { id: string }).id;
       }
     }
-    expect(responses.size).toBe(served.length);
+    expect(responses.size).toBe(localMethodNames.length);
 
     const context = responses.get('context.sessionStart')?.data as {
       text: string;
@@ -437,16 +481,25 @@ describe('local requests over the runner socket (e2e)', () => {
       ['card.finish', 'ok', localUserId, 'mcp'],
       ['card.track', 'ok', localUserId, 'mcp'],
       ['away.set', 'ok', localUserId, 'mcp'],
+      ...BOARD_CONTROL_ORDER.map((method) => [
+        method,
+        'ok',
+        localUserId,
+        'mcp',
+      ]),
     ]);
 
-    // #845: until then they answer as a server without them would.
-    for (const method of NOT_SERVED_YET) {
-      const response = await ask(method, ARGS[method], projectId);
-      expect([method, response.error?.code]).toEqual([
-        method,
-        'unknown_method',
-      ]);
-    }
+    // #845: the take queued C-3 behind the tracked C-2; the release cleared it.
+    expect(responses.get('card.take')?.data).toMatchObject({
+      number: 3,
+      state: 'queued',
+      queuePosition: 1,
+    });
+    expect(responses.get('card.release')?.data).toEqual({
+      number: 3,
+      column: 'todo',
+      next: null,
+    });
     const issueAudit = await ctx.prisma.auditRecord.findFirst({
       where: { action: 'issue.create', projectId },
       orderBy: { seq: 'asc' },
