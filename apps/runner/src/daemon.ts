@@ -783,7 +783,7 @@ export const runDaemon = async (
             (r) =>
               r.sessionId === sessionId &&
               (r.phase === 'starting' || r.phase === 'running'),
-          ),
+          ) || cards.reviewSession(sessionId),
       // #482: a round's session is known from its record after a restart.
       liveRound: (cwd) =>
         cardAtWorktree(

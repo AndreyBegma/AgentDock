@@ -3,6 +3,22 @@
 Each release's GitHub release links here. A release with an upgrade note says
 what to do on every machine that runs the runner.
 
+## Unreleased
+
+- **Review steps before Finished.** `card.review` starts a review session for
+  a card's pull request once its CI is green: a new Claude session in its own
+  tmux session (`nautelle-review-<shortId>`) and its own detached worktree
+  (`.wt-<repo>-review-<shortId>`) on the pull request's head, beside the
+  card's worktree and session, which it never touches. The session gets its
+  own `NAUTELLE_CARD` (and so its own test database and port) and reports its
+  findings once with the new `report_review` MCP tool; a review session is
+  offered the read tools and `report_review` only. `card.reviewStop` ends it
+  and removes its worktree; `card.reviewPublish` posts the findings as one
+  GitHub pull request review (inline comments, folded into the body when
+  GitHub refuses them) through `gh`
+  ([ADR-0084](../../docs/adr/0084-a-card-passes-its-review-steps-before-finished.md)).
+  Needs an API with the same release (#884).
+
 ## 0.15.0
 
 **Upgrade note — the local OTLP receiver now needs a token.** Run

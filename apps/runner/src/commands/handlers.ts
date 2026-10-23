@@ -13,6 +13,7 @@ import {
   closeCardPr,
   mergeCard,
   openCardPr,
+  publishCardReview,
   retargetCardPr,
   retriggerCardCi,
 } from '../cards';
@@ -316,6 +317,17 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
     'card.prOpen': (args) =>
       context.cards
         ? openCardPr(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    // #884: review steps (ADR-0084), advertised like every handler (ADR-0023).
+    'card.review': (args) => context.cards?.['card.review'](args) ?? noCards(),
+    'card.reviewStop': (args) =>
+      context.cards?.['card.reviewStop'](args) ?? noCards(),
+    'card.reviewPublish': (args) =>
+      context.cards
+        ? publishCardReview(args, {
             exec: context.exec,
             watchedProjects: context.watchedProjects,
           })
