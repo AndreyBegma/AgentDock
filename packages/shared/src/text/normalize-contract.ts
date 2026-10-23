@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BOARD_CARD_KINDS } from '../board/types';
+import { DESIGN_TEMPLATE_KEY_MAX } from '../design/templates';
 import { checkPlaceholders, unmaskText } from './mask';
 
 /**
@@ -52,6 +53,12 @@ export const textOutputFieldSchema = z
 export const textOutputSchema = z.strictObject({
   fields: z.array(textOutputFieldSchema),
   kind: z.enum(BOARD_CARD_KINDS).optional(),
+  /**
+   * #833 D8: the card's design template, answered with `kind`. Its key is
+   * checked against the project's templates by the caller, so an unknown one
+   * is ignored rather than a contract violation.
+   */
+  designTemplate: z.string().min(1).max(DESIGN_TEMPLATE_KEY_MAX).optional(),
 });
 export type TextOutput = z.infer<typeof textOutputSchema>;
 

@@ -8,6 +8,7 @@ import type {
 } from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
+import type { DesignTemplateChoice } from '../design/templates';
 import type { FleetStage } from '../fleet';
 import type { CardRestartMode, RestartEstimate } from '../handoff/contracts';
 import type {
@@ -180,6 +181,10 @@ export interface BoardCardView {
   kind: BoardCardKind;
   /** #271 D9: `auto` while the model may still set kind ("Auto" badge). */
   kindSource: CardKindSource;
+  /** #833 D8: the design template key; `null` until the normalizer chose (`page` applies). */
+  designTemplate?: string | null;
+  /** #833 D8: `auto` while the normalizer may still choose it. */
+  designTemplateSource?: DesignTemplateChoice;
   column: BoardColumn;
   position: number;
   source: BoardCardSource;
@@ -658,6 +663,8 @@ export interface UpdateBoardCardRequest {
   title?: string;
   body?: string;
   kind?: BoardCardKind;
+  /** #833 D8: a template key of the project; sets `designTemplateSource` to `person`. */
+  designTemplate?: string;
   issueOnRun?: boolean;
   specOnRun?: boolean;
   model?: string | null;
@@ -917,6 +924,8 @@ export const BOARD_ERROR = {
   dependencyCycle: 'dependency_cycle',
   /** 400 (#337 D8): the card itself, or a number that is no card of this project. */
   invalidDependency: 'invalid_dependency',
+  /** 400 (#833 D8): `designTemplate` names no template of the project. */
+  invalidDesignTemplate: 'invalid_design_template',
   /**
    * 409 (#480, ADR-0044): Run on a card of a stack whose design is needed and
    * not approved — nothing writes project code before it is.

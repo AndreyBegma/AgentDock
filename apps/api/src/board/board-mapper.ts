@@ -417,6 +417,8 @@ export const toCardView = (
   title: card.title,
   kind: card.kind,
   kindSource: card.kindSource,
+  designTemplate: card.designTemplate,
+  designTemplateSource: card.designTemplateSource,
   column: card.column,
   position: card.position,
   source: card.source,
