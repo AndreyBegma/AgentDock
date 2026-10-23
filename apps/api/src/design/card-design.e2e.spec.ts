@@ -190,6 +190,86 @@ describe('card design (e2e, #243)', () => {
     expect(design.activeTurnId).not.toBeNull();
   });
 
+  describe('devices (#863)', () => {
+    const WIDE = { name: 'Wide', width: 1920, height: 1080 };
+    const KIOSK = { name: 'Kiosk', width: 1080, height: 1920, theme: 'dark' };
+
+    const generateFor = (number: number, devices: object[]) =>
+      h.author.send('post', `${h.cardDesignBase(number)}/generate`, {
+        devices,
+      });
+
+    it('stores the devices a Generate names, and the prompt lists each with its size', async () => {
+      await h.seedProfile();
+      const card = await h.designedCard(1);
+      expect((await h.cardDesign(card.number)).devices).toBeNull();
+
+      expect((await generateFor(card.number, [WIDE, KIOSK])).status).toBe(201);
+      expect((await h.cardDesign(card.number)).devices).toEqual([WIDE, KIOSK]);
+      const prompt = String(h.sentOf('plan.turn').at(-1)?.prompt);
+      expect(prompt).toContain('# Devices');
+      expect(prompt).toContain('- Wide: 1920 × 1080 px');
+      expect(prompt).toContain('- Kiosk: 1080 × 1920 px, dark theme');
+      expect(prompt).toContain('one responsive page');
+      expect(prompt).not.toContain('- Desktop:');
+    });
+
+    it('keeps the devices when the project presets change later', async () => {
+      await h.seedProfile();
+      const card = await h.designedCard(1);
+      expect((await generate(card.number)).status).toBe(201);
+      const stored = (await h.cardDesign(card.number)).devices;
+      expect(stored?.map((d) => d.name)).toEqual(['Desktop', 'Tablet', 'Phone']);
+
+      const presets = await h.admin.send(
+        'put',
+        `/projects/${h.projectId}/design-settings`,
+        { viewports: [WIDE], defaultSkills: [] },
+      );
+      expect(presets.status).toBe(200);
+      const view = await h.cardDesign(card.number);
+      expect(view.viewports).toEqual([WIDE]);
+      expect(view.devices).toEqual(stored);
+    });
+
+    it('refuses an empty list, too many devices and two of one name, storing nothing', async () => {
+      await h.seedProfile();
+      const card = await h.designedCard(1);
+      const many = Array.from({ length: 13 }, (_, i) => ({
+        ...WIDE,
+        name: `D${i}`,
+      }));
+      for (const devices of [[], many, [WIDE, { ...KIOSK, name: 'Wide' }]]) {
+        expect((await generateFor(card.number, devices)).status).toBe(400);
+      }
+      expect(
+        (await generateFor(card.number, [{ ...WIDE, width: 10 }])).status,
+      ).toBe(400);
+      const view = await h.cardDesign(card.number);
+      expect(view.devices).toBeNull();
+      expect(view.status).toBe('idle');
+      expect(h.sentOf('plan.turn')).toHaveLength(0);
+    });
+
+    it('a refused second Generate leaves the devices of the running one', async () => {
+      await h.seedProfile();
+      const card = await h.designedCard(1);
+      const profiles = h.ctx.app.get(UiProfileService);
+      const ensureFresh = profiles.ensureFresh.bind(profiles);
+      let second: { status: number } | null = null;
+      jest
+        .spyOn(profiles, 'ensureFresh')
+        .mockImplementationOnce(async (...args) => {
+          second = await generateFor(card.number, [KIOSK]);
+          return ensureFresh(...args);
+        });
+
+      expect((await generateFor(card.number, [WIDE])).status).toBe(201);
+      expect(second).toMatchObject({ status: 409 });
+      expect((await h.cardDesign(card.number)).devices).toEqual([WIDE]);
+    });
+  });
+
   it('#628: a revise runs in a session of its own and keeps a frame it does not draw', async () => {
     await h.seedProfile();
     const card = await h.designedCard(1);

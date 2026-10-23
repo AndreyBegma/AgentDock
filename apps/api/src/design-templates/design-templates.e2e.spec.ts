@@ -210,7 +210,7 @@ describe('design templates API (e2e, #833)', () => {
       });
       const prompt = await promptFor('page');
       expect(prompt).toContain('# Frames to draw');
-      expect(prompt).not.toContain('States and mobile');
+      expect(prompt).not.toContain('States — kind');
     });
 
     it('carries a custom template’s frames with their instructions', async () => {

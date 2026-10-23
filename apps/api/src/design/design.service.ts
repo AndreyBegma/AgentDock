@@ -567,18 +567,19 @@ export class DesignService implements OnModuleInit {
       );
     }
     // #604: a design that follows the default takes today's default; its
-    // turns, and every later one, read that copy. #863: so do the devices —
-    // a later edit of the project's presets leaves them.
-    const design = await this.prisma.taskDesign.update({
-      where: { id: drawable.id },
-      data: {
-        devices: devices as Prisma.InputJsonValue,
-        ...(followsDefaultSkills(drawable, revisions.length > 0)
-          ? { skills: await defaultSkillsOf(this.prisma, owner.projectId) }
-          : {}),
-      },
+    // turns, and every later one, read that copy.
+    const design = followsDefaultSkills(drawable, revisions.length > 0)
+      ? await this.prisma.taskDesign.update({
+          where: { id: drawable.id },
+          data: { skills: await defaultSkillsOf(this.prisma, owner.projectId) },
+        })
+      : drawable;
+    // #863: so do the devices — a later edit of the project's presets leaves
+    // them. They are written with the busy claim, so a refused Generate never
+    // changes the devices of a running one.
+    await this.start(owner, design, 'generate', [], actor, {
+      devices: devices as Prisma.InputJsonValue,
     });
-    await this.start(owner, design, 'generate', [], actor);
   }
 
   /**
@@ -875,6 +876,7 @@ export class DesignService implements OnModuleInit {
     mode: DesignTurnPlan['mode'],
     comments: string[],
     actor: PlanActor,
+    claim: Prisma.TaskDesignUpdateManyMutationInput = {},
   ): Promise<void> {
     await owner.assertIdle();
     const caller: PlanCaller = callerOf(actor);
@@ -890,7 +892,7 @@ export class DesignService implements OnModuleInit {
     // failure never settles the winner's running turn.
     const claimed = await this.prisma.taskDesign.updateMany({
       where: { id: design.id, status: design.status },
-      data: { status: busyStatusOf(mode), busySince: new Date() },
+      data: { ...claim, status: busyStatusOf(mode), busySince: new Date() },
     });
     if (claimed.count === 0) throw busy();
     let readiness: ProfileReadiness;
