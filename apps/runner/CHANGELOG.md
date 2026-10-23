@@ -3,6 +3,60 @@
 Each release's GitHub release links here. A release with an upgrade note says
 what to do on every machine that runs the runner.
 
+## 0.15.0
+
+**Upgrade note — the local OTLP receiver now needs a token.** Run
+`nautelle-runner setup claude` once on every machine whose Claude Code sends
+telemetry to the runner: it writes the token header into each profile's
+`settings.json`. Sessions the runner launches get it on their own. Until then
+those sessions' usage and cost records are refused (401) and missing from the
+web app.
+
+- **Work the Board from a Claude Code session.** The `nautelle` MCP server
+  gains eleven tools for a person's own session: `board_list`, `board_card`,
+  `board_wait` (waits up to five minutes for a card to move, finish, change
+  CI or ask a question), `card_create`, `card_run`, `card_move`,
+  `card_feedback`, `card_message`, `card_stop`, `take_card` and
+  `release_card`. `finish_card` accepts the pull request of a card the session
+  took, and `request_action` can ask a person to accept a finished card. The
+  `nautelle` plugin 0.6.0 adds the `nautelle:board` skill that drives them
+  ([ADR-0083](../../docs/adr/0083-a-persons-session-may-work-the-board-through-mcp.md)).
+  Needs an API with the same release.
+- **Token saver techniques** behind per-card flags: a 400-line read guard
+  that answers with a file outline, large MCP, Grep and WebFetch results cut
+  to head and tail, a one-hour prompt-cache TTL, a long card session that
+  starts fresh from its handoff by size, and the launch prefix measured and
+  replaced by approved overlays.
+- **A Sonnet card round can escalate to Opus once** (`escalate_card`), and a
+  card's effort is passed at launch
+  ([ADR-0076](../../docs/adr/0076-a-cards-model-and-effort-follow-its-class-and-stay-fixed-per-session.md)).
+- **Design frame templates**: a design turn draws typed frames from the
+  card's template, with a conformance check and one repair turn.
+- **Update prompt**: after an interactive command the runner says when npm
+  has a newer `nautelle-runner`. `NAUTELLE_NO_UPDATE_CHECK=1` (or `CI`) turns
+  it off.
+- **Pushes follow a branch policy**: the runner refuses to push to the
+  repository's default branch or a protected branch (`branch_refused`), and
+  reports the protected paths a card changes so the card is never
+  auto-merged
+  ([ADR-0077](../../docs/adr/0077-runner-pushes-follow-a-branch-policy-and-protected-paths-need-a-person.md)).
+- **Security hardening**: the OTLP receiver checks its token and its Host
+  header and caps a request at 5 000 records; untrusted GitHub text is fenced
+  in `SessionStart` and MCP results; attachments, card files and skill copies
+  are written owner-only; each event source accepts only its own event
+  types; only sessions inside watched roots are reported
+  ([ADR-0078](../../docs/adr/0078-only-sessions-inside-watched-roots-are-reported.md));
+  plan and UI-profile cancels for another project's run are refused; issue
+  labels with commas, control characters or `cs:*` are refused; the plugin
+  marketplace is pinned.
+- **Fixes**: a stale daemon lock is taken over atomically; capture output,
+  board files and `state.json` reads are capped and transcript lines over
+  16 MiB are dropped with a warning; fingerprint globs no longer backtrack;
+  Bash calls stay unwrapped under a managed policy; capture, normalize and
+  assess calls load no MCP server; `finish_card` is guarded in the daemon and
+  a resumed card keeps its recorded permission mode; stopping an escalated
+  round works when tmux cannot be read.
+
 ## 0.14.0
 
 **Upgrade note — the runner is renamed `nautelle-runner`
