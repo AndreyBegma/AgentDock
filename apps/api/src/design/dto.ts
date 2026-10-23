@@ -4,6 +4,8 @@ import {
   DESIGN_COMMENT_MAX,
   DESIGN_SELECTOR_MAX,
   DESIGN_SKILLS_MAX,
+  DESIGN_TEMPLATE_KEY_MAX,
+  DESIGN_TEMPLATE_KEY_PATTERN,
   DESIGN_THEMES,
   DESIGN_VARIANTS_MAX,
   DESIGN_VARIANTS_MIN,
@@ -102,6 +104,14 @@ export class TaskDesignPatchDto implements TaskDesignPatchRequest {
   @Min(DESIGN_VARIANTS_MIN)
   @Max(DESIGN_VARIANTS_MAX)
   variantCount?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(DESIGN_TEMPLATE_KEY_MAX)
+  @Matches(DESIGN_TEMPLATE_KEY_PATTERN, {
+    message: 'templateKey is not a template key',
+  })
+  templateKey?: string;
 
   @IsOptional()
   @IsArray()

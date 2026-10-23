@@ -1,6 +1,7 @@
 import type {
   DesignCommentKind,
   DesignSuggestion,
+  DesignTemplateChoice,
   DesignTheme,
   PlanTaskStatus,
   TaskDesignStatus,
@@ -41,15 +42,20 @@ export interface SuggestedDesign {
   suggested: boolean;
   suggestionWhy: string;
   variantCount: number;
+  /** #833 D8: the suggested template; null when none, or not one of the project's. */
+  templateKey: string | null;
 }
 
 /**
  * D2, D3: a suggestion read for a project. A profile with `hasUi: false`
  * turns every suggestion off — the planner is told so, this enforces it.
+ * `templateKeys` are the project's template keys (#833 D8): any other key the
+ * planner names is dropped.
  */
 export const suggestionOf = (
   suggestion: DesignSuggestion,
   hasUi: boolean | null,
+  templateKeys: readonly string[] = [],
 ): SuggestedDesign => {
   const needed = suggestion.needed && hasUi !== false;
   return {
@@ -57,26 +63,43 @@ export const suggestionOf = (
     suggested: needed,
     suggestionWhy: suggestion.why,
     variantCount: suggestion.variants,
+    templateKey:
+      suggestion.template !== undefined &&
+      templateKeys.includes(suggestion.template)
+        ? suggestion.template
+        : null,
   };
 };
 
 /**
  * D2: what a later suggestion changes on an existing row. The planner
  * suggests, the person decides: `needed` stays the person's, and the variant
- * count follows the planner only while nothing was drawn.
+ * count follows the planner only while nothing was drawn. #833 D8: so does
+ * the template, and never over a person's choice.
  */
 export const suggestionUpdate = (
   suggestion: SuggestedDesign,
-  row: { status: TaskDesignStatus; drawn: boolean },
+  row: {
+    status: TaskDesignStatus;
+    drawn: boolean;
+    templateSource?: DesignTemplateChoice;
+  },
 ): {
   suggested: boolean;
   suggestionWhy: string;
   variantCount?: number;
+  templateKey?: string;
 } => ({
   suggested: suggestion.suggested,
   suggestionWhy: suggestion.suggestionWhy,
   ...(row.status === 'idle' && !row.drawn
     ? { variantCount: suggestion.variantCount }
+    : {}),
+  ...(row.status === 'idle' &&
+  !row.drawn &&
+  row.templateSource !== 'person' &&
+  suggestion.templateKey !== null
+    ? { templateKey: suggestion.templateKey }
     : {}),
 });
 

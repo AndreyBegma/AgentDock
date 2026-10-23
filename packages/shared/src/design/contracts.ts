@@ -320,6 +320,8 @@ export interface DesignFailureView {
 export interface TaskDesignPatchRequest {
   needed?: boolean;
   variantCount?: number;
+  /** #833 D8: a template key of the project; sets `templateSource` to `person`. */
+  templateKey?: string;
   /** Edits the skills by hand: the design keeps this set (#604). */
   skills?: string[];
   /** #604: drop a hand edit; the design follows the project default again. Not with `skills`. */

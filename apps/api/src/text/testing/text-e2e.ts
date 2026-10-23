@@ -29,6 +29,7 @@ export interface AnswerField {
 export const textBlock = (
   fields: AnswerField[],
   kind?: BoardCardKind,
+  designTemplate?: string,
 ): string =>
   [
     'Done.',
@@ -40,6 +41,7 @@ export const textBlock = (
         ...(f.english !== undefined ? { english: f.english } : {}),
       })),
       ...(kind ? { kind } : {}),
+      ...(designTemplate ? { designTemplate } : {}),
     }),
     '```',
   ].join('\n');

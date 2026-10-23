@@ -51,6 +51,7 @@ import {
   defaultSkillsOf,
   designWhere,
   followsDefaultSkills,
+  projectDesignTemplateKeys,
 } from './design-store';
 import { loadDesignView } from './design-view';
 import { UiProfileLearner } from './learn/ui-profile-learner';
@@ -441,6 +442,28 @@ export class DesignService implements OnModuleInit {
     ) {
       throw approvedAlready();
     }
+    if (request.templateKey !== undefined) {
+      if (existing?.status === 'approved') throw approvedAlready();
+      if (
+        !(
+          await projectDesignTemplateKeys(this.prisma, owner.projectId)
+        ).includes(request.templateKey)
+      ) {
+        throw designError(
+          400,
+          DESIGN_ERROR.invalidArgs,
+          'templateKey is not a design template of this project',
+        );
+      }
+    }
+    // A plan task's and a stack's template live on the design (#833 D8).
+    const template =
+      request.templateKey !== undefined && !('cardId' in owner.key)
+        ? {
+            templateKey: request.templateKey,
+            templateSource: 'person' as const,
+          }
+        : {};
     const skills =
       request.skills !== undefined
         ? { skills: request.skills, skillsEdited: true }
@@ -458,6 +481,7 @@ export class DesignService implements OnModuleInit {
             ...(request.variantCount !== undefined
               ? { variantCount: request.variantCount }
               : {}),
+            ...template,
             ...skills,
           },
         })
@@ -466,9 +490,20 @@ export class DesignService implements OnModuleInit {
             ...owner.key,
             needed: request.needed ?? false,
             variantCount: request.variantCount ?? 1,
+            ...template,
             ...skills,
           },
         });
+    // A card's template is the card's own (D8): the person's choice there.
+    if (request.templateKey !== undefined && 'cardId' in owner.key) {
+      await this.prisma.boardCard.update({
+        where: { id: owner.key.cardId },
+        data: {
+          designTemplate: request.templateKey,
+          designTemplateSource: 'person',
+        },
+      });
+    }
     await owner.gate(design);
     const before = existing?.needed ?? false;
     if (design.needed !== before) {

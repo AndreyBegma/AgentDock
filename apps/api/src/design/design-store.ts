@@ -1,4 +1,5 @@
 import {
+  BUILTIN_DESIGN_TEMPLATES,
   builtinDesignTemplate,
   DEFAULT_DESIGN_TEMPLATE_KEY,
   DESIGN_COMMENTS_PER_TURN_MAX,
@@ -247,19 +248,21 @@ export const applySuggestions = async (
   );
   if (suggesting.length === 0) return;
   const hasUi = await profileHasUi(tx, plan.projectId);
+  const templateKeys = await projectDesignTemplateKeys(tx, plan.projectId);
   const existing = await tx.taskDesign.findMany({
     where: { planId: plan.id, taskKey: { in: suggesting.map((t) => t.key) } },
     select: {
       id: true,
       taskKey: true,
       status: true,
+      templateSource: true,
       _count: { select: { revisions: true } },
     },
   });
   const byKey = new Map(existing.map((r) => [r.taskKey, r]));
   let skills: string[] | null = null;
   for (const t of suggesting) {
-    const suggestion = suggestionOf(t.design, hasUi);
+    const suggestion = suggestionOf(t.design, hasUi, templateKeys);
     const row = byKey.get(t.key);
     if (row) {
       await tx.taskDesign.update({
@@ -267,6 +270,7 @@ export const applySuggestions = async (
         data: suggestionUpdate(suggestion, {
           status: row.status,
           drawn: row._count.revisions > 0,
+          templateSource: row.templateSource,
         }),
       });
     } else if (suggestion.needed) {
@@ -430,6 +434,23 @@ export const projectDesignTemplate = async (
     builtinDesignTemplate(key),
     stored?.success ? stored.data : null,
   );
+};
+
+/**
+ * #833 D8: the keys a card, plan task or stack may choose — the built-ins,
+ * then the project's own templates. An override of a built-in adds no key.
+ */
+export const projectDesignTemplateKeys = async (
+  db: Db,
+  projectId: string,
+): Promise<string[]> => {
+  const rows = await db.designTemplate.findMany({
+    where: { projectId },
+    select: { key: true },
+    orderBy: { key: 'asc' },
+  });
+  const keys = BUILTIN_DESIGN_TEMPLATES.map((t) => t.key);
+  return [...keys, ...rows.map((r) => r.key).filter((k) => !keys.includes(k))];
 };
 
 /** The template a key names, or the project's `page` when it names none. */

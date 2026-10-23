@@ -209,6 +209,85 @@ describe('text normalization of board cards (e2e)', () => {
     expect(views.get('board_card:title')?.status).toBe('english');
   });
 
+  it.each([
+    ['Settings page for webhooks', 'page'],
+    ['Date range picker component', 'component'],
+    ['Three-step onboarding wizard', 'flow'],
+  ])('classifies the design template of "%s" as %s with the kind (#833 D8)', async (title, template) => {
+    const { number } = await w.createCard({ title, body: '' });
+    expect(await w.card(number)).toMatchObject({
+      designTemplate: null,
+      designTemplateSource: 'auto',
+    });
+    const row = await w.latest();
+    const runId = await w.start(row.id);
+    expect(w.normalized()[0].prompt).toContain('"page", "component", "flow"');
+    // Answers the fields the request asked, whichever the heuristic skipped.
+    const asked = w
+      .fields(row)
+      .filter((f) => f.outcome === undefined)
+      .map((f) => ({ id: f.field, alreadyEnglish: true }));
+    await w.finish(runId, textBlock(asked, 'feature', template));
+    expect(await w.card(number)).toMatchObject({
+      designTemplate: template,
+      designTemplateSource: 'auto',
+    });
+  });
+
+  it('ignores a template key the project does not have (#833 D8)', async () => {
+    const { number } = await w.createCard({ title: 'Add login', body: '' });
+    const runId = await w.start((await w.latest()).id);
+    await w.finish(runId, textBlock([], 'feature', 'landing'));
+    expect(await w.card(number)).toMatchObject({ designTemplate: null });
+  });
+
+  it("never overwrites the person's template, and a custom template is selectable (#833 D8)", async () => {
+    const { number } = await w.createCard({ title: 'Add login', body: '' });
+    const runId = await w.start((await w.latest()).id);
+    await w.ctx.prisma.designTemplate.create({
+      data: {
+        projectId: w.a,
+        key: 'landing',
+        name: 'Landing',
+        definition: {
+          frames: [
+            {
+              key: 'hero',
+              kind: 'custom',
+              name: 'Hero',
+              instruction: 'Draw the hero.',
+              required: true,
+              enabled: true,
+            },
+          ],
+        },
+      },
+    });
+    const patched = await w.operator.send(
+      'patch',
+      `${w.path()}/board/cards/${number}`,
+      { designTemplate: 'landing' },
+    );
+    expect(patched.status).toBe(200);
+    expect(patched.body).toMatchObject({
+      designTemplate: 'landing',
+      designTemplateSource: 'person',
+    });
+    // The request that was running answers after the person chose.
+    await w.finish(runId, textBlock([], 'feature', 'flow'));
+    expect(await w.card(number)).toMatchObject({
+      designTemplate: 'landing',
+      designTemplateSource: 'person',
+    });
+
+    const unknown = await w.operator.send(
+      'patch',
+      `${w.path()}/board/cards/${number}`,
+      { designTemplate: 'email' },
+    );
+    expect(unknown.status).toBe(400);
+  });
+
   it('accepting a suggestion normalizes its text and keeps its extracted kind', async () => {
     // A suggestion as capture leaves it: model-written, auto kind.
     const { id, number } = await w.createCard({ title: 'Seed', body: '' });
