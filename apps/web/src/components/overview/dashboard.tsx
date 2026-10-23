@@ -25,12 +25,10 @@ export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
     projects,
     facts.data?.terminalSetup ?? new Map(),
   );
+  // Every row of Needs you counts, the setup rows included.
   const needsByProject = new Map<string, number>();
-  for (const item of waiting ?? []) {
-    needsByProject.set(
-      item.projectId,
-      (needsByProject.get(item.projectId) ?? 0) + 1,
-    );
+  for (const { projectId } of [...setup, ...(waiting ?? [])]) {
+    needsByProject.set(projectId, (needsByProject.get(projectId) ?? 0) + 1);
   }
 
   return (
@@ -46,6 +44,7 @@ export function Dashboard({ projects }: { projects: ProjectSummary[] }) {
           <ProjectsPanel
             projects={projects}
             facts={facts}
+            costByProject={dashboard.costByProject}
             needsByProject={needsByProject}
           />
           <SpendTrend />
