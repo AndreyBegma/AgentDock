@@ -53,6 +53,36 @@ const design = (status: 'reviewing' | 'approved'): BoardCardView['design'] => ({
   busySince: null,
 });
 
+describe('CardFace taken by a session (#845 D2, D10)', () => {
+  test('a taken card names its session', () => {
+    const html = render('in_progress', {
+      taken: { sessionId: 'abcdef123456', alive: true, branch: null },
+    });
+    expect(html).toContain('taken by abcdef12');
+    expect(html).not.toContain('session ended');
+  });
+
+  test('says "session ended" once the session is gone', () => {
+    const html = render('in_progress', {
+      taken: { sessionId: 'abcdef123456', alive: false, branch: null },
+    });
+    expect(html).toContain('taken by abcdef12');
+    expect(html).toContain('session ended');
+  });
+
+  test('a queued card names the session it waits for', () => {
+    expect(render('todo', { queuedForSessionId: 'zzzzzzzz9999' })).toContain(
+      'queued for zzzzzzzz',
+    );
+  });
+
+  test('an ordinary card shows neither', () => {
+    const html = render('todo');
+    expect(html).not.toContain('taken by');
+    expect(html).not.toContain('queued for');
+  });
+});
+
 describe('CardFace pull request link (#329 D6)', () => {
   for (const column of COLUMNS) {
     test(`shows PR #7 with its state in ${column}`, () => {

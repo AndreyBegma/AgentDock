@@ -20,6 +20,8 @@ import {
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import {
+  cardAcceptArgs,
+  cardAcceptMergeText,
   describeActionRequestError,
   formatCountdown,
   issueQueueArgs,
@@ -50,6 +52,8 @@ export function RequestCell({ request }: { request: ActionRequestSummary }) {
   const review = reviewToolUse(request);
   const pr = prApproveArgs(request);
   const issue = issueQueueArgs(request);
+  const accept = cardAcceptArgs(request);
+  const mergeText = cardAcceptMergeText(request);
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="font-medium">{requestTitle(request)}</span>
@@ -84,6 +88,22 @@ export function RequestCell({ request }: { request: ActionRequestSummary }) {
             Read the issue
           </a>
         </span>
+      ) : null}
+      {/* #845 D5: the card a session asks a person to accept, and its pull request. */}
+      {accept && accept.prNumber !== null && accept.prUrl ? (
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-ink-2">
+          <a
+            href={accept.prUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-ink"
+          >
+            Pull request #{accept.prNumber}
+          </a>
+          {mergeText ? <span className="text-ink-3">{mergeText}</span> : null}
+        </span>
+      ) : mergeText ? (
+        <span className="text-sm text-ink-3">{mergeText}</span>
       ) : null}
       {request.summary ? (
         <span className="line-clamp-3 break-words text-sm text-ink-2">
