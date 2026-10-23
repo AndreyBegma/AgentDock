@@ -344,14 +344,6 @@ describe('local requests over the runner socket (e2e)', () => {
       }
     }
     expect(responses.size).toBe(served.length);
-    // Until then they answer as a server without them would.
-    for (const method of NOT_SERVED_YET) {
-      const response = await ask(method, ARGS[method], projectId);
-      expect([method, response.error?.code]).toEqual([
-        method,
-        'unknown_method',
-      ]);
-    }
 
     const context = responses.get('context.sessionStart')?.data as {
       text: string;
@@ -446,6 +438,15 @@ describe('local requests over the runner socket (e2e)', () => {
       ['card.track', 'ok', localUserId, 'mcp'],
       ['away.set', 'ok', localUserId, 'mcp'],
     ]);
+
+    // #845: until then they answer as a server without them would.
+    for (const method of NOT_SERVED_YET) {
+      const response = await ask(method, ARGS[method], projectId);
+      expect([method, response.error?.code]).toEqual([
+        method,
+        'unknown_method',
+      ]);
+    }
     const issueAudit = await ctx.prisma.auditRecord.findFirst({
       where: { action: 'issue.create', projectId },
       orderBy: { seq: 'asc' },
