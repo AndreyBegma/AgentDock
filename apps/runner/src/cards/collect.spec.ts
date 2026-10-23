@@ -106,6 +106,8 @@ describe('card.collect (#242 D8)', () => {
 
     const first = await collectCard(deps, record, args);
     expect(first).toEqual({
+      // #837: the pushed commit, now the PR's head.
+      headSha: await f.run(record.worktree, 'rev-parse', 'HEAD'),
       ahead: 2,
       pushed: true,
       protectedPaths: [],
@@ -142,6 +144,8 @@ describe('card.collect (#242 D8)', () => {
     f.write(record.worktree, { 'src/export.ts': 'export const csv = 2;\n' });
     const second = await collectCard(deps, record, args);
     expect(second).toEqual({
+      // #837: the pushed commit, now the PR's head.
+      headSha: await f.run(record.worktree, 'rev-parse', 'HEAD'),
       ahead: 3,
       pushed: true,
       protectedPaths: [],
@@ -263,6 +267,7 @@ describe('card.collect after card.close removed the worktree (#344)', () => {
     expect((await removeCardWorktree(deps, record)).branchDeleted).toBe(false);
 
     expect(await collectBranch(deps, record, args)).toEqual({
+      headSha: head,
       ahead: 1,
       pushed: true,
       protectedPaths: [],
@@ -330,7 +335,9 @@ describe('card.collect reports the open PR (#329 D3, D6)', () => {
       head: BRANCH,
     });
     writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
-    expect(await collectCard(deps, record, args)).toEqual({
+    const result = await collectCard(deps, record, args);
+    expect(result).toEqual({
+      headSha: await f.run(record.worktree, 'rev-parse', 'HEAD'),
       ahead: 1,
       pushed: true,
       protectedPaths: [],

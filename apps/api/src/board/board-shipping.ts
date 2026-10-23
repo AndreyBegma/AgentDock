@@ -9,6 +9,7 @@ import {
   type CardCollectOutcome,
   type CardNeedsPersonReason,
   cardAutoMergeEnabled,
+  cardCheckCounts,
   cardCiMergeable,
   cardCiStateOf,
   cardLabel,
@@ -335,7 +336,15 @@ export class BoardShipping
         card.protectedPaths.length > 0 ||
         !(await this.autoMergeOn(project)));
     const forward = await this.work.forwarded(card.id, prNumber);
-    if (mergeOnly && card.prBase === null && !forward) return;
+    // #837: checks still running are read on, for the round that left the head.
+    if (
+      mergeOnly &&
+      card.prBase === null &&
+      !forward &&
+      card.ciState !== 'pending'
+    ) {
+      return;
+    }
 
     const result = boardOutput(
       'card.checks',
@@ -575,6 +584,16 @@ export class BoardShipping
         data: { state: prState },
       });
     }
+    // #837: the round that left this head keeps its checks as they answer.
+    const counts = cardCheckCounts(result.checks);
+    await this.prisma.boardCardRound.updateMany({
+      where: { cardId: card.id, headSha: result.headSha },
+      data: {
+        ciState: state,
+        ciPassed: counts.passed,
+        ciTotal: counts.total,
+      },
+    });
     this.work.publish(card.projectId, card.id);
     return noneSince;
   }
