@@ -2,15 +2,14 @@
 
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Select } from '@andrewbehma/glass-ui/select';
-import type { DesignTemplateChoice } from '@nautelle/shared';
+import type {
+  DesignTemplateChoice,
+  DesignTemplatesView,
+} from '@nautelle/shared';
 import { useId } from 'react';
 import { api } from '../../lib/api';
 import { designTemplatesApi } from '../../lib/design/href';
-import {
-  type DesignTemplatesResponse,
-  templateOptions,
-  templatesOf,
-} from '../../lib/design/templates';
+import { templateOptions, templatesOf } from '../../lib/design/templates';
 import { useSection } from '../../lib/section/use-section';
 
 /**
@@ -34,7 +33,7 @@ export function TemplateSelect({
 }) {
   const labelId = useId();
   const loaded = useSection(
-    () => api<DesignTemplatesResponse>(designTemplatesApi(projectId)),
+    () => api<DesignTemplatesView>(designTemplatesApi(projectId)),
     [projectId],
   );
   const options = templateOptions(templatesOf(loaded.data));

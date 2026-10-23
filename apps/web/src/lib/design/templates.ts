@@ -6,6 +6,7 @@ import {
   type DesignRevisionView,
   type DesignTemplate,
   type DesignTemplateChoice,
+  type DesignTemplatesView,
 } from '@nautelle/shared';
 
 /**
@@ -89,17 +90,9 @@ export function compareColumns(
   });
 }
 
-/**
- * `GET design/templates` (#843): `{ templates }`. Local until the shared
- * `DesignTemplatesView` is on develop.
- */
-export interface DesignTemplatesResponse {
-  templates: DesignTemplate[];
-}
-
 /** The templates of a loaded response; null while loading or after a failed request. */
 export function templatesOf(
-  data: DesignTemplatesResponse | undefined,
+  data: DesignTemplatesView | undefined,
 ): DesignTemplate[] | null {
   return Array.isArray(data?.templates) ? data.templates : null;
 }

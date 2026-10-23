@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { BUILTIN_DESIGN_TEMPLATES } from '@nautelle/shared';
+import {
+  BUILTIN_DESIGN_TEMPLATES,
+  type DesignTemplate,
+  type DesignTemplatesView,
+  type DesignTemplateView,
+} from '@nautelle/shared';
 import { framesOf, revision } from './fixtures';
 import {
   compareColumns,
@@ -77,8 +82,20 @@ describe('compareColumns', () => {
 
 describe('templatesOf (GET design/templates is { templates })', () => {
   test('reads the project list, built-ins plus custom', () => {
+    const view = (t: DesignTemplate, builtin: boolean): DesignTemplateView => ({
+      ...t,
+      builtin,
+      overridden: !builtin,
+      updatedBy: null,
+      updatedAt: null,
+    });
     const landing = { key: 'landing', name: 'Landing', frames: [] };
-    const data = { templates: [...BUILTIN_DESIGN_TEMPLATES, landing] };
+    const data: DesignTemplatesView = {
+      templates: [
+        ...BUILTIN_DESIGN_TEMPLATES.map((t) => view(t, true)),
+        view(landing, false),
+      ],
+    };
     expect(templateOptions(templatesOf(data)).map((o) => o.key)).toEqual([
       'page',
       'component',
@@ -89,7 +106,7 @@ describe('templatesOf (GET design/templates is { templates })', () => {
 
   test('a bare array or no answer is not a response', () => {
     expect(templatesOf(undefined)).toBeNull();
-    expect(templatesOf([] as unknown as { templates: never[] })).toBeNull();
+    expect(templatesOf([] as unknown as DesignTemplatesView)).toBeNull();
   });
 });
 
