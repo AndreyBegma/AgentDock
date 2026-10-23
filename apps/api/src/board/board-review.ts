@@ -37,12 +37,7 @@ import { PrismaService } from '../database/prisma.service';
 import { RuntimeProfileResolver } from '../readiness';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure, boardError } from './board-error';
-import type {
-  CardFacts,
-  CardReviewRunFact,
-  CardReviewStepFact,
-  CardWithRounds,
-} from './board-mapper';
+import type { CardWithRounds } from './board-mapper';
 import { BoardRoundsService } from './board-rounds.service';
 import type { BoardProject } from './board-work';
 import { BoardWork } from './board-work';
@@ -149,57 +144,6 @@ export const reviewPublication = (
     '_Posted by Nautelle review._',
   ].join('\n');
   return { body: clipBytes(body, CARD_REVIEW_BODY_MAX_BYTES), comments };
-};
-
-/**
- * #884: the review strip's facts of `cards` — the enabled steps of each
- * project with review on, and each card's runs on its current pull request.
- */
-export const reviewFactsFor = async (
-  prisma: PrismaService,
-  cards: readonly Pick<CardWithRounds, 'id' | 'projectId' | 'prNumber'>[],
-): Promise<Pick<CardFacts, 'reviewSteps' | 'reviewRuns'>> => {
-  const projectIds = [...new Set(cards.map((c) => c.projectId))];
-  if (projectIds.length === 0) return {};
-  const steps = await prisma.projectReviewStep.findMany({
-    where: {
-      projectId: { in: projectIds },
-      enabled: true,
-      project: { boardSettings: { reviewEnabled: true } },
-    },
-    orderBy: { position: 'asc' },
-    select: { id: true, name: true, projectId: true },
-  });
-  const reviewSteps = new Map<string, CardReviewStepFact[]>();
-  for (const { projectId, ...step } of steps) {
-    reviewSteps.set(projectId, [...(reviewSteps.get(projectId) ?? []), step]);
-  }
-  const onPr = cards.flatMap((c) =>
-    c.prNumber !== null && reviewSteps.has(c.projectId)
-      ? [{ cardId: c.id, prNumber: c.prNumber }]
-      : [],
-  );
-  const reviewRuns = new Map<string, CardReviewRunFact[]>();
-  if (onPr.length > 0) {
-    const runs = await prisma.boardCardReviewRun.findMany({
-      where: { OR: onPr },
-      select: {
-        cardId: true,
-        stepId: true,
-        prNumber: true,
-        headSha: true,
-        pass: true,
-        state: true,
-        blockingCount: true,
-        nitCount: true,
-        startedAt: true,
-      },
-    });
-    for (const { cardId, ...run } of runs) {
-      reviewRuns.set(cardId, [...(reviewRuns.get(cardId) ?? []), run]);
-    }
-  }
-  return { reviewSteps, reviewRuns };
 };
 
 /**

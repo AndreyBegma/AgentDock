@@ -56,7 +56,7 @@ import {
   toCardView,
   toSettingsView,
 } from './board-mapper';
-import { reviewFactsFor } from './board-review';
+import { reviewFactsFor } from './board-review-facts';
 import { BoardStacks } from './board-stacks';
 import {
   ACTIVE_PHASES,

@@ -33,6 +33,9 @@ type WorldCommand =
   | 'card.prClose'
   | 'card.prRetarget'
   | 'card.prOpen'
+  | 'card.review'
+  | 'card.reviewStop'
+  | 'card.reviewPublish'
   | 'issue.create'
   | 'pr.inspect'
   | 'docs.publish_specs';
@@ -127,6 +130,8 @@ export class BoardWorld {
   prRetargetServed = true;
   /** #709: whether the runner advertises `card.prOpen`. */
   prOpenServed = true;
+  /** #884: whether the runner serves `card.review` (`reviewSupport`). */
+  reviewServed = true;
   /** #329 D4: the delayed collect retries scheduled so far, oldest first. */
   retries: ScheduledRetry[] = [];
   connectHooks!: RunnerConnectHooks;
@@ -211,6 +216,33 @@ export class BoardWorld {
         this.commands.assertReady(runnerId, 'card.prOpen');
         return this.answer('card.prOpen', { ...args });
       });
+    jest
+      .spyOn(this.commands, 'reviewSupport')
+      .mockImplementation(() =>
+        this.offline
+          ? 'offline'
+          : this.reviewServed
+            ? 'connected'
+            : 'unsupported',
+      );
+    jest
+      .spyOn(this.commands, 'review')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.review');
+        return this.answer('card.review', { ...args });
+      });
+    jest
+      .spyOn(this.commands, 'stopReview')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.reviewStop');
+        return this.answer('card.reviewStop', { ...args });
+      });
+    jest
+      .spyOn(this.commands, 'publishReview')
+      .mockImplementation(async (runnerId, args) => {
+        this.commands.assertReady(runnerId, 'card.reviewPublish');
+        return this.answer('card.reviewPublish', { ...args });
+      });
     this.connectHooks = this.ctx.app.get(RunnerConnectHooks);
     const timer = this.ctx.app.get(CollectRetryTimer);
     jest.spyOn(timer, 'schedule').mockImplementation((cardId, delayMs, run) => {
@@ -252,6 +284,15 @@ export class BoardWorld {
         tmuxSession: `nautelle-card-${String(args.shortId)}`,
       },
       'card.stop': { stopped: true },
+      'card.review': {
+        phase: 'running',
+        tmuxSession: `nautelle-review-${String(args.shortId)}`,
+      },
+      'card.reviewStop': { stopped: true },
+      'card.reviewPublish': {
+        published: true,
+        inline: Array.isArray(args.comments) && args.comments.length > 0,
+      },
       'card.collect': {
         ahead: 2,
         pushed: true,
@@ -302,7 +343,11 @@ export class BoardWorld {
     jest.mocked(this.commands.ciRetrigger).mockClear();
     jest.mocked(this.commands.retargetPr).mockClear();
     jest.mocked(this.commands.openPr).mockClear();
+    jest.mocked(this.commands.review).mockClear();
+    jest.mocked(this.commands.stopReview).mockClear();
+    jest.mocked(this.commands.publishReview).mockClear();
     this.handlers = {};
+    this.reviewServed = true;
     this.offline = false;
     this.unserved = new Set();
     this.prCloseAdvertised = true;
@@ -425,6 +470,20 @@ export class BoardWorld {
   prOpens(): Record<string, unknown>[] {
     return jest
       .mocked(this.commands.openPr)
+      .mock.calls.map(([, args]) => ({ ...args }));
+  }
+
+  /** #884: the `card.review` commands sent, oldest first. */
+  reviews(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.review)
+      .mock.calls.map(([, args]) => ({ ...args }));
+  }
+
+  /** #884: the `card.reviewPublish` commands sent, oldest first. */
+  reviewPublishes(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.commands.publishReview)
       .mock.calls.map(([, args]) => ({ ...args }));
   }
 
