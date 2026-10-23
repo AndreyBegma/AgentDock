@@ -1,7 +1,8 @@
 # ADR-0035: A card ships itself
 
 Status: accepted · Date: 2026-10-15 · Amends [ADR-0024](0024-board-cards-and-dedicated-card-workers.md) §6 and [ADR-0029](0029-accepting-a-board-card-may-merge-its-pull-request-through-the-runner.md) ·
-Issue: [#359](https://github.com/AndreyBegma/AgentDock/issues/359)
+Issue: [#359](https://github.com/AndreyBegma/AgentDock/issues/359) ·
+Amended by [ADR-0084](0084-a-card-passes-its-review-steps-before-finished.md) (with review on, Finished also needs the review steps passed; review fix rounds, at most three per PR)
 
 ## Context
 
