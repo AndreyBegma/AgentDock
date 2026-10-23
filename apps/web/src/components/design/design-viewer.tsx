@@ -7,6 +7,7 @@ import { SheetContent, SheetRoot } from '@andrewbehma/glass-ui/sheet';
 import { SidePanel } from '@andrewbehma/glass-ui/side-panel';
 import { TabGroup, TabPanel } from '@andrewbehma/glass-ui/tabs';
 import {
+  type CardDesignGenerateRequest,
   type CardDesignLaunchRequest,
   type CardStackRef,
   DESIGN_VIEWPORT_MAX_PX,
@@ -70,7 +71,7 @@ import { ViewControls, ViewerToolbar } from './viewer-toolbar';
 
 export interface DesignViewerActions {
   patch: (body: TaskDesignPatchRequest) => Promise<unknown>;
-  generate: (body?: CardDesignLaunchRequest) => Promise<unknown>;
+  generate: (body?: CardDesignGenerateRequest) => Promise<unknown>;
   comment: (body: DesignCommentRequest) => Promise<unknown>;
   revise: (body?: CardDesignLaunchRequest) => Promise<unknown>;
   approve: (body: { revisionId: string }) => Promise<unknown>;

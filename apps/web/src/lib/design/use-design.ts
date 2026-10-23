@@ -2,6 +2,7 @@
 
 import {
   BOARD_CHANGED_EVENT,
+  type CardDesignGenerateRequest,
   type CardDesignLaunchRequest,
   DESIGN_LIVE_EVENT,
   type DesignApproveRequest,
@@ -174,7 +175,7 @@ export function useDesignAt(
     patch: (body: TaskDesignPatchRequest) =>
       run('patch', () => api<TaskDesignView>(base, { method: 'PATCH', body })),
     /** #322 D1: a card's launch popover sends its profile and model; a plan task's sends nothing. */
-    generate: (body?: CardDesignLaunchRequest) =>
+    generate: (body?: CardDesignGenerateRequest) =>
       run('generate', () =>
         api(`${base}/generate`, { method: 'POST', ...(body ? { body } : {}) }),
       ),
