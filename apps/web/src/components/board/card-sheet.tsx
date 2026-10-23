@@ -30,6 +30,7 @@ import { ExternalLink, Move, Zap } from 'lucide-react';
 import NextLink from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { PolicyRefusalText } from '@/components/runners/policy-refusal';
+import { FilterBreakdown } from '@/components/token-saver/filter-breakdown';
 import { summarizeCard } from '../../lib/ai/actions';
 import { ApiError } from '../../lib/api';
 import {
@@ -118,7 +119,6 @@ import { useCurrentUser } from '../shell/user-context';
 import { CardStewardSection } from '../steward/card-steward-section';
 import { NormalizedNote } from '../text/normalized-note';
 import { DescriptionIncompleteBadge } from '../token-saver/description-incomplete-badge';
-import { FilterBreakdown } from '../token-saver/filter-breakdown';
 import { SavedBadge } from '../token-saver/saved-badge';
 import { CardDependenciesSection } from './card-dependencies';
 import { CardDescription } from './card-description';
@@ -137,6 +137,7 @@ import {
 import { CardHandoffSection } from './handoff/card-handoff-section';
 import { LaunchPopover } from './launch-popover';
 import { MovePicker } from './move-picker';
+import { RoundFacts, RoundSummary, RoundTokenSaver } from './round-facts';
 import { SuggestionSheetBody } from './suggestion-sheet';
 import { TriageHints } from './triage-hints';
 import type { CardActions } from './use-card-actions';
@@ -197,11 +198,11 @@ function roundItems(
   notes: TextNotes,
   canOperate: boolean,
   files: RoundAttachments,
-  /** The card page folds the summary and the breakdown; the sheet shows them bare. */
+  /** The card page folds the summary and the breakdown; the sheet clamps them. */
   foldable = false,
+  now: number = Date.now(),
 ): TimelineItem[] {
   return rounds.map((round) => {
-    const cost = formatCost(round.costUsd);
     return {
       id: round.id,
       at: round.startedAt,
@@ -251,6 +252,7 @@ function roundItems(
             removing={files.removing}
             onRemove={files.onRemove}
           />
+          <RoundFacts round={round} now={now} />
           {round.summary ? (
             foldable ? (
               <RoundBlock label="Summary">
@@ -259,9 +261,7 @@ function roundItems(
                 </p>
               </RoundBlock>
             ) : (
-              <span className="whitespace-pre-wrap break-words">
-                {round.summary}
-              </span>
+              <RoundSummary text={round.summary} />
             )
           ) : null}
           {round.error ? <PolicyRefusalText text={round.error} /> : null}
@@ -284,14 +284,15 @@ function roundItems(
             // A round is a runner launch, whatever the card's source.
             <span>{hooksNotice({ source: 'manual' }, round).text}</span>
           ) : null}
-          {cost ? <span className="tabular-nums">{cost}</span> : null}
           <DescriptionIncompleteBadge incomplete={round.artifactIncomplete} />
-          {foldable && round.tokenSaverFilters?.length ? (
-            <RoundBlock label="Token saver breakdown">
-              <FilterBreakdown filters={round.tokenSaverFilters} />
-            </RoundBlock>
-          ) : foldable ? null : (
-            <FilterBreakdown filters={round.tokenSaverFilters} />
+          {foldable ? (
+            round.tokenSaverFilters?.length ? (
+              <RoundBlock label="Token saver breakdown">
+                <FilterBreakdown filters={round.tokenSaverFilters} />
+              </RoundBlock>
+            ) : null
+          ) : (
+            <RoundTokenSaver round={round} />
           )}
         </span>
       ),

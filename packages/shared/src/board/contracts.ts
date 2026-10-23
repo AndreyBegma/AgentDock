@@ -494,6 +494,12 @@ export interface CardRoundView {
   /** #449 D9: from `round.warmup`; null until the round's first edit. */
   warmupTokens?: number | null;
   warmupMs?: number | null;
+  /**
+   * C-332: the model and effort the round ran with, for the Rounds tab; absent
+   * reads as null until the API records them per round.
+   */
+  model?: string | null;
+  effort?: CardEffort | null;
   // #837 — optional so older fixtures stay valid; absent reads as null.
   /**
    * #837: the pull request the round pushed to; null for a round that pushed
