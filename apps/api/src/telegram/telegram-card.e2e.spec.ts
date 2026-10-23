@@ -346,7 +346,12 @@ describe('Telegram: feedback, accept, finish and message cards (#578, e2e)', () 
       },
     ]);
     const messages = await w.ctx.prisma.auditRecord.findMany({
-      where: { action: { in: ['card.message', 'slot.session_message'] } },
+      // Scoped to this project: the e2e suites share one database, and other
+      // specs write `card.message` rows of their own (#861).
+      where: {
+        projectId: w.a,
+        action: { in: ['card.message', 'slot.session_message'] },
+      },
       orderBy: { seq: 'asc' },
     });
     expect(messages.map((m) => m.action)).toEqual([
