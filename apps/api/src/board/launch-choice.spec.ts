@@ -4,7 +4,57 @@ import {
   defaultCardModel,
   isOpusModel,
   rememberedChoice,
+  startBranchChoice,
+  startBranchOutcome,
 } from './launch-choice';
+
+describe('startBranchChoice (#854 D1)', () => {
+  const own = 'card/c12-export';
+
+  it('sends a taken card branch to a runner that takes it', () => {
+    expect(startBranchChoice('feat/12-export', own, false, true)).toEqual({
+      kind: 'send',
+      branch: 'feat/12-export',
+    });
+  });
+
+  it('has nothing to choose without a taken branch, or when it is the card’s', () => {
+    expect(startBranchChoice(null, own, false, true)).toBeNull();
+    expect(startBranchChoice(own, own, false, true)).toBeNull();
+  });
+
+  it('launches as today for an older runner, a non-card branch, a follow-up', () => {
+    expect(startBranchChoice('feat/12-export', own, false, false)).toEqual({
+      kind: 'skip',
+      reason: 'runner_outdated',
+    });
+    for (const taken of ['main', 'chore/export', 'feat/']) {
+      expect(startBranchChoice(taken, own, false, true)).toEqual({
+        kind: 'skip',
+        reason: 'not_a_card_branch',
+      });
+    }
+    expect(startBranchChoice('feat/12-export', own, true, true)).toEqual({
+      kind: 'skip',
+      reason: 'follow_up',
+    });
+  });
+
+  it('the launch event says why the branch was not used', () => {
+    const send = { kind: 'send', branch: 'feat/12-export' } as const;
+    expect(startBranchOutcome(send, undefined)).toEqual({});
+    expect(startBranchOutcome(send, 'not_on_origin')).toEqual({
+      startBranchSkipped: 'not_on_origin',
+    });
+    expect(
+      startBranchOutcome(
+        { kind: 'skip', reason: 'runner_outdated' },
+        undefined,
+      ),
+    ).toEqual({ startBranchSkipped: 'runner_outdated' });
+    expect(startBranchOutcome(null, undefined)).toEqual({});
+  });
+});
 
 describe('defaultCardModel (#322 D2)', () => {
   it('takes the recommendation first', () => {
