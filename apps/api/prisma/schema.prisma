@@ -20,18 +20,29 @@ enum UserStatus {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  name         String?
-  passwordHash String
-  role         Role       @default(viewer)
-  status       UserStatus @default(pending)
-  approvedById String?
-  approvedAt   DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  email             String     @unique
+  name              String?
+  passwordHash      String
+  role              Role       @default(viewer)
+  status            UserStatus @default(pending)
+  approvedById      String?
+  approvedAt        DateTime?
+  /// C-189: the TOTP secret (RFC 6238), sealed with `APP_ENCRYPTION_KEY`; null
+  /// while two-factor sign-in is off.
+  totpSecret        String?
+  /// C-189: a secret offered by setup and not yet confirmed with a code.
+  totpPendingSecret String?
+  /// C-189: when two-factor sign-in was turned on; null: off.
+  totpEnabledAt     DateTime?
+  /// C-189: the last 30-second step a code was accepted for; a code is never
+  /// accepted twice.
+  totpLastStep      Int?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   approvedBy                  User?                         @relation("UserApprovals", fields: [approvedById], references: [id], onDelete: SetNull)
+  recoveryCodes               UserRecoveryCode[]
   approvedUsers               User[]                        @relation("UserApprovals")
   sessions                    UserSession[]
   settingsUpdated             Setting[]
@@ -56,6 +67,7 @@ model User {
   notificationMutes           NotificationMute[]
   telegramLink                TelegramLink?
   telegramLinkCodes           TelegramLinkCode[]
+  telegramPendingLink         TelegramPendingLink?
   skillInstallPreviews        SkillInstallPreview[]
   schedulesCreated            Schedule[]                    @relation("ScheduleCreatedBy")
   schedulesUpdated            Schedule[]                    @relation("ScheduleUpdatedBy")
@@ -73,6 +85,7 @@ model User {
   planTurns                   PlanTurn[]
   uiProfilesAuthored          UiProfile[]
   designSettingsUpdated       DesignSettings[]
+  designTemplatesUpdated      DesignTemplate[]
   taskDesignsApproved         TaskDesign[]
   designComments              DesignComment[]
   boardCardsCreated           BoardCard[]                   @relation("BoardCardCreatedBy")
@@ -80,6 +93,7 @@ model User {
   boardStackRunsStarted       BoardStackRun[]               @relation("BoardStackRunStartedBy")
   boardCardsMoved             BoardCard[]                   @relation("BoardCardMovedBy")
   boardCardsCompleted         BoardCard[]                   @relation("BoardCardCompletedBy")
+  boardCardsAutoRunArmed      BoardCard[]                   @relation("BoardCardAutoRunArmedBy")
   boardCardRounds             BoardCardRound[]
   boardSettingsUpdated        BoardSettings[]
   cardDismissals              CardDismissal[]
@@ -87,6 +101,9 @@ model User {
   textSettingsUpdated         TextSettings[]
   attachmentsUploaded         Attachment[]
   tokenSaverSettingsUpdated   TokenSaverSettings[]
+  prefixOverlaysDecided       PrefixOverlay[]
+  tokenEconomySettingsUpdated TokenEconomySettings[]
+  tokenEconomyTechniquesSet   TokenEconomyTechnique[]
   stewardSettingsUpdated      StewardSettings[]
   aiDigestSettingsUpdated     AiDigestSettings[]
   settings                    UserSettings?
@@ -125,6 +142,22 @@ model LoginThrottle {
   @@id([email, ip])
   @@index([lastFailureAt])
   @@map("login_throttles")
+}
+
+/// C-189: a single-use recovery code for two-factor sign-in. Only the SHA-256
+/// of the code is stored; a code carries 80 random bits, so the hash cannot be
+/// reversed by trying every code.
+model UserRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@map("user_recovery_codes")
 }
 
 /// A login session. Named `UserSession` because `Session` is reserved for agent
@@ -404,6 +437,9 @@ model Project {
   displayName                 String
   baseBranch                  String
   baseSource                  BaseSource
+  /// C-148: the repository's default branch from the last inspection (`gh`,
+  /// else `origin/HEAD`); null when unknown — auto-merge then stays off.
+  defaultBranch               String?
   baseOverride                String?
   readyLabelOverride          String?
   /// Must belong to `runnerId`; checked by the API.
@@ -461,6 +497,7 @@ model Project {
   actionRequests         ActionRequest[]
   uiProfiles             UiProfile[]
   designSettings         DesignSettings?
+  designTemplates        DesignTemplate[]
   boardCards             BoardCard[]
   boardStacks            BoardStack[]
   boardSettings          BoardSettings?
@@ -472,6 +509,11 @@ model Project {
   assistantConversations AssistantConversation[]
   tokenSaverSettings     TokenSaverSettings?
   tokenSaverStats        TokenSaverStat[]
+  runPrefixParts         RunPrefixPart[]
+  prefixOverlays         PrefixOverlay[]
+  tokenEconomySettings   TokenEconomySettings?
+  tokenEconomyTechniques TokenEconomyTechnique[]
+  runUsageFacts          RunUsageFact[]
   stewardSettings        StewardSettings?
   stewardIncidents       StewardIncident[]
   stewardDigests         StewardDigest[]
@@ -641,6 +683,11 @@ model Slot {
   /// null until the tmux session is first seen.
   sessionAlive   Boolean?
   pane           PaneState?
+  /// Which limit the quota banner names (`weekly`, `session`, `usage`,
+  /// `unknown`); set while `pane` is `quota`, null otherwise (spec 741 D3).
+  quotaLimit     String?
+  /// When that limit resets, read off the banner; null when it shows none.
+  quotaResetsAt  DateTime?
   worktreeExists Boolean         @default(true)
   ahead          Int?
   behind         Int?
@@ -780,6 +827,10 @@ model AgentSession {
   cardCaptures         CardCapture[]
   capturedCards        BoardCard[]           @relation("BoardCardSourceSession")
   trackedCard          BoardCard?            @relation("BoardCardTrackedSession")
+  /// #845 D2: the cards this session took while holding another.
+  queuedCards          BoardCard[]           @relation("BoardCardQueuedForSession")
+  usageFact            RunUsageFact?
+  tokenSaverStats      TokenSaverStat[]
 
   @@unique([runnerId, runtime, externalId])
   @@index([projectId, startedAt])
@@ -995,6 +1046,8 @@ enum ActionRequestKind {
   orchestrator_stop
   pr_approve
   issue_queue
+  /// #845 D5: a session asks a person to accept a Finished card.
+  card_accept
 }
 
 enum ActionRequestStatus {
@@ -1530,6 +1583,24 @@ model TelegramLinkCode {
   @@map("telegram_link_codes")
 }
 
+/// C-147 (D-16): the chat that redeemed a link code, waiting for its user to
+/// confirm it in the web app. It is not a link: nothing is delivered to it
+/// and its button presses are refused. One per user; it expires with the
+/// code's lifetime and the confirmation moves it into `TelegramLink`.
+model TelegramPendingLink {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  chatId    BigInt
+  username  String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("telegram_pending_links")
+}
+
 /// The single row (`id = 1`) of the notification loops' positions (D4, D7).
 /// `eventsCursor`: every event with `id <=` it has been matched.
 model NotificationMatcherState {
@@ -1665,6 +1736,12 @@ enum RunKind {
   steward
   /// The assistant's read-only code question on the runner (issue #622).
   code_ask
+  /// A UI profile's learning from an approved design (issue #752, ADR-0075 §6).
+  ui_profile_learn
+  /// The injected rules compressed with haiku, once per rules version (#751 B6).
+  rules_compress
+  /// An overlay proposal for one prefix part (#751 B8, ADR-0075).
+  prefix_propose
 }
 
 enum RunStatus {
@@ -1726,6 +1803,17 @@ model Run {
   /// #445 D12: the launch carried `tokenSaver.enabled`. The before/after
   /// compares runs with `false` against runs with `true`, by kind.
   tokenSaver         Boolean    @default(false)
+  /// #746 D11: the technique flags launched, `{ [technique]: on }`; null for
+  /// a launch without techniques. Reports read this, never the setting.
+  techniques         Json?
+  /// #746 D4: the run's `bypassed` token-saver rows — unfiltered re-runs and
+  /// reads let through after a guard refusal.
+  retries            Int        @default(0)
+  /// #751 B2: turn 1's input + cache read + cache write — the measured
+  /// prefix. Null until the run's first request is known.
+  prefixTokens       Int?
+  /// #751 B4: the card type of a card session's round; null elsewhere.
+  cardType           String?
 
   project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   slot              Slot?              @relation(fields: [slotId], references: [id], onDelete: Cascade)
@@ -1738,6 +1826,10 @@ model Run {
   textNormalization TextNormalization?
   inboundDeliveries InboundDelivery[]
   tokenSaverStats   TokenSaverStat[]
+  usageFact         RunUsageFact?
+  prefixParts       RunPrefixPart[]
+  /// #449 DA-11: the run's handoff note, deleted with the run.
+  handoffNotes      HandoffNote[]
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
@@ -2311,6 +2403,10 @@ model GitHubInstallationRepo {
 /// D11's "recent delivery"; 14 days (D17).
 model GitHubDelivery {
   deliveryId      String   @id
+  /// C-145: hex `sha256` of the raw body. The signature covers the body, not
+  /// `X-GitHub-Delivery`: a replay under a fresh id is caught here. Null on
+  /// rows stored before it.
+  bodySha256      String?  @unique
   event           String
   action          String?
   /// Lower-cased `repository.full_name`.
@@ -2647,10 +2743,11 @@ model PlanTurn {
 
 // ─── Design stage (spec 223) ────────────────────────────────────────────────
 
-/// Shared `UI_PROFILE_SOURCES` (D14).
+/// Shared `UI_PROFILE_SOURCES` (D14; `memory`: issue #752, ADR-0075 §6).
 enum UiProfileSource {
   agent
   manual
+  memory
 }
 
 /// Shared `TASK_DESIGN_STATUSES`.
@@ -2679,27 +2776,37 @@ enum DesignTheme {
 /// built by a `ui_profile` run; a manual one is a person's edit, whose diff
 /// the next build keeps as `obligations` (D14).
 model UiProfile {
-  id               String          @id @default(cuid())
-  projectId        String
-  version          Int
-  source           UiProfileSource
-  hasUi            Boolean
+  id                    String          @id @default(cuid())
+  projectId             String
+  version               Int
+  source                UiProfileSource
+  hasUi                 Boolean
   /// Markdown: libraries, styling, tokens, components, patterns, themes, icons.
-  summary          String
+  summary               String
   /// The style kit's CSS (at most `UI_PROFILE_KIT_MAX_BYTES`).
-  kit              String
+  kit                   String
   /// `[{ name, html }]` (shared `uiProfileSnippetSchema`).
-  snippets         Json            @default("[]")
-  fingerprintGlobs String[]        @default([])
+  snippets              Json            @default("[]")
+  fingerprintGlobs      String[]        @default([])
   /// SHA-256 hex of the files matching `fingerprintGlobs` on `origin/<base>`.
-  fingerprint      String
+  fingerprint           String
   /// The manual edits this build was told to keep (D14).
-  obligations      String?
+  obligations           String?
+  /// #752: the approved-screen library, newest first —
+  /// `[{ designId, revisionId, name, summary, snippetsUsed[], approvedAt }]`.
+  /// Carried forward verbatim onto every later version.
+  screens               Json            @default("[]")
+  /// #752: style rules from design comments — `[{ text, commentIds[], designId }]`.
+  styleRules            Json            @default("[]")
+  /// #752: the approved revision a `memory` version learned from.
+  learnedFromRevisionId String?
+  /// #752: what a learn dropped (invalid or duplicate snippets).
+  learnNotes            String?
   /// The build's run; null for a manual version.
-  runId            String?
+  runId                 String?
   /// The person behind a manual version; null for an agent build.
-  authorId         String?
-  createdAt        DateTime        @default(now())
+  authorId              String?
+  createdAt             DateTime        @default(now())
 
   project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   run     Run?         @relation(fields: [runId], references: [id], onDelete: SetNull)
@@ -2717,6 +2824,8 @@ model DesignSettings {
   /// `[{ name, width, height, theme? }]` (shared `viewportPresetsSchema`).
   viewports     Json
   defaultSkills String[] @default([])
+  /// #752 A6: design prompts read the approved screens and style rules.
+  useMemory     Boolean  @default(true)
   updatedById   String?
   updatedAt     DateTime @updatedAt
 
@@ -2726,41 +2835,88 @@ model DesignSettings {
   @@map("design_settings")
 }
 
+/// #833 D9 (ADR-0082): a project's frame template — an override of a
+/// built-in (`page`, `component`, `flow`) under its key, or the project's own.
+/// `definition` holds the frames, validated by the shared
+/// `designTemplateSchema`.
+model DesignTemplate {
+  id          String   @id @default(cuid())
+  projectId   String
+  key         String
+  name        String
+  definition  Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, key])
+  @@map("design_templates")
+}
+
+/// #833 D8: who chose a design's template — the model, or a person, whose
+/// choice the model never overrides.
+enum DesignTemplateChoice {
+  auto
+  person
+}
+
+/// #833 (ADR-0082): a frame's kind; `legacy` for a frame stored before
+/// templates, which is never checked.
+enum DesignFrameKind {
+  screen
+  breakdown
+  states
+  in_context
+  anatomy
+  state_grid
+  flow_map
+  flow_step
+  mobile
+  custom
+  legacy
+}
+
 /// A task's design, keyed by `(planId, taskKey)` — not by a `plan_tasks` row,
 /// which is versioned per plan version while the design carries across them.
 /// A design has exactly one owner (ADR-0025): a plan task (`planId` and
 /// `taskKey`) or a board card (`cardId`) — CHECK `task_designs_owner_check`.
 model TaskDesign {
-  id                 String           @id @default(cuid())
+  id                 String               @id @default(cuid())
   planId             String?
   taskKey            String?
-  cardId             String?          @unique
+  cardId             String?              @unique
   /// #480 (ADR-0044): a stack's shared design, drawn for the whole result.
-  stackId            String?          @unique
+  stackId            String?              @unique
   /// The person's switch (D2); starts as the planner's suggestion.
   needed             Boolean
   /// Whether the planner suggested it, and why (D2).
-  suggested          Boolean          @default(false)
+  suggested          Boolean              @default(false)
   suggestionWhy      String?
   /// 1–3 (D4), checked by the DTO and the contract.
-  variantCount       Int              @default(1)
+  variantCount       Int                  @default(1)
   /// What the latest turns applied, or the project default when it was
   /// copied. While `skillsEdited` is false and nothing is drawn, the design
   /// follows `design_settings.defaultSkills` instead (#604).
-  skills             String[]         @default([])
+  skills             String[]             @default([])
   /// #604: the skills were chosen by hand on this design's panel; a change of
   /// the project default no longer reaches it.
-  skillsEdited       Boolean          @default(false)
+  skillsEdited       Boolean              @default(false)
   /// The profile version the latest revisions were drawn from.
   profileId          String?
-  status             TaskDesignStatus @default(idle)
-  approvedRevisionId String?          @unique
+  status             TaskDesignStatus     @default(idle)
+  approvedRevisionId String?              @unique
   approvedById       String?
   approvedAt         DateTime?
   /// #275 D2: when the current Generate or Revise started; null at rest.
   busySince          DateTime?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  /// #833 D8: a plan task's or a stack's template; null follows `page`. A
+  /// card's design reads `BoardCard.designTemplate` instead.
+  templateKey        String?
+  templateSource     DesignTemplateChoice @default(auto)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
   plan             Plan?            @relation(fields: [planId], references: [id], onDelete: Cascade)
   card             BoardCard?       @relation(fields: [cardId], references: [id], onDelete: Cascade)
@@ -2779,20 +2935,27 @@ model TaskDesign {
 /// drew. A variant not picked on approve is `archived` — readable, never
 /// published.
 model DesignRevision {
-  id        String   @id @default(cuid())
-  designId  String
+  id           String   @id @default(cuid())
+  designId     String
   /// 1–3.
-  variant   Int
-  revision  Int
-  title     String
-  rationale String
+  variant      Int
+  revision     Int
+  title        String
+  rationale    String
   /// The one validated mockup of a revision stored before #441, without the
   /// pin helper; it reads as a single frame named `Mockup`. Null on a revision
   /// with frames (`design_frames`).
-  html      String?
-  turnId    String
-  archived  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  html         String?
+  turnId       String
+  archived     Boolean  @default(false)
+  /// #833: the template in effect when it was drawn; null before templates.
+  templateKey  String?
+  /// #833 D7: `{ ok, missing, extra, misplaced, reason? }` (shared
+  /// `DesignConformance`); null on a revision that was never checked.
+  conformance  Json?
+  /// #833 D7: the repair turn started for it — at most one automatic repair.
+  repairTurnId String?
+  createdAt    DateTime @default(now())
 
   design            TaskDesign      @relation("TaskDesignRevisions", fields: [designId], references: [id], onDelete: Cascade)
   turn              PlanTurn        @relation(fields: [turnId], references: [id], onDelete: Cascade)
@@ -2810,14 +2973,18 @@ model DesignRevision {
 /// frames keep the order the turn drew them in; together at most
 /// `DESIGN_HTML_MAX_BYTES`, without the pin helper.
 model DesignFrame {
-  id         String @id @default(cuid())
-  revisionId String
+  id               String          @id @default(cuid())
+  revisionId       String
   /// 0-based.
-  position   Int
-  name       String
+  position         Int
+  name             String
   /// The published file's stem, distinct within the revision.
-  slug       String
-  html       String
+  slug             String
+  html             String
+  /// #833: the kind the turn named; `legacy` for a frame stored before.
+  kind             DesignFrameKind @default(legacy)
+  /// #833: the template frame it fills (`breakdown`, `flow_step-2`).
+  templateFrameKey String?
 
   revision DesignRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
 
@@ -2902,6 +3069,8 @@ enum CardRoundTrigger {
   feedback
   /// #359 D6: started by Nautelle for a red check or a merge conflict.
   ci_fix
+  /// #750 D9: the relaunch on Opus after the worker's `escalate_card`.
+  escalation
 }
 
 /// Shared `CARD_ROUND_PHASES` (D4, D6).
@@ -2964,27 +3133,56 @@ enum CardEffort {
   high
 }
 
+/// Shared `CARD_WORK_CLASSES` (#750 D1, ADR-0076): what the card's work still
+/// has to decide.
+enum CardWorkClass {
+  mechanical
+  deciding
+  unsure
+}
+
+/// Shared `CARD_ESCALATION_REASONS` (#750 D8): why a worker called `escalate_card`.
+enum CardEscalationReason {
+  misclassified
+  gave_up
+}
+
+/// Shared `CARD_MERGE_POLICIES` (#845 D4): who merges a finished card's green
+/// pull request when a person's session conducts a Board Run.
+enum CardMergePolicy {
+  /// The conductor asks the person once at the start of a run.
+  ask
+  /// The conductor merges a green, `CLEAN` pull request itself.
+  agent
+  /// Only a person merges.
+  person
+}
+
 /// A work item Nautelle owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
-  id                      String           @id @default(cuid())
+  id                      String                @id @default(cuid())
   projectId               String
   /// Per project, `C-<number>`: max + 1 under `pg_advisory_xact_lock` (D1).
   number                  Int
   /// `^[a-z0-9]{8}$`: the worktree, tmux session and runner record (D5).
-  shortId                 String           @unique
+  shortId                 String                @unique
   /// At most 200 characters, checked by the DTO.
   title                   String
   /// Markdown, at most 20 000 characters.
-  body                    String           @default("")
-  kind                    BoardCardKind    @default(feature)
+  body                    String                @default("")
+  kind                    BoardCardKind         @default(feature)
   /// #271 D9: `auto` lets the normalization classify `kind` until the first
   /// Run fixes the branch; a person setting kind makes it `person`.
-  kindSource              CardKindSource   @default(auto)
-  column                  BoardColumn      @default(todo)
+  kindSource              CardKindSource        @default(auto)
+  /// #833 D8: the design's frame template; null follows `page`. The
+  /// normalizer sets it while `designTemplateSource` is `auto`.
+  designTemplate          String?
+  designTemplateSource    DesignTemplateChoice  @default(auto)
+  column                  BoardColumn           @default(todo)
   /// Fractional index inside the column (D3).
   position                Float
-  source                  BoardCardSource  @default(manual)
+  source                  BoardCardSource       @default(manual)
   issueOnRun              Boolean
   specOnRun               Boolean
   /// Overrides the project's model from the next round (D12). #322 D3: the
@@ -3016,12 +3214,31 @@ model BoardCard {
   assessedAt              DateTime?
   /// The `runs` row of the last `card.assess` call.
   assessRunId             String?
+  /// #750 D1, D2: the class and the deciding signals of the last applied
+  /// `card.assess`, stored in both arms of `model-by-type`. A signal makes
+  /// the class `deciding`; `null` before the first assessment.
+  workClass               CardWorkClass?
+  workSignals             String[]              @default([])
+  /// #750 D7: the model and effort `sessionId` was started with. A round
+  /// that resolves another pair starts a fresh session. Null for a card with
+  /// no session or one started before #750 — read as matching.
+  sessionModel            String?
+  sessionEffort           CardEffort?
+  /// #751 B4, S2: the card type and the prefix (selection, rules version,
+  /// overlay ids) `sessionId` was started with; a resumed round reuses them.
+  sessionCardType         String?
+  sessionPrefix           Json?
+  /// #750 D9: the card's one escalation to Opus — when, why and the worker's
+  /// note (at most 2 000 characters). Null while it never escalated.
+  escalatedAt             DateTime?
+  escalationReason        CardEscalationReason?
+  escalationNote          String?
   /// #243 D5: approving the design starts round 1. Changeable until the design is approved.
-  continueAfterDesign     Boolean          @default(false)
+  continueAfterDesign     Boolean               @default(false)
   /// #243 D2: the design turns' Claude session — `--session-id` first, then `--resume`.
-  designSessionId         String?          @db.Uuid
+  designSessionId         String?               @db.Uuid
   /// The Claude session, fixed at the first Run (D6).
-  sessionId               String?          @db.Uuid
+  sessionId               String?               @db.Uuid
   branch                  String?
   /// Display only: the runner owns the path.
   worktree                String?
@@ -3039,16 +3256,16 @@ model BoardCard {
   /// `null` while the card has no PR or its state is not known yet.
   prState                 CardPrState?
   /// #329 D2: written on every collect attempt, for every source.
-  collectState            CardCollectState @default(none)
+  collectState            CardCollectState      @default(none)
   /// #329 D2: the runner's one-line message of a failed collect, at most 500
   /// characters; cleared by a collect that does not fail.
   collectError            String?
   /// #329 D4: automatic attempts since the last manual collect (at most 3).
-  collectAttempts         Int              @default(0)
+  collectAttempts         Int                   @default(0)
   /// When the last collect attempt ended.
   collectedAt             DateTime?
   /// #359 D5: the checks on `ciHeadSha`, from the last `card.checks`.
-  ciState                 CardCiState      @default(none)
+  ciState                 CardCiState           @default(none)
   /// #359 D5: the failed checks, `[{name, link}]` (shared `cardCiCheckSchema`);
   /// `null` unless `ciState` is `red`.
   ciChecks                Json?
@@ -3057,17 +3274,21 @@ model BoardCard {
   /// #359 D5: when `card.checks` last answered.
   ciCheckedAt             DateTime?
   /// #359 D6: `ci_fix` rounds on the current PR (at most 3).
-  ciFixAttempts           Int              @default(0)
+  ciFixAttempts           Int                   @default(0)
   /// #484: since when `ciHeadSha` has had no checks (`ciState` `none`);
   /// `null` while it has some. Reset when the head is retriggered.
   ciNoneSince             DateTime?
   /// #484: the head `card.ciRetrigger` was sent for — once per head.
   ciRetriggeredSha        String?
   /// #359 D6: CI still failing after the budget — no automation until a person acts.
-  needsPerson             Boolean          @default(false)
+  needsPerson             Boolean               @default(false)
   /// #542: why `needsPerson` is set (shared `CARD_NEEDS_PERSON_REASONS`);
   /// `null` while it is not, and for a card marked before #542.
   needsPersonReason       String?
+  /// C-148 (D-12): the protected paths (shared `PROTECTED_PATHS`) the card's
+  /// branch changes, from the runner's last push or collect. Not empty: the
+  /// PR is never auto-merged; a person reviews it.
+  protectedPaths          String[]              @default([])
   /// #359 D8: when the latest PR merged; the card stays in Finished as Merged.
   mergedAt                DateTime?
   /// Nullable so deleting a user keeps the card.
@@ -3104,13 +3325,23 @@ model BoardCard {
   /// #443: Auto-run when ready — accepting the last open dependency starts
   /// the Run. Off by default; it turns itself off when it fires, so it starts
   /// the card at most once.
-  autoRunWhenReady        Boolean          @default(false)
+  autoRunWhenReady        Boolean               @default(false)
+  /// C-181 (D-09): who turned Auto-run when ready on, or last edited the card
+  /// while it was on — the Run it starts runs as them (their project role,
+  /// their budget). `null` (or a deleted user) runs as the board, as operator.
+  autoRunArmedById        String?
   /// #282 D1: the manual session a `terminal` card tracks; unique, so a
   /// second `card.track` of the session updates its card.
-  trackedSessionId        String?          @unique
+  trackedSessionId        String?               @unique
+  /// #845 D2: the manual session this card waits for — it took the card while
+  /// holding another; promoted in board order when that one finishes.
+  queuedForSessionId      String?
+  /// #845 D10: the branch a taken card is worked on, kept after the taking
+  /// session ends so another session or Run can continue it.
+  takenBranch             String?
   /// #282 D3: Automatic work — collect when the tracked session finishes.
   /// Starts from `board_settings.autoCollectTracked`.
-  autoCollect             Boolean          @default(false)
+  autoCollect             Boolean               @default(false)
   /// #282 D4: a `fleet` card's key is `(projectId, fleetIssue, fleetSlot)`;
   /// `fleetSlot` is null for a `cs:ready` issue no slot has picked up. Postgres
   /// treats nulls as distinct, so that row is kept unique by the partial index
@@ -3120,7 +3351,7 @@ model BoardCard {
   /// Shared `FLEET_STAGES`, written by the fleet projector.
   fleetStage              String?
   /// The slot left the projection; the card keeps its last column.
-  fleetSlotGone           Boolean          @default(false)
+  fleetSlotGone           Boolean               @default(false)
   /// #337 D6, D7: the plan the card came from — a New Card intake or a New
   /// Plan's Create cards; kept as its origin.
   planId                  String?
@@ -3133,8 +3364,8 @@ model BoardCard {
   /// #636: the dependency `prBase` belongs to; both are cleared once that
   /// dependency merges and the card's PR is retargeted onto the base.
   prBaseCardId            String?
-  createdAt               DateTime         @default(now())
-  updatedAt               DateTime         @updatedAt
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 
   project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   prBaseCard           BoardCard?             @relation("BoardCardPrBase", fields: [prBaseCardId], references: [id], onDelete: SetNull)
@@ -3143,9 +3374,11 @@ model BoardCard {
   plan                 Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
   stage                BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
   trackedSession       AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
+  queuedForSession     AgentSession?          @relation("BoardCardQueuedForSession", fields: [queuedForSessionId], references: [id], onDelete: SetNull)
   createdBy            User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   movedBy              User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
   completedBy          User?                  @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  autoRunArmedBy       User?                  @relation("BoardCardAutoRunArmedBy", fields: [autoRunArmedById], references: [id], onDelete: SetNull)
   capture              CardCapture?           @relation(fields: [captureId], references: [id], onDelete: SetNull)
   sourceSession        AgentSession?          @relation("BoardCardSourceSession", fields: [sourceSessionId], references: [id], onDelete: SetNull)
   rounds               BoardCardRound[]
@@ -3170,6 +3403,10 @@ model BoardCard {
   stackRunEntry        BoardStackRunCard?
   /// #652: the stack runs this card paused.
   stackRunsPaused      BoardStackRun[]        @relation("BoardStackRunPausedCard")
+  /// #746: the card's A/B arm per technique, drawn at its first launch.
+  techniqueArms        CardTechniqueArm[]
+  /// #449 DA-11: the card's handoff note, deleted with the card.
+  handoffNotes         HandoffNote[]
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3179,6 +3416,7 @@ model BoardCard {
   @@index([planId])
   @@index([stageId])
   @@index([prBaseCardId])
+  @@index([queuedForSessionId])
   @@map("board_cards")
 }
 
@@ -3376,10 +3614,10 @@ model BoardCardPullRequest {
 
 /// One Run or feedback of a card (D4), with its `runs` row of kind `card`.
 model BoardCardRound {
-  id                  String           @id @default(cuid())
+  id                  String                @id @default(cuid())
   cardId              String
   round               Int
-  runId               String           @unique
+  runId               String                @unique
   trigger             CardRoundTrigger
   /// #443: started by Auto-run when ready, after this dependency (`C-<n>`)
   /// was accepted; `null` for a round a person or Nautelle started.
@@ -3392,10 +3630,10 @@ model BoardCardRound {
   cardKind            BoardCardKind
   /// #309 D10: the card's attachments this round's prompt was built from,
   /// `[{id, name, mime}]` (shared `cardAttachmentSnapshotSchema`).
-  cardAttachments     Json             @default("[]")
+  cardAttachments     Json                  @default("[]")
   /// Nullable so deleting the author keeps the round.
   authorId            String?
-  phase               CardRoundPhase   @default(queued)
+  phase               CardRoundPhase        @default(queued)
   /// `nautelle-card-<shortId>`.
   tmuxSession         String?
   /// #367 D3: how the round's session reports (`plugin` | `injected` | `none`),
@@ -3406,9 +3644,11 @@ model BoardCardRound {
   finishedBy          CardFinishedBy?
   /// From `finish_card` (D6), at most 4 000 characters.
   summary             String?
+  /// #750 D9: set on the round whose worker called `escalate_card`.
+  escalation          CardEscalationReason?
   exitCode            Int?
   error               String?
-  startedAt           DateTime         @default(now())
+  startedAt           DateTime              @default(now())
   waitingAt           DateTime?
   /// #390: when the round entered `background`; cleared when it leaves.
   backgroundAt        DateTime?
@@ -3431,6 +3671,10 @@ model BoardCardRound {
   /// #624: the Claude Code dialog (shared `paneDialogSchema`) that blocks
   /// the round's session, from `card_run.dialog`; cleared when it runs again.
   blockingDialog      String?
+  /// #741: the usage limit (shared `quotaLimitSchema`) the round's pane shows
+  /// and when it resets, from `card_run.quota`; cleared when it resumes.
+  quotaLimit          String?
+  quotaResetsAt       DateTime?
   finishedAt          DateTime?
   endedAt             DateTime?
   /// #542: the card PR's head when the round started (`ciHeadSha`); `null`
@@ -3446,7 +3690,7 @@ model BoardCardRound {
   /// #449 D3: the Claude session the round ran in, from `round.restart`. A
   /// `fresh` round starts a new one; the earlier rounds keep theirs, so an old
   /// session can still be resumed.
-  sessionId           String?          @db.Uuid
+  sessionId           String?               @db.Uuid
   /// #449 D9: tokens and ms from the round's start to its first file edit,
   /// from `round.warmup`.
   warmupTokens        Int?
@@ -3510,26 +3754,29 @@ model Attachment {
 
 /// A project's board settings (D2, D13). No row: the defaults.
 model BoardSettings {
-  projectId              String   @id
-  issueOnRun             Boolean  @default(false)
-  specOnRun              Boolean  @default(false)
+  projectId              String          @id
+  issueOnRun             Boolean         @default(false)
+  specOnRun              Boolean         @default(false)
   /// 1–10, checked by the DTO.
-  maxRunning             Int      @default(3)
+  maxRunning             Int             @default(3)
   /// #244 D10: on only while the project's `shipSessionContent` is on;
   /// turning content off turns it off.
-  captureEnabled         Boolean  @default(false)
+  captureEnabled         Boolean         @default(false)
   /// Shared `CAPTURE_MODELS`: `haiku` or `sonnet`, checked by the DTO.
-  captureModel           String   @default("haiku")
+  captureModel           String          @default("haiku")
   /// #282 D3: the `autoCollect` a new `terminal` card starts with.
-  autoCollectTracked     Boolean  @default(false)
+  autoCollectTracked     Boolean         @default(false)
   /// #359 D7: merge a card's PR on entering Finished. `null` is the default:
   /// on for a base other than the default branch (shared `cardAutoMergeDefault`).
   autoMergeCards         Boolean?
+  /// #845 D4: who merges a finished card's pull request when a person's
+  /// session conducts the Board.
+  cardMergePolicy        CardMergePolicy @default(ask)
   /// #390: minutes in `background` before `card.background_stalled`; 5–1440,
   /// checked by the DTO.
-  backgroundStallMinutes Int      @default(30)
+  backgroundStallMinutes Int             @default(30)
   updatedById            String?
-  updatedAt              DateTime @updatedAt
+  updatedAt              DateTime        @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
@@ -3756,12 +4003,18 @@ enum TokenSaverRunKind {
 
 /// A project's Token saver setting (D11). No row: on, with an empty allowlist.
 model TokenSaverSettings {
-  projectId   String   @id
-  enabled     Boolean  @default(true)
+  projectId          String   @id
+  enabled            Boolean  @default(true)
   /// D6: MCP servers a launch may load besides `agentdock`, by name.
-  mcpAllow    String[] @default([])
-  updatedById String?
-  updatedAt   DateTime @updatedAt
+  mcpAllow           String[] @default([])
+  /// #751 B3: the budget a launch kind's median prefix is checked against.
+  prefixBudgetTokens Int      @default(25000)
+  /// #751 B5: `{ [cardType]: server[] }`, each a subset of `mcpAllow`.
+  mcpByType          Json     @default("{}")
+  /// #751 B5: `{ [cardType]: skill[] }` hidden with `skillOverrides: "off"`.
+  skillsOffByType    Json     @default("{}")
+  updatedById        String?
+  updatedAt          DateTime @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
@@ -3772,30 +4025,207 @@ model TokenSaverSettings {
 /// One filtered command (D12), from the runner's `filter.stats` event.
 /// `id` is the runner's, so a resent `events` batch inserts nothing twice.
 model TokenSaverStat {
-  id            String            @id
-  projectId     String
+  id                String            @id
+  projectId         String
   /// Null for the orchestrator and manual sessions, or a run the API does not know.
-  runId         String?
-  runKind       TokenSaverRunKind
+  runId             String?
+  runKind           TokenSaverRunKind
   /// `<family>/<command>`, e.g. `js/jest`; `none` or a `none:*` reason when no filter matched.
-  filter        String
+  filter            String
   /// #648: the program the command ran (`git log`), never its arguments;
   /// null on rows of older runners and on reads.
-  program       String?
-  rawBytes      Int
-  keptBytes     Int
+  program           String?
+  rawBytes          Int
+  keptBytes         Int
   /// `NAUTELLE_RAW=1`: the command ran unfiltered.
-  bypassed      Boolean
+  bypassed          Boolean
   /// The filter returned the original output.
-  passedThrough Boolean
-  createdAt     DateTime
+  passedThrough     Boolean
+  createdAt         DateTime
+  /// #748 D4: the manual session the row was read from, kept only when it is a
+  /// session of the project's runner and project; null otherwise.
+  sessionId         String?
+  /// #748: the Claude session id as the runner sent it, so a session the API
+  /// learns of after the batch still joins at read time.
+  sessionExternalId String?
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  run     Run?    @relation(fields: [runId], references: [id], onDelete: SetNull)
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     Run?          @relation(fields: [runId], references: [id], onDelete: SetNull)
+  session AgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([projectId, createdAt])
   @@index([runId])
+  @@index([sessionId])
+  @@index([projectId, sessionExternalId])
   @@map("token_saver_stats")
+}
+
+/// One part of a launch's prefix (#751 B1), from the runner's
+/// `prefix.measured`. Sizes only — the runner never sends the content. A
+/// resent event inserts nothing twice: `(runId, kind, name)` is unique.
+model RunPrefixPart {
+  id         String   @id @default(cuid())
+  runId      String
+  projectId  String
+  /// `TokenSaverRunKind` of the launch.
+  launchKind String
+  /// `PREFIX_PART_KINDS`.
+  kind       String
+  name       String
+  /// Relative to the worktree, or to `~` for a profile file; "" for none.
+  path       String   @default("")
+  /// `PREFIX_ORIGINS`: repo, profile, plugin or nautelle.
+  origin     String
+  bytes      Int
+  /// ≈ bytes / 4 — an estimate; the run's `prefixTokens` is the fact.
+  estTokens  Int
+  sha256     String
+  createdAt  DateTime @default(now())
+
+  run     Run     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, kind, name])
+  @@index([projectId, createdAt])
+  @@index([runId])
+  @@map("run_prefix_parts")
+}
+
+/// Mirrors `PREFIX_OVERLAY_STATES` of the shared contract (#751 B7).
+enum PrefixOverlayState {
+  proposed
+  approved
+  rejected
+  stale
+}
+
+/// An admin-approved replacement of one prefix part (#751 B7, ADR-0075):
+/// `claude_md`, `skill:<name>` or `rules`. The original's text is kept for
+/// the diff; the project repository is never edited. At most one open
+/// (`proposed` or `approved`) overlay per part — a partial unique index in
+/// the migration.
+model PrefixOverlay {
+  id                String             @id @default(cuid())
+  projectId         String
+  part              String
+  originalSha256    String
+  originalBytes     Int
+  originalText      String
+  content           String
+  contentBytes      Int
+  state             PrefixOverlayState @default(proposed)
+  /// The `prefix_propose` or `rules_compress` run that made it.
+  runId             String?
+  /// B6: the rules version a `rules` overlay compresses.
+  rulesVersion      String?
+  decidedById       String?
+  decidedAt         DateTime?
+  /// B12: the one Board card **Open a pull request** created.
+  pullRequestCardId String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  decidedBy User?   @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, part])
+  @@map("prefix_overlays")
+}
+
+/// Token economy (#746, ADR-0074): every saving technique is judged by billed
+/// cost per successful card, A against B.
+
+/// Shared `TECHNIQUE_MODES` (D9): nobody, randomised, every card.
+enum TechniqueMode {
+  off
+  ab
+  on
+}
+
+/// Shared `TECHNIQUE_ARMS` (D9): A runs without the technique, B with it.
+enum TechniqueArm {
+  a
+  b
+}
+
+/// A project's A/B setting (D2). No row: a B share of 50 %.
+model TokenEconomySettings {
+  projectId     String   @id
+  /// 0–100, checked by the DTO.
+  bSharePercent Int      @default(50)
+  updatedById   String?
+  updatedAt     DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("token_economy_settings")
+}
+
+/// A technique's mode in a project (D9). No row: the registry's default mode.
+model TokenEconomyTechnique {
+  projectId   String
+  /// A key of shared `TOKEN_ECONOMY_TECHNIQUES`.
+  technique   String
+  mode        TechniqueMode
+  changedById String?
+  changedAt   DateTime      @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  changedBy User?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@id([projectId, technique])
+  @@map("token_economy_techniques")
+}
+
+/// A card's arm for one technique (D2, D10): drawn at the card's first launch
+/// and sticky for all its rounds.
+model CardTechniqueArm {
+  cardId     String
+  technique  String
+  arm        TechniqueArm
+  /// The mode when the arm was drawn, so a card forced `on` is told apart
+  /// from a randomised B.
+  mode       TechniqueMode
+  assignedAt DateTime      @default(now())
+
+  card BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, technique])
+  @@index([technique, arm])
+  @@map("card_technique_arms")
+}
+
+/// The usage of one ended card run or manual session (D1), rebuilt from its
+/// `llm_requests` while late ones may still arrive. Exactly one of `runId`
+/// and `sessionId` is set (a CHECK in the migration).
+model RunUsageFact {
+  id               String   @id @default(cuid())
+  runId            String?  @unique
+  sessionId        String?  @unique
+  projectId        String
+  input            BigInt
+  output           BigInt
+  cacheRead        BigInt
+  cacheWrite5m     BigInt
+  cacheWrite1h     BigInt
+  /// The priced requests' cost, subagent sessions included; null while none is priced.
+  costUsd          Decimal? @db.Decimal(14, 6)
+  unpricedRequests Int
+  compactions      Int
+  /// The largest request: input + cache read + cache writes.
+  peakContext      Int
+  turns            Int
+  /// The part of `costUsd` from subagent sessions; null while none is priced.
+  subagentCostUsd  Decimal? @db.Decimal(14, 6)
+  builtAt          DateTime
+
+  run     Run?          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  session AgentSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, builtAt])
+  @@map("run_usage_facts")
 }
 
 // Steward (issue #447, ADR-0040)
@@ -3929,6 +4359,11 @@ model HandoffNote {
   subjectKind HandoffSubjectKind
   /// `board_cards.id` or `runs.id`.
   subjectId   String
+  /// DA-11: `subjectId` of a card note, so the note goes with its card. A
+  /// CHECK keeps exactly one of `cardId` / `runId` equal to `subjectId`.
+  cardId      String?
+  /// DA-11: `subjectId` of a run note, so the note goes with its run.
+  runId       String?
   /// The note's markdown (shared `validateHandoffNote`).
   content     String
   /// `HandoffLineRange[]`: the lines a person wrote (D7), `[{ from, to }]`.
@@ -3936,10 +4371,14 @@ model HandoffNote {
   updatedBy   HandoffUpdatedBy
   updatedAt   DateTime           @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  card    BoardCard? @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  run     Run?       @relation(fields: [runId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectKind, subjectId])
-  @@index([projectId])
+  /// DA-11: a subject is unique within its project, never across projects.
+  @@unique([projectId, subjectKind, subjectId])
+  @@index([cardId])
+  @@index([runId])
   @@map("handoff_notes")
 }
 
@@ -3963,6 +4402,8 @@ model ProjectRule {
   enabled     Boolean           @default(true)
   position    Int
   source      ProjectRuleSource @default(manual)
+  /// #751 B5: the card types the rule applies to; empty is all.
+  appliesTo   String[]          @default([])
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 

@@ -1,5 +1,8 @@
 import { BUDGET_ERROR } from '@nautelle/shared';
-import type { LocalErrorCode } from '@nautelle/shared/protocol';
+import {
+  LOCAL_BOARD_REFUSALS,
+  type LocalErrorCode,
+} from '@nautelle/shared/protocol';
 import { HttpException } from '@nestjs/common';
 
 /** A typed refusal of a local request: becomes `local.response {ok: false}`. */
@@ -29,6 +32,21 @@ export const httpErrorBody = (
   return { code, message };
 };
 
+type LocalBoardRefusal = (typeof LOCAL_BOARD_REFUSALS)[number];
+
+const boardRefusalOf = (code: string | null): LocalBoardRefusal | null =>
+  code !== null && (LOCAL_BOARD_REFUSALS as readonly string[]).includes(code)
+    ? (code as LocalBoardRefusal)
+    : null;
+
+/** A board error body's `reason`, when it has one. */
+const reasonOf = (error: HttpException): string | null => {
+  const body = error.getResponse();
+  if (typeof body !== 'object' || body === null) return null;
+  const reason = (body as Record<string, unknown>).reason;
+  return typeof reason === 'string' ? reason : null;
+};
+
 /**
  * A domain service's HTTP error, in the local allowlist's words (D7). The
  * message is the service's own, never a stack trace.
@@ -40,6 +58,16 @@ export const toLocalError = (error: unknown): LocalError => {
   }
   const { code, message } = httpErrorBody(error);
   const status = error.getStatus();
+  // #845 D3: the Board's own refusals keep their names; `move_refused`
+  // carries its `BoardMoveRefusal`.
+  const refusal = boardRefusalOf(code);
+  if (refusal) {
+    const reason = reasonOf(error);
+    return new LocalError(
+      refusal,
+      refusal === 'move_refused' && reason ? reason : message,
+    );
+  }
   if (code === BUDGET_ERROR.exceeded) {
     return new LocalError('budget_exceeded', message);
   }

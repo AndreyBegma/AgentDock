@@ -211,6 +211,11 @@ export const capabilitiesSchema = z.object({
    */
   tokenSaver: z.boolean().optional(),
   /**
+   * #746: the runner takes `tokenSaver.techniques` on `card.run` (ADR-0074).
+   * Absent means `false` — the API then sends no `techniques`.
+   */
+  tokenEconomy: z.boolean().optional(),
+  /**
    * #447: the runner serves Steward — it reads `watchedProjectSchema.steward`,
    * sends `steward.observed` / `steward.acted`, and handles `session.nudge`,
    * `session.dismiss`, `card.resume` and — when `commands` lists it —
@@ -239,6 +244,31 @@ export const capabilitiesSchema = z.object({
    */
   cardEffort: z.boolean().optional(),
   /**
+   * #750 D7: the runner takes `session.fresh` on `card.run` and starts the
+   * round in a fresh session seeded from the handoff. `card.run` args are
+   * strict, so the API sends the field only when this is `true`. Absent means
+   * `false` — the session lock then degrades to resuming.
+   */
+  cardFreshStart: z.boolean().optional(),
+  /**
+   * #750 D8: the runner takes `escalate` on `card.run`, offers the worker
+   * `escalate_card` and stops the session after it answers. Absent means
+   * `false` — the API sends no `escalate` and the escalation is not offered.
+   */
+  cardEscalate: z.boolean().optional(),
+  /**
+   * #751 B1: the runner sends `prefix.measured` on every launch. Absent means
+   * `false` — the Prefix section then has nothing from this runner.
+   */
+  prefixMeasure: z.boolean().optional(),
+  /**
+   * #751: the runner takes `tokenSaver.prefix` on `card.run` — the card
+   * type's selection and the overlays, hash-checked at launch (B10).
+   * `card.run` args are strict, so the API sends the field only when this is
+   * `true`. Absent means `false`.
+   */
+  prefixOverlays: z.boolean().optional(),
+  /**
    * ADR-0047: the runner's local security policy as it is now — values only,
    * no path beyond `allowedRoots`. The server cannot change it; the UI reads
    * it to explain a `policy_refused` before the person asks. Absent means
@@ -263,6 +293,10 @@ export const terminalAvailable = (capabilities: Capabilities): boolean =>
 export const tokenSaverAvailable = (capabilities: Capabilities): boolean =>
   capabilities.tokenSaver === true;
 
+/** Whether the API may send `tokenSaver.techniques` on `card.run`; absent is `false`. */
+export const tokenEconomyAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.tokenSaver === true && capabilities.tokenEconomy === true;
+
 /** Whether the API may send Steward's commands (#447); absent is `false`. */
 export const stewardAvailable = (capabilities: Capabilities): boolean =>
   capabilities.steward === true;
@@ -278,6 +312,18 @@ export const sessionMessageAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `card.run`'s `effort` (#663); absent is `false`. */
 export const cardEffortAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardEffort === true;
+
+/** Whether the API may send `card.run`'s `session.fresh` (#750); absent is `false`. */
+export const cardFreshStartAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardFreshStart === true;
+
+/** Whether the API may send `card.run`'s `escalate` (#750); absent is `false`. */
+export const cardEscalateAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardEscalate === true;
+
+/** Whether the API may send `tokenSaver.prefix` on `card.run` (#751); absent is `false`. */
+export const prefixOverlaysAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.tokenSaver === true && capabilities.prefixOverlays === true;
 
 /** The runner's policy (ADR-0047); null for a runner older than it. */
 export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {
@@ -356,11 +402,15 @@ export const RUNNER_FEATURE_COMMANDS = {
   planner: ['plan.turn'],
   design: ['plan.turn', 'uiprofile.fingerprint', 'uiprofile.build'],
   uiProfileBuild: ['uiprofile.build'],
+  /** #752 A2: a runner without it gets no `uiprofile.learn`; approvals still succeed. */
+  uiProfileLearn: ['uiprofile.learn'],
   worktree: ['worktree.status'],
   /** #379: specs written into an external docs repository. */
   docsRepo: ['docs.publish_specs'],
   /** #584: coding-rule candidates read from the project's own docs. */
   ruleScan: ['project.scan_rules'],
+  /** #751 B6, B8: compressed rules and overlay proposals. */
+  prefixOptimise: ['rules.compress', 'prefix.propose'],
 } as const satisfies Record<string, readonly CommandName[]>;
 
 /** Facts about the host itself, sent next to the capabilities. */

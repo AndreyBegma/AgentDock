@@ -26,6 +26,8 @@ const REASON_TEXT: Record<TextNoteReason, string> = {
   budget_exceeded: 'The project budget stopped the translation.',
   off: 'Normalization is switched off for this project.',
   rejected: 'The translation lost part of the text, so the original stays.',
+  too_long:
+    'The translation ran past the field’s length limit, so the original stays.',
 };
 
 export const describeNoteReason = (

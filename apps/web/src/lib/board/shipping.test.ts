@@ -5,6 +5,7 @@ import {
   ciBanner,
   ciDot,
   effectiveAutoMerge,
+  protectedPathsBanner,
   pullRequestRows,
   shippingBadge,
 } from './shipping';
@@ -74,6 +75,15 @@ describe('shippingBadge (#359 D6–D8)', () => {
     );
     expect(ciBanner(c)?.hint).toContain('Merge them into the branch');
   });
+  test('needsPerson on a head whose checks did not all pass says it was not merged (C-182)', () => {
+    const c = card(1, 'finished', {
+      needsPerson: true,
+      needsPersonReason: 'ci_not_green',
+      ciState: 'green',
+    });
+    expect(shippingBadge(c)?.label).toBe('Not every check passed; not merged');
+    expect(ciBanner(c)?.title).toBe('Not every check passed; not merged');
+  });
   test('a plain card has no badge', () => {
     expect(shippingBadge(card(1, 'in_progress'))).toBeNull();
   });
@@ -87,6 +97,40 @@ describe('ciBanner', () => {
       card(1, 'in_progress', { needsPerson: true, ciChecks: checks }),
     );
     expect(b?.checks).toEqual(checks);
+  });
+});
+
+describe('protected paths (C-148)', () => {
+  const paths = ['.woodpecker/pipeline.yml'];
+  test('an unmerged card says a person merges it, with the paths', () => {
+    const c = card(1, 'finished', { protectedPaths: paths });
+    expect(shippingBadge(c)).toEqual({
+      tone: 'warn',
+      label: 'Protected paths changed; a person merges',
+    });
+    expect(protectedPathsBanner(c)).toMatchObject({
+      title: 'Protected paths changed; a person merges',
+      paths,
+    });
+  });
+  test('merged, or without protected paths, nothing is said', () => {
+    const merged = card(1, 'finished', {
+      protectedPaths: paths,
+      mergedAt: '2026-10-16T10:00:00.000Z',
+    });
+    expect(shippingBadge(merged)?.label).toBe('Merged');
+    expect(protectedPathsBanner(merged)).toBeNull();
+    expect(protectedPathsBanner(card(1, 'finished'))).toBeNull();
+  });
+  test('needsPerson still beats it', () => {
+    const c = card(1, 'finished', {
+      protectedPaths: paths,
+      needsPerson: true,
+      needsPersonReason: 'branch_diverged',
+    });
+    expect(shippingBadge(c)?.label).toBe(
+      'Branch diverged on origin; not pushed',
+    );
   });
 });
 

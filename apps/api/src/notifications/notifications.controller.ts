@@ -44,13 +44,13 @@ export class NotificationsController {
     @CurrentUser() user: AuthUser,
     @Query() query: NotificationListQueryDto,
   ): Promise<NotificationPage> {
-    return this.notifications.list(user.id, query);
+    return this.notifications.list(user, query);
   }
 
   @Post('read-all')
   @HttpCode(200)
   readAll(@CurrentUser() user: AuthUser): Promise<NotificationReadResult> {
-    return this.notifications.markAllRead(user.id);
+    return this.notifications.markAllRead(user);
   }
 
   @Get('rules')
@@ -114,6 +114,6 @@ export class NotificationsController {
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
   ): Promise<NotificationReadResult> {
-    return this.notifications.markRead(user.id, id);
+    return this.notifications.markRead(user, id);
   }
 }

@@ -1,9 +1,11 @@
 import type { AdminRunnerDetail } from '@nautelle/shared';
 import {
+  COMMAND_RESULT_EVENT,
   RUNNER_CLOSE_CODES,
   type RunnerEvent,
   SPOOL_TRUNCATED_EVENT,
 } from '@nautelle/shared/protocol';
+import { Logger } from '@nestjs/common';
 import { resetDatabase, type Session } from '../test/e2e-app';
 import { generateRunnerToken } from './credentials';
 import { RunnerConnectHooks } from './runner-connect-hooks';
@@ -330,6 +332,7 @@ describe('/runner gateway (e2e)', () => {
         runnerId,
         config: { projects: [], pollIntervalsMs: {} },
         ackedSeq: 0,
+        features: ['command_results_spooled'],
       });
 
       const shown = await detail(runnerId);
@@ -598,6 +601,49 @@ describe('/runner gateway (e2e)', () => {
       }
     });
 
+    it('C-183: stores a runner-owned type from code-sentinel as events.forged, reaching no sink', async () => {
+      const { runnerId, token } = await pairedRunner(ctx, admin);
+      const socket = open(token);
+      await socket.connect();
+      socket.send({
+        type: 'events',
+        events: [
+          event(1, {
+            type: 'steward.acted',
+            data: {
+              projectId: 'prj_other',
+              at: '2026-10-07T18:36:02.335Z',
+              subject: { kind: 'run', runId: 'run_1' },
+              action: 'hold_push',
+              result: 'done',
+            },
+          }),
+          event(2, {
+            type: 'filter.stats',
+            data: { rows: [], pluginEventId: 'eid-forged' },
+          }),
+          event(3),
+        ],
+      });
+      expect(await socket.next('ack')).toEqual({ type: 'ack', seq: 3 });
+
+      const stored = await ctx.prisma.event.findMany({
+        where: { runnerId },
+        orderBy: { seq: 'asc' },
+      });
+      expect(stored.map((e) => [e.type, e.source, e.data])).toEqual([
+        ['events.forged', 'code-sentinel', { type: 'steward.acted' }],
+        ['events.forged', 'code-sentinel', { type: 'filter.stats' }],
+        [
+          'slot.checkpoint',
+          'code-sentinel',
+          { checkpoint: 'plan_ready', n: 3 },
+        ],
+      ]);
+      expect(await ctx.prisma.stewardIncident.count()).toBe(0);
+      expect(await ctx.prisma.tokenSaverStat.count()).toBe(0);
+    });
+
     it('drops an invalid message and keeps the socket', async () => {
       const { token } = await pairedRunner(ctx, admin);
       const socket = open(token);
@@ -672,18 +718,77 @@ describe('/runner gateway (e2e)', () => {
       expect(elapsed).toBeLessThan(PING_TIMEOUT_MS + 1_000);
     });
 
-    it('a socket that closes mid-command makes it unknown at once', async () => {
+    it('#740: a result replayed after a reconnect settles the command sent before it', async () => {
       const { runnerId, token } = await pairedRunner(ctx, admin);
-      const socket = open(token);
-      await socket.connect();
-      const started = Date.now();
+      const first = open(token);
+      const welcome = await first.connect();
+      expect(welcome.features).toEqual(['command_results_spooled']);
       const pinging = admin
         .send('post', `/admin/runners/${runnerId}/ping`)
         .then((r) => r);
-      await socket.next('command');
-      socket.socket.terminate();
-      expect((await pinging).body).toEqual({ status: 'unknown' });
-      expect(Date.now() - started).toBeLessThan(PING_TIMEOUT_MS);
+      const command = await first.next('command');
+      first.socket.terminate();
+      await first.closed;
+
+      // The handler finished while the socket was down; the spool replays it.
+      const second = open(token);
+      await second.connect();
+      const ts = new Date().toISOString();
+      const result = {
+        type: 'command.result',
+        id: command.id,
+        ok: true,
+        output: { pong: true, ts },
+      };
+      second.send({
+        type: 'events',
+        events: [
+          event(1, {
+            type: COMMAND_RESULT_EVENT,
+            source: 'runner',
+            project: undefined,
+            slot: undefined,
+            issue: undefined,
+            session: undefined,
+            data: result,
+          }),
+        ],
+      });
+      expect(await second.next('ack')).toEqual({ type: 'ack', seq: 1 });
+      expect((await pinging).body).toEqual({
+        status: 'ok',
+        rttMs: expect.any(Number),
+        ts,
+      });
+      // The seq is filled; the output is not kept.
+      const rows = await ctx.prisma.event.findMany({ where: { runnerId } });
+      expect(rows.map((r) => [r.type, r.data])).toEqual([
+        [COMMAND_RESULT_EVENT, { id: command.id, ok: true }],
+      ]);
+    });
+
+    it('#740 D4: a result nobody awaits is logged at warn and the socket stays', async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      try {
+        const { token } = await pairedRunner(ctx, admin);
+        const socket = open(token);
+        await socket.connect();
+        socket.send({
+          type: 'command.result',
+          id: 'cmd_stray',
+          ok: false,
+          error: { code: 'internal' },
+        });
+        socket.send({ type: 'events', events: range(1, 1) });
+        expect(await socket.next('ack')).toEqual({ type: 'ack', seq: 1 });
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(/cmd_stray \(ok: false\) arrived with nobody/),
+        );
+      } finally {
+        warn.mockRestore();
+      }
     });
   });
 });

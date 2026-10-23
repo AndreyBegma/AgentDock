@@ -2,6 +2,7 @@ import { basename, dirname, join } from 'node:path';
 import type { PlanTurnArgs, PlanTurnSession } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
+import type { OtlpEndpoint } from '../otlp/token';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
 
@@ -69,11 +70,11 @@ export const planTurnLaunchSpec = (
   args: Pick<PlanTurnArgs, 'session' | 'model' | 'projectId' | 'runId'>,
   worktree: string,
   promptFile: string,
-  otlpPort: number | null,
+  otlp: OtlpEndpoint | null,
   tokenSaver?: TokenSaverLaunch | null,
 ): LaunchSpec => ({
   ...planTurnArgv(profile, args, tokenSaver),
-  env: { ...runEnv(profile, args, otlpPort), ...(tokenSaver?.env ?? {}) },
+  env: { ...runEnv(profile, args, otlp), ...(tokenSaver?.env ?? {}) },
   cwd: worktree,
   stdin: promptFile,
 });

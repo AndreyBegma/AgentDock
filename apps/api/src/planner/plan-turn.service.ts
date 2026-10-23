@@ -467,7 +467,7 @@ export class PlanTurnService {
       await this.commands.send(
         project.runnerId,
         'plan.cancel',
-        { planId: plan.id, turnId },
+        { planId: plan.id, turnId, projectId: plan.projectId },
         { role: caller.role, ctx: caller.ctx },
       ),
     );
@@ -646,6 +646,12 @@ export class PlanTurnService {
     const { turnId, runId } = await this.prisma.$transaction(async (tx) => {
       // Serializes turn starts of one plan: one turn at a time.
       await tx.$queryRaw`SELECT id FROM plans WHERE id = ${plan.id} FOR UPDATE`;
+      // L-28: archived, sent or done since the row was read.
+      const fresh = await tx.plan.findUniqueOrThrow({
+        where: { id: plan.id },
+        select: { status: true },
+      });
+      this.store.assertOpen(fresh);
       const active = await tx.planTurn.findFirst({
         where: { planId: plan.id, phase: { in: [...ACTIVE] } },
         select: { id: true },
@@ -670,7 +676,7 @@ export class PlanTurnService {
           data: { sessionId: session.id },
         });
       }
-      if (spec.action === 'decompose' && plan.status === 'clarifying') {
+      if (spec.action === 'decompose' && fresh.status === 'clarifying') {
         await tx.plan.update({
           where: { id: plan.id },
           data: { status: 'drafting' },

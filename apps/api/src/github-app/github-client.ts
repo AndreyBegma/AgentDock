@@ -17,6 +17,13 @@ const PER_PAGE = 100;
 /** 100 pages × 100: far beyond one instance's installations or repos. */
 const MAX_PAGES = 100;
 
+/**
+ * C-145: an installation token carries only what its one call needs, never
+ * the App's full D2 set. Listing the installation's repositories (coverage,
+ * D10–D11) needs repository metadata, read-only.
+ */
+export const REPO_LIST_PERMISSIONS = { metadata: 'read' } as const;
+
 /** GitHub did not answer, or answered an error. The message never holds a secret. */
 export class GitHubRequestError extends Error {
   constructor(
@@ -153,6 +160,7 @@ export class GitHubAppClient {
       'POST',
       `/app/installations/${installationId}/access_tokens`,
       this.jwt(appId, key),
+      { permissions: REPO_LIST_PERMISSIONS },
     );
     const token = str(isRecord(tokenBody.json) ? tokenBody.json.token : null);
     if (!token) throw malformed('installation token');
@@ -204,6 +212,7 @@ export class GitHubAppClient {
     method: 'GET' | 'POST',
     path: string,
     authorization: string | null,
+    body?: object,
   ): Promise<{ status: number; json: unknown }> {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
@@ -211,11 +220,13 @@ export class GitHubAppClient {
       'User-Agent': 'Nautelle',
     };
     if (authorization) headers.Authorization = authorization;
+    if (body) headers['Content-Type'] = 'application/json';
     let response: Response;
     try {
       response = await this.options.fetch(`${this.options.apiBase}${path}`, {
         method,
         headers,
+        body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(this.options.requestTimeoutMs),
       });
     } catch {

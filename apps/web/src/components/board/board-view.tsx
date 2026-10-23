@@ -457,7 +457,7 @@ export function BoardColumns({
                       <MenuItem
                         tone="danger"
                         disabled={actions.busy || busy}
-                        onSelect={() => void actions.dismiss(card)}
+                        onSelect={() => actions.askDismiss(card)}
                       >
                         Dismiss
                       </MenuItem>

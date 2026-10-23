@@ -10,6 +10,7 @@ import { toast } from '@andrewbehma/glass-ui/toast';
 import {
   GITHUB_APP_EVENTS,
   GITHUB_APP_PERMISSIONS,
+  GITHUB_WEBHOOK_SECRET_MIN_LENGTH,
   type GitHubAppView,
   type GitHubManifestRequest,
   type GitHubManifestResponse,
@@ -316,7 +317,7 @@ export function ManualCard({
           label="Webhook secret"
           htmlFor="gh-webhook-secret"
           required
-          hint="The same value you entered on GitHub."
+          hint={`The same value you entered on GitHub — at least ${GITHUB_WEBHOOK_SECRET_MIN_LENGTH} characters.`}
           error={errors.webhookSecret}
         >
           <Input

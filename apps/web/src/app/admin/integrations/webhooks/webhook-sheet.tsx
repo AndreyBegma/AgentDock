@@ -26,6 +26,7 @@ import {
   type WebhookWithSecret,
 } from '@nautelle/shared';
 import { useCallback, useEffect, useState } from 'react';
+import { ConfirmGate } from '../../../../components/confirm/confirm-gate';
 import { api } from '../../../../lib/api';
 import { Time } from '../../../../lib/format/time';
 import { useLive } from '../../../../lib/live/use-live';
@@ -38,8 +39,11 @@ import {
   DELIVERY_STATUS_LABEL,
   DELIVERY_STATUS_TONE,
   describeWebhooksError,
+  maskUrlPath,
+  redeliverCopy,
   VERIFY_SAMPLE,
 } from '../../../../lib/webhooks/format';
+import { MaskedUrl } from '../../../../lib/webhooks/masked-url';
 
 const POLL_MS = 15_000;
 
@@ -70,6 +74,7 @@ export function WebhookSheet({
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [status, setStatus] = useState<WebhookDeliveryStatus | ''>('');
   const [confirm, setConfirm] = useState<Confirm>();
+  const [redelivering, setRedelivering] = useState<WebhookDeliveryView>();
   const showError = useErrorToast();
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string>();
@@ -107,6 +112,7 @@ export function WebhookSheet({
       setWebhook(undefined);
       setDeliveries(undefined);
       setConfirm(undefined);
+      setRedelivering(undefined);
       setLoadError(undefined);
       return;
     }
@@ -199,7 +205,7 @@ export function WebhookSheet({
           <SheetContent
             side="right"
             title={webhook?.name ?? 'Webhook'}
-            description={webhook?.url}
+            description={webhook ? maskUrlPath(webhook.url) : undefined}
           >
             {loadError ? (
               <div className="mb-4">
@@ -301,6 +307,16 @@ export function WebhookSheet({
                     Delete
                   </Button>
                 </div>
+
+                <section
+                  aria-labelledby="webhook-url"
+                  className="flex flex-col gap-2"
+                >
+                  <h3 id="webhook-url" className="text-sm font-semibold">
+                    Destination
+                  </h3>
+                  <MaskedUrl url={webhook.url} />
+                </section>
 
                 <section
                   aria-labelledby="webhook-log"
@@ -408,12 +424,7 @@ export function WebhookSheet({
                                   variant="glass"
                                   size="sm"
                                   disabled={busy}
-                                  onClick={() =>
-                                    post(
-                                      `/deliveries/${d.id}/redeliver`,
-                                      'Redelivery queued',
-                                    )
-                                  }
+                                  onClick={() => setRedelivering(d)}
                                 >
                                   Redeliver
                                 </Button>
@@ -460,6 +471,18 @@ export function WebhookSheet({
         ) : null}
       </SheetRoot>
 
+      <ConfirmGate
+        pending={redelivering}
+        copy={redeliverCopy}
+        busy={busy}
+        onConfirm={(delivery) =>
+          void post(
+            `/deliveries/${delivery.id}/redeliver`,
+            'Redelivery queued',
+          ).then(() => setRedelivering(undefined))
+        }
+        onCancel={() => setRedelivering(undefined)}
+      />
       <ConfirmDialog
         open={confirm !== undefined}
         onOpenChange={(open) => !open && setConfirm(undefined)}

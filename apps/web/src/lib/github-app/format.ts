@@ -4,6 +4,7 @@ import {
   type GITHUB_APP_PERMISSIONS,
   GITHUB_HOOK_PATH,
   GITHUB_LOGIN_PATTERN,
+  GITHUB_WEBHOOK_SECRET_MIN_LENGTH,
   type GitHubAppCredentialsRequest,
   type GitHubAppView,
   type GitHubHealthReason,
@@ -120,8 +121,15 @@ export function credentialsProblem(
       text: 'The private key is the PEM file GitHub offered for download.',
     };
   }
-  if (form.webhookSecret.trim() === '')
+  const secret = form.webhookSecret.trim();
+  if (secret === '')
     return { field: 'webhookSecret', text: 'The webhook secret is required.' };
+  if (secret.length < GITHUB_WEBHOOK_SECRET_MIN_LENGTH) {
+    return {
+      field: 'webhookSecret',
+      text: `The webhook secret needs at least ${GITHUB_WEBHOOK_SECRET_MIN_LENGTH} characters.`,
+    };
+  }
   return null;
 }
 

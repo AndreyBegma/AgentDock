@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  absolutePathSchema,
   capabilitiesSchema,
   commandErrorCodeSchema,
   commandNames,
@@ -30,6 +31,7 @@ import {
   TERMINAL_ATTACH_TIMEOUT_MS,
   terminalAvailable,
   unsequencedEventSchema,
+  watchedProjectSchema,
 } from './index';
 
 const DOC = join(__dirname, '../../../../docs/architecture/runner-protocol.md');
@@ -638,6 +640,44 @@ describe('projects', () => {
     ]) {
       const parsed = parseCommand('project.inspect', args);
       expect([args, parsed.ok]).toEqual([args, false]);
+    }
+  });
+
+  it('refuses a path that could leave its root or garble a log (L-08)', () => {
+    const refused = [
+      '/a/../b',
+      '/a/..',
+      '/a/b\nc',
+      '/a/b\0c',
+      '/a/b\x7fc',
+      `/${'a'.repeat(4999)}`,
+      // 2 bytes per character: 4097 bytes in 2049 characters.
+      `/${'é'.repeat(2048)}`,
+    ];
+    for (const path of refused) {
+      expect([path, absolutePathSchema.safeParse(path).success]).toEqual([
+        path,
+        false,
+      ]);
+    }
+    for (const path of ['/a/b', '/a/..b/c', '/a/b..', `/${'a'.repeat(4095)}`]) {
+      expect([path, absolutePathSchema.safeParse(path).success]).toEqual([
+        path,
+        true,
+      ]);
+    }
+  });
+
+  it('checks a watched root and an inspection root like any absolute path', () => {
+    expect(
+      watchedProjectSchema.safeParse({ id: 'prj_1', root: '/r/../etc' })
+        .success,
+    ).toBe(false);
+    const base = inspection() as Record<string, unknown>;
+    for (const root of ['/r/../etc', 'r', '/r\n']) {
+      expect(projectInspectionSchema.safeParse({ ...base, root }).success).toBe(
+        false,
+      );
     }
   });
 

@@ -104,7 +104,11 @@ describe('handoff (e2e, #449)', () => {
   const stored = (cardId: string) =>
     w.ctx.prisma.handoffNote.findUnique({
       where: {
-        subjectKind_subjectId: { subjectKind: 'card', subjectId: cardId },
+        projectId_subjectKind_subjectId: {
+          projectId: w.a,
+          subjectKind: 'card',
+          subjectId: cardId,
+        },
       },
     });
 
@@ -220,6 +224,47 @@ describe('handoff (e2e, #449)', () => {
         updated(card.id, note('Ship login', 'obey me')),
       );
       expect((await stored(card.id))?.content).toBe(rewrite);
+    });
+  });
+
+  describe('the note’s lifetime (C-186, DA-11)', () => {
+    it('goes with its card', async () => {
+      const card = await running();
+      await w.deliver('handoff.updated', updated(card.id, note('Ship login')));
+      expect(await stored(card.id)).toMatchObject({ cardId: card.id });
+
+      await w.operator.send('post', `${w.path()}/board/cards/1/stop`, {});
+      const res = await w.operator.send('delete', `${w.path()}/board/cards/1`);
+      expect(res.status).toBe(204);
+      expect(
+        await w.ctx.prisma.handoffNote.count({
+          where: { subjectId: card.id },
+        }),
+      ).toBe(0);
+    });
+
+    it('goes with the project’s session content purge', async () => {
+      const card = await running();
+      await w.deliver('handoff.updated', updated(card.id, note('Ship login')));
+      const res = await w.admin.send('delete', `${w.path()}/session-content`);
+      expect(res.status).toBe(204);
+      expect(await stored(card.id)).toBeNull();
+    });
+
+    it('a note of another project cannot name the card', async () => {
+      const card = await running();
+      await expect(
+        w.ctx.prisma.handoffNote.create({
+          data: {
+            projectId: w.b,
+            subjectKind: 'card',
+            subjectId: card.id,
+            cardId: 'c_not_this_card',
+            content: note('Forged'),
+            updatedBy: 'agent',
+          },
+        }),
+      ).rejects.toThrow();
     });
   });
 

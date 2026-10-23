@@ -44,17 +44,24 @@ const BLOCKED = (() => {
     ['169.254.0.0', 16], // link-local, cloud metadata
     ['172.16.0.0', 12], // private
     ['192.0.0.0', 24], // IETF protocol assignments
+    ['192.0.2.0', 24], // TEST-NET-1
     ['192.168.0.0', 16], // private
     ['198.18.0.0', 15], // benchmarking
+    ['198.51.100.0', 24], // TEST-NET-2
+    ['203.0.113.0', 24], // TEST-NET-3
     ['224.0.0.0', 4], // multicast
     ['240.0.0.0', 4], // reserved, broadcast
   ];
   const v6: [string, number][] = [
     ['::', 96], // unspecified, loopback, IPv4-compatible
     ['64:ff9b::', 96], // NAT64: embeds an IPv4 address
+    ['64:ff9b:1::', 48], // local-use NAT64
+    ['100::', 64], // discard-only
+    ['2001::', 32], // Teredo: embeds an IPv4 address
     ['2002::', 16], // 6to4: embeds an IPv4 address
     ['fc00::', 7], // unique local
     ['fe80::', 10], // link-local
+    ['fec0::', 10], // site-local (deprecated)
     ['ff00::', 8], // multicast
   ];
   for (const [net, bits] of v4) list.addSubnet(net, bits, 'ipv4');
@@ -243,14 +250,28 @@ const pinnedLookup =
     }
   };
 
+/** A GET through the same guard (C-328: the runner release check). */
+export type GuardedGetRequest = Omit<GuardedPostRequest, 'body'>;
+
 /**
  * D12 + D15: check the target, then POST to the checked address with the
  * original host name (Host header, TLS SNI and certificate check unchanged).
  * Redirects are never followed — a 3xx is a failed attempt (`redirect`). The
  * response body is read up to the cap and the connection then dropped.
  */
-export const guardedPost = async (
+export const guardedPost = (
   request: GuardedPostRequest,
+): Promise<GuardedPostResult> => guardedRequest('POST', request, request.body);
+
+/** `guardedPost`'s check, pinning and caps, for a GET without a body. */
+export const guardedGet = (
+  request: GuardedGetRequest,
+): Promise<GuardedPostResult> => guardedRequest('GET', request, null);
+
+const guardedRequest = async (
+  method: 'GET' | 'POST',
+  request: GuardedGetRequest,
+  payload: string | null,
 ): Promise<GuardedPostResult> => {
   const check = await checkWebhookTarget(
     request.url,
@@ -292,12 +313,15 @@ export const guardedPost = async (
     const req = client.request(
       check.url,
       {
-        method: 'POST',
-        headers: {
-          ...request.headers,
-          'Content-Type': 'application/json',
-          'Content-Length': String(Buffer.byteLength(request.body)),
-        },
+        method,
+        headers:
+          payload === null
+            ? request.headers
+            : {
+                ...request.headers,
+                'Content-Type': 'application/json',
+                'Content-Length': String(Buffer.byteLength(payload)),
+              },
         lookup: pinnedLookup(check.connectTo),
         // No pooled socket: every attempt connects to the address it checked.
         agent: false,
@@ -343,6 +367,7 @@ export const guardedPost = async (
     }, timeoutMs);
 
     req.on('error', () => finish(failed(WEBHOOK_ATTEMPT_ERRORS.network)));
-    req.end(request.body);
+    if (payload === null) req.end();
+    else req.end(payload);
   });
 };

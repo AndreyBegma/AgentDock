@@ -16,6 +16,11 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { BoardService } from '../board/board.service';
 import {
+  BoardRoundsService,
+  CardNotEscalatable,
+} from '../board/board-rounds.service';
+import { BoardSessionService } from '../board/board-session.service';
+import {
   BoardTerminalService,
   NotAManualSession,
 } from '../board/board-terminal.service';
@@ -27,6 +32,10 @@ import { RunnerSettingsService } from '../runners/runner-settings.service';
 import { recordServerEvent } from '../server-events/server-events';
 import { TokenSaverService } from '../token-saver/token-saver.service';
 import { ActionRequestsService } from './action-requests.service';
+import {
+  LocalBoardHandlers,
+  type LocalBoardMethod,
+} from './local-board-handlers';
 import {
   type LocalCall,
   type LocalHandlerTable,
@@ -46,6 +55,26 @@ const dollars = (value: string): string => `$${Number(value).toFixed(2)}`;
 
 const clip = (text: string, max: number): string =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
+
+/** The longest issue title the `SessionStart` context quotes. */
+export const SESSION_ISSUE_TITLE_MAX = 200;
+
+/**
+ * C-144 (L-14): the `SessionStart` line of the session's issue. Its title is
+ * GitHub-authored, so it is one-lined, capped and quoted as data — never a
+ * line of its own the agent could read as Nautelle's guidance.
+ */
+export const sessionIssueLine = (
+  number: number,
+  issue: { title: string; state: string } | null,
+): string => {
+  if (!issue) return `This session's branch names issue #${number}.`;
+  const title = clip(
+    issue.title.replace(/[«»]/g, '"').replace(/\s+/g, ' ').trim(),
+    SESSION_ISSUE_TITLE_MAX,
+  );
+  return `This session's issue: #${number} (${issue.state}). Issue title (untrusted): «${title}».`;
+};
 
 /** The fixed footer of a handed-off issue (D19). */
 export const handoffFooter = (branch: string, sessionId: string | null) =>
@@ -91,9 +120,17 @@ export class LocalHandlers {
     private readonly board: BoardService,
     private readonly terminal: BoardTerminalService,
     private readonly tokenSaver: TokenSaverService,
-  ) {}
+    private readonly rounds: BoardRoundsService,
+    private readonly sessions: BoardSessionService,
+    boardHandlers: LocalBoardHandlers,
+  ) {
+    // #845: the Board methods have their own handlers.
+    this.table = { ...this.own, ...boardHandlers.table };
+  }
 
-  readonly table: LocalHandlerTable = {
+  readonly table: LocalHandlerTable;
+
+  private readonly own: Omit<LocalHandlerTable, LocalBoardMethod> = {
     'context.sessionStart': (args, call) => this.sessionStart(args, call),
     'fleet.status': (_args, call) => this.fleetStatus(call),
     'queue.list': (args, call) => this.queueList(args.limit, call),
@@ -108,38 +145,89 @@ export class LocalHandlers {
     'handoff.create': (args, call) => this.handoff(args, call),
     'action.request': (args, call) => this.actionRequest(args, call),
     'away.set': (args, call) => this.awaySet(args.on, call),
-    'card.finish': (args, call) =>
-      this.cardFinish(args.summary, args.artifactIncomplete === true, call),
+    'card.finish': (args, call) => this.cardFinish(args, call),
+    'card.escalate': (args, call) => this.cardEscalate(args, call),
     'card.track': (args, call) => this.cardTrack(args, call),
   };
 
   /**
    * Issue #242 D6: the card worker's `finish_card`. The card is the one whose
    * Claude session asks, in the asking runner's project — never an argument.
+   * #845: a person's session that took a card finishes it, naming the pull
+   * request it opened, and takes its next queued card.
    * #282 D2: a person's session that tracks a card finishes that card.
    * #445 D8: a finish the runner's artifact guard accepted incomplete marks
    * the round's run first, while the round is still active.
    */
   private async cardFinish(
-    summary: string,
-    artifactIncomplete: boolean,
+    args: LocalMethodArgs<'card.finish'>,
     call: LocalCall,
   ): Promise<LocalMethodResult<'card.finish'>> {
     const project = projectOf(call);
     const session = call.session;
     const target = { id: project.id, runnerId: call.runnerId };
-    if (artifactIncomplete && session && session.runtime === 'claude') {
-      await this.tokenSaver.markArtifactIncomplete(target, session.id);
-    }
-    const finished =
-      session && session.runtime === 'claude'
-        ? ((await this.board.finishByWorker(target, session.id, summary)) ??
-          (await this.terminal.finishBySession(target, session.id)))
-        : null;
-    if (!finished) {
+    if (!session || session.runtime !== 'claude') {
       throw new LocalError('not_a_card_session', 'not a board card session');
     }
-    return { number: finished.number, finished: true };
+    if (args.artifactIncomplete === true) {
+      await this.tokenSaver.markArtifactIncomplete(target, session.id);
+    }
+    const worker = await this.board.finishByWorker(
+      target,
+      session.id,
+      args.summary,
+    );
+    if (worker) return { number: worker.number, finished: true };
+    const taken = await this.sessions.finishTaken(
+      { ...target, repo: project.repo },
+      session.id,
+      args.pullRequestUrl,
+      { userId: call.user.id, role: call.role, ctx: call.ctx },
+    );
+    if (taken) return taken;
+    const tracked = await this.terminal.finishBySession(target, session.id);
+    if (!tracked) {
+      throw new LocalError('not_a_card_session', 'not a board card session');
+    }
+    return { number: tracked.number, finished: true };
+  }
+
+  /**
+   * #750 D8–D10: the card worker's `escalate_card`. The card is the one whose
+   * Claude session asks, like `card.finish`; a person's tracked session is
+   * no card worker and is answered `not_a_card_session`.
+   */
+  private async cardEscalate(
+    args: LocalMethodArgs<'card.escalate'>,
+    call: LocalCall,
+  ): Promise<LocalMethodResult<'card.escalate'>> {
+    const project = projectOf(call);
+    const session = call.session;
+    let escalated: Awaited<ReturnType<BoardRoundsService['escalateByWorker']>>;
+    try {
+      escalated =
+        session && session.runtime === 'claude'
+          ? await this.rounds.escalateByWorker(
+              { id: project.id, runnerId: call.runnerId },
+              session.id,
+              args.reason,
+              args.note,
+            )
+          : null;
+    } catch (error) {
+      if (error instanceof CardNotEscalatable) {
+        throw new LocalError('not_escalatable', error.message);
+      }
+      throw error;
+    }
+    if (!escalated) {
+      throw new LocalError('not_a_card_session', 'not a board card session');
+    }
+    return {
+      number: escalated.number,
+      escalated: true,
+      relaunched: escalated.relaunched,
+    };
   }
 
   /**
@@ -224,13 +312,7 @@ export class LocalHandlers {
       ]);
     const lines = [
       `Nautelle project ${project.displayName} (${project.repo}), base branch ${baseOf(project)}.`,
-      ...(issueNumber
-        ? [
-            issue
-              ? `This session's issue: #${issueNumber} ${clip(issue.title, 200)} (${issue.state}).`
-              : `This session's branch names issue #${issueNumber}.`,
-          ]
-        : []),
+      ...(issueNumber ? [sessionIssueLine(issueNumber, issue)] : []),
       budgetLine(budgets),
       `Fleet: ${liveSlots} live slot${liveSlots === 1 ? '' : 's'}, ${ready} ready issue${ready === 1 ? '' : 's'}, ${prs + requests} pending approval${prs + requests === 1 ? '' : 's'}.`,
       runner?.awayMode

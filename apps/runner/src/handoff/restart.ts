@@ -29,15 +29,32 @@ export interface RestartDecision {
   estimate: RestartEstimate;
 }
 
+/** #749: the A/B technique of the size rule. */
+export const TECHNIQUE_RESUME_BY_SIZE = 'resume-by-size';
+
+/**
+ * #749 D4: from this much history the next round starts fresh, warm cache or
+ * not — every later turn of a resumed round re-reads it. Tuned by A/B.
+ */
+export const RESUME_BY_SIZE_TOKENS = 60_000;
+
+export interface RestartRules {
+  /** #749 D3: the size rule, technique `resume-by-size`. Off when absent (D7). */
+  resumeBySize?: boolean;
+}
+
 /**
  * The cheaper start. `freshTokens` is null when a fresh start is not possible
  * (no valid note, no saved card prompt, the seed does not fit): then resume,
- * with the fresh estimate recorded as 0 tokens — it was not an option.
+ * with the fresh estimate recorded as 0 tokens — it was not an option. With
+ * the size rule on, a history of `RESUME_BY_SIZE_TOKENS` or more starts fresh
+ * whenever a seed exists (#749 D3); below it, the first turn decides.
  */
 export const decideRestart = (
   stats: TranscriptStats,
   freshTokens: number | null,
   now: number,
+  rules: RestartRules = {},
 ): RestartDecision => {
   const warm = cacheWarm(stats, now);
   const estimate: RestartEstimate = {
@@ -46,6 +63,9 @@ export const decideRestart = (
     cacheWarm: warm,
   };
   if (freshTokens === null) return { mode: 'resume', estimate };
+  if (rules.resumeBySize && stats.historyTokens >= RESUME_BY_SIZE_TOKENS) {
+    return { mode: 'fresh', estimate };
+  }
   const resumeCost = stats.historyTokens * (warm ? CACHE_READ_PRICE_RATIO : 1);
   return { mode: freshTokens < resumeCost ? 'fresh' : 'resume', estimate };
 };

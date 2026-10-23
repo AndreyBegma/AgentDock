@@ -345,8 +345,10 @@ export class ApprovalsService {
 
     const row = await this.prisma.$transaction(async (tx) => {
       await lockApprovals(tx, project.id);
-      // The row a void may have replaced since `before` was read.
-      const current = (await currentRow(tx, project.id, pr)) ?? before;
+      // The row a void may have replaced since `before` was read; none when
+      // the PR's approval was closed (merged, dropped) in the meantime.
+      const current = await currentRow(tx, project.id, pr);
+      if (!current) return null;
       return tx.mergeApproval.update({
         where: { id: current.id },
         data: {
@@ -359,6 +361,15 @@ export class ApprovalsService {
         include: APPROVAL_ROW_INCLUDE,
       });
     });
+    if (!row) {
+      return refuse(
+        approvalsError(
+          409,
+          APPROVALS_ERROR.approvalClosed,
+          `PR #${pr}'s approval was closed while the decision was being sent`,
+        ),
+      );
+    }
     await record('ok', { rowId: row.id });
     this.publish(project.id, {
       projectId: project.id,

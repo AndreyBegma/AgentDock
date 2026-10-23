@@ -113,6 +113,7 @@ export class AttachmentsController {
       access.projectId,
       attachmentId(id),
       user.id,
+      access.role,
     );
     return sendAttachment(res, content);
   }

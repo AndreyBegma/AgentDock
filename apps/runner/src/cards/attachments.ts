@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -128,7 +129,9 @@ const ensureDirectory = (worktree: string): string => {
       throw unavailable(`${part} in the card's worktree is a symlink`);
     }
   }
-  mkdirSync(dir, { recursive: true });
+  // The person's attachments are theirs: no other local user reads them.
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  chmodSync(dir, 0o700);
   const real = realpathSync(dir);
   if (real !== dir && !real.startsWith(`${top}${sep}`)) {
     throw unavailable("the attachments directory leaves the card's worktree");
@@ -176,7 +179,9 @@ const present = (
 
 const writeAtomic = (dir: string, name: string, bytes: Uint8Array): void => {
   const temp = join(dir, `${TEMP_PREFIX}${name}`);
-  writeFileSync(temp, bytes, { mode: 0o644 });
+  // `mode` applies only to a file `writeFileSync` creates.
+  rmSync(temp, { force: true });
+  writeFileSync(temp, bytes, { mode: 0o600 });
   renameSync(temp, join(dir, name));
 };
 
@@ -265,7 +270,8 @@ export const syncAttachments = async (
       manifest[name] = { source: ref.sha256, sha256: sha256Of(model) };
     });
     if (options.forModel) {
-      writeFileSync(manifestFile, JSON.stringify(manifest), { mode: 0o644 });
+      writeFileSync(manifestFile, JSON.stringify(manifest), { mode: 0o600 });
+      chmodSync(manifestFile, 0o600);
     }
   } catch (error) {
     if (error instanceof CommandFailure) throw error;

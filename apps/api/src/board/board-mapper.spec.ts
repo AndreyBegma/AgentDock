@@ -4,9 +4,13 @@ import type { BoardCard, BoardCardRound } from '@prisma/client';
 import {
   type CardFacts,
   type CardWithRounds,
+  escalationOf,
   hooksCauseOf,
+  quotaWaitOf,
+  recommendationOf,
   restartOf,
   stewardChipOf,
+  takenOf,
 } from './board-mapper';
 
 const now = new Date('2026-10-16T12:00:00.000Z');
@@ -40,6 +44,8 @@ const facts = (
     tokenSaved: new Map(),
     tokenSaverFilters: new Map(),
     artifactIncomplete: new Set(),
+    tokenSavedBySession: new Map(),
+    tokenSaverFiltersBySession: new Map(),
   },
   now,
 });
@@ -176,5 +182,156 @@ describe('restartOf (#449 D9)', () => {
     expect(
       restartOf(withRounds({ id: 'r2', restartMode: 'fresh' }), {}),
     ).toEqual({ restartMode: 'fresh', warmupSavedUsd: null });
+  });
+});
+
+describe('quotaWaitOf (#741)', () => {
+  const round = (over: Partial<BoardCardRound>) =>
+    ({
+      phase: 'running',
+      quotaLimit: 'session',
+      quotaResetsAt: new Date('2026-10-21T15:00:00.000Z'),
+      ...over,
+    }) as BoardCardRound;
+
+  it('names the limit and its reset while the round is active', () => {
+    expect(quotaWaitOf(round({}))).toEqual({
+      limit: 'session',
+      resetsAt: '2026-10-21T15:00:00.000Z',
+    });
+    expect(quotaWaitOf(round({ quotaResetsAt: null }))).toEqual({
+      limit: 'session',
+      resetsAt: null,
+    });
+  });
+
+  it('is null once the round is over, without a limit, or for a limit it does not know', () => {
+    expect(quotaWaitOf(round({ phase: 'ended' }))).toBeNull();
+    expect(quotaWaitOf(round({ quotaLimit: null }))).toBeNull();
+    expect(quotaWaitOf(round({ quotaLimit: 'monthly' }))).toBeNull();
+  });
+});
+
+describe('recommendationOf (#750 D1–D3, D5)', () => {
+  const assessed = (over: Partial<BoardCard> = {}): CardWithRounds => ({
+    ...card({
+      recommendedModel: 'haiku',
+      recommendedEffort: 'high',
+      recommendedReason: 'A one-file change.',
+      recommendedDesignModel: null,
+      recommendedDesignReason: null,
+      assessedAt: now,
+      workClass: 'mechanical',
+      workSignals: [],
+      ...over,
+    }),
+    rounds: [],
+  });
+
+  it('keeps the assessment’s model and effort in the A arm, with the class', () => {
+    expect(recommendationOf(assessed(), null).work).toEqual({
+      model: 'haiku',
+      effort: 'high',
+      reason: 'A one-file change.',
+      class: 'mechanical',
+      signals: [],
+    });
+  });
+
+  it('carries the mapped pair in the B arm, so the popover preselects the Run default', () => {
+    expect(
+      recommendationOf(assessed(), { workClass: 'mechanical' }).work,
+    ).toMatchObject({ model: 'sonnet', effort: 'medium', class: 'mechanical' });
+    expect(
+      recommendationOf(
+        assessed({ workClass: 'deciding', workSignals: ['auth', 'retired'] }),
+        { workClass: 'deciding' },
+      ).work,
+    ).toMatchObject({
+      model: 'opus',
+      effort: 'high',
+      class: 'deciding',
+      signals: ['auth'],
+    });
+  });
+
+  it('maps a stale class as unsure, and leaves no assessment as none', () => {
+    expect(
+      recommendationOf(assessed(), { workClass: null }).work,
+    ).toMatchObject({ model: 'opus', effort: 'medium' });
+    expect(
+      recommendationOf(assessed({ recommendedModel: null }), {
+        workClass: null,
+      }).work,
+    ).toBeNull();
+  });
+});
+
+describe('escalationOf (#750 D9)', () => {
+  it('is null until the card escalated', () => {
+    expect(
+      escalationOf(
+        card({
+          escalatedAt: null,
+          escalationReason: null,
+          escalationNote: null,
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('carries the reason, the note and when', () => {
+    expect(
+      escalationOf(
+        card({
+          escalatedAt: now,
+          escalationReason: 'misclassified',
+          escalationNote: 'Needs a schema decision.',
+        }),
+      ),
+    ).toEqual({
+      reason: 'misclassified',
+      note: 'Needs a schema decision.',
+      at: now.toISOString(),
+    });
+  });
+});
+
+describe('takenOf (#845 D2, D10)', () => {
+  const alive = { alive: new Set(['ses_live']) };
+
+  it("is a bound card's session, its liveness and the branch it left", () => {
+    expect(
+      takenOf(
+        card({
+          source: 'manual',
+          trackedSessionId: 'ses_live',
+          takenBranch: 'feat/42-login',
+        }),
+        alive,
+      ),
+    ).toEqual({ sessionId: 'ses_live', alive: true, branch: 'feat/42-login' });
+    expect(
+      takenOf(
+        card({
+          source: 'captured',
+          trackedSessionId: 'ses_gone',
+          takenBranch: null,
+        }),
+        alive,
+      ),
+    ).toEqual({ sessionId: 'ses_gone', alive: false, branch: null });
+  });
+
+  it("is null for a session's own terminal card and an unbound card", () => {
+    expect(
+      takenOf(
+        card({ source: 'terminal', trackedSessionId: 'ses_live' }),
+        alive,
+      ),
+    ).toBeNull();
+    expect(
+      takenOf(card({ source: 'manual', trackedSessionId: null }), alive),
+    ).toBeNull();
   });
 });

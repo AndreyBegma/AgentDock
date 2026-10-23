@@ -1,6 +1,5 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { LOCAL_REQUEST_TIMEOUT_MS } from '@nautelle/shared/protocol';
-import { FinishGuard, parseFinishGuardArgs } from '../cards/finish-guard';
 import { cardsDirOf, sessionCardNote } from '../handoff/context';
 import { localRequest } from '../local/client';
 import {
@@ -11,6 +10,7 @@ import {
 import type { LocalCommandDeps } from '../local/subcommand';
 import { LOCAL_RETRY_METHODS, LOCAL_RETRY_WINDOW_MS } from '../local/types';
 import { buildMcpServer, type McpRequest } from './server';
+import { CARD_ESCALATE_ENV } from './tools';
 
 /** The daemon retries inside its window, then makes one last attempt (#434). */
 const RETRY_CALL_MS =
@@ -38,15 +38,10 @@ export const mcpSessionToken = (
  * (`daemon_unavailable`), never a crash: Claude keeps its other tools.
  */
 export const runMcp = async (
-  args: readonly string[],
+  _args: readonly string[],
   deps: LocalCommandDeps,
 ): Promise<number> => {
   const cwd = deps.env.CLAUDE_PROJECT_DIR || deps.cwd;
-  // #445 D8: a card round with Token saver on guards `finish_card`.
-  const guard = parseFinishGuardArgs(args);
-  const finishGuard = guard
-    ? new FinishGuard({ ...guard, worktree: cwd })
-    : undefined;
   const request: McpRequest = (method, args) =>
     // The daemon and the server check `args` against the method's schema.
     localRequest(
@@ -63,7 +58,11 @@ export const runMcp = async (
     );
   // #449 D6: the session's card note, from the daemon's store on disk.
   const cardNote = () => sessionCardNote(cardsDirOf(deps.env), cwd, deps.exec);
-  const server = buildMcpServer(request, { finishGuard, cardNote });
+  const server = buildMcpServer(request, {
+    cardNote,
+    // #750 D8: set in the env of a round launched with `escalate`.
+    escalate: deps.env[CARD_ESCALATE_ENV] === '1',
+  });
   const closed = new Promise<void>((resolve) => {
     server.server.onclose = resolve;
   });

@@ -15,6 +15,7 @@ import type { Clock } from '../clock';
 import type { ConfigProfile } from '../config';
 import type { Env } from '../env';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import { runEnv } from '../skills/run/launch';
 import { finalResult } from '../skills/run/stream';
 
@@ -61,7 +62,7 @@ export interface HandoffWriterOptions {
   env: Env;
   clock: Clock;
   log: Logger;
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   spawn?: CaptureSpawn;
   timeoutMs?: number;
 }
@@ -101,7 +102,7 @@ export class HandoffWriter {
         runEnv(
           profile,
           { projectId, runId: sessionId },
-          this.options.otlpPort?.() ?? null,
+          this.options.otlp?.() ?? null,
         ),
       );
       // No run of the API's: only the project is attributed.

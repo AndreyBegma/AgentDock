@@ -1,6 +1,7 @@
-import { type FSWatcher, readFileSync, statSync, watch } from 'node:fs';
+import { type FSWatcher, watch } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
+  CODE_SENTINEL_EVENT_TYPES,
   eventsUnparsedData,
   normalizeCodeSentinelLine,
 } from '@nautelle/shared';
@@ -17,6 +18,7 @@ import {
   fleetEmitter,
   resolveFleetProject,
 } from '../../fleet/project';
+import { readFileCapped } from '../../fs/safe-read';
 import { errorMessage } from '../../log';
 import type {
   Collector,
@@ -29,6 +31,8 @@ import { readNewLines, type TailState } from './tail';
 
 export const EVENTS_FILE = 'events.jsonl';
 export const STATE_FILE = 'state.json';
+/** The orchestrator's snapshot is a few KiB; a larger file is never read. */
+export const STATE_FILE_MAX_BYTES = 4 * 1024 * 1024;
 /** Offsets live beside spec 12's `offsets.json`, in a file of their own (spec 16 D2). */
 export const EVENTS_OFFSETS_FILE = 'events-offsets.json';
 /** A burst of `fs.watch` notices is read once, this long after the first. */
@@ -175,7 +179,26 @@ export class EventsCollector implements Collector {
           repo: project.repo,
           root: project.root,
         });
-        if (result.ok) {
+        if (result.ok && !CODE_SENTINEL_EVENT_TYPES.has(result.event.type)) {
+          // Agents can write the file: only the plugin's own types go on (C-169).
+          this.context.log.warn(
+            'events: dropped a type the plugin never writes',
+            {
+              projectId: project.id,
+              type: result.event.type,
+              offset: line.offset,
+            },
+          );
+          emitFleet(
+            'events.unparsed',
+            eventsUnparsedData(
+              file,
+              line.text,
+              `type ${result.event.type} is not one events.jsonl may carry`,
+              line.offset,
+            ),
+          );
+        } else if (result.ok) {
           emitRaw(result.event);
         } else {
           emitFleet(
@@ -201,13 +224,16 @@ export class EventsCollector implements Collector {
     const emitRaw = this.emitRaw;
     if (!project || !emitFleet || !emitRaw) return;
     const file = join(project.boardDir, STATE_FILE);
-    let content: string;
-    try {
-      if (!statSync(file).isFile()) return;
-      content = readFileSync(file, 'utf8');
-    } catch {
+    const read = readFileCapped(file, STATE_FILE_MAX_BYTES);
+    if (read === null) return;
+    if (!read.ok) {
+      const reason = `state.json holds ${read.size} bytes; at most ${STATE_FILE_MAX_BYTES} are read`;
+      if (reason === this.lastState) return;
+      this.lastState = reason;
+      emitFleet('events.unparsed', eventsUnparsedData(file, '', reason));
       return;
     }
+    const content = read.text;
     if (content === this.lastState) return;
     this.lastState = content;
 

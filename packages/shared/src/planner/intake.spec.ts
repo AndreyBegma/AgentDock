@@ -15,6 +15,7 @@ import {
   isIntakeRound,
   isIntakeSplit,
   isIntakeStack,
+  missingCardSections,
   PLAN_MODES,
   PLAN_STATUSES,
   PLANNER_CONTRACT_VERSION,
@@ -296,6 +297,31 @@ describe('the generated card (D5, D6)', () => {
     expect(
       isCardDraftEnglish({ title: 'Export the board', body: ENGLISH_BODY }),
     ).toBe(true);
+  });
+
+  it('takes a heading closed by hashes and trailing blanks', () => {
+    const body = ENGLISH_BODY.replace(
+      '## Out of scope',
+      '##\tOut of scope \t## \t',
+    ).replace('## Open questions', '## open questions\r');
+    expect(missingCardSections(body)).toEqual([]);
+    expect(
+      missingCardSections(
+        ENGLISH_BODY.replace('## Out of scope', '## Out of scope now'),
+      ),
+    ).toEqual(['Out of scope']);
+  });
+
+  // WI-61: the heading match ran `[ \t]*#*[ \t]*$`, quadratic on a long run
+  // of blanks after a heading.
+  it.each([
+    ['blanks', `## What to do${' \t'.repeat(50_000)}x`],
+    ['hashes', `## What to do ${'#'.repeat(100_000)}x`],
+  ])('checks a 100 KB run of %s after a heading in under 50 ms', (_, body) => {
+    const started = performance.now();
+    expect(missingCardSections(body)).toEqual([...CARD_DRAFT_SECTIONS]);
+    isCardDraftEnglish({ title: 'Export the board', body });
+    expect(performance.now() - started).toBeLessThan(50);
   });
 });
 

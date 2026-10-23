@@ -181,6 +181,18 @@ describe('error mapping', () => {
     ).toContain('boom');
   });
 
+  test('a failed command shows its headline and the redacted runner text (WI-74)', () => {
+    expect(
+      describeApprovalError(
+        apiError(502, 'command_failed', 'The runner did not finish in time', {
+          detail: 'git fetch https://github.com/o/r [redacted]',
+        }),
+      ),
+    ).toBe(
+      'The runner could not complete the request: The runner did not finish in time — git fetch https://github.com/o/r [redacted]',
+    );
+  });
+
   test('403 and 404 without a code', () => {
     expect(
       describeApprovalError(new ApiError(403, undefined, 'Forbidden')),

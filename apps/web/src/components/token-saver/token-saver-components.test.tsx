@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'bun:test';
+import type { TokenEconomyReport } from '@nautelle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
+import {
+  armFixture,
+  emptyArmFixture,
+  reportFixture,
+  techniqueFixture,
+} from '../../lib/token-saver/economy.fixture';
 import { emptySummary } from '../../lib/token-saver/summary';
+import { BShareForm } from './b-share-card';
 import {
   CostPerRoundTable,
   CostPerRoundWeeksTable,
@@ -15,15 +23,23 @@ import {
   UnfilteredReasonTable,
 } from './summary-tables';
 import { PromptCacheTile, SummaryTiles } from './summary-tiles';
+import { TechniquesReport } from './techniques-report';
 
-describe('SavedBadge (#445 D13)', () => {
-  test('shows "saved ≈ $x" with the tokens behind it', () => {
+describe('SavedBadge (#746 D7)', () => {
+  test('shows the tokens first, and says how the dollars are priced', () => {
     const html = renderToStaticMarkup(
-      <SavedBadge saved={{ estimateUsd: 0.41, estimateTokens: 90_000 }} />,
+      <SavedBadge saved={{ estimateUsd: 0.13, estimateTokens: 42_000 }} />,
     );
-    expect(html).toContain('saved ≈ $0.41');
-    expect(html).toContain('90');
+    expect(html).toContain('saved ≈ 42k tok · $0.13');
     expect(html).toContain('estimate');
+    expect(html).toContain('cache write');
+  });
+
+  test('a sub-cent saving stays <$0.01 after the tokens', () => {
+    const html = renderToStaticMarkup(
+      <SavedBadge saved={{ estimateUsd: 0.004, estimateTokens: 900 }} />,
+    );
+    expect(html).toContain('saved ≈ 900 tok · &lt;$0.01');
   });
 
   test('renders nothing without a saving', () => {
@@ -296,5 +312,104 @@ describe('cost per round (#663 D5)', () => {
     const html = renderToStaticMarkup(<UnmeasuredKindsNote />);
     expect(html).toContain('skill runs');
     expect(html).toContain('model assessments');
+  });
+});
+
+describe('TechniquesReport (#746)', () => {
+  const noop = async () => {};
+  const render = (report: TokenEconomyReport, isAdmin: boolean): string =>
+    renderToStaticMarkup(
+      <TechniquesReport report={report} isAdmin={isAdmin} onSetMode={noop} />,
+    );
+
+  test('arm A against arm B, with $/successful card and every signal', () => {
+    const html = render(reportFixture(), false);
+    expect(html).toContain('Read guard');
+    expect(html).toContain('A/B test');
+    expect(html).toContain('Enough data');
+    expect(html).toContain('$ per successful card');
+    expect(html).toContain('$1.20');
+    expect(html).toContain('$0.90–$1.60');
+    expect(html).toContain('$0.80');
+    expect(html).toContain('Green on the first push');
+    expect(html).toContain('48–74%');
+    expect(html).toContain('Rounds per card');
+    expect(html).toContain('2.6–3.7');
+    expect(html).toContain('Merged without review returns');
+    expect(html).toContain('No retries');
+  });
+
+  test('Enable for all and Stop are for admins only', () => {
+    const admin = render(reportFixture(), true);
+    expect(admin).toContain('Enable for all');
+    expect(admin).toContain('>Stop<');
+    const member = render(reportFixture(), false);
+    expect(member).not.toContain('Enable for all');
+    expect(member).not.toContain('>Stop<');
+  });
+
+  test('a technique already on offers Stop, not Enable for all', () => {
+    const html = render(
+      reportFixture([techniqueFixture({ mode: 'on' })]),
+      true,
+    );
+    expect(html).not.toContain('Enable for all');
+    expect(html).toContain('Stop');
+  });
+
+  test('a signal B worsens is marked and named', () => {
+    const html = render(
+      reportFixture([techniqueFixture({ worsens: ['greenFirstPush'] })]),
+      false,
+    );
+    expect(html).toContain('Worse in B');
+    expect(html).toContain('Arm B is worse on a quality signal');
+  });
+
+  test('too few settled cards is Collecting, and an empty arm shows dashes', () => {
+    const html = render(
+      reportFixture([
+        techniqueFixture({
+          enoughData: false,
+          a: armFixture('a', { settledCards: 12 }),
+          b: emptyArmFixture('b'),
+        }),
+      ]),
+      false,
+    );
+    expect(html).toContain('Collecting · A 12/30 · B 0/30');
+    expect(html).not.toContain('Enough data');
+    expect(html).toContain('—');
+    expect(html).not.toContain('$0.00');
+  });
+
+  test('no registered technique says so', () => {
+    expect(render(reportFixture([]), true)).toContain(
+      'No saving technique is under test yet',
+    );
+  });
+});
+
+describe('BShareForm (#746 D2)', () => {
+  const noop = async () => {};
+
+  test('an admin edits the share and saves it', () => {
+    const html = renderToStaticMarkup(
+      <BShareForm isAdmin stored={50} onSave={noop} />,
+    );
+    expect(html).toContain('Share of cards in test arm B');
+    expect(html).toContain('value="50"');
+    expect(html).not.toMatch(/readonly/i);
+    expect(html).toContain('>Save<');
+  });
+
+  test('everyone else reads it', () => {
+    const html = renderToStaticMarkup(
+      <BShareForm isAdmin={false} stored={20} onSave={noop} />,
+    );
+    expect(html).toContain('value="20"');
+    expect(html).toMatch(/readonly/i);
+    expect(html).not.toContain('>Save<');
+    expect(html).toContain('Only project administrators');
   });
 });

@@ -15,6 +15,7 @@ import { CollectorPollSender } from './collector-poll-sender';
 import { GitHubHookController } from './github-app.controller';
 import { GitHubHealthService } from './github-health.service';
 import { GitHubHookService } from './github-hook.service';
+import { GitHubInstallationsService } from './github-installations.service';
 import { GitHubRetentionJob } from './github-retention.job';
 import { signGitHubDelivery } from './github-signature';
 import {
@@ -74,6 +75,7 @@ describe('GitHub App (e2e, spec 27)', () => {
     ctx.sender.sent = [];
     ctx.sender.delayMs = 0;
     ctx.app.get(GitHubHookService).debouncer.clear();
+    ctx.app.get(GitHubHookService).resyncs.clear();
     ctx.app.get(SignatureFailureTracker).reset();
     new HookFailureThrottle().reset();
     adminId = (await createUser(ctx.prisma, 'ada@example.com', 'admin')).id;
@@ -247,6 +249,17 @@ describe('GitHub App (e2e, spec 27)', () => {
     });
 
     it('takes manual credentials, verified against GET /app, and audits a re-entry', async () => {
+      const weak = await admin.send('put', ADMIN_ROUTE, {
+        appId: APP_ID,
+        slug: SLUG,
+        privateKey: APP_PEM,
+        webhookSecret: 'x'.repeat(19),
+      });
+      // C-145: a guessable secret is refused before GitHub is asked.
+      expect(weak.status).toBe(400);
+      expect(JSON.stringify(weak.body)).toContain('webhookSecret');
+      expect(ctx.github.calls).toEqual([]);
+
       const badKey = await admin.send('put', ADMIN_ROUTE, {
         appId: APP_ID,
         slug: SLUG,
@@ -419,6 +432,75 @@ describe('GitHub App (e2e, spec 27)', () => {
       ).toBe(1);
     });
 
+    it('stores a signed body replayed under a new delivery id once, and polls once (C-145)', async () => {
+      const first = await deliver(ctx, 'issues', issuesLabeled(), {
+        deliveryId: 'original-guid',
+      });
+      const replay = await deliver(ctx, 'issues', issuesLabeled(), {
+        deliveryId: 'fresh-guid-from-attacker',
+      });
+      expect(first.body).toEqual({ status: 'accepted' });
+      expect(replay.status).toBe(200);
+      expect(replay.body).toEqual({ status: 'duplicate' });
+      expect(
+        (await ctx.prisma.gitHubDelivery.findMany()).map((d) => d.deliveryId),
+      ).toEqual(['original-guid']);
+      await ctx.app.get(GitHubHookService).debouncer.flushAll();
+      expect(ctx.sender.sent).toHaveLength(1);
+      expect(
+        await ctx.prisma.event.count({ where: { source: 'github' } }),
+      ).toBe(1);
+    });
+
+    it('ignores a delivery for an installation the last resync did not list, or none (C-145)', async () => {
+      const unknown = await deliver(ctx, 'issues', issuesLabeled(REPO, 9999));
+      const { installation: _, ...bare } = issuesLabeled();
+      const none = await deliver(ctx, 'issues', bare);
+      for (const res of [unknown, none]) {
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ status: 'ignored' });
+      }
+      await ctx.app.get(GitHubHookService).debouncer.flushAll();
+      expect(ctx.sender.sent).toEqual([]);
+      expect(
+        await ctx.prisma.event.count({ where: { source: 'github' } }),
+      ).toBe(0);
+      const rows = await ctx.prisma.gitHubDelivery.findMany();
+      expect(rows.map((r) => r.handled)).toEqual([false, false]);
+    });
+
+    it('starts one resync for two installation deliveries within a minute (C-145)', async () => {
+      const installations = ctx.app.get(GitHubInstallationsService);
+      const resync = jest
+        .spyOn(installations, 'resyncInBackground')
+        .mockImplementation(() => undefined);
+      const installation = (action: string) => ({
+        action,
+        installation: { id: 77 },
+        sender: { login: 'archi' },
+      });
+      const first = await deliver(ctx, 'installation', installation('created'));
+      // The same body under a new id: a replay, refused before routing.
+      const replay = await deliver(
+        ctx,
+        'installation',
+        installation('created'),
+      );
+      const second = await deliver(
+        ctx,
+        'installation',
+        installation('new_permissions_accepted'),
+      );
+      expect([first, replay, second].map((r) => r.body.status)).toEqual([
+        'accepted',
+        'duplicate',
+        'accepted',
+      ]);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(resync).toHaveBeenCalledTimes(1);
+      ctx.app.get(GitHubHookService).resyncs.clear();
+    });
+
     it('is routed to the GitHub handler, not to #26’s /hooks/:publicId', async () => {
       await admin.send('delete', ADMIN_ROUTE);
       // No App: 401 from this module; a trigger route would answer 404.
@@ -543,7 +625,8 @@ describe('GitHub App (e2e, spec 27)', () => {
       const { runnerId } = await seedRepoProject(ctx.prisma, REPO, '/srv/a');
       await registerWith();
       await deliver(ctx, 'issues', issuesLabeled());
-      await deliver(ctx, 'issues', issuesLabeled());
+      // Another body: the same one again would be a replay (C-145).
+      await deliver(ctx, 'issues', { ...issuesLabeled(), action: 'unlabeled' });
       const ingest = ctx.app.get(RunnerIngestService);
       const ack = await ingest.events(runnerId, [
         {

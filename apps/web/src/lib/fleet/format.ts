@@ -174,16 +174,6 @@ export function issueUrl(
   return match ? `${match[1]}/issues/${issue}` : null;
 }
 
-/** Only `https:` links are rendered as anchors; the URL came from a markdown file. */
-export function safeHttpsUrl(url: string | null): string | null {
-  if (url === null) return null;
-  try {
-    return new URL(url).protocol === 'https:' ? url : null;
-  } catch {
-    return null;
-  }
-}
-
 export interface SlotQuery {
   status?: SlotStatus;
   issue?: number;

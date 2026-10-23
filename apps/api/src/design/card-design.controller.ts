@@ -58,7 +58,11 @@ export class CardDesignController {
     @ProjectAccess() access: ResolvedProjectAccess,
     @Param('number') number: string,
   ): Promise<TaskDesignView> {
-    return this.designs.cardView(access.projectId, cardNumber(number));
+    return this.designs.cardView(
+      access.projectId,
+      cardNumber(number),
+      access.role,
+    );
   }
 
   @Patch()
@@ -133,6 +137,24 @@ export class CardDesignController {
       n,
       actorOf(access, user, ctx),
       dto,
+    );
+    return this.designs.cardView(access.projectId, n);
+  }
+
+  /** #833 D7: no body; the repair turn of every variant off its template. */
+  @Post('complete')
+  @ProjectRole('operator')
+  async complete(
+    @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Param('number') number: string,
+  ): Promise<TaskDesignView> {
+    const n = cardNumber(number);
+    await this.designs.cardComplete(
+      access.projectId,
+      n,
+      actorOf(access, user, ctx),
     );
     return this.designs.cardView(access.projectId, n);
   }

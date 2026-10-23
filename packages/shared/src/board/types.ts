@@ -1,6 +1,11 @@
 import {
+  LOCAL_BOARD_COLUMNS,
   LOCAL_CARD_BODY_MAX,
+  LOCAL_CARD_CI_STATES,
   LOCAL_CARD_KINDS,
+  LOCAL_CARD_MERGE_POLICIES,
+  LOCAL_CARD_PR_STATES,
+  LOCAL_CARD_ROUND_PHASES,
   LOCAL_CARD_SUMMARY_MAX,
   LOCAL_CARD_TITLE_MAX,
 } from '../protocol/local';
@@ -15,13 +20,7 @@ import {
  * D3. `inbox` (#244 D8/D9) holds captured suggestions; it is first, and only
  * operators and above see it.
  */
-export const BOARD_COLUMNS = [
-  'inbox',
-  'todo',
-  'in_progress',
-  'finished',
-  'completed',
-] as const;
+export const BOARD_COLUMNS = LOCAL_BOARD_COLUMNS;
 export type BoardColumn = (typeof BOARD_COLUMNS)[number];
 
 export const isBoardColumn = (value: string): value is BoardColumn =>
@@ -66,9 +65,15 @@ export const isMirroredCardSource = (
 
 /**
  * D4: what started a round. `ci_fix` (#359 D6) is Nautelle's own round for a
- * red check or a merge conflict on the card's PR.
+ * red check or a merge conflict on the card's PR; `escalation` (#750 D9) is
+ * the relaunch on Opus after the worker's `escalate_card`.
  */
-export const CARD_ROUND_TRIGGERS = ['run', 'feedback', 'ci_fix'] as const;
+export const CARD_ROUND_TRIGGERS = [
+  'run',
+  'feedback',
+  'ci_fix',
+  'escalation',
+] as const;
 export type CardRoundTrigger = (typeof CARD_ROUND_TRIGGERS)[number];
 
 /**
@@ -78,17 +83,7 @@ export type CardRoundTrigger = (typeof CARD_ROUND_TRIGGERS)[number];
  * them, not on the person; `finished` is done (worker, session end or the
  * person); `ended` is a session that exited without being finished first.
  */
-export const CARD_ROUND_PHASES = [
-  'queued',
-  'starting',
-  'running',
-  'waiting',
-  'background',
-  'finished',
-  'ended',
-  'failed',
-  'cancelled',
-] as const;
+export const CARD_ROUND_PHASES = LOCAL_CARD_ROUND_PHASES;
 export type CardRoundPhase = (typeof CARD_ROUND_PHASES)[number];
 
 /** D7: a round in one of these phases holds the card in In progress. */
@@ -145,7 +140,7 @@ export const CARD_COLLECT_RETRY_DELAY_MS = 2 * 60 * 1000;
  * #329 D6: the card's PR as last seen — from the PR poll, else from a
  * `card.collect` / `card.merge` / `card.prClose` result.
  */
-export const CARD_PR_STATES = ['open', 'draft', 'merged', 'closed'] as const;
+export const CARD_PR_STATES = LOCAL_CARD_PR_STATES;
 export type CardPrState = (typeof CARD_PR_STATES)[number];
 
 export const isCardPrState = (value: string): value is CardPrState =>
@@ -155,11 +150,26 @@ export const isCardPrState = (value: string): value is CardPrState =>
  * #359 D5: the checks on the head of the card's PR.
  * - `none` — no PR, or the head has no checks;
  * - `pending` — a check is still running;
- * - `green` — every check passed (or was skipped);
- * - `red` — a check failed or was cancelled; `ciChecks` names them.
+ * - `green` — every check passed, cancelled and skipped ones ignored;
+ * - `red` — a check failed; `ciChecks` names them.
+ * Auto-merge asks more than `green` (`cardCiMergeable`, C-182).
  */
-export const CARD_CI_STATES = ['none', 'pending', 'green', 'red'] as const;
+export const CARD_CI_STATES = LOCAL_CARD_CI_STATES;
 export type CardCiState = (typeof CARD_CI_STATES)[number];
+
+/**
+ * #845 D4: who merges a finished card's green pull request when a person's
+ * session conducts a Board Run — `ask` (default): the conductor asks the
+ * person once per run; `agent`: it merges a green, `CLEAN` pull request
+ * itself; `person`: it never merges. A pull request touching `.woodpecker/**`
+ * or carrying a `Gate:` always goes to the person.
+ */
+export const CARD_MERGE_POLICIES = LOCAL_CARD_MERGE_POLICIES;
+export type CardMergePolicy = (typeof CARD_MERGE_POLICIES)[number];
+export const CARD_MERGE_POLICY_DEFAULT: CardMergePolicy = 'ask';
+
+export const isCardMergePolicy = (value: string): value is CardMergePolicy =>
+  (CARD_MERGE_POLICIES as readonly string[]).includes(value);
 
 export const isCardCiState = (value: string): value is CardCiState =>
   (CARD_CI_STATES as readonly string[]).includes(value);
@@ -187,11 +197,14 @@ export const CARD_CI_MISSING_MS = 5 * 60_000;
  * had, so nothing was pushed (#630). A stacked PR that merged into a
  * dependency branch whose own PR had already merged gets a forward PR into
  * the base (#709): `forward_conflict` when that PR conflicts with the base,
- * `forward_failed` when it could not be opened.
+ * `forward_failed` when it could not be opened. Auto-merge refuses a head
+ * whose checks are not all passed — none, cancelled or skipped ones —
+ * with `ci_not_green` (C-182).
  */
 export const CARD_NEEDS_PERSON_REASONS = [
   'ci_still_failing',
   'ci_not_reported',
+  'ci_not_green',
   'round_failed',
   'round_pushed_nothing',
   'round_ended_at_once',

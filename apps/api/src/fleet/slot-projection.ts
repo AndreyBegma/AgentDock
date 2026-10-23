@@ -24,10 +24,14 @@ import {
   SLOT_GROUPS,
   type SlotPatch,
   sourceOf,
+  withoutAdvisoryPrState,
 } from './slot-patch';
 import { deriveSlotStatus } from './slot-status';
 
 export type { SlotPatch } from './slot-patch';
+
+/** A slot that is not on a quota banner carries no limit. */
+const NO_QUOTA = { quotaLimit: null, quotaResetsAt: null } as const;
 
 const PULL_PATH = /^\/[^/]+\/[^/]+\/pull\/(\d+)\/?$/;
 
@@ -57,6 +61,7 @@ export type SlotEvent = EventOf<
   | 'pane.prompt'
   | 'pane.idle'
   | 'pane.quota_hit'
+  | 'pane.quota_resumed'
   | 'pane.busy'
   | 'worktree.changed'
   | 'slot.dispatched'
@@ -126,6 +131,7 @@ export class SlotProjection {
       | 'pane.prompt'
       | 'pane.idle'
       | 'pane.quota_hit'
+      | 'pane.quota_resumed'
       | 'pane.busy'
       | 'worktree.changed'
       | 'slot.redispatched'
@@ -133,7 +139,22 @@ export class SlotProjection {
   ): SlotPatch {
     switch (event.type) {
       case 'session.vanished':
-        return { sessionAlive: false, pane: null };
+        return { sessionAlive: false, pane: null, ...NO_QUOTA };
+      case 'pane.quota_hit':
+        return {
+          pane: 'quota',
+          quotaLimit: event.data.limit ?? null,
+          quotaResetsAt: event.data.resetsAt
+            ? new Date(event.data.resetsAt)
+            : null,
+        };
+      // The runner typed `continue`: the slot no longer waits for the limit.
+      case 'pane.quota_resumed':
+        return NO_QUOTA;
+      case 'pane.prompt':
+      case 'pane.idle':
+      case 'pane.busy':
+        return { pane: PANE_OF[event.type], ...NO_QUOTA };
       case 'slot.redispatched':
         return { model: event.data.toModel };
       case 'worktree.changed': {
@@ -148,15 +169,13 @@ export class SlotProjection {
           dirty: data.dirty ?? null,
         };
       }
-      default:
-        return { pane: PANE_OF[event.type] };
     }
   }
 
   private async sessionAppeared(
     applied: Applied<EventOf<'session.appeared'>>,
   ): Promise<void> {
-    const patch: SlotPatch = { sessionAlive: true, pane: null };
+    const patch: SlotPatch = { sessionAlive: true, pane: null, ...NO_QUOTA };
     const name = this.slotName(applied.event);
     const row = await this.covering(name, applied.ts);
     if (row && applied.seq <= row.lastSeq) return;
@@ -431,7 +450,12 @@ export class SlotProjection {
     patch: SlotPatch,
     options: { startedAt?: Date; extra?: SlotSources } = {},
   ): Promise<void> {
-    const guarded = guardGroups(SLOT_GROUPS, {}, source.source, patch);
+    const guarded = guardGroups(
+      SLOT_GROUPS,
+      {},
+      source.source,
+      withoutAdvisoryPrState(source.source, patch),
+    );
     const fields = {
       sessionAlive: null,
       pane: null,
@@ -475,7 +499,7 @@ export class SlotProjection {
       SLOT_GROUPS,
       current,
       source.source,
-      patch,
+      withoutAdvisoryPrState(source.source, patch),
     );
     const fields = {
       ...guarded.patch,

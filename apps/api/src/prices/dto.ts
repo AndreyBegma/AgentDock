@@ -8,6 +8,7 @@ import {
   type PriceTestRequest,
   type PriceTier,
   type RecomputeRequest,
+  SAFE_PATTERN_MAX_CHARS,
   type TierCondition,
   type TierPrices,
 } from '@nautelle/shared';
@@ -107,10 +108,10 @@ export class ModelPriceDto implements ModelPriceInput {
   @MaxLength(200)
   modelName!: string;
 
-  /** Compiled by the service; an invalid regex is a 400 `invalid_price`. */
+  /** Checked by the service; an invalid or unsafe regex is a 400 `invalid_price`. */
   @IsString()
   @IsNotEmpty()
-  @MaxLength(1000)
+  @MaxLength(SAFE_PATTERN_MAX_CHARS)
   matchPattern!: string;
 
   @IsInt()

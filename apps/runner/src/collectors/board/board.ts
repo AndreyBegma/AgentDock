@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type {
   RoundDecisions,
@@ -6,8 +6,12 @@ import type {
 } from '@nautelle/shared/protocol';
 import type { FleetEmitter, FleetProject } from '../../fleet/project';
 import type { SlotBook } from '../../fleet/slots';
+import { readFileCapped } from '../../fs/safe-read';
 import { parseBoard } from './parse-board';
 import { parseBrief } from './parse-brief';
+
+/** A board or brief is a page of Markdown; anything larger is not one and is never read. */
+export const BOARD_FILE_MAX_BYTES = 1024 * 1024;
 
 /** Boards older than this many days are history the first scan does not replay. */
 export const BOARD_LOOKBACK_DAYS = 7;
@@ -30,14 +34,6 @@ const stampOf = (path: string): { stamp: string; mtimeMs: number } | null => {
     return stat.isFile()
       ? { stamp: `${stat.mtimeMs}:${stat.size}`, mtimeMs: stat.mtimeMs }
       : null;
-  } catch {
-    return null;
-  }
-};
-
-const readText = (path: string): string | null => {
-  try {
-    return readFileSync(path, 'utf8');
   } catch {
     return null;
   }
@@ -116,10 +112,26 @@ export class BoardWatcher {
     return { boards, briefs };
   }
 
+  /** The file's text; null when it cannot be read or is too large (`board.unparsed`). */
+  private readText(path: string): string | null {
+    const read = readFileCapped(path, BOARD_FILE_MAX_BYTES);
+    if (read === null) return null;
+    if (read.ok) return read.text;
+    this.options.emit(
+      'board.unparsed',
+      {
+        file: path,
+        reason: `the file holds ${read.size} bytes; at most ${BOARD_FILE_MAX_BYTES} are read`,
+      },
+      { source: 'scraped' },
+    );
+    return null;
+  }
+
   private readBoard(file: FileStamp): void {
     if (this.boards.get(file.path) === file.stamp) return;
     this.boards.set(file.path, file.stamp);
-    const text = readText(file.path);
+    const text = this.readText(file.path);
     if (text === null) return;
     const { emit } = this.options;
     const parsed = parseBoard(text);
@@ -153,7 +165,7 @@ export class BoardWatcher {
   private readBrief(slot: string, file: FileStamp): void {
     if (this.briefs.get(slot) === `${file.path}:${file.stamp}`) return;
     this.briefs.set(slot, `${file.path}:${file.stamp}`);
-    const text = readText(file.path);
+    const text = this.readText(file.path);
     if (text === null) return;
     const { emit, book, project } = this.options;
     const parsed = parseBrief(text);

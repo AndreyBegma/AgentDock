@@ -1,4 +1,11 @@
 import {
+  BOARD_CARD_BODY_MAX,
+  BOARD_CARD_TITLE_MAX,
+  CARD_FEEDBACK_MAX,
+  DESIGN_COMMENT_MAX,
+  PLANNER_QUESTION_MAX,
+  PLANNER_SUMMARY_MAX,
+  PROJECT_RULE_DESCRIPTION_MAX,
   PROJECT_RULE_TITLE_MAX,
   TEXT_ANSWER_FIELD_PREFIX,
   type TextOwnerType,
@@ -6,6 +13,7 @@ import {
 } from '@nautelle/shared';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../database/prisma.service';
+import { BRIEF_MAX_LENGTH } from '../planner/dto';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -49,6 +57,31 @@ export const ownerOfRow = (row: {
   ownerType: row.ownerType,
   ownerId: row[TEXT_OWNER_KEYS[row.ownerType]] ?? '',
 });
+
+/**
+ * The input limit of each normalized field, the one its DTO enforces. A
+ * translation may run longer than the text it came from; it is stored only
+ * within this limit.
+ */
+const FIELD_MAX: Record<TextOwnerType, Readonly<Record<string, number>>> = {
+  board_card: { title: BOARD_CARD_TITLE_MAX, body: BOARD_CARD_BODY_MAX },
+  board_card_round: { feedback: CARD_FEEDBACK_MAX },
+  design_comment: { body: DESIGN_COMMENT_MAX },
+  plan: { brief: BRIEF_MAX_LENGTH },
+  plan_task: { rewriteComment: PLANNER_SUMMARY_MAX },
+  plan_turn: { message: PLANNER_SUMMARY_MAX },
+  project_rule: {
+    title: PROJECT_RULE_TITLE_MAX,
+    description: PROJECT_RULE_DESCRIPTION_MAX,
+  },
+};
+
+/** The most characters a field of this owner type may hold. */
+export const textFieldMax = (ownerType: TextOwnerType, field: string): number =>
+  FIELD_MAX[ownerType][field] ??
+  (ownerType === 'plan_turn' && field.startsWith(TEXT_ANSWER_FIELD_PREFIX)
+    ? PLANNER_QUESTION_MAX
+    : 0);
 
 const TABLES: Record<TextOwnerType, string> = {
   board_card: 'board_cards',
@@ -252,8 +285,7 @@ export const writeOwnerText = async (
       return;
     }
     case 'project_rule': {
-      // A translation may run longer than the original; the title stays in bounds.
-      const title = value('title')?.slice(0, PROJECT_RULE_TITLE_MAX);
+      const title = value('title');
       await tx.projectRule.update({
         where: { id },
         data: {

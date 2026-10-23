@@ -17,6 +17,11 @@ import type { ReactNode } from 'react';
 import { attachmentCountLabel } from '../../lib/attachments/format';
 import { dependencyChip, readinessChip } from '../../lib/board/dependencies';
 import {
+  ESCALATED_TAG,
+  ESCALATED_TAG_TITLE,
+  isEscalated,
+} from '../../lib/board/escalation';
+import {
   approveRunOffer,
   autoRunFailureText,
   blockingDialogText,
@@ -38,13 +43,14 @@ import {
 } from '../../lib/board/format';
 import { prChipText } from '../../lib/board/pull-request';
 import { ciDot, shippingBadge } from '../../lib/board/shipping';
+import { SESSION_ENDED_TEXT, takenState } from '../../lib/board/taken';
 import { hintsLabel } from '../../lib/board-ai/triage';
 import { formatCost } from '../../lib/format';
-import { safeHttpsUrl } from '../../lib/queue/format';
+import { githubUrl } from '../../lib/url';
 import { StewardChip } from '../steward/steward-chip';
-import { SavedBadge } from '../token-saver/saved-badge';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
 import { RestartChip } from './handoff/restart-chip';
+import { QuotaWaitLine } from './quota-wait-line';
 import {
   type FaceSelection,
   SelectedTint,
@@ -61,11 +67,14 @@ const HEAD_CHIP = 'h-4 shrink-0';
 const TEXT_LINK = `${TAP} text-xs text-accent-ink underline-offset-2 hover:underline`;
 
 /**
- * What a card shows on the board (C-35, #423): four rows in one column at the
- * card's full width — the **header** (label, Bug, attachments, dependency, and
- * the cost with the menu trigger at its end), the **title**, the **status**
- * (one wrapping row of state, then the approve offer, detail lines and the
- * face's links) and the **footer** (PR and Issue, above a hairline).
+ * What a card shows on the board (C-35, #423, #778): four rows in one column at
+ * the card's full width — the **header** (selection box or unselectable mark,
+ * label, Bug, and the menu trigger at its end; nothing else, so it never
+ * truncates), the **title**, the **status** (one wrapping row: readiness, the
+ * dependency, Auto-run, stack, triage hints, → Opus, then the process state;
+ * below it the approve offer, detail lines and the face's links) and the
+ * **footer** (PR and Issue, with the attachment count and the cost at its right
+ * end, above a hairline). The token saving is in the card's Run section, not on the face.
  */
 export function CardFace({
   projectId,
@@ -107,7 +116,7 @@ export function CardFace({
         data-select-column={card.column}
         data-selected={selection ? selection.selected : undefined}
         onClickCapture={(event) => toggleOnClick(event, selection)}
-        className="relative flex min-w-0 flex-col gap-1.5 text-sm"
+        className="@container relative flex min-w-0 flex-col gap-1.5 text-sm"
       >
         <div
           data-card-row="header"
@@ -124,60 +133,13 @@ export function CardFace({
             />
           ) : null}
           <span className="shrink-0 font-mono">{card.label}</span>
-          {card.stack ? (
-            // #480: the card's stack, wherever the card sits.
-            <Chip
-              size="sm"
-              title={`Part of ${card.stack.label} ${card.stack.title}`}
-              className={`${HEAD_CHIP} gap-1 font-mono`}
-            >
-              <Layers aria-hidden="true" className="size-3" />
-              {card.stack.label}
-            </Chip>
-          ) : null}
           {card.kind === 'bug' ? (
             <Chip size="sm" tone="danger" className={HEAD_CHIP}>
               Bug
             </Chip>
           ) : null}
-          {hints ? (
-            <Chip
-              size="sm"
-              title="Triage hints: open the card to apply or dismiss them"
-              className={`${HEAD_CHIP} gap-1`}
-            >
-              <Sparkles aria-hidden="true" className="size-3" />
-              {hintsLabel(hints)}
-            </Chip>
-          ) : null}
-          {card.attachmentCount > 0 ? (
-            <span
-              className="flex shrink-0 items-center gap-0.5 tabular-nums"
-              role="img"
-              aria-label={attachmentCountLabel(card.attachmentCount)}
-              title={attachmentCountLabel(card.attachmentCount)}
-            >
-              <Paperclip aria-hidden="true" className="size-3" />
-              {card.attachmentCount}
-            </span>
-          ) : null}
-          {after ? (
-            // The one header item that gives way: it truncates first.
-            <Chip
-              size="sm"
-              tone={after.open ? 'warn' : 'neutral'}
-              title={after.title}
-              className="h-4 min-w-0 shrink"
-            >
-              <span className="truncate">{after.text}</span>
-            </Chip>
-          ) : null}
-          {cost || menu || card.tokenSaved ? (
-            <span className="ms-auto flex shrink-0 items-center gap-1">
-              {cost ? <span className="tabular-nums">{cost}</span> : null}
-              <SavedBadge saved={card.tokenSaved} />
-              {menu}
-            </span>
+          {menu ? (
+            <span className="ms-auto flex shrink-0 items-center">{menu}</span>
           ) : null}
         </div>
         <button
@@ -206,16 +168,54 @@ export function CardFace({
               {ready.text}
             </Chip>
           ) : null}
+          {after ? (
+            // #337 D8: next to the readiness it explains; truncates if long.
+            <Chip
+              size="sm"
+              tone={after.open ? 'warn' : 'neutral'}
+              title={after.title}
+              className="min-w-0 max-w-full"
+            >
+              <span className="truncate">{after.text}</span>
+            </Chip>
+          ) : null}
+          {ready?.waitsFor ? (
+            <span className="text-xs text-ink-3">{ready.waitsFor}</span>
+          ) : null}
           {card.autoRunWhenReady ? (
             <Chip size="sm" title="Auto-run when ready is on" className="gap-1">
               <Zap aria-hidden="true" className="size-3" />
               Auto-run
             </Chip>
           ) : null}
-          {ready?.waitsFor ? (
-            <span className="text-xs text-ink-3">{ready.waitsFor}</span>
+          {card.stack ? (
+            // #480: the card's stack, wherever the card sits.
+            <Chip
+              size="sm"
+              title={`Part of ${card.stack.label} ${card.stack.title}`}
+              className="gap-1 font-mono"
+            >
+              <Layers aria-hidden="true" className="size-3" />
+              {card.stack.label}
+            </Chip>
+          ) : null}
+          {hints ? (
+            <Chip
+              size="sm"
+              title="Triage hints: open the card to apply or dismiss them"
+              className="gap-1"
+            >
+              <Sparkles aria-hidden="true" className="size-3" />
+              {hintsLabel(hints)}
+            </Chip>
+          ) : null}
+          {isEscalated(card) ? (
+            <Chip size="sm" title={ESCALATED_TAG_TITLE}>
+              {ESCALATED_TAG}
+            </Chip>
           ) : null}
           {card.tracking ? <TerminalBadges card={card} /> : null}
+          <TakenBadges card={card} />
           {card.fleet ? <FleetBadges card={card} /> : null}
           {suggestion ? <SuggestionBadges card={card} /> : null}
           <CardFaceDesign card={card} />
@@ -237,6 +237,9 @@ export function CardFace({
                 <Badge tone="warn" size="md" label="Dialog open" />
               </span>
             </Tooltip>
+          ) : null}
+          {card.round?.quotaWait ? (
+            <QuotaWaitLine wait={card.round.quotaWait} />
           ) : null}
           {card.round?.finishRefused ? (
             <Tooltip content={finishRefusedText(card.round.finishRefused)}>
@@ -296,8 +299,11 @@ export function CardFace({
           <p className={note}>{card.captureWhy}</p>
         ) : null}
         <FaceLinks projectId={projectId} card={card} suggestion={suggestion} />
-        {card.prNumber !== null || card.issueNumber !== null ? (
-          <CardFooter card={card} />
+        {card.prNumber !== null ||
+        card.issueNumber !== null ||
+        cost ||
+        card.attachmentCount > 0 ? (
+          <CardFooter card={card} cost={cost} />
         ) : null}
       </div>
     </SelectionFrame>
@@ -347,6 +353,20 @@ function TerminalBadges({ card }: { card: BoardCardView }) {
         <StatusPill size="sm" status="running" label="Session running" />
       ) : null}
       {card.autoCollect ? <Chip size="sm">Automatic work</Chip> : null}
+    </>
+  );
+}
+
+/** #845 D2, D10: "taken by <session>" / "queued for <session>", and "session ended". */
+function TakenBadges({ card }: { card: BoardCardView }) {
+  const state = takenState(card);
+  if (!state) return null;
+  return (
+    <>
+      <Chip size="sm">{state.text}</Chip>
+      {state.kind === 'taken' && !state.alive ? (
+        <Chip size="sm">{SESSION_ENDED_TEXT}</Chip>
+      ) : null}
     </>
   );
 }
@@ -417,11 +437,14 @@ function FaceLinks({
   );
 }
 
-/** The PR (with its CI dot) and the Issue, above a hairline. */
-function CardFooter({ card }: { card: BoardCardView }) {
+/**
+ * The PR (with its CI dot) and the Issue, above a hairline; the attachment
+ * count and the cost sit at its right end and wrap as one group (#778).
+ */
+function CardFooter({ card, cost }: { card: BoardCardView; cost: string }) {
   const dot = ciDot(card);
-  const prHref = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
-  const issueHref = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
+  const prHref = card.prUrl ? githubUrl(card.prUrl) : null;
+  const issueHref = card.issueUrl ? githubUrl(card.issueUrl) : null;
   return (
     <div
       data-card-row="footer"
@@ -447,6 +470,22 @@ function CardFooter({ card }: { card: BoardCardView }) {
       ) : null}
       {card.issueNumber !== null ? (
         <Link href={issueHref}>Issue #{card.issueNumber}</Link>
+      ) : null}
+      {card.attachmentCount > 0 || cost ? (
+        <span className="ms-auto flex items-center gap-2 whitespace-nowrap text-ink-2 tabular-nums">
+          {card.attachmentCount > 0 ? (
+            <span
+              className="flex items-center gap-0.5"
+              role="img"
+              aria-label={attachmentCountLabel(card.attachmentCount)}
+              title={attachmentCountLabel(card.attachmentCount)}
+            >
+              <Paperclip aria-hidden="true" className="size-3" />
+              {card.attachmentCount}
+            </span>
+          ) : null}
+          {cost ? <span>{cost}</span> : null}
+        </span>
       ) : null}
     </div>
   );

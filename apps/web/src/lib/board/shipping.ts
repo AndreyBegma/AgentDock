@@ -32,6 +32,9 @@ export const CI_STILL_FAILING_TEXT = `CI still failing after ${CARD_CI_FIX_ATTEM
 /** #484: the budget stop's text when CI never reported on the head. */
 export const CI_NOT_REPORTED_TEXT = 'CI reported no checks';
 
+/** C-182: auto-merge refused a head whose checks did not all pass. */
+export const CI_NOT_GREEN_TEXT = 'Not every check passed; not merged';
+
 /**
  * #542: why auto-merge refused the head the latest round left — the round
  * did not do the card's work.
@@ -56,6 +59,9 @@ export const FORWARD_CONFLICT_TEXT = 'Forward PR conflicts with the base';
 export const FORWARD_FAILED_TEXT =
   'Merged into a dead branch; forward PR not opened';
 
+/** C-148 (ADR-0077): a push changed CI, deploy or plugin files. */
+export const PROTECTED_PATHS_TEXT = 'Protected paths changed; a person merges';
+
 /**
  * Why automation stopped: the stored reason, else — a card marked before
  * #542 — no checks at all (#484), or red ones (#359 D6).
@@ -68,6 +74,8 @@ const needsPersonText = (
       return CI_STILL_FAILING_TEXT;
     case 'ci_not_reported':
       return CI_NOT_REPORTED_TEXT;
+    case 'ci_not_green':
+      return CI_NOT_GREEN_TEXT;
     case 'round_failed':
     case 'round_pushed_nothing':
     case 'round_ended_at_once':
@@ -95,6 +103,8 @@ export interface ShippingBadge {
  * #359 D6–D8: the one sub-state a card shows next to its PR chip.
  * - `needsPerson` beats everything: automation stopped (D6);
  * - a merged card is "Merged" and stays in Finished (D8);
+ * - an unmerged card whose push changed a protected path is never
+ *   auto-merged (C-148);
  * - an In progress card with red CI and fix rounds spent is "Fixing CI (n/3)";
  * - an In progress card whose checks are running is "Checks running" (D7).
  */
@@ -107,10 +117,14 @@ export function shippingBadge(
     | 'needsPerson'
     | 'needsPersonReason'
     | 'mergedAt'
+    | 'protectedPaths'
   >,
 ): ShippingBadge | null {
   if (card.needsPerson) return { tone: 'danger', label: needsPersonText(card) };
   if (card.mergedAt !== null) return { tone: 'ok', label: 'Merged' };
+  if (card.protectedPaths.length > 0) {
+    return { tone: 'warn', label: PROTECTED_PATHS_TEXT };
+  }
   if (card.column !== 'in_progress') return null;
   if (card.ciState === 'red' && card.ciFixAttempts > 0) {
     const n = Math.min(card.ciFixAttempts, CARD_CI_FIX_ATTEMPTS_MAX);
@@ -145,6 +159,22 @@ export function ciBanner(
       card.needsPersonReason === 'branch_diverged'
         ? 'Nothing was pushed: the remote branch has commits the card’s branch never had. Merge them into the branch — yourself, or by Send feedback — then Create pull request.'
         : 'Nothing runs on its own now. Send feedback, Run again, or Accept.',
+  };
+}
+
+/**
+ * C-148 (ADR-0077): the sheet's banner while the card's latest push changed
+ * a protected path and its PR is not merged — never auto-merged, whatever
+ * the project's switch; `null` otherwise.
+ */
+export function protectedPathsBanner(
+  card: Pick<BoardCardView, 'protectedPaths' | 'mergedAt'>,
+): { title: string; paths: string[]; hint: string } | null {
+  if (card.protectedPaths.length === 0 || card.mergedAt !== null) return null;
+  return {
+    title: PROTECTED_PATHS_TEXT,
+    paths: card.protectedPaths,
+    hint: 'These files run in CI, deploys or plugins, so the board never merges this card on its own. Review the changes, then Accept.',
   };
 }
 

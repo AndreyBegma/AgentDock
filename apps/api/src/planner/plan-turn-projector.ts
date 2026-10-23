@@ -5,6 +5,7 @@ import {
   type DecomposeOutput,
   type DesignOutput,
   type DiscussOutput,
+  designBytes,
   type GrillOutput,
   type IntakeOutput,
   isIntakeCard,
@@ -17,6 +18,7 @@ import {
 } from '@nautelle/shared';
 import {
   isPlanTurnEventType,
+  PLAN_TURN_RESULT_TOTAL_MAX_BYTES,
   type PlanTurnFinishedData,
   type PlanTurnPhaseChangedData,
   type PlanTurnResultChunkData,
@@ -92,6 +94,35 @@ type OwnedTurn =
 type Chain =
   | { action: 'write' | 'decompose'; taskId: string | null }
   | { action: 'design'; taskId: string; design: DesignTurnPlan };
+
+/** A plan a late turn's output no longer changes (L-28). */
+const CLOSED_STATUSES: ReadonlySet<string> = new Set([
+  'sending',
+  'sent',
+  'archived',
+  'done',
+]);
+
+/** A truncated result's error, as every turn but a design turn reads it. */
+const TRUNCATED =
+  'contract_violation: result_truncated: the result was cut at the event size limit';
+
+/**
+ * #833 D12: a design turn whose result the runner cut. A cut under this
+ * API's `PLAN_TURN_RESULT_TOTAL_MAX_BYTES` is a runner released before the
+ * 2 MiB designs — the error names its version and asks for an update. The
+ * turn fails whole; no half revision is stored.
+ */
+const truncatedDesignError = (
+  version: string | null,
+  resultText: string | null,
+): string => {
+  const cut = designBytes(resultText ?? '');
+  if (cut > 0 && cut < PLAN_TURN_RESULT_TOTAL_MAX_BYTES) {
+    return `contract_violation: result_truncated: runner ${version ?? '(unknown version)'} is too old for this design — it cut the result at ${cut} bytes, under the ${PLAN_TURN_RESULT_TOTAL_MAX_BYTES} this API takes; update the runner`;
+  }
+  return `contract_violation: result_truncated: the result was cut at ${PLAN_TURN_RESULT_TOTAL_MAX_BYTES} bytes (runner ${version ?? '(unknown version)'})`;
+};
 
 const taskData = (planId: string, version: number, draft: TaskDraft) => ({
   planId,
@@ -333,7 +364,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     const owned = await this.turnOf(runnerId, data);
     if (!owned) return;
     if (owned.kind === 'host') {
-      await this.hostFinished(owned.turn, owned.host, data);
+      await this.hostFinished(runnerId, owned.turn, owned.host, data);
       return;
     }
     const { turn } = owned;
@@ -380,14 +411,19 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
         ? null
         : await this.parse(tx, turn, turn.action, resultText, designPlan);
       if (!parsed?.ok) {
-        const why = parsed
-          ? `${parsed.error.reason}: ${parsed.error.message}`
-          : 'result_truncated: the result was cut at the event size limit';
+        const error = parsed
+          ? `contract_violation: ${parsed.error.reason}: ${parsed.error.message}`
+          : turn.action === 'design'
+            ? truncatedDesignError(
+                await this.runnerVersion(runnerId),
+                resultText,
+              )
+            : TRUNCATED;
         const settled = await this.store.settleTurn(
           turn.id,
           {
             phase: 'failed',
-            error: `contract_violation: ${why}`,
+            error,
             resultText,
             at,
           },
@@ -509,6 +545,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
    * of the batch starts, or the design rests. No write turn follows (D7).
    */
   private async hostFinished(
+    runnerId: string,
     turn: PlanTurn,
     host: DesignHost,
     data: PlanTurnFinishedData,
@@ -544,7 +581,7 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       if (data.resultTruncated) {
         return fail(
           'failed',
-          'contract_violation: result_truncated: the result was cut at the event size limit',
+          truncatedDesignError(await this.runnerVersion(runnerId), resultText),
         );
       }
       if (!designPlan || turn.action !== 'design') {
@@ -642,6 +679,15 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
       where: { id: planId, mode: 'discuss', status: 'clarifying' },
       data: { title: output.title },
     });
+  }
+
+  /** #833 D12: the version the runner last reported, for a truncated design. */
+  private async runnerVersion(runnerId: string): Promise<string | null> {
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { version: true },
+    });
+    return runner?.version ?? null;
   }
 
   /** Validates against the contract with what only the API knows (D17). */
@@ -744,8 +790,12 @@ export class PlanTurnProjector implements RunnerEventSink, OnModuleInit {
     ) {
       return null;
     }
-    // The turn may have been started on an older row; read the plan now.
+    // The turn may have been started on an older row; read the plan now,
+    // holding it (L-28) so a late turn cannot reopen a plan that was sent,
+    // archived or made its cards meanwhile, nor rewrite one being sent.
+    await tx.$queryRaw`SELECT id FROM plans WHERE id = ${planRow.id} FOR UPDATE`;
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planRow.id } });
+    if (CLOSED_STATUSES.has(plan.status)) return null;
     switch (output.action) {
       case 'clarify':
         return output.done ? { action: 'decompose', taskId: null } : null;

@@ -1,6 +1,7 @@
 import {
   type ApiErrorBody,
   AUTH_ERROR,
+  type CurrentUserResponse,
   type PublicUser,
   SESSION_COOKIE,
 } from '@nautelle/shared';
@@ -12,8 +13,14 @@ const API_URL = process.env.API_URL ?? 'http://localhost:8180';
 /**
  * The signed-in user for a segment layout (spec D6): `GET /auth/me` with the
  * request's session cookie. 401 → `/login`, a pending account → `/pending`.
+ * An admin who must still set up two-factor sign-in (C-189) is sent to
+ * `/account`, the one segment that passes `allowTwoFactorSetup`.
  */
-export async function requireUser(): Promise<PublicUser> {
+export async function requireUser({
+  allowTwoFactorSetup = false,
+}: {
+  allowTwoFactorSetup?: boolean;
+} = {}): Promise<PublicUser> {
   const session = (await cookies()).get(SESSION_COOKIE);
   if (!session) redirect('/login');
 
@@ -21,7 +28,13 @@ export async function requireUser(): Promise<PublicUser> {
     headers: { cookie: `${SESSION_COOKIE}=${session.value}` },
     cache: 'no-store',
   });
-  if (response.ok) return (await response.json()) as PublicUser;
+  if (response.ok) {
+    const user = (await response.json()) as CurrentUserResponse;
+    if (user.twoFactorSetupRequired && !allowTwoFactorSetup) {
+      redirect('/account');
+    }
+    return user;
+  }
 
   const body = (await response
     .json()

@@ -1,10 +1,15 @@
-import type { Role, TelegramLinkCode } from '@nautelle/shared';
+import type {
+  Role,
+  TelegramLinkCode,
+  TelegramLinkStatus,
+} from '@nautelle/shared';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BotTokenStore } from '../notifications';
 import { seedUser } from '../notifications/testing/notifications-e2e';
 import { login, type Session } from '../test/e2e-app';
 import { HELP_TEXT, UNKNOWN_COMMAND_TEXT } from './telegram-commands';
 import { hashLinkCode, LINK_REPLIES } from './telegram-linking.service';
+import { TelegramPendingLinkExpiryJob } from './telegram-pending-link-expiry.job';
 import { TelegramPoller } from './telegram-poller';
 import {
   BOT_TOKEN,
@@ -16,6 +21,14 @@ import {
   resetTelegram,
   type TelegramE2e,
 } from './testing/telegram-e2e';
+
+const NOT_LINKED = {
+  linked: false,
+  username: null,
+  linkedAt: null,
+  botConfigured: true,
+  pending: null,
+};
 
 describe('Telegram linking (e2e)', () => {
   let ctx: TelegramE2e;
@@ -56,6 +69,30 @@ describe('Telegram linking (e2e)', () => {
     return privateMessage(nextUpdate, chatId, text, username);
   };
 
+  const statusOf = async (session: Session): Promise<TelegramLinkStatus> => {
+    const response = await session.get('/notifications/telegram/link');
+    expect(response.status).toBe(200);
+    return response.body as TelegramLinkStatus;
+  };
+
+  const confirm = (session: Session, id: string) =>
+    session.send('post', '/notifications/telegram/link/confirm', { id });
+
+  /** `/start <code>` from `chatId`, then the confirmation in the app. */
+  const link = async (
+    session: Session,
+    chatId: number,
+    username?: string,
+  ): Promise<void> => {
+    const code = await newCode(session);
+    expect(await say(fromChat(chatId, `/start ${code}`, username))).toBe(
+      LINK_REPLIES.pending,
+    );
+    const { pending } = await statusOf(session);
+    if (!pending) throw new Error('no pending link');
+    expect((await confirm(session, pending.id)).status).toBe(200);
+  };
+
   beforeAll(async () => {
     ctx = await createTelegramApp();
     poller = ctx.app.get(TelegramPoller);
@@ -76,51 +113,39 @@ describe('Telegram linking (e2e)', () => {
   });
 
   describe('GET /notifications/telegram/link', () => {
-    it('reports not linked, then linked, for the caller only', async () => {
+    it('reports not linked, pending, then linked, for the caller only', async () => {
       const ada = await signIn('ada@example.com');
       const bob = await signIn('bob@example.com');
-      expect(
-        (await ada.session.get('/notifications/telegram/link')).body,
-      ).toEqual({
-        linked: false,
-        username: null,
-        linkedAt: null,
-        botConfigured: true,
-      });
+      expect(await statusOf(ada.session)).toEqual(NOT_LINKED);
 
       const code = await newCode(ada.session);
       expect(await say(fromChat(555, `/start ${code}`))).toBe(
-        LINK_REPLIES.linked,
+        LINK_REPLIES.pending,
       );
+      const waiting = await statusOf(ada.session);
+      expect(waiting).toMatchObject({ linked: false, username: null });
+      expect(waiting.pending).toMatchObject({ username: 'ada_tg' });
 
-      const linked = await ada.session.get('/notifications/telegram/link');
-      expect(linked.status).toBe(200);
-      expect(linked.body).toMatchObject({
+      expect(
+        (await confirm(ada.session, waiting.pending?.id ?? '')).status,
+      ).toBe(200);
+      const linked = await statusOf(ada.session);
+      expect(linked).toMatchObject({
         linked: true,
         username: 'ada_tg',
         botConfigured: true,
+        pending: null,
       });
-      expect(typeof linked.body.linkedAt).toBe('string');
+      expect(typeof linked.linkedAt).toBe('string');
       // Bob's own state, not Ada's.
-      expect(
-        (await bob.session.get('/notifications/telegram/link')).body,
-      ).toEqual({
-        linked: false,
-        username: null,
-        linkedAt: null,
-        botConfigured: true,
-      });
+      expect(await statusOf(bob.session)).toEqual(NOT_LINKED);
     });
 
     it('reports the bot as not configured', async () => {
       const ada = await signIn('ada@example.com');
       await store.clear({ actor: SYSTEM_ACTOR });
-      const response = await ada.session.get('/notifications/telegram/link');
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({
-        linked: false,
-        username: null,
-        linkedAt: null,
+      expect(await statusOf(ada.session)).toEqual({
+        ...NOT_LINKED,
         botConfigured: false,
       });
     });
@@ -171,13 +196,13 @@ describe('Telegram linking (e2e)', () => {
         LINK_REPLIES.invalidCode,
       );
       expect(await say(fromChat(555, `/start ${second}`))).toBe(
-        LINK_REPLIES.linked,
+        LINK_REPLIES.pending,
       );
     });
   });
 
-  describe('/start <code> (D9)', () => {
-    it('binds the private chat, audits, and moves the update offset', async () => {
+  describe('/start <code> (D9, C-147)', () => {
+    it('only records a pending link, audits it, tells the user in the app, and moves the update offset', async () => {
       const ada = await signIn('ada@example.com');
       const code = await newCode(ada.session);
       // The poller is one instance for the suite: ids keep growing across tests.
@@ -186,14 +211,22 @@ describe('Telegram linking (e2e)', () => {
       ctx.fake.updates.push(privateMessage(updateId, 555, `/start ${code}`));
       expect(await poller.pollOnce()).toEqual({ status: 'polled', updates: 1 });
 
-      const link = await ctx.prisma.telegramLink.findUniqueOrThrow({
+      // L-18: whoever redeems the code first does not get the account.
+      expect(await ctx.prisma.telegramLink.count()).toBe(0);
+      const pending = await ctx.prisma.telegramPendingLink.findUniqueOrThrow({
         where: { userId: ada.id },
       });
-      expect(link).toMatchObject({ chatId: 555n, username: 'ada_tg' });
+      expect(pending).toMatchObject({ chatId: 555n, username: 'ada_tg' });
+      const codeRow = await ctx.prisma.telegramLinkCode.findFirstOrThrow({
+        where: { userId: ada.id },
+      });
+      // It lives as long as the code would have.
+      expect(pending.expiresAt).toEqual(codeRow.expiresAt);
+
       const reply = ctx.fake.sent()[0];
       expect(reply.body).toMatchObject({
         chat_id: 555,
-        text: LINK_REPLIES.linked,
+        text: LINK_REPLIES.pending,
       });
       expect(reply.body.parse_mode).toBeUndefined();
 
@@ -210,29 +243,46 @@ describe('Telegram linking (e2e)', () => {
       expect(ctx.fake.sent()).toHaveLength(1);
 
       const audit = await ctx.prisma.auditRecord.findFirstOrThrow({
-        where: { action: 'telegram.link', actorUserId: ada.id },
+        where: { action: 'telegram.link_request', actorUserId: ada.id },
         select: { actorUserId: true, after: true, meta: true, result: true },
       });
       expect(audit).toMatchObject({
         actorUserId: ada.id,
         result: 'ok',
         meta: { via: 'telegram' },
-        after: { linked: true, username: 'ada_tg' },
+        after: { pending: true, username: 'ada_tg' },
       });
       expect(JSON.stringify(audit)).not.toContain('555');
+      expect(
+        await ctx.prisma.auditRecord.count({
+          where: { action: 'telegram.link', actorUserId: ada.id },
+        }),
+      ).toBe(0);
+
+      const notifications = await ctx.prisma.notification.findMany({
+        where: { userId: ada.id },
+        select: { kind: true, title: true, link: true },
+      });
+      expect(notifications).toEqual([
+        {
+          kind: 'telegram.link_pending',
+          title: 'Confirm the Telegram chat @ada_tg',
+          link: '/account/notifications#telegram',
+        },
+      ]);
     });
 
     it('refuses a code that was already used', async () => {
       const ada = await signIn('ada@example.com');
       const code = await newCode(ada.session);
       expect(await say(fromChat(555, `/start ${code}`))).toBe(
-        LINK_REPLIES.linked,
+        LINK_REPLIES.pending,
       );
-      expect(await say(fromChat(555, '/stop'))).toBe(LINK_REPLIES.unlinked);
-      expect(await say(fromChat(555, `/start ${code}`))).toBe(
+      expect(await say(fromChat(666, `/start ${code}`))).toBe(
         LINK_REPLIES.invalidCode,
       );
-      expect(await ctx.prisma.telegramLink.count()).toBe(0);
+      const pending = await ctx.prisma.telegramPendingLink.findMany();
+      expect(pending.map((p) => p.chatId)).toEqual([555n]);
     });
 
     it('refuses an expired code', async () => {
@@ -245,7 +295,7 @@ describe('Telegram linking (e2e)', () => {
       expect(await say(fromChat(555, `/start ${code}`))).toBe(
         LINK_REPLIES.invalidCode,
       );
-      expect(await ctx.prisma.telegramLink.count()).toBe(0);
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(0);
     });
 
     it('refuses an unknown or malformed code', async () => {
@@ -265,7 +315,7 @@ describe('Telegram linking (e2e)', () => {
       expect(await say(groupMessage(nextUpdate, -1001, `/start ${code}`))).toBe(
         LINK_REPLIES.notPrivate,
       );
-      expect(await ctx.prisma.telegramLink.count()).toBe(0);
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(0);
       const row = await ctx.prisma.telegramLinkCode.findFirstOrThrow({
         where: { userId: ada.id },
       });
@@ -275,23 +325,62 @@ describe('Telegram linking (e2e)', () => {
     it('refuses a chat already linked to another user', async () => {
       const ada = await signIn('ada@example.com');
       const bob = await signIn('bob@example.com');
-      expect(
-        await say(fromChat(555, `/start ${await newCode(ada.session)}`)),
-      ).toBe(LINK_REPLIES.linked);
+      await link(ada.session, 555);
       expect(
         await say(fromChat(555, `/start ${await newCode(bob.session)}`)),
       ).toBe(LINK_REPLIES.chatTaken);
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(0);
       const links = await ctx.prisma.telegramLink.findMany();
       expect(links.map((l) => l.userId)).toEqual([ada.id]);
     });
 
-    it('moves a user to a new chat: one chat per user', async () => {
+    it('answers linked when the chat is already the user’s link', async () => {
       const ada = await signIn('ada@example.com');
-      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
-      await say(fromChat(777, `/start ${await newCode(ada.session)}`));
+      await link(ada.session, 555);
+      expect(
+        await say(fromChat(555, `/start ${await newCode(ada.session)}`)),
+      ).toBe(LINK_REPLIES.linked);
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(0);
+    });
+
+    it('moves a user to a new chat once confirmed: one chat per user', async () => {
+      const ada = await signIn('ada@example.com');
+      await link(ada.session, 555);
+      expect(
+        await say(fromChat(777, `/start ${await newCode(ada.session)}`)),
+      ).toBe(LINK_REPLIES.pending);
+      // The old chat stays linked until the new one is confirmed.
+      expect(await ctx.prisma.telegramLink.findMany()).toMatchObject([
+        { userId: ada.id, chatId: 555n },
+      ]);
+
+      const { pending } = await statusOf(ada.session);
+      expect((await confirm(ada.session, pending?.id ?? '')).status).toBe(200);
       const links = await ctx.prisma.telegramLink.findMany();
       expect(links).toHaveLength(1);
       expect(links[0]).toMatchObject({ userId: ada.id, chatId: 777n });
+      const audit = await ctx.prisma.auditRecord.findFirstOrThrow({
+        where: { action: 'telegram.link', actorUserId: ada.id },
+        orderBy: { seq: 'desc' },
+        select: { after: true },
+      });
+      expect(audit.after).toMatchObject({ replacedChat: true });
+    });
+
+    it('keeps one pending link per user: a later /start replaces it', async () => {
+      const ada = await signIn('ada@example.com');
+      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
+      const first = (await statusOf(ada.session)).pending;
+      await say(fromChat(777, `/start ${await newCode(ada.session)}`, 'eve'));
+      const second = (await statusOf(ada.session)).pending;
+      expect(second).toMatchObject({ username: 'eve' });
+      // The page that showed the first request cannot confirm the second.
+      const stale = await confirm(ada.session, first?.id ?? '');
+      expect(stale.status).toBe(404);
+      expect(stale.body).toMatchObject({
+        error: 'telegram_link_request_not_found',
+      });
+      expect(await ctx.prisma.telegramLink.count()).toBe(0);
     });
 
     it('refuses a code of a user disabled since', async () => {
@@ -304,7 +393,7 @@ describe('Telegram linking (e2e)', () => {
       expect(await say(fromChat(555, `/start ${code}`))).toBe(
         LINK_REPLIES.invalidCode,
       );
-      expect(await ctx.prisma.telegramLink.count()).toBe(0);
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(0);
     });
 
     it('ignores text that is not a command', async () => {
@@ -319,10 +408,140 @@ describe('Telegram linking (e2e)', () => {
     });
   });
 
+  describe('confirming in the app (C-147)', () => {
+    it('activates the chat, tells it, and audits the confirmation', async () => {
+      const ada = await signIn('ada@example.com');
+      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
+      const { pending } = await statusOf(ada.session);
+      ctx.fake.reset();
+
+      const response = await confirm(ada.session, pending?.id ?? '');
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        linked: true,
+        username: 'ada_tg',
+        pending: null,
+      });
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(0);
+      expect(
+        await ctx.prisma.telegramLink.findUniqueOrThrow({
+          where: { userId: ada.id },
+        }),
+      ).toMatchObject({ chatId: 555n, username: 'ada_tg' });
+      expect(ctx.fake.sent().map((c) => c.body)).toEqual([
+        expect.objectContaining({ chat_id: 555, text: LINK_REPLIES.linked }),
+      ]);
+
+      const audit = await ctx.prisma.auditRecord.findFirstOrThrow({
+        where: { action: 'telegram.link', actorUserId: ada.id },
+        select: { after: true, meta: true, result: true },
+      });
+      expect(audit).toMatchObject({
+        result: 'ok',
+        meta: { via: 'app', confirmed: true },
+        after: { linked: true, username: 'ada_tg', replacedChat: false },
+      });
+      expect(JSON.stringify(audit)).not.toContain('555');
+
+      // Single use.
+      expect((await confirm(ada.session, pending?.id ?? '')).status).toBe(404);
+    });
+
+    it('refuses another user’s pending link with 404', async () => {
+      const ada = await signIn('ada@example.com');
+      const bob = await signIn('bob@example.com');
+      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
+      const { pending } = await statusOf(ada.session);
+      const response = await confirm(bob.session, pending?.id ?? '');
+      expect(response.status).toBe(404);
+      expect(await ctx.prisma.telegramLink.count()).toBe(0);
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(1);
+    });
+
+    it('refuses with 409 when another user linked the chat meanwhile', async () => {
+      const ada = await signIn('ada@example.com');
+      const bob = await signIn('bob@example.com');
+      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
+      const adaPending = (await statusOf(ada.session)).pending;
+      await link(bob.session, 555);
+
+      const response = await confirm(ada.session, adaPending?.id ?? '');
+      expect(response.status).toBe(409);
+      expect(response.body).toMatchObject({ error: 'telegram_chat_taken' });
+      const links = await ctx.prisma.telegramLink.findMany();
+      expect(links.map((l) => l.userId)).toEqual([bob.id]);
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(0);
+    });
+
+    it('validates the body', async () => {
+      const ada = await signIn('ada@example.com');
+      const response = await ada.session.send(
+        'post',
+        '/notifications/telegram/link/confirm',
+        { id: '', extra: 1 },
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it('turns the chat away with DELETE …/pending, and audits it', async () => {
+      const ada = await signIn('ada@example.com');
+      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
+      const { pending } = await statusOf(ada.session);
+
+      const response = await ada.session.send(
+        'delete',
+        '/notifications/telegram/link/pending',
+      );
+      expect(response.status).toBe(204);
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(0);
+      expect((await statusOf(ada.session)).pending).toBeNull();
+      expect((await confirm(ada.session, pending?.id ?? '')).status).toBe(404);
+      // Idempotent.
+      expect(
+        (
+          await ada.session.send(
+            'delete',
+            '/notifications/telegram/link/pending',
+          )
+        ).status,
+      ).toBe(204);
+
+      const audits = await ctx.prisma.auditRecord.findMany({
+        where: { action: 'telegram.link_decline', actorUserId: ada.id },
+        select: { before: true, meta: true, result: true },
+      });
+      expect(audits).toMatchObject([
+        { result: 'ok', meta: { via: 'app' }, before: { username: 'ada_tg' } },
+      ]);
+    });
+  });
+
+  describe('expiry (C-147)', () => {
+    it('hides an expired pending link, refuses to confirm it, and the sweep removes it', async () => {
+      const ada = await signIn('ada@example.com');
+      const bob = await signIn('bob@example.com');
+      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
+      await say(fromChat(666, `/start ${await newCode(bob.session)}`));
+      const { pending } = await statusOf(ada.session);
+      await ctx.prisma.telegramPendingLink.updateMany({
+        where: { userId: ada.id },
+        data: { expiresAt: new Date(Date.now() - 1_000) },
+      });
+
+      expect((await statusOf(ada.session)).pending).toBeNull();
+      expect((await confirm(ada.session, pending?.id ?? '')).status).toBe(404);
+      expect(await ctx.prisma.telegramLink.count()).toBe(0);
+
+      expect(await ctx.app.get(TelegramPendingLinkExpiryJob).sweep()).toBe(1);
+      const left = await ctx.prisma.telegramPendingLink.findMany();
+      expect(left.map((p) => p.userId)).toEqual([bob.id]);
+    });
+  });
+
   describe('unlinking', () => {
     it('/stop in the chat unlinks and audits', async () => {
       const ada = await signIn('ada@example.com');
-      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
+      await link(ada.session, 555);
       expect(await say(fromChat(555, '/stop'))).toBe(LINK_REPLIES.unlinked);
       expect(await ctx.prisma.telegramLink.count()).toBe(0);
       expect(await say(fromChat(555, '/stop'))).toBe(LINK_REPLIES.notLinked);
@@ -334,11 +553,19 @@ describe('Telegram linking (e2e)', () => {
       expect(audit).toEqual({ result: 'ok', meta: { via: 'telegram' } });
     });
 
+    it('/stop in a waiting chat withdraws the pending link', async () => {
+      const ada = await signIn('ada@example.com');
+      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
+      expect(await say(fromChat(555, '/stop'))).toBe(LINK_REPLIES.unlinked);
+      expect(await ctx.prisma.telegramPendingLink.count()).toBe(0);
+      expect((await statusOf(ada.session)).pending).toBeNull();
+    });
+
     it('DELETE /notifications/telegram/link unlinks only the caller', async () => {
       const ada = await signIn('ada@example.com');
       const bob = await signIn('bob@example.com');
-      await say(fromChat(555, `/start ${await newCode(ada.session)}`));
-      await say(fromChat(666, `/start ${await newCode(bob.session)}`));
+      await link(ada.session, 555);
+      await link(bob.session, 666);
 
       const response = await ada.session.send(
         'delete',

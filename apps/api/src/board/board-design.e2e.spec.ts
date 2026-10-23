@@ -186,23 +186,30 @@ describe('board × design (e2e, #243)', () => {
 
     expect((await run(card.number)).status).toBe(200);
     const [args] = h.cardSentOf('card.run');
-    const path = cardDesignPath(
-      null,
-      { number: card.number, title: card.title, issueNumber: null },
-      1,
-      'mockup',
-    );
-    expect(path).toBe('docs/design/cards/C-1-add-login/1/mockup.html');
+    // #833: the page template's two frames.
+    const pathOf = (slug: string) =>
+      cardDesignPath(
+        null,
+        { number: card.number, title: card.title, issueNumber: null },
+        1,
+        slug,
+      );
+    const path = pathOf('screen');
+    expect(path).toBe('docs/design/cards/C-1-add-login/1/screen.html');
     const files = args.files as CardRunFile[];
-    expect(files).toEqual([{ path, content: PICKED }]);
+    expect(files).toEqual([
+      { path, content: PICKED },
+      { path: pathOf('breakdown'), content: PICKED },
+    ]);
     expect(files[0].content).not.toContain(MOCKUP_PIN_HELPER_ATTRIBUTE);
     const prompt = String(args.prompt);
     expect(prompt).toContain('## Design');
-    expect(prompt).toContain(`The approved mockup is ${path}`);
+    expect(prompt).toContain(`- ${path} — Screen`);
     expect(prompt).toContain(
       'Why this design:\n<card>\nThe button says what it does.\n</card>',
     );
-    expect(prompt).toContain('- Say "Sign in", not "Export".');
+    // #833: two frames — the decision is led by the frame it was left on.
+    expect(prompt).toContain('Say "Sign in", not "Export".');
 
     // Designs freeze once a round exists.
     const frozen = await h.author.send('patch', base, { needed: false });
@@ -222,7 +229,8 @@ describe('board × design (e2e, #243)', () => {
     const files = h.cardSentOf('card.run')[0].files as CardRunFile[];
     expect(files.map((f) => f.path)).toEqual([
       'docs/specs/card-1-add-login.md',
-      'docs/specs/card-1-add-login/design/1/mockup.html',
+      'docs/specs/card-1-add-login/design/1/screen.html',
+      'docs/specs/card-1-add-login/design/1/breakdown.html',
     ]);
   });
 
@@ -231,11 +239,24 @@ describe('board × design (e2e, #243)', () => {
     const card = await h.designedCard(1);
     const base = h.cardDesignBase(card.number);
     await h.author.send('post', `${base}/generate`);
+    // #833: the page template's screen, breakdown and optional states.
     const frames = [
-      { name: 'Board page', html: MOCKUP.replace('Export', 'Board') },
-      { name: 'Card page', html: MOCKUP.replace('Export', 'Card') },
-      { name: 'Frame tabs', html: MOCKUP.replace('Export', 'Tabs') },
-    ];
+      {
+        name: 'Board page',
+        kind: 'screen',
+        html: MOCKUP.replace('Export', 'Board'),
+      },
+      {
+        name: 'Card page',
+        kind: 'breakdown',
+        html: MOCKUP.replace('Export', 'Card'),
+      },
+      {
+        name: 'Frame tabs',
+        kind: 'states',
+        html: MOCKUP.replace('Export', 'Tabs'),
+      },
+    ] as const;
     await h.finishCard(
       card.id,
       designResult({ taskKey: KEY, variant: 1 }, frames),

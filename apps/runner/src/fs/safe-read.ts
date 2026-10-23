@@ -55,3 +55,40 @@ export const readRegularFileInside = (
     if (fd !== undefined) closeSync(fd);
   }
 };
+
+/** A capped read: the text, or — for a file over the cap, never read — its size. */
+export type CappedRead =
+  | { ok: true; text: string }
+  | { ok: false; size: number };
+
+/**
+ * Reads `path` as text when it is a regular file of at most `maxBytes`. An
+ * oversized file is reported by its size and never read; a missing file, a
+ * directory or any error gives null.
+ */
+export const readFileCapped = (
+  path: string,
+  maxBytes: number,
+): CappedRead | null => {
+  let fd: number | undefined;
+  try {
+    // O_NONBLOCK: a FIFO in the file's place must not block the open.
+    fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK);
+    const stat = fstatSync(fd);
+    if (!stat.isFile()) return null;
+    if (stat.size > maxBytes) return { ok: false, size: stat.size };
+    // Up to the size the stat saw: a file growing meanwhile never reads past the cap.
+    const buffer = Buffer.alloc(stat.size);
+    let read = 0;
+    while (read < buffer.length) {
+      const n = readSync(fd, buffer, read, buffer.length - read, read);
+      if (n === 0) break;
+      read += n;
+    }
+    return { ok: true, text: buffer.toString('utf8', 0, read) };
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+};

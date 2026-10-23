@@ -132,6 +132,69 @@ describe('fleet projector (e2e)', () => {
     });
   });
 
+  it('lets an advisory event name a PR but never change its merge or check state (C-169)', async () => {
+    await project(
+      appeared(),
+      stream.next(
+        'pr.opened',
+        {
+          number: 7,
+          branch: 'feat/42',
+          url: PR_URL,
+          title: 'widget',
+          checks: 'red',
+          mergeable: false,
+        },
+        { slot: 'i42' },
+      ),
+    );
+    for (const source of ['code-sentinel', 'hook', 'scraped'] as const) {
+      await project(
+        stream.next(
+          'pr.checks_changed',
+          { number: 7, branch: 'feat/42', checks: 'green', mergeable: true },
+          { slot: 'i42', source },
+        ),
+        stream.next('pr.merged', { number: 7 }, { slot: 'i42', source }),
+        stream.next(
+          'pr.closed',
+          { number: 7, branch: 'feat/42', merged: true },
+          { slot: 'i42', source },
+        ),
+        stream.next(
+          'orchestrator.snapshot',
+          {
+            state: {
+              v: 1,
+              slots: {
+                i42: { status: 'merged', pr: { number: 7, rollup: 'green' } },
+              },
+            },
+          },
+          { source },
+        ),
+      );
+      expect(await slot()).toMatchObject({
+        status: 'running',
+        prNumber: 7,
+        prState: 'open',
+        prChecks: 'red',
+        prMergeable: false,
+        endedAt: null,
+      });
+    }
+
+    // The runner's own `gh` observation still decides.
+    await project(
+      stream.next(
+        'pr.closed',
+        { number: 7, branch: 'feat/42', merged: true },
+        { slot: 'i42' },
+      ),
+    );
+    expect(await slot()).toMatchObject({ prState: 'merged' });
+  });
+
   it('follows the pane through prompt, idle, quota and busy', async () => {
     await project(appeared());
     const pane = (type: string, data: Record<string, unknown> = {}) =>
@@ -147,6 +210,48 @@ describe('fleet projector (e2e)', () => {
     expect((await slot()).status).toBe('quota');
     await project(vanished());
     expect(await slot()).toMatchObject({ status: 'stale', pane: null });
+  });
+
+  it('keeps the limit and its reset while the slot is on the quota banner (#741)', async () => {
+    await project(appeared());
+    const pane = (type: string, data: Record<string, unknown> = {}) =>
+      stream.next(type, data, { slot: 'i42' });
+
+    await project(
+      pane('pane.quota_hit', {
+        limit: 'session',
+        resetsAt: '2026-10-21T15:00:00.000Z',
+      }),
+    );
+    expect(await slot()).toMatchObject({
+      status: 'quota',
+      quotaLimit: 'session',
+      quotaResetsAt: new Date('2026-10-21T15:00:00.000Z'),
+    });
+
+    await project(pane('pane.quota_resumed'));
+    expect(await slot()).toMatchObject({
+      quotaLimit: null,
+      quotaResetsAt: null,
+    });
+
+    // An older runner sends neither field.
+    await project(pane('pane.quota_hit'));
+    expect(await slot()).toMatchObject({
+      status: 'quota',
+      quotaLimit: null,
+      quotaResetsAt: null,
+    });
+
+    await project(
+      pane('pane.quota_hit', { limit: 'weekly', resetsAt: null }),
+      pane('pane.busy'),
+    );
+    expect(await slot()).toMatchObject({
+      status: 'running',
+      quotaLimit: null,
+      quotaResetsAt: null,
+    });
   });
 
   it('takes the brief: dispatched until the session appears, on the same run', async () => {

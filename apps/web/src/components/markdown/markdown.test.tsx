@@ -21,6 +21,8 @@ describe('safeHref', () => {
     expect(safeHref(' JavaScript:alert(1)')).toBeNull();
     expect(safeHref('data:text/html,<b>x</b>')).toBeNull();
     expect(safeHref('//evil.example')).toBeNull();
+    expect(safeHref('/\\evil.example')).toBeNull();
+    expect(safeHref('/\t/evil.example')).toBeNull();
     expect(safeHref('')).toBeNull();
     expect(safeHref(undefined)).toBeNull();
   });
@@ -47,6 +49,17 @@ describe('Markdown', () => {
     const html = render('[click](javascript:alert(1))');
     expect(html).not.toContain('href');
     expect(html).toContain('click');
+  });
+
+  test('a /\\host link renders as plain text (spec 164)', () => {
+    const html = render('[x](/\\evil.com)');
+    expect(html).not.toContain('href');
+    expect(html).toContain('x');
+  });
+
+  test('an external link names its real host on hover', () => {
+    const html = render('[the PR](https://github.com/a/b/pull/1)');
+    expect(html).toContain('title="github.com"');
   });
 
   test('bare URLs become external links', () => {

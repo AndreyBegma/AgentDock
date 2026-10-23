@@ -2,6 +2,7 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { Tooltip } from '@andrewbehma/glass-ui/tooltip';
 import type { SlotSummary } from '@nautelle/shared';
+import { QuotaWaitLine } from '../../../../../components/board/quota-wait-line';
 import {
   CHECKS_LABEL,
   CHECKS_TONE,
@@ -10,15 +11,15 @@ import {
   issueUrl,
   SLOT_STATUS_LABEL,
   SLOT_TERM_HINT,
-  safeHttpsUrl,
 } from '../../../../../lib/fleet/format';
 import { Time } from '../../../../../lib/format/time';
 import { slotHue } from '../../../../../lib/hue';
 import { SLOT_PILL_STATUS } from '../../../../../lib/status/pill';
+import { githubUrl } from '../../../../../lib/url';
 
 function IssueCell({ slot }: { slot: SlotSummary }) {
   if (slot.issue === null) return <>—</>;
-  const href = safeHttpsUrl(issueUrl(slot.issue, slot.prUrl));
+  const href = githubUrl(issueUrl(slot.issue, slot.prUrl));
   return href ? (
     <a
       href={href}
@@ -48,7 +49,7 @@ function ModelCell({ slot }: { slot: SlotSummary }) {
 
 function PrCell({ slot }: { slot: SlotSummary }) {
   if (slot.prNumber === null) return <>—</>;
-  const href = safeHttpsUrl(slot.prUrl);
+  const href = githubUrl(slot.prUrl);
   return (
     // `relative`: the sr-only label is absolutely positioned, and without an
     // anchor inside the table's scroller it escapes it and widens the page.
@@ -141,6 +142,14 @@ export function SlotList({
             <ModelCell slot={slot} />
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
+            {slot.status === 'quota' && slot.quotaLimit ? (
+              <QuotaWaitLine
+                wait={{
+                  limit: slot.quotaLimit,
+                  resetsAt: slot.quotaResetsAt ?? null,
+                }}
+              />
+            ) : null}
             <span>{checkpointLabel(slot.lastCheckpoint)}</span>
             {slot.prNumber !== null ? (
               <span>

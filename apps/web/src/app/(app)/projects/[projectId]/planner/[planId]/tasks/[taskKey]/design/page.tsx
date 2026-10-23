@@ -42,7 +42,52 @@ export default function DesignViewerPage() {
     taskKey: string;
   }>();
   const { projectId, planId } = params;
-  const taskKey = decodeURIComponent(params.taskKey);
+  const taskKey = decodeTaskKey(params.taskKey);
+  if (taskKey === null) {
+    return <TaskNotFound back={planHref(projectId, planId)} />;
+  }
+  return (
+    <DesignViewerScreen
+      projectId={projectId}
+      planId={planId}
+      taskKey={taskKey}
+    />
+  );
+}
+
+/** The task key from the route; null when it is not valid percent-encoding (C-165). */
+function decodeTaskKey(raw: string): string | null {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** A key that does not decode names no task: say so instead of crashing. */
+function TaskNotFound({ back }: { back: string }) {
+  return (
+    <EmptyState
+      title="Task not found"
+      description="The link to this design is malformed. Open the task from its plan."
+      action={
+        <Link href={back} className={buttonClassName({ variant: 'glass' })}>
+          Back to plan
+        </Link>
+      }
+    />
+  );
+}
+
+function DesignViewerScreen({
+  projectId,
+  planId,
+  taskKey,
+}: {
+  projectId: string;
+  planId: string;
+  taskKey: string;
+}) {
   const router = useRouter();
   const search = useSearchParams();
 

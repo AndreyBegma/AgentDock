@@ -53,6 +53,36 @@ const design = (status: 'reviewing' | 'approved'): BoardCardView['design'] => ({
   busySince: null,
 });
 
+describe('CardFace taken by a session (#845 D2, D10)', () => {
+  test('a taken card names its session', () => {
+    const html = render('in_progress', {
+      taken: { sessionId: 'abcdef123456', alive: true, branch: null },
+    });
+    expect(html).toContain('taken by abcdef12');
+    expect(html).not.toContain('session ended');
+  });
+
+  test('says "session ended" once the session is gone', () => {
+    const html = render('in_progress', {
+      taken: { sessionId: 'abcdef123456', alive: false, branch: null },
+    });
+    expect(html).toContain('taken by abcdef12');
+    expect(html).toContain('session ended');
+  });
+
+  test('a queued card names the session it waits for', () => {
+    expect(render('todo', { queuedForSessionId: 'zzzzzzzz9999' })).toContain(
+      'queued for zzzzzzzz',
+    );
+  });
+
+  test('an ordinary card shows neither', () => {
+    const html = render('todo');
+    expect(html).not.toContain('taken by');
+    expect(html).not.toContain('queued for');
+  });
+});
+
 describe('CardFace pull request link (#329 D6)', () => {
   for (const column of COLUMNS) {
     test(`shows PR #7 with its state in ${column}`, () => {
@@ -81,6 +111,42 @@ describe('CardFace pull request link (#329 D6)', () => {
     });
     expect(html).not.toContain('PR #');
     expect(html).toContain('Issue #3');
+  });
+});
+
+describe('CardFace usage limit (#741)', () => {
+  test('says the round waits for the limit, and nothing without one', () => {
+    const waiting = render('in_progress', {
+      round: round('running', {
+        quotaWait: { limit: 'session', resetsAt: '2026-10-21T15:00:00.000Z' },
+      }),
+    });
+    expect(waiting).toContain('Waiting for the limit until');
+    expect(render('in_progress', { round: round('running') })).not.toContain(
+      'the limit',
+    );
+  });
+});
+
+describe('CardFace escalation tag (#750)', () => {
+  const face = (card: BoardCardView) =>
+    renderToStaticMarkup(
+      <CardFace
+        projectId="p1"
+        canOperate
+        onOpen={() => undefined}
+        card={card}
+      />,
+    );
+
+  test('an escalated card wears → Opus; any other, or a view from before #750, does not', () => {
+    // `escalated` lands on the view with i750-api; set as the API will.
+    const escalated = Object.assign(fixtureCard(7, 'in_progress'), {
+      escalated: true,
+    });
+    expect(face(escalated)).toContain('→ Opus');
+    expect(face(escalated)).toContain('title="The worker asked for Opus"');
+    expect(face(fixtureCard(7, 'in_progress'))).not.toContain('→ Opus');
   });
 });
 
@@ -124,26 +190,92 @@ describe('CardFace shipping state (#359)', () => {
   });
 });
 
-describe('CardFace rows (C-35, #423)', () => {
+describe('CardFace rows (C-35, #423, #778)', () => {
   const busy = {
     kind: 'bug' as const,
     attachmentCount: 2,
     dependsOn: [{ number: 3, label: 'C-3', column: 'todo' as const }],
     costUsd: '4.81',
+    stack: {
+      number: 12,
+      label: 'S-12',
+      title: 'Rate limiting',
+      stage: 0,
+      stageTitle: 'Stage 1',
+      gate: null,
+    },
+    readiness: {
+      state: 'waiting' as const,
+      satisfied: 0,
+      total: 1,
+      open: [{ number: 3, label: 'C-3', column: 'todo' as const }],
+    },
+    autoRunWhenReady: true,
   };
+  const face = (extra: Partial<BoardCardView>, hints?: number) =>
+    renderToStaticMarkup(
+      <CardFace
+        projectId="p1"
+        canOperate
+        menu={MENU}
+        hints={hints}
+        onOpen={() => undefined}
+        card={fixtureCard(7, 'todo', {
+          prNumber: 7,
+          prUrl: 'https://github.com/o/r/pull/7',
+          prState: 'open',
+          ...extra,
+        })}
+      />,
+    );
 
-  test('the header holds label, Bug, attachments, dependency, then the cost and the menu at its end', () => {
-    const header = row(render('todo', busy), 'header') ?? '';
-    const order = [
-      'C-7',
-      'Bug',
-      '2 attachments',
-      'after C-3',
-      '$4.81',
-      'data-menu-trigger',
-    ].map((text) => header.indexOf(text));
+  test('the header holds only label, Bug and the menu at its end', () => {
+    const html = face(busy, 2);
+    const header = row(html, 'header') ?? '';
+    const order = ['C-7', 'Bug', 'data-menu-trigger'].map((text) =>
+      header.indexOf(text),
+    );
     for (const at of order) expect(at).toBeGreaterThan(-1);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+    for (const moved of ['S-12', 'hint', 'attachment', 'after C-3', '$4.81'])
+      expect(header).not.toContain(moved);
+  });
+
+  test('the status row leads with readiness, then the dependency, Auto-run, stack and hints', () => {
+    const status = row(face(busy, 2), 'status') ?? '';
+    const order = [
+      'Waiting · 0 of 1',
+      'after C-3',
+      '>Waits for C-3<',
+      'Auto-run',
+      'title="Part of S-12 Rate limiting"',
+      'title="Triage hints: open the card to apply or dismiss them"',
+    ].map((text) => status.indexOf(text));
+    for (const at of order) expect(at).toBeGreaterThan(-1);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  test('the footer holds PR on the left and attachments then cost at its right end', () => {
+    const footer = row(face(busy), 'footer') ?? '';
+    const order = [
+      'PR #7 · Open',
+      'ms-auto',
+      'aria-label="2 attachments"',
+      '$4.81',
+    ].map((text) => footer.indexOf(text));
+    for (const at of order) expect(at).toBeGreaterThan(-1);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  test('a cost or attachments alone still draw the footer; nothing at all draws none', () => {
+    const bare = { prNumber: null, prUrl: null, prState: null };
+    expect(row(face({ ...bare, costUsd: '0.12' }), 'footer')).toContain(
+      '$0.12',
+    );
+    expect(row(face({ ...bare, attachmentCount: 1 }), 'footer')).toContain(
+      '1 attachment',
+    );
+    expect(row(face(bare), 'footer')).toBeNull();
   });
 
   test('the menu is placed once, in the header, and nowhere else', () => {
@@ -152,7 +284,7 @@ describe('CardFace rows (C-35, #423)', () => {
     expect(row(html, 'status') ?? '').not.toContain('data-menu-trigger');
   });
 
-  test('without a menu or a cost the header has no end group', () => {
+  test('without a menu the header has no end group', () => {
     const header = row(render('todo', {}, { menu: false }), 'header') ?? '';
     expect(header).not.toContain('ms-auto');
   });
@@ -302,10 +434,10 @@ describe('CardFace readiness and Auto-run (#443)', () => {
   });
 
   test('the dependency chip reads a Finished dependency as satisfied (#638)', () => {
-    const header = (column: BoardColumn) =>
-      row(render('todo', { dependsOn: [dep(3, column)] }), 'header') ?? '';
-    expect(header('finished')).toContain('Runs after C-3, all ready.');
-    expect(header('in_progress')).toContain('No ready pull request yet: C-3.');
+    const status = (column: BoardColumn) =>
+      row(render('todo', { dependsOn: [dep(3, column)] }), 'status') ?? '';
+    expect(status('finished')).toContain('Runs after C-3, all ready.');
+    expect(status('in_progress')).toContain('No ready pull request yet: C-3.');
   });
 
   test('the Auto-run marker shows only with the switch on', () => {
@@ -344,6 +476,29 @@ describe('CardFace touch targets (#497)', () => {
     expect(row(render('todo', {}, { menu: false }), 'header')).not.toContain(
       coarse,
     );
+  });
+});
+
+describe('CardFace without the token-saver badge (#778)', () => {
+  const tokenSaved = { estimateUsd: 0.004, estimateTokens: 1_000 };
+
+  test('a card that saved tokens shows no saving and no saved line on its face', () => {
+    const html = render('completed', { costUsd: '0.3', tokenSaved });
+    expect(html).not.toContain('saved ≈');
+    expect(html).not.toContain('Token saver kept');
+    expect(html).not.toContain('data-card-row="saved"');
+    expect(row(html, 'footer')).toContain('$0.30');
+  });
+
+  test('a narrow card keeps the label whole: nothing in the header shrinks', () => {
+    const header =
+      row(
+        render('todo', { kind: 'bug', costUsd: '0.3', tokenSaved }),
+        'header',
+      ) ?? '';
+    expect(render('todo')).toContain('@container');
+    expect(header).not.toContain('truncate');
+    expect(header).not.toContain('@max-[15rem]');
   });
 });
 

@@ -1,4 +1,8 @@
-import type { AdminUser, RegistrationState } from '@nautelle/shared';
+import type {
+  AdminUser,
+  RegistrationState,
+  TwoFactorPolicy,
+} from '@nautelle/shared';
 import {
   Body,
   Controller,
@@ -15,6 +19,8 @@ import type { AuditContext } from '../audit/audit.types';
 import { AuditCtx } from '../audit/audit-context';
 import type { AuthUser } from '../auth/auth-request';
 import { CurrentUser, Roles } from '../auth/decorators';
+import { TwoFactorPolicyDto } from '../auth/dto';
+import { TwoFactorService } from '../auth/two-factor.service';
 import { SettingsService } from '../settings/settings.service';
 import { AdminUsersService } from './admin-users.service';
 import {
@@ -63,6 +69,15 @@ export class AdminUsersController {
     return this.users.update(id, dto, ctx);
   }
 
+  @Delete(':id/two-factor')
+  resetTwoFactor(
+    @Param('id') id: string,
+    @CurrentUser() admin: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<AdminUser> {
+    return this.users.resetTwoFactor(id, admin.id, ctx);
+  }
+
   @Delete(':id')
   @HttpCode(204)
   remove(
@@ -76,7 +91,10 @@ export class AdminUsersController {
 @Roles('admin')
 @Controller('admin/settings')
 export class AdminSettingsController {
-  constructor(private readonly settings: SettingsService) {}
+  constructor(
+    private readonly settings: SettingsService,
+    private readonly twoFactor: TwoFactorService,
+  ) {}
 
   @Get('registration')
   async registration(): Promise<RegistrationState> {
@@ -91,6 +109,26 @@ export class AdminSettingsController {
   ): Promise<RegistrationState> {
     return {
       open: await this.settings.setRegistrationOpen(dto.open, admin.id, ctx),
+    };
+  }
+
+  @Get('two-factor')
+  async twoFactorPolicy(): Promise<TwoFactorPolicy> {
+    return { requiredForAdmins: await this.twoFactor.requiredForAdmins() };
+  }
+
+  @Put('two-factor')
+  async setTwoFactorPolicy(
+    @Body() dto: TwoFactorPolicyDto,
+    @CurrentUser() admin: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<TwoFactorPolicy> {
+    return {
+      requiredForAdmins: await this.twoFactor.setRequiredForAdmins(
+        dto.requiredForAdmins,
+        admin.id,
+        ctx,
+      ),
     };
   }
 }

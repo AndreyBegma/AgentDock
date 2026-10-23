@@ -66,15 +66,21 @@ describe('runner settings (e2e)', () => {
   });
 
   it('lets an admin set the local user, and refuses anyone else', async () => {
+    // Not its local user: the runner is hidden, so 404 before the field check.
     expect(
       (await me.send('patch', `/runners/${runnerId}`, { localUserId: meId }))
         .status,
-    ).toBe(403);
+    ).toBe(404);
     const response = await admin.send('patch', `/runners/${runnerId}`, {
       localUserId: meId,
     });
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ localUserId: meId, awayMode: false });
+    // Its local user sees the runner but may not change the local user.
+    expect(
+      (await me.send('patch', `/runners/${runnerId}`, { localUserId: null }))
+        .status,
+    ).toBe(403);
     expect(
       (
         await admin.send('patch', `/admin/runners/${runnerId}`, {
@@ -90,6 +96,17 @@ describe('runner settings (e2e)', () => {
       after: { localUserId: meId },
       result: 'ok',
     });
+  });
+
+  it('answers 404 for an unknown runner to a non-admin as to an admin, whatever the fields', async () => {
+    for (const body of [{ localUserId: meId }, { awayMode: true }]) {
+      expect(
+        (await me.send('patch', '/runners/no-such-runner', body)).status,
+      ).toBe(404);
+      expect(
+        (await admin.send('patch', '/runners/no-such-runner', body)).status,
+      ).toBe(404);
+    }
   });
 
   it('lets the local user switch away mode, pushes it, and hides the runner from others', async () => {
@@ -131,7 +148,16 @@ describe('runner settings (e2e)', () => {
     expect(on.body).toMatchObject({ id: runnerId, awayMode: true });
     expect((await socket.next('config')).config.awayMode).toBe(true);
     expect((await me.get('/runners/local')).body).toEqual([
-      { id: runnerId, name: 'desk', localUserId: meId, awayMode: true },
+      {
+        id: runnerId,
+        name: 'desk',
+        localUserId: meId,
+        awayMode: true,
+        hostname: 'test-host',
+        version: '0.1.0',
+        // The suite never reads the registry: no release is known.
+        update: null,
+      },
     ]);
 
     expect(

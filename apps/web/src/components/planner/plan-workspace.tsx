@@ -16,9 +16,10 @@ import {
   turnsOf,
   writeBlock,
 } from '../../lib/planner/format';
-import { approvableDrafts } from '../../lib/planner/header';
+import { approvableDrafts, sharePlanCopy } from '../../lib/planner/header';
 import { pastRounds } from '../../lib/planner/rounds';
 import type { usePlan } from '../../lib/planner/use-plan';
+import { ConfirmGate } from '../confirm/confirm-gate';
 import { NARROW_QUERY } from '../shell/narrow';
 import { Conversation } from './conversation';
 import { PlanGraph } from './plan-graph';
@@ -83,6 +84,7 @@ export function PlanWorkspace({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string>();
   const [archiving, setArchiving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [creatingCards, setCreatingCards] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -217,7 +219,7 @@ export function PlanWorkspace({
         busy={busy !== null}
         approveCount={drafts.length}
         readOnly={readOnly}
-        onShare={() => void actions.setVisibility('project').catch(() => {})}
+        onShare={() => setSharing(true)}
         onApproveAll={() =>
           void actions.approveAll(drafts.map((t) => t.key)).catch(() => {})
         }
@@ -345,6 +347,18 @@ export function PlanWorkspace({
         verb="Create cards"
         busy={busy?.kind === 'cards'}
         onConfirm={() => void createCards()}
+      />
+      <ConfirmGate
+        pending={sharing ? plan : undefined}
+        copy={sharePlanCopy}
+        busy={busy?.kind === 'visibility'}
+        onConfirm={() =>
+          void actions
+            .setVisibility('project')
+            .then(() => setSharing(false))
+            .catch(() => {})
+        }
+        onCancel={() => setSharing(false)}
       />
       <ConfirmDialog
         open={archiving}

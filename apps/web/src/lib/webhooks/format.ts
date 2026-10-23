@@ -1,10 +1,10 @@
 import {
   checkArgsTemplate,
+  checkValuePattern,
   DEFAULT_INBOUND_VALUE_PATTERN,
   INBOUND_ALLOWED_PATHS_MAX,
   INBOUND_DELIVERY_REASONS,
   INBOUND_TEMPLATE_ERRORS,
-  INBOUND_VALUE_PATTERN_MAX_CHARS,
   type InboundDeliveryStatus,
   type InboundTemplateError,
   type InboundTriggerAction,
@@ -12,8 +12,9 @@ import {
   type InboundTriggerUpdateRequest,
   type InboundTriggerView,
   inboundPayloadPathSchema,
-  isValidValuePattern,
   normalizeAllowedTarget,
+  SAFE_PATTERN_MESSAGES,
+  shellWord,
   WEBHOOK_ATTEMPT_ERRORS,
   WEBHOOK_CIRCUIT_OPEN_MS,
   WEBHOOK_EVENT_TYPES,
@@ -22,6 +23,7 @@ import {
   type WebhookCircuitState,
   type WebhookCreateRequest,
   type WebhookDeliveryStatus,
+  type WebhookDeliveryView,
   type WebhookEventType,
   type WebhookUpdateRequest,
   type WebhookView,
@@ -187,6 +189,22 @@ export function urlHost(url: string): string {
   }
 }
 
+const MASK = '••••••••';
+
+/**
+ * C-177: a URL that works as a bearer secret, with everything after the host
+ * (path, query, fragment) and any user name or password hidden, so a glance
+ * or a screenshot does not leak it. A URL that does not parse is hidden whole.
+ */
+export function maskUrlPath(url: string): string {
+  try {
+    const { protocol, host } = new URL(url);
+    return `${protocol}//${host}/${MASK}`;
+  } catch {
+    return MASK;
+  }
+}
+
 export const eventsLabel = (events: readonly string[]): string =>
   events.length === 1 ? '1 event' : `${events.length} events`;
 
@@ -303,10 +321,9 @@ export function triggerFormProblem(
     return `“${badPath}” is not a valid payload path (dotted letters, digits, _ and -).`;
   const pattern = form.valuePattern.trim();
   if (pattern !== '') {
-    if (pattern.length > INBOUND_VALUE_PATTERN_MAX_CHARS)
-      return 'The value pattern is too long.';
-    if (!isValidValuePattern(pattern))
-      return 'The value pattern is not a valid regular expression.';
+    const problem = checkValuePattern(pattern);
+    if (!problem.ok)
+      return `Value pattern: ${SAFE_PATTERN_MESSAGES[problem.reason]}`;
   }
   if (form.kind === 'orchestrator') return null;
   if (form.skill.trim() === '') return 'Name the skill to run.';
@@ -459,11 +476,15 @@ export function parseTargets(text: string): TargetsParse {
 
 // ─── Samples (shown next to the secret) ─────────────────────────────────────
 
-/** A shell sample that signs and sends one delivery (D2). */
+/**
+ * A shell sample that signs and sends one delivery (D2). The secret and the
+ * URL are each one shell word (C-177), so a quote in either cannot end the
+ * string early and run what follows.
+ */
 export function curlExample(url: string, secret: string): string {
   return [
-    `SECRET='${secret}'`,
-    `URL='${url}'`,
+    `SECRET=${shellWord(secret)}`,
+    `URL=${shellWord(url)}`,
     `BODY='{"example":"value"}'`,
     'TS=$(date +%s)',
     'DELIVERY=$(uuidgen)',
@@ -491,5 +512,19 @@ export function verify(rawBody, header, secret) {
   const wanted = Buffer.from(expected, 'hex');
   return given.length === wanted.length && timingSafeEqual(given, wanted);
 }`;
+
+/**
+ * C-166: Redeliver asks first — the receiver gets the same event again and
+ * acts on it again unless it deduplicates.
+ */
+export const redeliverCopy = (
+  delivery: Pick<WebhookDeliveryView, 'eventType'>,
+) => ({
+  title: `Send ${delivery.eventType} again?`,
+  consequence:
+    'The same event is queued for the receiver once more, with a new signature. A receiver that does not deduplicate acts on it twice.',
+  verb: 'Redeliver',
+  tone: 'default' as const,
+});
 
 export { DEFAULT_INBOUND_VALUE_PATTERN };

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { SettingsModule } from '../settings/settings.module';
 import {
   AdminSettingsController,
@@ -7,7 +8,7 @@ import {
 import { AdminUsersService } from './admin-users.service';
 
 @Module({
-  imports: [SettingsModule],
+  imports: [SettingsModule, AuthModule],
   controllers: [AdminUsersController, AdminSettingsController],
   providers: [AdminUsersService],
 })

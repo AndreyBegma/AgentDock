@@ -4,14 +4,17 @@ import type { BoardCard } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { autoRunFailureOf } from './board-error';
+import { BoardPrincipals } from './board-principal';
 import { BoardRoundsService } from './board-rounds.service';
-import { type BoardActor, BoardWork } from './board-work';
+import { BoardWork } from './board-work';
 
 /**
  * Auto-run when ready (#443): a card reaching Finished (#638) or being
  * accepted starts the Run of every To Do card that waited for it, has the
- * switch on and now has no open dependency — as the person (or Nautelle)
- * that moved it, under the manual Run's rules (slots, budget, profile). A refusal is not queued: it is stored on the card
+ * switch on and now has no open dependency — under the manual Run's rules
+ * (slots, budget, profile). C-181 (D-09): it runs as the person who armed
+ * the switch (`autoRunArmedById`), never as whoever moved the dependency —
+ * their role now, their budget. A refusal is not queued: it is stored on the card
  * (`autoRunFailure` with `after`) and audited, like a refused design
  * auto-run (#273 D9).
  */
@@ -24,11 +27,12 @@ export class BoardAutoRun implements OnModuleInit {
     private readonly work: BoardWork,
     private readonly rounds: BoardRoundsService,
     private readonly audit: AuditService,
+    private readonly principals: BoardPrincipals,
   ) {}
 
   onModuleInit(): void {
-    this.work.onSatisfied((projectId, card, actor) =>
-      this.afterSatisfied(projectId, card, actor),
+    this.work.onSatisfied((projectId, card) =>
+      this.afterSatisfied(projectId, card),
     );
   }
 
@@ -36,7 +40,6 @@ export class BoardAutoRun implements OnModuleInit {
   async afterSatisfied(
     projectId: string,
     satisfied: Pick<BoardCard, 'id' | 'number'>,
-    actor: BoardActor,
   ): Promise<void> {
     const cards = await this.prisma.boardCard.findMany({
       where: {
@@ -49,8 +52,9 @@ export class BoardAutoRun implements OnModuleInit {
       orderBy: { number: 'asc' },
     });
     for (const card of cards) {
-      if (await this.claim(card.id)) {
-        await this.start(projectId, card, satisfied.number, actor);
+      const claimed = await this.claim(card.id);
+      if (claimed) {
+        await this.start(projectId, card, satisfied.number, claimed.armedById);
       }
     }
   }
@@ -62,10 +66,14 @@ export class BoardAutoRun implements OnModuleInit {
    * commit, so the last one to commit sees every dependency satisfied; of
    * those that race (a dependency's Finished, then its Accept), the row lock
    * lets one through and the rest re-read the switch off. The Run starts
-   * exactly once.
+   * exactly once, as the person the claimed row names (C-181).
    */
-  private async claim(cardId: string): Promise<boolean> {
-    const count = await this.prisma.$executeRaw`
+  private async claim(
+    cardId: string,
+  ): Promise<{ armedById: string | null } | null> {
+    const rows = await this.prisma.$queryRaw<
+      { autoRunArmedById: string | null }[]
+    >`
       UPDATE board_cards AS card
          SET "autoRunWhenReady" = false, "updatedAt" = now()
        WHERE card.id = ${cardId}
@@ -77,17 +85,19 @@ export class BoardAutoRun implements OnModuleInit {
              JOIN board_cards AS target ON target.id = dep."dependsOnId"
             WHERE dep."cardId" = card.id
               AND target."column" NOT IN ('finished', 'completed')
-         )`;
-    return count === 1;
+         )
+      RETURNING card."autoRunArmedById"`;
+    return rows.length === 1 ? { armedById: rows[0].autoRunArmedById } : null;
   }
 
   private async start(
     projectId: string,
     card: Pick<BoardCard, 'id' | 'number'>,
     after: number,
-    actor: BoardActor,
+    armedById: string | null,
   ): Promise<void> {
     try {
+      const actor = await this.principals.actor(projectId, armedById);
       await this.rounds.run(projectId, card.number, {}, actor, after);
     } catch (error) {
       const { code, message } = autoRunFailureOf(error);
@@ -105,7 +115,7 @@ export class BoardAutoRun implements OnModuleInit {
         },
       });
       await this.audit.record({
-        ...actor.ctx,
+        ...this.principals.ctxOf(armedById),
         action: 'card.auto_run_failed',
         target: { type: 'board_card', id: card.id },
         projectId,

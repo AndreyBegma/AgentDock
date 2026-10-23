@@ -13,11 +13,13 @@ import {
   type CardRunPhaseChangedData,
   type CardRunPushedData,
   type CardRunQuestionData,
+  type CardRunQuotaData,
   cardDialogEventDataSchemas,
   cardFinishRefusedEventDataSchemas,
   cardPendingQuestionEventDataSchemas,
   cardPushEventDataSchemas,
   cardQuestionEventDataSchemas,
+  cardQuotaEventDataSchemas,
   cardRunEventDataSchemas,
   HOOK_PROMPT_SUBMITTED_EVENT,
   HOOK_SESSION_ENDED_EVENT,
@@ -29,6 +31,7 @@ import {
   isCardPendingQuestionEventType,
   isCardPushEventType,
   isCardQuestionEventType,
+  isCardQuotaEventType,
   isCardRunEventType,
   type PaneDialog,
   parseHookEvent,
@@ -145,6 +148,19 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
         await this.dialog(runnerId, event.seq, parsed.data);
         continue;
       }
+      if (isCardQuotaEventType(event.type)) {
+        const parsed = cardQuotaEventDataSchemas[event.type].safeParse(
+          event.data,
+        );
+        if (!parsed.success) {
+          this.logger.warn(
+            `runner ${runnerId}: malformed ${event.type} (seq ${event.seq}), skipped`,
+          );
+          continue;
+        }
+        await this.quota(runnerId, parsed.data);
+        continue;
+      }
       if (isCardPendingQuestionEventType(event.type)) {
         const parsed = cardPendingQuestionEventDataSchemas[
           event.type
@@ -223,6 +239,10 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
               prUrl: data.prUrl,
               prState: data.prState ?? 'open',
             }
+          : {}),
+        // C-148: the paths of the push that only a person may merge.
+        ...(data.protectedPaths !== undefined
+          ? { protectedPaths: data.protectedPaths }
           : {}),
         ...(newHead
           ? {
@@ -308,6 +328,32 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
     if (await this.toWaiting(runnerId, seq, card, round, reason, dialog)) {
       this.work.publish(card.projectId, card.id);
     }
+  }
+
+  /**
+   * #741: the round's pane shows a usage-limit banner — the card says it
+   * waits for the limit until the banner's reset time — or the runner has
+   * resumed it, which clears that. The phase does not move: the session is
+   * still the round's. An active round of the card's current run only.
+   */
+  private async quota(runnerId: string, data: CardRunQuotaData): Promise<void> {
+    const round = await this.roundOf(runnerId, data);
+    if (!round) {
+      this.logger.warn(
+        `runner ${runnerId}: usage limit for unknown card round ${data.runId}, skipped`,
+      );
+      return;
+    }
+    const { count } = await this.prisma.boardCardRound.updateMany({
+      where: { id: round.id, phase: { in: [...ACTIVE_PHASES] } },
+      data: data.resumed
+        ? { quotaLimit: null, quotaResetsAt: null }
+        : {
+            quotaLimit: data.limit,
+            quotaResetsAt: data.resetsAt ? new Date(data.resetsAt) : null,
+          },
+    });
+    if (count > 0) this.work.publish(data.projectId, round.cardId);
   }
 
   /**

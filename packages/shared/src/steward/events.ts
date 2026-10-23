@@ -20,7 +20,8 @@ import {
  * ordinary `events` stream with `source: "runner"` — no new message type
  * (the #445 precedent); four are recorded by the API itself
  * (`source: "api"`, ADR-0014) as an incident moves, and those are what
- * Activity shows.
+ * Activity shows. The runner's `data` schemas are strict (C-183): a key the
+ * runner never sends means the event is not the runner's.
  */
 
 // The subject
@@ -68,7 +69,7 @@ export const STEWARD_ACTED_EVENT = 'steward.acted';
  * the project ships content (`watchedProjectSchema.shipContent`).
  */
 export const stewardObservedDataSchema = z
-  .object({
+  .strictObject({
     projectId: z.string().min(1),
     at: z.iso.datetime(),
     subject: stewardSubjectSchema,
@@ -100,7 +101,7 @@ export type StewardObservedData = z.infer<typeof stewardObservedDataSchema>;
  * (`hold_push`, D7). The API appends it to the subject's open incident; this
  * event, not the command's result, is the record.
  */
-export const stewardActedDataSchema = z.object({
+export const stewardActedDataSchema = z.strictObject({
   projectId: z.string().min(1),
   at: z.iso.datetime(),
   subject: stewardActableSubjectSchema,

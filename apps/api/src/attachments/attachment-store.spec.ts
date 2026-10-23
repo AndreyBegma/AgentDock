@@ -9,6 +9,7 @@ describe('FsAttachmentStore (#309 D2, D6)', () => {
   const store = new FsAttachmentStore({
     dir,
     projectQuotaBytes: 1024,
+    userPendingBytes: 1024,
     sweepEnabled: false,
   });
 

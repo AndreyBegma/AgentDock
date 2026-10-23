@@ -7,13 +7,18 @@ import {
   type DesignProgressView,
   type DesignRevisionView,
   type DesignSkillWarning,
+  type DesignTemplate,
   type TaskDesignView,
   type ViewportPreset,
   viewportPresetsSchema,
 } from '@nautelle/shared';
 import type { Prisma } from '@prisma/client';
 import { userRef, userSelect } from '../planner/plan-mapper';
-import { frameNameSelect, frameNamesOf } from './design-store';
+import {
+  conformanceOfRow,
+  frameNameSelect,
+  frameNamesOf,
+} from './design-store';
 
 /**
  * The design views (docs/specs/223-design-stage.md "API"). Pure.
@@ -41,6 +46,8 @@ export const revisionSelect = {
   rationale: true,
   turnId: true,
   archived: true,
+  templateKey: true,
+  conformance: true,
   createdAt: true,
   frames: frameNameSelect,
 } as const;
@@ -64,8 +71,13 @@ export const toRevisionView = (row: RevisionRow): DesignRevisionView => ({
       name: f.name,
       slug: f.slug,
       htmlUrl: frameUrl(row.id, position),
+      kind: f.kind,
+      templateFrameKey: f.templateFrameKey,
     }),
   ),
+  templateKey: row.templateKey,
+  // #833: a legacy revision has none — no "not per template" badge.
+  conformance: row.templateKey ? conformanceOfRow(row.conformance) : null,
   createdAt: row.createdAt.toISOString(),
 });
 
@@ -148,6 +160,7 @@ export const toDesignView = (
     activeTurnId: string | null;
     progress: DesignProgressView | null;
     lastFailure: DesignFailureView | null;
+    template: DesignTemplate;
   },
 ): TaskDesignView => ({
   id: row.id,
@@ -166,6 +179,7 @@ export const toDesignView = (
   profileId: row.profileId,
   approvedBy: row.approvedBy ? userRef(row.approvedBy) : null,
   approvedAt: row.approvedAt?.toISOString() ?? null,
+  template: extra.template,
   revisions: row.revisions.map(toRevisionView),
   comments: row.comments.map(toCommentView),
   warnings: extra.warnings,

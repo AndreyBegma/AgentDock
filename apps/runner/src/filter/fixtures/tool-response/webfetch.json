@@ -1,0 +1,16 @@
+{
+  "claudeCode": "2.1.306",
+  "tool_name": "WebFetch",
+  "tool_input": {
+    "url": "https://example.com",
+    "prompt": "Return the page title"
+  },
+  "tool_response": {
+    "bytes": 577,
+    "code": 200,
+    "codeText": "OK",
+    "result": "The page title is **Example Domain**.",
+    "durationMs": 1400,
+    "url": "https://example.com"
+  }
+}

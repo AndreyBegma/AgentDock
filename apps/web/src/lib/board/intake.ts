@@ -29,6 +29,22 @@ import { activeTurn, failedTurn } from '../planner/format';
 /** What to do, as typed: the API's brief limit (`BRIEF_MAX_LENGTH`). */
 export const INTAKE_BRIEF_MAX = 20_000;
 
+/**
+ * The New work link's prefilled brief (`?newWork=1&brief=…`; the old
+ * `?newPlan=1` too) and whether it came from the link rather than from this
+ * person (security audit L-45): a brief the Board wrote itself — Discuss's
+ * Make card hands its text over the same way — is `ownBrief`, so it is not
+ * flagged. Anyone can send a link, so anything else is.
+ */
+export function newWorkBrief(
+  params: Pick<URLSearchParams, 'get' | 'has'>,
+  ownBrief?: string,
+): { brief?: string; fromLink: boolean } {
+  const linked = params.has('newWork') || params.has('newPlan');
+  const brief = linked ? (params.get('brief') ?? undefined) : undefined;
+  return { brief, fromLink: !!brief && brief !== ownBrief };
+}
+
 export type IntakePhase =
   /** A turn is queued or running: the model is reading or writing. */
   | { kind: 'thinking'; turn: PlanTurnView }

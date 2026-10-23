@@ -26,7 +26,7 @@ interface StopOwner {
   /** The `planId` its turns run under on the runner: the plan's, the card's or the stack's. */
   hostId: string;
   target: { type: 'plan' | 'board_card' | 'board_stack'; id: string };
-  label: { key: string } | { number: number } | { stack: number };
+  label: { task: string } | { number: number } | { stack: number };
   publish(): void;
 }
 
@@ -38,7 +38,8 @@ const notRunning = () =>
   );
 
 /**
- * #275 D5: Stop a busy design, for both owners. On the draw or revise stage
+ * #275 D5: Stop a busy design, for both owners — or, #840, one whose design
+ * turn is still queued or running. On the draw or revise stage
  * the design turn is cancelled (`plan.cancel`) and the projector settles the
  * design when the runner reports it. On the profile stage the design leaves
  * the build's `args.waiting` and rests at once; the build itself is cancelled
@@ -66,7 +67,7 @@ export class DesignStopService {
         projectId: plan.projectId,
         hostId: plan.id,
         target: { type: 'plan', id: plan.id },
-        label: { key: taskKey },
+        label: { task: taskKey },
         publish: () =>
           this.store.publishDesign(plan.projectId, plan.id, taskKey),
       },
@@ -132,12 +133,6 @@ export class DesignStopService {
     if (!design) {
       throw designError(404, DESIGN_ERROR.notFound, 'Design not found');
     }
-    if (design.status !== 'generating' && design.status !== 'revising') {
-      throw notRunning();
-    }
-    const project = await this.store.project(owner.projectId);
-    const caller = { role: actor.role, ctx: actor.ctx };
-
     const turn = await this.prisma.planTurn.findFirst({
       where: {
         ...designTurnWhere(owner.key),
@@ -145,13 +140,25 @@ export class DesignStopService {
       },
       select: { id: true, runId: true, run: { select: { args: true } } },
     });
+    // #840: a turn still queued or running is stoppable whatever the status
+    // says; the design is busy until the turn's end settles it.
+    if (
+      !turn &&
+      design.status !== 'generating' &&
+      design.status !== 'revising'
+    ) {
+      throw notRunning();
+    }
+    const project = await this.store.project(owner.projectId);
+    const caller = { role: actor.role, ctx: actor.ctx };
+
     if (turn) {
       plannerOutput(
         'plan.cancel',
         await this.planner.send(
           project.runnerId,
           'plan.cancel',
-          { planId: owner.hostId, turnId: turn.id },
+          { planId: owner.hostId, turnId: turn.id, projectId: project.id },
           caller,
         ),
       );
@@ -208,7 +215,9 @@ export class DesignStopService {
       await settleDesign(tx, owner.key);
       return cancels;
     });
-    if (cancel) await this.cancelBuild(project.runnerId, build.id, caller);
+    if (cancel) {
+      await this.cancelBuild(project.runnerId, project.id, build.id, caller);
+    }
     await this.stopped(owner, actor, { stage: 'profile', runId: build.id });
   }
 
@@ -224,13 +233,14 @@ export class DesignStopService {
    */
   private async cancelBuild(
     runnerId: string,
+    projectId: string,
     runId: string,
     caller: Pick<PlanActor, 'role' | 'ctx'>,
   ): Promise<void> {
     const result = await this.commands.send(
       runnerId,
       'uiprofile.cancel',
-      { runId },
+      { runId, projectId },
       caller,
     );
     if (result.status === 'error') {

@@ -5,6 +5,7 @@ import {
   CSRF_COOKIE,
   CSRF_HEADER,
 } from '@nautelle/shared';
+import { readCookie } from './cookies';
 import { reachability } from './live/reachability';
 
 export class ApiError extends Error {
@@ -20,16 +21,6 @@ export class ApiError extends Error {
     super(message);
   }
 }
-
-const readCookie = (name: string): string | undefined => {
-  for (const part of document.cookie.split('; ')) {
-    const eq = part.indexOf('=');
-    if (part.slice(0, eq) === name) {
-      return decodeURIComponent(part.slice(eq + 1));
-    }
-  }
-  return undefined;
-};
 
 /** The CSRF header a write carries, for calls that cannot go through `api` (a stream). */
 export const csrfHeaders = (): Record<string, string> => {
@@ -73,11 +64,39 @@ export const apiRuntime = {
 const isGatewayStatus = (status: number) =>
   status === 502 || status === 503 || status === 504;
 
+/** What `api` says when it refuses a path (C-165). */
+export const UNSAFE_PATH_MESSAGE = 'This link points at an invalid address.';
+
+/** `api` refused the path before any request was made (C-165). */
+export class UnsafeApiPathError extends ApiError {
+  constructor() {
+    super(400, undefined, UNSAFE_PATH_MESSAGE);
+  }
+}
+
+/**
+ * Whether the path part of `path` (before `?` or `#`) can only reach the
+ * route it names (C-165): no backslash, no `.` or `..` segment, and no
+ * encoded dot, slash or backslash that a proxy could decode into one. An id
+ * from the URL that slipped through unencoded fails here, not at the API.
+ */
+export function isSafeApiPath(path: string): boolean {
+  const end = path.search(/[?#]/);
+  const pathname = end === -1 ? path : path.slice(0, end);
+  if (!pathname.startsWith('/')) return false;
+  if (pathname.includes('\\')) return false;
+  if (/%(2e|2f|5c)/i.test(pathname)) return false;
+  return pathname
+    .split('/')
+    .every((segment) => segment !== '.' && segment !== '..');
+}
+
 /** Same-origin call to the API through the `/api` rewrite (spec D12). */
 export async function api<T = void>(
   path: string,
   { method = 'GET', body }: RequestOptions = {},
 ): Promise<T> {
+  if (!isSafeApiPath(path)) throw new UnsafeApiPathError();
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['content-type'] = 'application/json';
   const safe = method === 'GET' || method === 'HEAD';

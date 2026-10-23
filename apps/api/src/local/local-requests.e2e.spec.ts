@@ -9,6 +9,7 @@ import {
 import { seedProject } from '../fleet/testing/fleet-e2e';
 import {
   adminSession,
+  capabilities,
   createRunnerE2eApp,
   pairedRunner,
   type RunnerE2eContext,
@@ -51,7 +52,53 @@ const ARGS: Record<LocalMethodName, unknown> = {
   },
   'away.set': { on: true },
   'card.finish': { summary: 'Done.' },
+  'card.escalate': {
+    reason: 'misclassified',
+    note: 'The card needs a schema decision.',
+  },
   'card.track': { title: 'Track the pairing fix' },
+  'board.list': {},
+  'board.card': { card: 1 },
+  'board.wait': { timeoutSec: 0 },
+  // #845: C-1 is Finished by now, C-2 the session's tracked card, C-3 new.
+  'card.create': { title: 'Retry the pairing handshake' },
+  'card.run': { card: 1 },
+  'card.move': { card: 3, column: 'todo', index: 0 },
+  'card.feedback': { card: 1, text: 'Handle the macOS case too.' },
+  'card.message': { card: 1, kind: 'text', text: 'Use the existing helper.' },
+  'card.stop': { card: 1 },
+  // The session holds C-2, so C-3 is queued for it — and released.
+  'card.take': { card: 3 },
+  'card.release': { card: 3 },
+};
+
+/**
+ * #845: the Board's control methods, in the order the sweep calls them —
+ * feedback on the Finished C-1 starts a round the message reaches and Stop
+ * ends, then a Run starts the next.
+ */
+const BOARD_CONTROL_ORDER: readonly LocalMethodName[] = [
+  'card.create',
+  'card.move',
+  'card.feedback',
+  'card.message',
+  'card.stop',
+  'card.run',
+  'card.take',
+  'card.release',
+];
+
+/** What the runner answers the card commands the Board methods send. */
+const CARD_COMMAND_OUTPUTS: Record<
+  string,
+  ((args: Record<string, unknown>) => unknown) | undefined
+> = {
+  'card.run': (args) => ({
+    phase: 'starting',
+    tmuxSession: `nautelle-card-${String(args.shortId)}`,
+  }),
+  'card.stop': () => ({ stopped: true }),
+  'session.message': () => ({ outcome: 'sent' }),
 };
 
 /**
@@ -119,6 +166,17 @@ describe('local requests over the runner socket (e2e)', () => {
       const args = command.args as Record<string, unknown>;
       commands.push({ name: command.name, args });
       number += 1;
+      // #845: a card worker's launch, stop and session message.
+      const card = CARD_COMMAND_OUTPUTS[command.name];
+      if (card) {
+        socket.send({
+          type: 'command.result',
+          id: command.id,
+          ok: true,
+          output: card(args),
+        });
+        continue;
+      }
       if (command.name === 'plan.queue_issues') {
         socket.send({
           type: 'command.result',
@@ -150,14 +208,19 @@ describe('local requests over the runner socket (e2e)', () => {
     }
   };
 
-  /** Card C-1 of the project, its worker running in `CARD_SESSION`. */
-  const seedCardSession = async () => {
+  /**
+   * Card C-1 of the project, its worker running in `CARD_SESSION`. #750: on
+   * the person's `sonnet` in the B arm of `model-by-type`, so `card.escalate`
+   * is answered and relaunches nothing (D10); `arm: 'a'` refuses it.
+   */
+  const seedCardSession = async (arm: 'a' | 'b' = 'b') => {
     const now = new Date();
     const run = await ctx.prisma.run.create({
       data: {
         kind: 'card',
         projectId,
         status: 'running',
+        model: 'sonnet',
         triggeredByType: 'user',
         startedAt: now,
         updatedAt: now,
@@ -175,6 +238,10 @@ describe('local requests over the runner socket (e2e)', () => {
         specOnRun: false,
         sessionId: CARD_SESSION,
         branch: 'card/c1-add-login',
+        model: 'sonnet',
+        techniqueArms: {
+          create: { technique: 'model-by-type', arm, mode: 'ab' },
+        },
         movedAt: now,
         rounds: {
           create: {
@@ -265,11 +332,36 @@ describe('local requests over the runner socket (e2e)', () => {
     await seedCardSession();
     // `card.track` asks from a person's own session (#282 D1).
     const manual = await seedManualSession();
+    // #845: the Board's control methods launch a worker and message it — the
+    // runner's Claude profile, and a runner that takes session messages.
+    const profile = await ctx.prisma.runtimeProfile.findFirstOrThrow({
+      where: { runnerId, key: 'claude-main' },
+    });
+    await ctx.prisma.project.update({
+      where: { id: projectId },
+      data: { defaultProfileId: profile.id },
+    });
+    await ctx.prisma.runner.update({
+      where: { id: runnerId },
+      data: { capabilities: { ...capabilities, sessionMessage: true } },
+    });
     // `action.request` first: `action.status` asks about the request it made.
-    const swept = localMethodNames;
+    // #750: `card.escalate` just before `card.finish` — it needs the active
+    // round, and its `card.stop` takes the place `card.finish`'s had.
+    // #845: the Board's control methods last, in their own order.
     const order = [
       'action.request',
-      ...swept.filter((m) => m !== 'action.request'),
+      ...localMethodNames
+        .filter(
+          (m) =>
+            m !== 'action.request' &&
+            m !== 'card.escalate' &&
+            !BOARD_CONTROL_ORDER.includes(m),
+        )
+        .flatMap((m) =>
+          m === 'card.finish' ? (['card.escalate', m] as const) : [m],
+        ),
+      ...BOARD_CONTROL_ORDER,
     ] as LocalMethodName[];
     for (const method of order) {
       const args = method === 'action.status' ? { id: actionId } : ARGS[method];
@@ -277,7 +369,9 @@ describe('local requests over the runner socket (e2e)', () => {
         method,
         args,
         localMethods[method].needsProject ? projectId : null,
-        method === 'card.finish' ? CARD_SESSION : undefined,
+        method === 'card.finish' || method === 'card.escalate'
+          ? CARD_SESSION
+          : undefined,
       );
       expect([method, response.ok, response.error]).toEqual([
         method,
@@ -293,14 +387,16 @@ describe('local requests over the runner socket (e2e)', () => {
         actionId = (response.data as { id: string }).id;
       }
     }
-    expect(responses.size).toBe(swept.length);
+    expect(responses.size).toBe(localMethodNames.length);
 
     const context = responses.get('context.sessionStart')?.data as {
       text: string;
     };
     expect(context.text).toContain('widget');
     expect(context.text).toContain('base branch develop');
-    expect(context.text).toContain('#12 Pairing fails on macOS (open)');
+    expect(context.text).toContain(
+      "This session's issue: #12 (open). Issue title (untrusted): «Pairing fails on macOS».",
+    );
     expect(context.text).toContain('1 pending approval');
     expect(context.text).toContain('agentdock MCP tools');
 
@@ -381,10 +477,29 @@ describe('local requests over the runner socket (e2e)', () => {
       ['issue.create', 'ok', localUserId, 'mcp'],
       ['activity.note', 'ok', localUserId, 'mcp'],
       ['handoff.create', 'ok', localUserId, 'mcp'],
+      ['card.escalate', 'ok', localUserId, 'mcp'],
       ['card.finish', 'ok', localUserId, 'mcp'],
       ['card.track', 'ok', localUserId, 'mcp'],
       ['away.set', 'ok', localUserId, 'mcp'],
+      ...BOARD_CONTROL_ORDER.map((method) => [
+        method,
+        'ok',
+        localUserId,
+        'mcp',
+      ]),
     ]);
+
+    // #845: the take queued C-3 behind the tracked C-2; the release cleared it.
+    expect(responses.get('card.take')?.data).toMatchObject({
+      number: 3,
+      state: 'queued',
+      queuePosition: 1,
+    });
+    expect(responses.get('card.release')?.data).toEqual({
+      number: 3,
+      column: 'todo',
+      next: null,
+    });
     const issueAudit = await ctx.prisma.auditRecord.findFirst({
       where: { action: 'issue.create', projectId },
       orderBy: { seq: 'asc' },
@@ -550,6 +665,53 @@ describe('local requests over the runner socket (e2e)', () => {
     });
     expect(card.column).toBe('in_progress');
     expect(card.rounds[0].phase).toBe('running');
+  });
+
+  it('answers card.escalate from a card worker, and keeps a person’s sonnet (#750 D9, D10)', async () => {
+    await seedCardSession();
+    const response = await ask(
+      'card.escalate',
+      ARGS['card.escalate'],
+      projectId,
+      CARD_SESSION,
+    );
+    expect([response.ok, response.data]).toEqual([
+      true,
+      { number: 1, escalated: true, relaunched: false },
+    ]);
+    const card = await ctx.prisma.boardCard.findFirstOrThrow({
+      where: { projectId, number: 1 },
+      include: { rounds: true },
+    });
+    expect(card).toMatchObject({
+      column: 'finished',
+      escalationReason: 'misclassified',
+      workClass: 'deciding',
+    });
+    expect(card.rounds[0]).toMatchObject({
+      finishedBy: 'worker',
+      escalation: 'misclassified',
+    });
+  });
+
+  it('refuses card.escalate in the A arm, and from a session that is no card worker (#750)', async () => {
+    await seedCardSession('a');
+    const refused = await ask(
+      'card.escalate',
+      ARGS['card.escalate'],
+      projectId,
+      CARD_SESSION,
+    );
+    expect([refused.ok, refused.error?.code]).toEqual([
+      false,
+      'not_escalatable',
+    ]);
+    await seedManualSession();
+    const manual = await ask('card.escalate', ARGS['card.escalate'], projectId);
+    expect([manual.ok, manual.error?.code]).toEqual([
+      false,
+      'not_a_card_session',
+    ]);
   });
 
   it('refuses card.track for a local user who is not a project member, and creates no card (#282 D1)', async () => {

@@ -2,8 +2,10 @@ import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
+  type CardPrefix,
   isRunnerMcpServer,
   RUNNER_MCP_SERVER,
+  type TechniqueFlags,
   type TokenSaverConfig,
   type TokenSaverRunKind,
 } from '@nautelle/shared';
@@ -15,7 +17,15 @@ import {
   type FilterLaunch,
   filterEnv,
   LAUNCH_SETTINGS_ENV,
+  TECHNIQUE_CACHE_TTL_1H,
+  TECHNIQUE_GREP_CUT,
+  TECHNIQUE_MCP_CUT,
+  TECHNIQUE_WEBFETCH_CUT,
+  techniquesEnv,
 } from '../filter/env';
+import { measurePrefix } from '../prefix/measure';
+import { type AppliedPrefix, applyCardPrefix } from '../prefix/overlays';
+import { PREFIX_MEASURED_FILE, type PrefixRecord } from '../prefix/record';
 import { writeJsonAtomic } from '../skills/run/record';
 import { readProfileMcpServers } from './profile-mcp';
 
@@ -160,6 +170,16 @@ export const EXCLUDE_DYNAMIC_SECTIONS_FLAG =
  */
 export const SHARED_PREFIX_KINDS: readonly TokenSaverRunKind[] = ['card'];
 
+/**
+ * #749 (technique `cache-ttl-1h`): the TTL of a card round. A key that is
+ * absent or true keeps the one-hour TTL of #663; false is the control arm,
+ * which pins `5m` — an unset TTL becomes 1h on a subscription.
+ */
+export const cacheTtlFor = (
+  techniques: Partial<TechniqueFlags> | undefined,
+): '1h' | '5m' =>
+  techniques?.[TECHNIQUE_CACHE_TTL_1H] === false ? '5m' : '1h';
+
 /** One argument for `sh -c`: bare when it is safe, else single-quoted. */
 export const shellQuote = (arg: string): string =>
   /^[A-Za-z0-9_@%+=:,./-]+$/.test(arg)
@@ -186,8 +206,9 @@ export interface TextCallLaunchOptions {
 
 /**
  * #445: a headless text call's Token saver. These run `--tools ""`, so
- * neither `nautelle` nor the scout could be called: only the strict MCP
- * list (the allowlist), the hook and compaction. `null` when off.
+ * neither `nautelle` nor the scout could be called: only the hook,
+ * compaction and a strict MCP list that is empty (C-179) — the allowlist is
+ * not loaded, since no MCP tool could be called. `null` when off.
  */
 export const textCallTokenSaver = (
   options: TextCallLaunchOptions,
@@ -197,7 +218,10 @@ export const textCallTokenSaver = (
   runKind: TokenSaverRunKind,
 ): TokenSaverLaunch | null =>
   tokenSaverLaunch({
-    config: args.tokenSaver,
+    config:
+      args.tokenSaver === undefined
+        ? undefined
+        : { ...args.tokenSaver, mcpAllow: [] },
     profile,
     home: options.home ?? homedir(),
     dir,
@@ -208,6 +232,28 @@ export const textCallTokenSaver = (
     runnerMcp: false,
     scout: false,
   });
+
+/** C-179: an MCP config that defines no server, as an inline JSON string. */
+export const EMPTY_MCP_CONFIG = JSON.stringify({ mcpServers: {} });
+
+/**
+ * C-179: the args that load no MCP server — neither the profile's own nor
+ * the project's. `--mcp-config` takes one value here: the caller's next
+ * argument is a flag.
+ */
+export const NO_MCP_ARGS: readonly string[] = [
+  '--strict-mcp-config',
+  '--mcp-config',
+  EMPTY_MCP_CONFIG,
+];
+
+/**
+ * C-179: a headless text call's args before its own flags. Token saver on
+ * carries the strict, empty MCP list in its own file; off, the call still
+ * loads no MCP server: its startup would run code the call never uses.
+ */
+export const textCallArgs = (tokenSaver: TokenSaverLaunch | null): string[] =>
+  tokenSaver?.args ?? [...NO_MCP_ARGS];
 
 export interface LaunchHookCommand {
   type: 'command';
@@ -221,15 +267,41 @@ export interface LaunchSettings {
 }
 
 /**
+ * #747 D4: the tools each cut technique governs, as matcher alternatives, in
+ * matcher order.
+ */
+export const TOOL_CUT_MATCHERS: readonly (readonly [string, string])[] = [
+  [TECHNIQUE_MCP_CUT, 'mcp__.*'],
+  [TECHNIQUE_GREP_CUT, 'Grep'],
+  [TECHNIQUE_WEBFETCH_CUT, 'WebFetch'],
+];
+
+/**
+ * #747 D4: the PostToolUse matcher of `tool-hook`, built only from the cut
+ * techniques that are on — a technique that is off spawns no process.
+ * `null` when none is on.
+ */
+export const toolCutMatcher = (
+  techniques: Partial<TechniqueFlags> | undefined,
+): string | null => {
+  const on = TOOL_CUT_MATCHERS.filter(
+    ([key]) => techniques?.[key] === true,
+  ).map(([, matcher]) => matcher);
+  return on.length === 0 ? null : on.join('|');
+};
+
+/**
  * D3: the PreToolUse hook that rewrites a Bash call into
  * `nautelle-runner filter -- <argv…>`, by the runner's absolute argv; and
  * #616's `read-hook` on `Read` (before and after) and on compaction, which
- * guards whole reads of big files and repeated reads.
+ * guards whole reads of big files and repeated reads; and #747's `tool-hook`
+ * after the MCP, Grep and WebFetch calls whose cut technique is on.
  * `|| true`: the hooks fail open — an exit code 2 would block the tool.
  */
 export const filterHookSettings = (
   selfCommand: readonly string[],
   base?: LaunchSettings,
+  techniques?: Partial<TechniqueFlags>,
 ): LaunchSettings => {
   const self = selfCommand.map(shellQuote).join(' ');
   const hook = (subcommand: string): LaunchHookCommand => ({
@@ -247,6 +319,10 @@ export const filterHookSettings = (
     ...(hooks.PostToolUse ?? []),
     { matcher: 'Read', hooks: [hook('read-hook')] },
   ];
+  const toolCut = toolCutMatcher(techniques);
+  if (toolCut !== null) {
+    hooks.PostToolUse.push({ matcher: toolCut, hooks: [hook('tool-hook')] });
+  }
   hooks.PreCompact = [
     ...(hooks.PreCompact ?? []),
     { hooks: [hook('read-hook')] },
@@ -279,6 +355,26 @@ export interface TokenSaverLaunchInput {
   scout: boolean;
   /** Hooks the launch already carries (the card's injected wiring). */
   baseSettings?: LaunchSettings;
+  /**
+   * #746 D11: the card's technique flags, `{ [technique]: on }`. #747 D3: a
+   * key that is absent behaves as before its technique — no cut, the
+   * 1,500-line read guard — so a launch without flags is unchanged. The cut
+   * keys add `tool-hook` (D4); every key that is on reaches the hooks in
+   * `NAUTELLE_TECHNIQUES`.
+   */
+  techniques?: Partial<TechniqueFlags>;
+  /**
+   * #751 B1: the launch's working directory, for the repo parts of its
+   * prefix; a launch in a run dir of its own has none worth measuring.
+   */
+  cwd?: string;
+  /** #751 B1: the launch's prompt, for its rules block and Nautelle's part. */
+  prompt?: string;
+  /**
+   * #751: a card session's frozen prefix (`card.run` `tokenSaver.prefix`):
+   * the MCP subset, the hidden skills and the overlays. Needs `cwd`.
+   */
+  prefix?: CardPrefix;
 }
 
 export interface TokenSaverLaunch {
@@ -290,6 +386,10 @@ export interface TokenSaverLaunch {
   mcpFile: string;
   /** Allowed servers the profile does not define — left out. */
   missing: string[];
+  /** #746: the technique flags this launch ran with. */
+  techniques: Partial<TechniqueFlags>;
+  /** #751: the card prefix as applied; null without one. */
+  prefix: AppliedPrefix | null;
 }
 
 /**
@@ -314,6 +414,23 @@ export const tokenSaverLaunch = (
   const [command, ...rest] = input.selfCommand;
   if (command === undefined) return null;
 
+  // #751: the overlays' files go into the run dir; one that cannot be
+  // written launches the round without Token saver, as for its own files.
+  let prefix: AppliedPrefix | null = null;
+  if (input.prefix !== undefined && input.cwd !== undefined) {
+    try {
+      prefix = applyCardPrefix(input.prefix, input.cwd, input.dir);
+    } catch {
+      return null;
+    }
+  }
+  // B5: the card type's subset narrows the setting's allowlist.
+  const narrowed = prefix?.mcpAllow;
+  const allowed =
+    narrowed === undefined
+      ? config.mcpAllow
+      : config.mcpAllow.filter((name) => narrowed.includes(name));
+
   const defined = readProfileMcpServers(input.profile, input.home);
   const servers: Record<string, unknown> = {};
   if (input.runnerMcp !== false) {
@@ -323,7 +440,7 @@ export const tokenSaverLaunch = (
     };
   }
   const missing: string[] = [];
-  for (const name of config.mcpAllow) {
+  for (const name of allowed) {
     // ADR-0073: an allowlist from before the rename names `agentdock`.
     if (isRunnerMcpServer(name) && input.runnerMcp !== false) continue;
     const definition = defined[name];
@@ -344,7 +461,12 @@ export const tokenSaverLaunch = (
     mkdirSync(rawDir, { recursive: true, mode: 0o700 });
     writeJsonAtomic(settingsFile, {
       ...PREFIX_SETTINGS,
-      ...filterHookSettings(input.selfCommand, input.baseSettings),
+      ...(prefix?.settings ?? {}),
+      ...filterHookSettings(
+        input.selfCommand,
+        input.baseSettings,
+        input.techniques,
+      ),
     });
     // 0600 (writeJsonAtomic): the copied definitions may hold secrets.
     writeJsonAtomic(mcpFile, { mcpServers: servers });
@@ -358,6 +480,28 @@ export const tokenSaverLaunch = (
     return null;
   }
 
+  const agents = input.scout ? JSON.stringify(LAUNCH_AGENTS) : undefined;
+  const { runId } = input;
+  if (runId !== null) {
+    writePrefixRecord(input.dir, {
+      measured: {
+        runId,
+        launchKind: input.runKind,
+        parts: measurePrefix({
+          profile: input.profile,
+          home: input.home,
+          cwd: input.cwd,
+          prompt: input.prompt,
+          agents,
+          mcpServers: servers,
+          skillsOff: prefix?.skillsOff,
+          overlays: prefix?.loaded,
+        }),
+      },
+      stale: (prefix?.stale ?? []).map((s) => ({ runId, ...s })),
+    });
+  }
+
   const sharedPrefix = SHARED_PREFIX_KINDS.includes(input.runKind);
   return {
     args: [
@@ -366,19 +510,35 @@ export const tokenSaverLaunch = (
       '--strict-mcp-config',
       '--mcp-config',
       mcpFile,
-      ...(input.scout ? ['--agents', JSON.stringify(LAUNCH_AGENTS)] : []),
+      ...(agents !== undefined ? ['--agents', agents] : []),
       ...(sharedPrefix ? [EXCLUDE_DYNAMIC_SECTIONS_FLAG] : []),
+      ...(prefix?.args ?? []),
     ],
     env: {
       [AUTOCOMPACT_WINDOW_ENV]: String(autoCompactWindowFor(COMPACT_AT_TOKENS)),
       [AUTOCOMPACT_PCT_ENV]: '100',
-      ...(sharedPrefix ? { [PROMPT_CACHE_TTL_ENV]: '1h' } : {}),
+      ...(sharedPrefix
+        ? { [PROMPT_CACHE_TTL_ENV]: cacheTtlFor(input.techniques) }
+        : {}),
       [CS_ECO_ENV]: 'off',
       [LAUNCH_SETTINGS_ENV]: settingsFile,
       ...filterEnv(run),
+      ...techniquesEnv(input.techniques),
     },
     settingsFile,
     mcpFile,
     missing,
+    techniques: input.techniques ?? {},
+    prefix,
   };
+};
+
+/**
+ * #751 B1: the measurement never fails a launch — a record that cannot be
+ * written is a launch not measured.
+ */
+const writePrefixRecord = (dir: string, record: PrefixRecord): void => {
+  try {
+    writeJsonAtomic(join(dir, PREFIX_MEASURED_FILE), record);
+  } catch {}
 };

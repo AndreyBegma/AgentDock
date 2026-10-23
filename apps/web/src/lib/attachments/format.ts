@@ -10,6 +10,7 @@ import {
   CSRF_HEADER,
   isAttachmentMime,
 } from '@nautelle/shared';
+import { readCookieFrom } from '../cookies';
 
 /** Spec "Copy": under every dropzone. */
 export const ATTACHMENT_NOTE =
@@ -31,6 +32,8 @@ export const REFUSAL_TEXT: Record<AttachmentRefusal, string> = {
   [ATTACHMENT_REFUSAL.tooMany]: `A card holds at most ${ATTACHMENTS_PER_CARD_MAX} attachments, feedback included.`,
   [ATTACHMENT_REFUSAL.quotaExceeded]:
     'This project has used up its attachment storage. Remove some attachments first.',
+  [ATTACHMENT_REFUSAL.pendingExceeded]:
+    'You have too many uploads not yet attached to a card. Attach or remove them first.',
   [ATTACHMENT_REFUSAL.notClaimable]:
     'That upload can no longer be attached. Upload it again.',
 };
@@ -85,13 +88,8 @@ export const uploadUrl = (projectId: string): string =>
 
 /** The CSRF header every non-GET call carries (see `api()`). */
 export function csrfHeaders(cookie: string): Record<string, string> {
-  for (const part of cookie.split('; ')) {
-    const eq = part.indexOf('=');
-    if (part.slice(0, eq) === CSRF_COOKIE) {
-      return { [CSRF_HEADER]: decodeURIComponent(part.slice(eq + 1)) };
-    }
-  }
-  return {};
+  const csrf = readCookieFrom(cookie, CSRF_COOKIE);
+  return csrf ? { [CSRF_HEADER]: csrf } : {};
 }
 
 /** The `AttachmentView` in a finished upload's response, or `undefined`. */
@@ -128,3 +126,13 @@ export function splitByRound(attachments: readonly AttachmentView[]): {
 /** The card face's count, "1 attachment" / "3 attachments". */
 export const attachmentCountLabel = (count: number): string =>
   `${count} attachment${count === 1 ? '' : 's'}`;
+
+/** C-166: Remove asks first, naming the file that goes. */
+export const removeAttachmentCopy = (
+  attachment: Pick<AttachmentView, 'name'>,
+) => ({
+  title: `Remove ${attachment.name}?`,
+  consequence:
+    'The file is deleted from the card. Agents and people no longer see it; this cannot be undone.',
+  verb: 'Remove',
+});

@@ -14,8 +14,7 @@ import {
 } from '@nautelle/shared/protocol';
 import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError } from '../api';
-
-const DEFAULT_LIVE_URL = 'ws://localhost:8180/live';
+import { liveSocketUrl } from '../live/url';
 
 /**
  * The `/terminal` socket sits beside `/live` (spec 29 D5): only the last
@@ -24,7 +23,7 @@ const DEFAULT_LIVE_URL = 'ws://localhost:8180/live';
 export function terminalSocketUrl(
   ticket: string,
   size: { cols: number; rows: number },
-  liveUrl: string = process.env.NEXT_PUBLIC_LIVE_URL ?? DEFAULT_LIVE_URL,
+  liveUrl: string = liveSocketUrl(),
 ): string {
   const url = new URL(liveUrl);
   const prefix = url.pathname.replace(/\/+$/, '').replace(/\/[^/]*$/, '');

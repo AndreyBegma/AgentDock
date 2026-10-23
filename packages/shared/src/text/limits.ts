@@ -72,7 +72,9 @@ export const isTextFailReason = (value: string): value is TextFailReason =>
  * - `translated` — the English text was applied to the column;
  * - `already_english` — skipped by `isReliablyEnglish`, or the model said so;
  * - `rejected` — the output lost, repeated or invented a placeholder (D6);
- * - `superseded` — the column changed after the request was made (D8).
+ * - `superseded` — the column changed after the request was made (D8);
+ * - `too_long` — the English text runs past the column's input limit, so the
+ *   original stays.
  *
  * Absent while the request has not finished.
  */
@@ -81,6 +83,7 @@ export const TEXT_FIELD_OUTCOMES = [
   'already_english',
   'rejected',
   'superseded',
+  'too_long',
 ] as const;
 export type TextFieldOutcome = (typeof TEXT_FIELD_OUTCOMES)[number];
 

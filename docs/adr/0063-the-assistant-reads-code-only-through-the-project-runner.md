@@ -1,6 +1,6 @@
 # ADR-0063: The assistant reads code only through the project's runner
 
-Status: accepted · Date: 2026-10-17 ·
+Status: accepted, §1 amended by [ADR-0075](0075-agent-instruction-files-may-be-stored-as-prefix-overlays.md) · Date: 2026-10-17 ·
 Card: C-241 (stack S-3, stage 3) ·
 Issue: [#622](https://github.com/AndreyBegma/AgentDock/issues/622) ·
 Spec: [`docs/specs/622-let-the-assistant-read-code-and-delegate.md`](../specs/622-let-the-assistant-read-code-and-delegate.md) ·

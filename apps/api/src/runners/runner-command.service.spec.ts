@@ -1,3 +1,4 @@
+import { RUNNER_CLOSE_CODES } from '@nautelle/shared/protocol';
 import type { HttpException } from '@nestjs/common';
 import type { WebSocket } from 'ws';
 import type { AuditService } from '../audit/audit.service';
@@ -29,8 +30,15 @@ const setup = () => {
   const { socket, sent } = fakeSocket();
   const live = new LiveConnection('rn_1', socket, Date.now());
   connections.attach(live);
-  return { service, live, sent, audit };
+  return { service, connections, live, socket, sent, audit };
 };
+
+const pong = (id: string) => ({
+  type: 'command.result' as const,
+  id,
+  ok: true,
+  output: { pong: true, ts: '2026-10-07T18:36:20.000Z' },
+});
 
 const ctx: AuditContext = { actor: { type: 'user', userId: 'u_1' } };
 
@@ -141,7 +149,7 @@ describe('RunnerCommandService', () => {
   });
 
   it('resolves with the validated result', async () => {
-    const { service, live, sent, audit } = setup();
+    const { service, connections, sent, audit } = setup();
     const pending = service.send(
       'rn_1',
       'runner.ping',
@@ -152,7 +160,7 @@ describe('RunnerCommandService', () => {
     // Recorded before the command reached the socket (spec 8 D8).
     expect(recorded(audit)).toEqual([['runner.command', 'requested']]);
     const ts = '2026-10-07T18:36:20.000Z';
-    live.settle({
+    connections.settle('rn_1', {
       type: 'command.result',
       id: sent[0].id,
       ok: true,
@@ -170,7 +178,7 @@ describe('RunnerCommandService', () => {
   });
 
   it('turns a malformed result into an internal error', async () => {
-    const { service, live, sent } = setup();
+    const { service, connections, sent } = setup();
     const pending = service.send(
       'rn_1',
       'runner.ping',
@@ -178,7 +186,7 @@ describe('RunnerCommandService', () => {
       { role: 'viewer', ctx },
     );
     await flush();
-    live.settle({
+    connections.settle('rn_1', {
       type: 'command.result',
       id: sent[0].id,
       ok: true,
@@ -191,7 +199,7 @@ describe('RunnerCommandService', () => {
   });
 
   it('is unknown after the timeout, and a late result is ignored', async () => {
-    const { service, live, sent } = setup();
+    const { service, connections, sent } = setup();
     const result = await service.send(
       'rn_1',
       'runner.ping',
@@ -203,18 +211,15 @@ describe('RunnerCommandService', () => {
       },
     );
     expect(result).toEqual({ status: 'unknown' });
-    expect(
-      live.settle({
-        type: 'command.result',
-        id: sent[0].id,
-        ok: true,
-        output: { pong: true, ts: '2026-10-07T18:36:20.000Z' },
-      }),
-    ).toBe(false);
+    // #740 D4: named from the waiter that gave up, so the log can say what.
+    expect(connections.settle('rn_1', pong(sent[0].id))).toEqual({
+      outcome: 'unawaited',
+      name: 'runner.ping',
+    });
   });
 
-  it('is unknown at once when the socket is lost', async () => {
-    const { service, live } = setup();
+  it('is unknown at once when the runner is revoked', async () => {
+    const { service, connections } = setup();
     const pending = service.send(
       'rn_1',
       'runner.ping',
@@ -222,7 +227,53 @@ describe('RunnerCommandService', () => {
       { role: 'viewer', ctx },
     );
     await flush();
-    live.lostAll();
+    connections.disconnect('rn_1', RUNNER_CLOSE_CODES.unauthorized, 'revoked');
     await expect(pending).resolves.toEqual({ status: 'unknown' });
+  });
+
+  describe('a reconnect keeps the waiter (#740 D2)', () => {
+    it('settles from the new connection a command sent on the old one', async () => {
+      const { service, connections, live, sent } = setup();
+      const pending = service.send(
+        'rn_1',
+        'runner.ping',
+        {},
+        { role: 'viewer', ctx },
+      );
+      await flush();
+      let settled = false;
+      void pending.then(() => {
+        settled = true;
+      });
+
+      live.close(1006, 'gone');
+      connections.detach(live);
+      await flush();
+      expect(settled).toBe(false);
+
+      const next = new LiveConnection('rn_1', fakeSocket().socket, Date.now());
+      connections.attach(next);
+      expect(connections.settle('rn_1', pong(sent[0].id)).outcome).toBe(
+        'settled',
+      );
+      await expect(pending).resolves.toMatchObject({ status: 'ok' });
+      // A resend of the same result (D3) is known, not a stray.
+      expect(connections.settle('rn_1', pong(sent[0].id)).outcome).toBe(
+        'repeat',
+      );
+    });
+
+    it('is unknown when the deadline passes before the runner is back', async () => {
+      const { service, connections, live } = setup();
+      const pending = service.send(
+        'rn_1',
+        'runner.ping',
+        {},
+        { role: 'viewer', ctx, timeoutMs: 20 },
+      );
+      await flush();
+      connections.detach(live);
+      await expect(pending).resolves.toEqual({ status: 'unknown' });
+    });
   });
 });

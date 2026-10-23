@@ -62,7 +62,9 @@ import {
   describeBoardError,
   isNotFound,
   parseCardParam,
+  parseLinkedPlans,
 } from '../../../../../lib/board/format';
+import { newWorkBrief } from '../../../../../lib/board/intake';
 import {
   boardItems,
   fetchPlanTasks,
@@ -103,14 +105,16 @@ function BoardScreen() {
   // #337, #409: the New work intake (`?newWork=1&brief=…`, then
   // `?intake=`) and an earlier plan's panel (`?planPanel=`) live in the URL,
   // so a reload or a Drafts Resume lands on them. The old `?newPlan=1`
-  // opens New work: New Plan is gone.
-  const intakeId = params.get('intake') ?? undefined;
-  const planPanelId = params.get('planPanel') ?? undefined;
+  // opens New work: New Plan is gone. #590: a discussion (`?discussion=`)
+  // lives in the URL too; Discuss opens the start panel, which then becomes
+  // the discussion. C-165: a value that is not an id is ignored.
+  const { intakeId, planPanelId, discussionId } = parseLinkedPlans(params);
   const planPanelOpen = planPanelId !== undefined;
   const newWorkLinked = params.has('newWork') || params.has('newPlan');
-  // #590: a discussion (`?discussion=`) lives in the URL too; Discuss opens
-  // the start panel, which then becomes the discussion.
-  const discussionId = params.get('discussion') ?? undefined;
+  // L-45: a `?brief=` someone else wrote is flagged; Discuss's own hand-over
+  // is remembered here so it is not.
+  const [ownBrief, setOwnBrief] = useState<string>();
+  const linkedBrief = newWorkBrief(params, ownBrief);
   const [discussing, setDiscussing] = useState(false);
   const user = useCurrentUser();
   /** Bumped by a live push or a mutation; the board and the sheet depend on it. */
@@ -437,9 +441,8 @@ function BoardScreen() {
             project={project}
             open={creating || newWorkLinked || intakeId !== undefined}
             planId={intakeId}
-            initialBrief={
-              newWorkLinked ? (params.get('brief') ?? undefined) : undefined
-            }
+            initialBrief={linkedBrief.brief}
+            briefFromLink={linkedBrief.fromLink}
             board={board.data}
             onOpenChange={(open) => {
               setCreating(open);
@@ -477,6 +480,7 @@ function BoardScreen() {
               // ADR-0037 §5: New work, What to do prefilled; the
               // discussion stays in Drafts.
               setDiscussing(false);
+              setOwnBrief(brief);
               setParams({ discussion: undefined, newWork: '1', brief });
             }}
             onDiscarded={() => {

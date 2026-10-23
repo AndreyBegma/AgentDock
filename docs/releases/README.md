@@ -17,4 +17,5 @@ A released note is never edited. A correction goes into the next release.
 
 | Version | Date | Summary |
 |---|---|---|
+| [v0.15.0](v0.15.0.md) | 2026-10-23 | Board from a Claude Code session, design frame templates, two-factor sign-in, token savings per card; runner 0.15.0 |
 | [v0.14.0](v0.14.0.md) | 2026-10-20 | The first versioned release: What's new, five-entry project navigation and the calm page layout |

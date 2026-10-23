@@ -26,7 +26,7 @@ import { type LocalCommandDeps, NotImplementedError } from './local/subcommand';
 import { LockError } from './lock';
 import { createLogger, errorMessage, type Logger, parseLogLevel } from './log';
 import { runMcp } from './mcp';
-import { otlpSettings } from './otlp';
+import { loadOtlpToken, otlpSettings, otlpTokenPath } from './otlp';
 import { PairingError, pair } from './pairing';
 import { runPolicy } from './policy/cli';
 import { nodeRealpath } from './policy/roots';
@@ -58,6 +58,11 @@ export interface CliDeps {
   stderr: (text: string) => void;
   /** The command a service manager runs to start the daemon, `run` included. */
   execStart: readonly string[];
+  /**
+   * C-162: the absolute path of this runner's compiled binary, which `setup
+   * claude` hands to the plugin; null when it runs from source under Bun.
+   */
+  runnerBinary?: string | null;
   exec?: Exec;
   createSocket?: SocketFactory;
   random?: () => number;
@@ -122,7 +127,10 @@ Used by the runner's launches (Token saver):
   read-hook                                the Read hook that refuses a whole read
                                            of a big file and a repeated read once
                                            (JSON on stdin)
-  register                                 print the terse working register
+  tool-hook                                the PostToolUse hook that cuts a large
+                                           MCP, Grep or WebFetch result (JSON on
+                                           stdin)
+  register                                print the terse working register
 `;
 
 class UsageError extends Error {}
@@ -575,7 +583,14 @@ const setupCommand = async ({
     telemetry: !values['no-telemetry'],
     dryRun: values['dry-run'] === true,
     uninstall: values.uninstall === true,
-    otlpPort: otlp.enabled ? otlp.httpPort : null,
+    runnerBinary: deps.runnerBinary ?? null,
+    // L-30: the token the daemon asks for, from the same file it reads.
+    otlp: otlp.enabled
+      ? {
+          port: otlp.httpPort,
+          token: loadOtlpToken(otlpTokenPath(paths.stateDir)),
+        }
+      : null,
     home: paths.home,
     env: deps.env,
     exec: (env) => createExec(env),
@@ -630,7 +645,8 @@ export const runCli = async (
   if (
     command === 'filter' ||
     command === 'filter-hook' ||
-    command === 'read-hook'
+    command === 'read-hook' ||
+    command === 'tool-hook'
   ) {
     const { runFilterCommand } = await import('./filter/main');
     // One decoder per stream: a character may span two chunks.

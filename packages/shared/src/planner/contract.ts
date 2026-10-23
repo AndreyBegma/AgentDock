@@ -1,7 +1,12 @@
 import type { z } from 'zod';
-import { DESIGN_CDN_ALLOWLIST } from '../design/cdn';
+import {
+  cdnPackagePath,
+  DESIGN_CDN_ALLOWLIST,
+  DESIGN_CDN_PACKAGES,
+} from '../design/cdn';
 import {
   DESIGN_FRAME_NAME_MAX,
+  DESIGN_FRAMES_MAX,
   DESIGN_LEGACY_FRAME_NAME,
   type DesignFrameDraft,
 } from '../design/frames';
@@ -18,7 +23,9 @@ import {
   CARD_DRAFT_SECTIONS,
   CARD_DRAFT_TITLE_MAX,
   type CardDraft,
+  type DesignFrameEntry,
   DISCUSS_PROPOSALS_MAX,
+  frameEntryOf,
   INTAKE_SPLIT_MAX,
   INTAKE_SPLIT_MIN,
   INTAKE_STACK_STAGES_MIN,
@@ -94,6 +101,10 @@ export const PLANNER_VIOLATION_REASONS = [
    * are design blocks, or names one frame twice.
    */
   'frame_mismatch',
+  /** Design (DA-07): `frames` or `kept` names more than `DESIGN_FRAMES_MAX`. */
+  'too_many_frames',
+  /** Design (DA-07): a design block with no HTML in it. */
+  'empty_design_block',
   /**
    * Design: one frame's HTML is over `DESIGN_HTML_MAX_BYTES`, or every frame's
    * together over `DESIGN_TOTAL_MAX_BYTES`.
@@ -175,7 +186,7 @@ export interface PlannerParseContexts {
      * #628: a revise's previous revision of the variant, in order — the
      * frames `kept` may name. Absent on a generate: nothing can be kept.
      */
-    previousFrames?: readonly DesignFrameDraft[];
+    previousFrames?: readonly Pick<DesignFrameDraft, 'name' | 'html'>[];
   };
   /** #337: what decides whether the intake turn may still ask. */
   intake: VersionContext & IntakeTurnState;
@@ -324,6 +335,15 @@ const shapeViolation = (issues: readonly Issue[]) => {
       `a round has at most ${PLANNER_MAX_QUESTIONS} questions (${formatPath(questions.path)})`,
     );
   }
+  const frames = tooBig.find(
+    (i) => lastKey(i) === 'frames' || lastKey(i) === 'kept',
+  );
+  if (frames) {
+    return violation(
+      'too_many_frames',
+      `a design has at most ${DESIGN_FRAMES_MAX} frames (${formatPath(frames.path)})`,
+    );
+  }
   const first = all.find((i) => i.code !== 'invalid_union') ?? all[0];
   return violation(
     'invalid_shape',
@@ -362,8 +382,29 @@ const checkTaskGraph = (
   return null;
 };
 
-const hasHeading = (document: string, heading: string): boolean =>
-  new RegExp(`^##[ \\t]+${heading}[ \\t]*#*[ \\t]*$`, 'im').test(document);
+/**
+ * `## <one of headings>` lines, with the rest of each line; whether the rest
+ * is only a closing run of `#` and blanks is checked in code (`isClosing`).
+ * WI-61: `[ \t]*#*[ \t]*$` in the pattern was quadratic on a long run of
+ * blanks.
+ */
+const headingLines = (headings: readonly string[]): RegExp =>
+  new RegExp(`^##[ \\t]+(?:${headings.join('|')})(.*)$`, 'gim');
+
+const isClosing = (rest: string): boolean => {
+  const trimmed = rest.trimEnd();
+  let end = trimmed.length;
+  // A loop, not `/#+$/`: that restarts at every `#` of a long run.
+  while (end > 0 && trimmed[end - 1] === '#') end--;
+  return trimmed.slice(0, end).trimEnd() === '';
+};
+
+const hasHeading = (document: string, heading: string): boolean => {
+  for (const match of document.matchAll(headingLines([heading]))) {
+    if (isClosing(match[1])) return true;
+  }
+  return false;
+};
 
 /** The heading each kind's document must carry (D4). */
 export const PLANNER_REQUIRED_HEADING: Record<PlanTaskKind, string> = {
@@ -375,10 +416,7 @@ export const PLANNER_REQUIRED_HEADING: Record<PlanTaskKind, string> = {
 export const missingCardSections = (body: string): string[] =>
   CARD_DRAFT_SECTIONS.filter((section) => !hasHeading(body, section));
 
-const SECTION_LINE = new RegExp(
-  `^##[ \\t]+(?:${CARD_DRAFT_SECTIONS.join('|')})[ \\t]*#*[ \\t]*$`,
-  'gim',
-);
+const SECTION_LINE = headingLines(CARD_DRAFT_SECTIONS);
 
 /**
  * #337 D5: the card's title and body pass ADR-0027 §6's English check. The
@@ -388,7 +426,11 @@ const SECTION_LINE = new RegExp(
  */
 export const isCardDraftEnglish = (draft: Pick<CardDraft, 'title' | 'body'>) =>
   isReliablyEnglish(draft.title) &&
-  isReliablyEnglish(draft.body.replace(SECTION_LINE, ''));
+  isReliablyEnglish(
+    draft.body.replace(SECTION_LINE, (line, rest: string) =>
+      isClosing(rest) ? '' : line,
+    ),
+  );
 
 /**
  * #337 D5, D6; #409: a written card — the single one or one of a split —
@@ -431,15 +473,19 @@ const intakeBranchSchema = (json: unknown) => {
  * most `DESIGN_HTML_MAX_BYTES` apiece — and together at most
  * `DESIGN_TOTAL_MAX_BYTES` (#686). #628: a frame named in `kept`
  * has no block; it is the previous revision's frame of that name, as drawn.
+ * #833 D13: each frame carries the kind its entry names — `legacy` for a
+ * plain name; conformance to the template is the API's check, not this one.
  */
 const parseDesignBlocks = (
   text: string,
-  names: readonly string[] | undefined,
+  entries: readonly DesignFrameEntry[] | undefined,
   kept: readonly string[],
-  previous: readonly DesignFrameDraft[],
+  previous: readonly Pick<DesignFrameDraft, 'name' | 'html'>[],
 ):
   | { ok: true; frames: DesignFrameDraft[] }
   | { ok: false; error: PlannerContractViolation } => {
+  const named = entries?.map(frameEntryOf);
+  const names = named?.map((f) => f.name);
   const blocks = extractFencedBlocks(text, PLANNER_DESIGN_BLOCK_TAG);
   if (blocks.includes(null)) {
     return violation(
@@ -497,12 +543,20 @@ const parseDesignBlocks = (
   const frames: DesignFrameDraft[] = [];
   let total = 0;
   let block = 0;
-  for (const name of frameNames) {
+  for (const [i, name] of frameNames.entries()) {
     const copy = keptKeys.has(name.toLowerCase())
       ? earlier.get(name.toLowerCase())
       : undefined;
     // A kept frame was validated when its revision was drawn.
     const html = copy ? copy.html : (blocks[block++] as string);
+    if (!copy && html.trim() === '') {
+      return violation(
+        'empty_design_block',
+        frameNames.length > 1
+          ? `frame "${name}": the ${PLANNER_DESIGN_BLOCK_TAG} block is empty`
+          : `the ${PLANNER_DESIGN_BLOCK_TAG} block is empty`,
+      );
+    }
     if (!copy) {
       const check = validateMockup(html);
       if (!check.ok) {
@@ -515,7 +569,7 @@ const parseDesignBlocks = (
       }
     }
     total += designBytes(html);
-    frames.push({ name, html });
+    frames.push({ name, kind: named?.[i].kind ?? 'legacy', html });
   }
   if (total > DESIGN_TOTAL_MAX_BYTES) {
     return violation(
@@ -766,8 +820,12 @@ export function parsePlannerOutput(
 }
 
 const CDN_HOSTS = DESIGN_CDN_ALLOWLIST.map(
-  (s) => `\`${s.host}${s.pathPrefix === '/' ? '' : s.pathPrefix}\``,
+  (s) => `${s.host}${s.pathPrefix === '/' ? '' : s.pathPrefix}`,
 ).join(', ');
+
+const CDN_PACKAGES = DESIGN_CDN_PACKAGES.map((p) =>
+  cdnPackagePath(p).replace(/\/$/, ''),
+).join(' ');
 
 /**
  * Spec 223 D6, D7: the design action's rules. Part of the v2 text; the API
@@ -791,17 +849,17 @@ backticks, each holding one self-contained HTML document:
 
 Frames:
 
-- Draw one frame unless the task touches several pages or several standalone components. Then draw one frame per page, plus one per component that matters on its own (its states side by side).
-- \`"frames"\` lists a short name per frame (at most ${DESIGN_FRAME_NAME_MAX} characters, distinct), in the order of the design blocks: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out; the frame is then named "${DESIGN_LEGACY_FRAME_NAME}".
-- On a revision, \`"kept"\` names the frames of \`"frames"\` you leave exactly as the previous revision drew them, by their previous names. A kept frame has no design block — Nautelle copies it; every other frame of \`"frames"\` has one, in order.
+- Draw exactly the frames of the template the turn gives you ("Frames to draw"), in that order — nothing else. An explanation is its own frame, never text over the screen.
+- \`"frames"\` lists them in block order as \`{ "name", "kind" }\`, with the template's kind: \`[{ "name": "Screen", "kind": "screen" }]\`. Names are one line (max ${DESIGN_FRAME_NAME_MAX} chars), distinct, ≤${DESIGN_FRAMES_MAX} frames. A plain string reads as kind \`legacy\` and fails the template; left out, the one frame is "${DESIGN_LEGACY_FRAME_NAME}".
+- On a revision, \`"kept"\` names the frames you leave exactly as the previous revision drew them. A kept frame has no design block — Nautelle copies it; every other frame has one, in order.
 
 The mockup's rules — a frame that breaks one fails the turn:
 
 - At most ${DESIGN_HTML_MAX_BYTES / 1024} KiB of HTML per frame, and ${DESIGN_TOTAL_MAX_BYTES / 1024} KiB for all frames together. Inline CSS and JS are allowed.
-- External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS. No other host, and no relative URL: inline it or use a \`data:\` URL (images and fonts only).
-- Every script or package URL names an exact version: \`react@18.3.1\`, never \`react@18\` or \`latest\`.
+- External scripts, styles, fonts and images only from ${CDN_HOSTS}, over HTTPS; no other host, no relative URL (inline it, or a \`data:\` URL for images and fonts).
+- npm CDNs, these only: ${CDN_PACKAGES}.
 - No network calls (\`fetch\`, \`XMLHttpRequest\`, \`WebSocket\`, \`EventSource\`, \`sendBeacon\`), no form that submits, no navigation of the top or parent window, no \`window.open\`, no \`<iframe>\`, \`<object>\`, \`<embed>\` or \`<base>\`, no link to another site.
-- Wrap inline scripts in an IIFE; never declare a top-level name after a window global (\`top\`, \`window\`, \`self\`, \`name\`, …).
+- Wrap inline scripts in an IIFE; no top-level name that is a window global (\`top\`, \`window\`, \`self\`, \`name\`, …).
 - The theme switches through \`:root[data-theme="light"]\` and \`:root[data-theme="dark"]\`.
 - \`variant\` is the variant the turn names (1–${DESIGN_VARIANTS_MAX}); \`addressed\` lists only ids of the open comments the turn gave you.
 `;
@@ -879,7 +937,7 @@ write     → { "action": "write", "taskKey": key, "document": markdown, "assump
 revise    → { "action": "revise", "tasks": [ Task | { "key": key } ] }${
     v2
       ? `
-design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ], "frames"?: [ string ], "kept"?: [ string ] }`
+design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ], "frames"?: [ { "name": string, "kind": string } ], "kept"?: [ string ] }`
       : ''
   }
 \`\`\`

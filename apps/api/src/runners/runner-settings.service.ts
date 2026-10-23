@@ -1,10 +1,12 @@
-import { RUNNER_ERROR } from '@nautelle/shared';
+import { type LocalRunner, RUNNER_ERROR } from '@nautelle/shared';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import type { Runner } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
 import { runnerError } from './runner-error';
+import { toLocalRunner } from './runner-mapper';
+import { RunnerReleaseService } from './runner-release.service';
 import { RunnerWatchList } from './runner-watch-list';
 
 /** What spec 201 adds to a runner's settings (D8, D17). */
@@ -28,11 +30,11 @@ export interface RunnerSettingsActor {
   meta?: object;
 }
 
-/** A runner a user is the local user of — what they may set away mode on. */
-export interface LocalRunnerView extends RunnerLocalSettings {
-  id: string;
-  name: string;
-}
+/**
+ * A runner a user is the local user of — what they may set away mode on, and
+ * whether it is older than the latest release (C-328).
+ */
+export type LocalRunnerView = LocalRunner;
 
 const invalidUser = () => {
   const body = {
@@ -57,6 +59,7 @@ export class RunnerSettingsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly watchList: RunnerWatchList,
+    private readonly release: RunnerReleaseService,
   ) {}
 
   async update(
@@ -64,17 +67,18 @@ export class RunnerSettingsService {
     patch: RunnerSettingsPatch,
     actor: RunnerSettingsActor,
   ): Promise<Runner> {
+    const before = await this.prisma.runner.findUnique({ where: { id } });
+    // Someone who is neither an admin nor its local user does not see it —
+    // checked before the field permission so a 403 never confirms an id.
+    if (!before || (!actor.isAdmin && before.localUserId !== actor.userId)) {
+      throw runnerError(404, RUNNER_ERROR.notFound, 'Runner not found');
+    }
     if (patch.localUserId !== undefined && !actor.isAdmin) {
       throw runnerError(
         403,
         RUNNER_ERROR.forbidden,
         "Only an admin changes a runner's local user",
       );
-    }
-    const before = await this.prisma.runner.findUnique({ where: { id } });
-    // Someone who is neither an admin nor its local user does not see it.
-    if (!before || (!actor.isAdmin && before.localUserId !== actor.userId)) {
-      throw runnerError(404, RUNNER_ERROR.notFound, 'Runner not found');
     }
     if (patch.localUserId) {
       const user = await this.prisma.user.findUnique({
@@ -126,8 +130,20 @@ export class RunnerSettingsService {
     const runners = await this.prisma.runner.findMany({
       where: { localUserId: userId, revokedAt: null },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, name: true, localUserId: true, awayMode: true },
+      select: {
+        id: true,
+        name: true,
+        localUserId: true,
+        awayMode: true,
+        hostname: true,
+        version: true,
+      },
     });
-    return runners;
+    return runners.map((runner) => this.toView(runner));
+  }
+
+  /** The runner as its local user sees it, with the version check (C-328). */
+  toView(runner: Parameters<typeof toLocalRunner>[0]): LocalRunnerView {
+    return toLocalRunner(runner, this.release.latest);
   }
 }

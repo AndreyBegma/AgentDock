@@ -4,7 +4,7 @@ import {
   roundDecisionsSchema,
 } from '@nautelle/shared/protocol';
 import type { Prisma, PrismaClient } from '@prisma/client';
-import type { CachedIssue, QueueInputs } from './queue-state';
+import { type CachedIssue, isReady, type QueueInputs } from './queue-state';
 
 type Db = Prisma.TransactionClient | PrismaClient;
 
@@ -47,16 +47,28 @@ export const decisionsOf = (value: Prisma.JsonValue): RoundDecisions => {
 
 export type IssueRow = Prisma.IssueCacheGetPayload<object>;
 
-export const toCachedIssue = (row: IssueRow): CachedIssue => ({
-  number: row.number,
-  kind: row.kind,
-  title: row.title,
-  state: row.state,
-  labels: strings(row.labels),
-  body: row.body,
-  closedBy: row.closedBy,
-  snapshotAt: row.snapshotAt,
-});
+/** The columns of an `issues_cache` row the queue reads, all but the body. */
+const CACHED_ISSUE = {
+  number: true,
+  kind: true,
+  title: true,
+  state: true,
+  labels: true,
+  closedBy: true,
+  snapshotAt: true,
+} satisfies Prisma.IssueCacheSelect;
+
+/**
+ * Whether the queue reads an issue's body: an open pull request's `Closes #n`,
+ * or a ready issue's gate, dependencies, spec and parallel plan. Every other
+ * row — closed, unlabelled — is read for its state and labels only (L-25).
+ */
+export const needsBody = (
+  issue: Omit<CachedIssue, 'body'>,
+  readyLabel: string,
+): boolean =>
+  (issue.kind === 'pull_request' && issue.state === 'open') ||
+  isReady({ ...issue, body: '' }, readyLabel);
 
 export const labelsOf = (row: Pick<IssueRow, 'labels'>): string[] =>
   strings(row.labels);
@@ -69,36 +81,50 @@ export const latestRound = (db: Db, projectId: string) =>
     orderBy: [{ date: 'desc' }, { label: 'desc' }],
   });
 
-/** Everything `computeQueue` reads for one project; null when it is gone. */
+/**
+ * Everything `computeQueue` reads for one project; null when it is gone. The
+ * bodies are read second, for the rows `needsBody` names only (L-25); every
+ * other row carries an empty body the computation never reads.
+ */
 export const loadQueueInputs = async (
   db: Db,
   projectId: string,
-): Promise<{ inputs: QueueInputs; issues: IssueRow[] } | null> => {
+): Promise<QueueInputs | null> => {
   const project = await db.project.findUnique({
     where: { id: projectId },
     select: { readyLabelOverride: true, codeSentinelConfig: true },
   });
   if (!project) return null;
-  const [issues, slots, round] = await Promise.all([
-    db.issueCache.findMany({ where: { projectId } }),
+  const readyLabel = readyLabelOf(project);
+  const [rows, slots, round] = await Promise.all([
+    db.issueCache.findMany({ where: { projectId }, select: CACHED_ISSUE }),
     db.slot.findMany({
       where: { projectId, status: { not: 'ended' } },
       select: { name: true, issue: true, branch: true },
     }),
     latestRound(db, projectId),
   ]);
+  const issues = rows.map((row) => ({ ...row, labels: strings(row.labels) }));
+  const wanted = issues
+    .filter((i) => needsBody(i, readyLabel))
+    .map((i) => i.number);
+  const bodies =
+    wanted.length === 0
+      ? []
+      : await db.issueCache.findMany({
+          where: { projectId, number: { in: wanted } },
+          select: { number: true, body: true },
+        });
+  const bodyOf = new Map(bodies.map((b) => [b.number, b.body]));
   return {
-    issues,
-    inputs: {
-      readyLabel: readyLabelOf(project),
-      issues: issues.map(toCachedIssue),
-      slots: slots.map((s) => ({ ...s, live: true })),
-      round: round
-        ? {
-            updatedAt: round.updatedAt,
-            verdicts: boardVerdicts(decisionsOf(round.decisions)),
-          }
-        : null,
-    },
+    readyLabel,
+    issues: issues.map((i) => ({ ...i, body: bodyOf.get(i.number) ?? '' })),
+    slots: slots.map((s) => ({ ...s, live: true })),
+    round: round
+      ? {
+          updatedAt: round.updatedAt,
+          verdicts: boardVerdicts(decisionsOf(round.decisions)),
+        }
+      : null,
   };
 };

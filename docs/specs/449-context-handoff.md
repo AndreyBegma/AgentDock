@@ -2,6 +2,12 @@
 
 Issue: [#449](https://github.com/AndreyBegma/Nautelle/issues/449) · Decision: [ADR-0042](../adr/0042-context-handoff.md)
 
+> **Amended by [#749](749-start-a-fresh-session-for-a-long-card-ro.md):**
+> D3 gains a size rule — with technique `resume-by-size` on, a history of
+> 60,000 tokens or more starts fresh from this spec's seed whenever one
+> exists, warm cache or not; below it, or with the flag off or absent, D3
+> decides unchanged.
+
 ## Summary
 
 A card round already resumes the card's Claude session (`--resume card.sessionId`, `apps/api/src/board/board-rounds.service.ts` D5) [Confirmed]. Context is still lost or paid for in four cases:
@@ -45,11 +51,14 @@ Context handoff gives every unit of work a short, structured **handoff note** th
 - `handoff_notes`:
   - `id`;
   - `subjectKind` (`card` | `run`), `subjectId`, `projectId`;
+  - `cardId` / `runId` — the subject again, as a foreign key with
+    `ON DELETE CASCADE`, so a note goes with its card or run (C-186, DA-11);
+    a CHECK keeps exactly one of them equal to `subjectId`;
   - `content` (text);
   - `personLines` (jsonb ranges marked as the person's);
   - `updatedBy` (`agent` | `haiku` | `person`), `updatedAt`.
 
-  Unique `(subjectKind, subjectId)`. Rows exist only for projects with session content on.
+  Unique `(projectId, subjectKind, subjectId)` (C-186, DA-11). Rows exist only for projects with session content on; the admin session-content purge deletes them too.
 - New nullable columns on `board_card_rounds`:
   - `restartMode` (`resume` | `fresh` | `first`);
   - `restartEstimate` (jsonb: `{ resumeTokens, freshTokens, cacheWarm }`);

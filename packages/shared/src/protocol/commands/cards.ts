@@ -4,7 +4,14 @@ import {
   ATTACHMENTS_PER_CARD_MAX,
   attachmentRefSchema,
 } from '../../attachments';
+import { cardPrefixSchema } from '../../prefix/contracts';
+import { techniqueFlagsSchema } from '../../token-economy/techniques';
 import { tokenSaverConfigSchema } from '../../token-saver/contracts';
+import {
+  cardBranchSchema,
+  hasCardBranchPrefix,
+  protectedPathsSchema,
+} from '../branch-policy';
 import type { CommandDefinition } from '../commands';
 import { absolutePathSchema } from '../projects';
 import { headShaSchema } from './approvals';
@@ -100,6 +107,14 @@ export const cardSessionSchema = z.strictObject({
   id: z.uuid(),
   /** `claude --resume <id>` when true, `claude --session-id <id>` when false. */
   resume: z.boolean(),
+  /**
+   * #750 D7 (ADR-0076): a later round whose model or effort differs from the
+   * pair this session was started with — the runner starts a fresh session
+   * seeded from the handoff (ADR-0042 `fresh`), never `--resume` with another
+   * `--model` or `--effort`. Needs `resume: true`. Sent only to a runner that
+   * advertises `cardFreshStart`.
+   */
+  fresh: z.boolean().optional(),
 });
 export type CardSession = z.infer<typeof cardSessionSchema>;
 
@@ -189,6 +204,19 @@ export type CardDraftPullRequest = z.infer<typeof cardDraftPullRequestSchema>;
  * release); an older one refuses them as `invalid_args`, so the API sends
  * them only to a runner that advertises it.
  */
+/**
+ * #746 D11: a card launch's Token saver — the project's setting plus the
+ * technique flags of the card's arms, `{ [technique]: on }`. `techniques` is
+ * sent only to a runner that advertises `tokenEconomy`; it is strict over the
+ * registered techniques, so an unknown key is refused.
+ */
+export const cardTokenSaverSchema = tokenSaverConfigSchema.extend({
+  techniques: techniqueFlagsSchema.optional(),
+  /** #751: the session's frozen prefix; only to a runner with `prefixOverlays`. */
+  prefix: cardPrefixSchema.optional(),
+});
+export type CardTokenSaver = z.infer<typeof cardTokenSaverSchema>;
+
 export const cardRunArgsSchema = z
   .strictObject({
     ...cardTarget,
@@ -196,7 +224,8 @@ export const cardRunArgsSchema = z
     root: absolutePathSchema,
     base: gitRefSchema,
     shortId: cardShortIdSchema,
-    branch: gitRefSchema,
+    /** C-148: `card/`, `feat/` or `fix/` — never the default branch by name. */
+    branch: cardBranchSchema,
     session: cardSessionSchema,
     prompt: cardPromptSchema,
     files: z.array(cardRunFileSchema).max(CARD_RUN_FILES_MAX).optional(),
@@ -218,7 +247,13 @@ export const cardRunArgsSchema = z
     /** #359 D8: create `branch` from the updated `origin/<base>` first. */
     newBranch: z.boolean().optional(),
     /** #445 D11: the project's Token saver; absent is off (a runner without the `tokenSaver` capability refuses it). */
-    tokenSaver: tokenSaverConfigSchema.optional(),
+    tokenSaver: cardTokenSaverSchema.optional(),
+    /**
+     * #750 D8: offer the worker `escalate_card` — a non-Opus round in the B
+     * arm of `model-by-type` on a card that has not escalated yet. Sent only
+     * to a runner that advertises `cardEscalate`.
+     */
+    escalate: z.literal(true).optional(),
   })
   .refine(
     (a) =>
@@ -229,6 +264,10 @@ export const cardRunArgsSchema = z
   .refine((a) => a.newBranch !== true || a.session.resume, {
     message: 'newBranch needs a resumed session',
     path: ['newBranch'],
+  })
+  .refine((a) => a.session.fresh !== true || a.session.resume, {
+    message: 'a fresh start needs a later round',
+    path: ['session', 'fresh'],
   })
   .refine((a) => a.pullRequest === undefined || a.branch !== a.base, {
     message: 'a pushed branch must not be the base branch',
@@ -269,6 +308,10 @@ export type CardStopResult = z.infer<typeof cardStopResultSchema>;
  * in the checkout that holds it, and only when that checkout is on `branch`
  * (else `invalid_args`). `branch` is never `base`: the base is not committed
  * to or pushed.
+ *
+ * C-148: a card worktree's `branch` has a card prefix (`cardBranchSchema`); a
+ * terminal card's is its session's own, so only the runner's push guard
+ * (never the default or a protected branch) applies to it.
  */
 export const cardCollectArgsSchema = z
   .strictObject({
@@ -285,6 +328,10 @@ export const cardCollectArgsSchema = z
   })
   .refine((a) => a.branch !== a.base, {
     message: 'must not be the base branch',
+    path: ['branch'],
+  })
+  .refine((a) => a.cwd !== undefined || hasCardBranchPrefix(a.branch), {
+    message: 'a card branch must start with card/, feat/ or fix/',
     path: ['branch'],
   });
 export type CardCollectArgs = z.infer<typeof cardCollectArgsSchema>;
@@ -315,6 +362,12 @@ export const cardCollectResultSchema = z
      * stages tracked changes only). Absent for a worktree collect.
      */
     staged: z.array(z.string()).optional(),
+    /**
+     * C-148 (D-12): the protected paths the pushed branch changes against
+     * `origin/<base>` (`isProtectedPath`); empty when none. Absent when
+     * nothing was pushed, or from a runner older than the field.
+     */
+    protectedPaths: protectedPathsSchema.optional(),
   })
   .refine((r) => (r.prNumber === undefined) === (r.prUrl === undefined), {
     message: 'prNumber and prUrl go together',

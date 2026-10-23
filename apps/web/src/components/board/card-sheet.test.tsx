@@ -1,11 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { card as fixtureCard } from '../../lib/board/fixtures';
 import {
   CardBranchLine,
+  CardHeaderMeta,
   cardSheetFooter,
   cardSheetSide,
+  EscalationRow,
   focusSheetTitle,
   PrTargetBanner,
+  RunMoney,
 } from './card-sheet';
 
 interface Fake {
@@ -181,5 +185,92 @@ describe('Card sheet PR target after a retarget on GitHub (#722)', () => {
     expect(
       renderToStaticMarkup(<CardBranchLine branch={null} target={null} />),
     ).toBe('');
+  });
+});
+
+describe('Card sheet escalation row (#750 D9, D10)', () => {
+  const escalation = {
+    reason: 'misclassified' as const,
+    note: 'The card needs a migration.',
+    at: '2026-10-21T12:00:00.000Z',
+  };
+  const row = (model: string | null) =>
+    renderToStaticMarkup(
+      <EscalationRow card={{ model }} escalation={escalation} />,
+    );
+
+  test('a relaunched card records the escalation with its note', () => {
+    const html = row(null);
+    expect(html).toContain('Escalated to Opus · misclassified');
+    expect(html).toContain('The card needs a migration.');
+    expect(html).not.toContain('asks for Opus');
+  });
+
+  test("over a person's sonnet override the worker's ask is shown instead", () => {
+    const html = row('sonnet');
+    expect(html).toContain('The worker asks for Opus: misclassified');
+    expect(html).toContain('The card needs a migration.');
+    expect(html).not.toContain('Escalated to Opus');
+  });
+});
+
+describe('Card sheet Run row saving (#778)', () => {
+  const tokenSaved = { estimateUsd: 0.41, estimateTokens: 103_200 };
+  const money = (extra: Parameters<typeof fixtureCard>[2]) =>
+    renderToStaticMarkup(
+      <RunMoney card={fixtureCard(7, 'completed', extra)} />,
+    );
+
+  test('the saving follows the cost, with its tokens title', () => {
+    const html = money({ costUsd: '3.18', tokenSaved });
+    expect(html).toContain('$3.18');
+    expect(html).toContain('saved ≈');
+    expect(html).toContain('title="Token saver kept');
+    expect(html.indexOf('$3.18')).toBeLessThan(html.indexOf('saved ≈'));
+  });
+
+  test('a saving without a cost stands alone', () => {
+    const html = money({ costUsd: null, tokenSaved });
+    expect(html).toContain('saved ≈');
+    expect(html).not.toContain('$3.18');
+  });
+
+  test('no tokenSaved, or one that saved nothing, draws nothing for it', () => {
+    expect(money({ costUsd: '3.18', tokenSaved: null })).not.toContain('saved');
+    expect(
+      money({
+        costUsd: null,
+        tokenSaved: { estimateUsd: 0, estimateTokens: 0 },
+      }),
+    ).toBe('');
+    expect(money({ costUsd: null, tokenSaved: null })).toBe('');
+  });
+});
+
+describe('Card sheet header (#836)', () => {
+  const meta = (extra: Parameters<typeof fixtureCard>[2]) =>
+    renderToStaticMarkup(
+      <CardHeaderMeta card={fixtureCard(7, 'in_progress', extra)} />,
+    );
+
+  test('shows the column, the PR with its CI state and the cost on one line', () => {
+    const html = meta({
+      prNumber: 12,
+      prUrl: 'https://github.com/o/r/pull/12',
+      prState: 'open',
+      ciState: 'green',
+      costUsd: '3.18',
+    });
+    expect(html).toContain('In progress');
+    expect(html).toContain('#12');
+    expect(html).toContain('aria-label="Checks passed"');
+    expect(html).toContain('$3.18');
+  });
+
+  test('a card without a PR or cost has only its column', () => {
+    const html = meta({ costUsd: null });
+    expect(html).toContain('In progress');
+    expect(html).not.toContain('Checks');
+    expect(html).not.toContain('$');
   });
 });

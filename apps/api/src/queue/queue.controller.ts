@@ -10,13 +10,13 @@ import {
   Get,
   HttpCode,
   Param,
-  ParseIntPipe,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuditCtx } from '../audit';
 import type { AuditContext } from '../audit/audit.types';
+import { PositiveIntPipe } from '../common/pipes';
 import {
   ProjectAccess,
   ProjectAccessGuard,
@@ -54,7 +54,7 @@ export class QueueController {
   @Get('queue/:number')
   issue(
     @ProjectAccess() access: ResolvedProjectAccess,
-    @Param('number', ParseIntPipe) number: number,
+    @Param('number', PositiveIntPipe) number: number,
   ): Promise<QueueIssueDetail> {
     return this.query.issue(access.projectId, number);
   }

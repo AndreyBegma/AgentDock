@@ -108,6 +108,7 @@ describe('card.collect (#242 D8)', () => {
     expect(first).toEqual({
       ahead: 2,
       pushed: true,
+      protectedPaths: [],
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
       prState: 'open',
@@ -143,6 +144,7 @@ describe('card.collect (#242 D8)', () => {
     expect(second).toEqual({
       ahead: 3,
       pushed: true,
+      protectedPaths: [],
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
       prState: 'open',
@@ -263,6 +265,7 @@ describe('card.collect after card.close removed the worktree (#344)', () => {
     expect(await collectBranch(deps, record, args)).toEqual({
       ahead: 1,
       pushed: true,
+      protectedPaths: [],
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
       prState: 'open',
@@ -330,6 +333,7 @@ describe('card.collect reports the open PR (#329 D3, D6)', () => {
     expect(await collectCard(deps, record, args)).toEqual({
       ahead: 1,
       pushed: true,
+      protectedPaths: [],
       prNumber: 41,
       prUrl: 'https://github.com/acme/widget/pull/41',
       prState: 'open',

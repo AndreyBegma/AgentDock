@@ -2,6 +2,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
   checkWebhookTarget,
+  guardedGet,
   guardedPost,
   type HostResolver,
   isBlockedAddress,
@@ -48,6 +49,16 @@ describe('isBlockedAddress (D15)', () => {
     ['fd00::1'],
     ['fe80::1'],
     ['64:ff9b::a00:5'],
+    // C-178: site-local, local NAT64, Teredo, discard and the TEST-NETs.
+    ['fec0::1'],
+    ['feff::1'],
+    ['64:ff9b:1::a00:5'],
+    ['2001::1'],
+    ['2001:0:ffff::1'],
+    ['100::1'],
+    ['192.0.2.10'],
+    ['198.51.100.10'],
+    ['203.0.113.10'],
   ])('blocks %s', (address) => {
     expect(isBlockedAddress(address)).toBe(true);
   });
@@ -57,6 +68,9 @@ describe('isBlockedAddress (D15)', () => {
     ['1.1.1.1'],
     ['2606:4700:4700::1111'],
     ['172.32.0.1'],
+    ['2001:4860:4860::8888'],
+    ['192.0.3.1'],
+    ['203.0.114.1'],
   ])('lets %s through', (address) => {
     expect(isBlockedAddress(address)).toBe(false);
   });
@@ -191,7 +205,12 @@ describe('guardedPost (D12, D15)', () => {
   let server: http.Server;
   let port: number;
   let handler: Handler;
-  const hits: { url: string; host: string | undefined; body: string }[] = [];
+  const hits: {
+    url: string;
+    host: string | undefined;
+    body: string;
+    method?: string;
+  }[] = [];
 
   beforeAll(async () => {
     server = http.createServer((req, res) => {
@@ -200,7 +219,12 @@ describe('guardedPost (D12, D15)', () => {
         body += chunk.toString();
       });
       req.on('end', () => {
-        hits.push({ url: req.url ?? '', host: req.headers.host, body });
+        hits.push({
+          url: req.url ?? '',
+          host: req.headers.host,
+          body,
+          ...(req.method === 'POST' ? {} : { method: req.method }),
+        });
         handler(req, res);
       });
     });
@@ -339,5 +363,41 @@ describe('guardedPost (D12, D15)', () => {
       resolve,
     );
     expect(result).toMatchObject({ succeeded: false, error: 'network_error' });
+  });
+
+  it('GETs through the same check, with no body (C-328)', async () => {
+    handler = (_req, res) => res.writeHead(200).end('{"version":"0.15.0"}');
+    const { resolve } = lan();
+    const result = await guardedGet({
+      url: `http://n8n.lan:${port}/nautelle-runner/latest`,
+      headers: { Accept: 'application/json' },
+      allowlist: new TargetAllowlist(['n8n.lan']),
+      resolve,
+    });
+    expect(result).toEqual({
+      succeeded: true,
+      status: 200,
+      body: '{"version":"0.15.0"}',
+      error: null,
+    });
+    expect(hits).toEqual([
+      {
+        url: '/nautelle-runner/latest',
+        host: `n8n.lan:${port}`,
+        body: '',
+        method: 'GET',
+      },
+    ]);
+    const refused = await guardedGet({
+      url: `http://n8n.lan:${port}/nautelle-runner/latest`,
+      headers: {},
+      allowlist: none,
+      resolve,
+    });
+    expect(refused).toMatchObject({
+      succeeded: false,
+      error: 'blocked_address',
+    });
+    expect(hits).toHaveLength(1);
   });
 });

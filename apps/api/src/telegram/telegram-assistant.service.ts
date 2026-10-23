@@ -364,8 +364,17 @@ export class TelegramAssistantService {
   private async authUser(userId: string): Promise<AuthUser | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, role: true, status: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        totpEnabledAt: true,
+      },
     });
-    return user?.status === 'active' ? user : null;
+    if (user?.status !== 'active') return null;
+    const { totpEnabledAt, ...rest } = user;
+    return { ...rest, twoFactorEnabled: totpEnabledAt !== null };
   }
 }

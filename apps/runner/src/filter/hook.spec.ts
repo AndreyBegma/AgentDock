@@ -66,6 +66,7 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
       now: () => Date.parse('2026-10-16T12:00:00.000Z'),
       random: () => 0.5,
       rules: () => NO_RULES,
+      managedPolicy: () => false,
     };
   });
   afterEach(() => {
@@ -219,6 +220,18 @@ describe('filter-hook (#445 D3, amendment 3)', () => {
       }),
     ).toBe('');
     expect(stats()[0]?.row.passedThrough).toBe(true);
+  });
+
+  it('leaves the command alone in every mode when a managed policy exists (DR-06)', () => {
+    for (const mode of ['bypassPermissions', 'auto', 'plan']) {
+      expect(
+        runFilterHook(JSON.stringify(preToolUse('bun run test', {}, mode)), {
+          ...deps,
+          managedPolicy: () => true,
+        }),
+      ).toBe('');
+    }
+    expect(stats().every(({ row }) => row.passedThrough)).toBe(true);
   });
 
   describe('by permission mode (amendments 9 and 10)', () => {

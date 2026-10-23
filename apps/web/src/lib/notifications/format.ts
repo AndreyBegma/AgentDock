@@ -10,6 +10,7 @@ import {
   type NotificationView,
 } from '@nautelle/shared';
 import { formatRelative } from '../format';
+import { internalHref } from '../url';
 
 export const BELL_LIMIT = 20;
 
@@ -45,6 +46,7 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   'cards.suggested': 'Cards suggested from your sessions',
   'steward.incident': 'Steward needs you on stuck work',
   'account.throttled': 'Sign-in attempts throttled',
+  'telegram.link_pending': 'Telegram chat waits for your confirmation',
 };
 
 /** What a notification of the kind reads like, under the rule's name. */
@@ -72,6 +74,8 @@ export const KIND_EXAMPLE: Record<NotificationKind, string> = {
     'C-12 needs you: API error persisted after 2 nudges — open the terminal',
   'account.throttled':
     'Ana Diaz’s account had 5 wrong passwords from 203.0.113.7',
+  'telegram.link_pending':
+    '@anatg used your link code — confirm it if that chat is yours',
 };
 
 export type RuleGroup =
@@ -109,6 +113,7 @@ const KIND_GROUP: Record<NotificationKind, RuleGroup> = {
   'cards.suggested': 'fleet',
   'steward.incident': 'fleet',
   'account.throttled': 'security',
+  'telegram.link_pending': 'security',
 };
 
 export type KindTone = 'ok' | 'warn' | 'danger' | 'neutral';
@@ -133,6 +138,7 @@ export const KIND_TONE: Record<NotificationKind, KindTone> = {
   'cards.suggested': 'neutral',
   'steward.incident': 'warn',
   'account.throttled': 'danger',
+  'telegram.link_pending': 'warn',
 };
 
 export interface FeedState {
@@ -227,7 +233,7 @@ export const relativeTime = (iso: string, now: number = Date.now()): string =>
 
 /** A link from the API is a path in this app; anything else is not followed. */
 export const safeLink = (link: string | null): string | null =>
-  link?.startsWith('/') && !link.startsWith('//') ? link : null;
+  link?.startsWith('/') ? (internalHref(link) ?? null) : null;
 
 /** `YYYY-MM-DD` of a local date, for `<input type="date">`. */
 export function toDateInput(iso: string | null): string {

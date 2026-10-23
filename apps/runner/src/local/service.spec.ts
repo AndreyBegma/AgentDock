@@ -10,7 +10,11 @@ import {
 import type { CardRecord } from '../cards/record';
 import { MASK } from '../pane/redact';
 import { memoryLogger } from '../testing/fixtures';
-import { LocalService, type LocalServiceDeps } from './service';
+import {
+  type EscalatedRound,
+  LocalService,
+  type LocalServiceDeps,
+} from './service';
 import { SessionTokens } from './session-tokens';
 import { HookSessions } from './sessions';
 import type { LocalCaller, LocalRelayRequest, LocalResult } from './types';
@@ -23,10 +27,15 @@ interface SetupOptions
   extends Partial<
     Pick<
       LocalServiceDeps,
-      'liveRound' | 'ancestorsOf' | 'alive' | 'launchedSession'
+      | 'liveRound'
+      | 'ancestorsOf'
+      | 'alive'
+      | 'launchedSession'
+      | 'readDescription'
     >
   > {
   reply?: LocalResult<unknown>;
+  duringRelay?: () => void;
 }
 
 const tokens = new SessionTokens(Buffer.alloc(32, 7));
@@ -45,6 +54,7 @@ const setup = (
 ) => {
   const emitted: UnsequencedEvent[] = [];
   const relayed: LocalRelayRequest[] = [];
+  const stopped: EscalatedRound[] = [];
   const sessions = new HookSessions();
   const projects: WatchedProject[] = [
     { id: 'prj_app', root: ROOT, ...(shipContent ? { shipContent } : {}) },
@@ -57,8 +67,11 @@ const setup = (
     emit: (event) => emitted.push(event),
     relay: async (request): Promise<LocalResult<unknown>> => {
       relayed.push(request);
+      // #750: the API may start the relaunch before it answers.
+      options.duringRelay?.();
       return options.reply ?? { ok: true, data: { echoed: true } };
     },
+    stopRoundSoon: (round) => stopped.push(round),
     envelope: async (id) =>
       id === 'prj_app' ? { repo: 'acme/app', root: ROOT } : undefined,
     sessions,
@@ -66,13 +79,16 @@ const setup = (
     ...(options.liveRound ? { liveRound: options.liveRound } : {}),
     ...(options.ancestorsOf ? { ancestorsOf: options.ancestorsOf } : {}),
     ...(options.alive ? { alive: options.alive } : {}),
+    ...(options.readDescription
+      ? { readDescription: options.readDescription }
+      : {}),
     ...(options.launchedSession
       ? { launchedSession: options.launchedSession }
       : {}),
     now: () => '2026-10-14T10:00:00.000Z',
     log: memoryLogger().log,
   });
-  return { service, emitted, relayed, sessions };
+  return { service, emitted, relayed, sessions, stopped };
 };
 
 const prompt = (text: string, cwd = ROOT) => ({
@@ -100,6 +116,27 @@ describe('LocalService — hook events (spec 201 D11, D13)', () => {
     });
     const parsed = parseHookEvent({ ...emitted[0], seq: 1 });
     expect(parsed?.ok).toBe(true);
+  });
+
+  it('refuses an event of a type outside the hook allowlist and spools nothing (C-169)', async () => {
+    const { service, emitted, sessions } = setup(false);
+    for (const type of [
+      'pr.merged',
+      'approvals.decided',
+      'card_run.phase_changed',
+    ]) {
+      const result = await service.handle(
+        'event',
+        { type, sessionId: 's-1', cwd: ROOT, data: { number: 7 } },
+        as('s-1'),
+      );
+      expect(result).toEqual({
+        ok: false,
+        error: { code: 'forbidden', message: `${type} is not a hook event` },
+      });
+    }
+    expect(emitted).toEqual([]);
+    expect(sessions.claudePidOf('s-1')).toBeNull();
   });
 
   it('strips every content field when the project does not ship content', async () => {
@@ -416,6 +453,92 @@ describe('LocalService — card rounds after a restart (#482)', () => {
     expect(relayed[0]?.session).toEqual({ runtime: 'claude', id: 's-own' });
   });
 
+  it('drops an artifactIncomplete the caller sets (DA-18)', async () => {
+    const { service, relayed } = setup(false, true, { liveRound });
+    await service.handle(
+      'request',
+      { ...finish, args: { ...finish.args, artifactIncomplete: true } },
+      as(SESSION, WORKTREE),
+    );
+    expect(relayed[0]?.args).toEqual({ summary: 'Done. Tested.' });
+  });
+
+  describe('the artifact guard on the daemon’s side (#445 D8, DR-10)', () => {
+    const COMPLETE = [
+      'Closes #12',
+      '## What changed and why',
+      'The daemon guards the finish.',
+      '## Acceptance criteria',
+      '- [x] tested',
+    ].join('\n');
+    const guarded: CardRecord = { ...round, finishGuard: { issueNumber: 12 } };
+    const guardedRound = (cwd: string) =>
+      cwd.startsWith(WORKTREE) ? guarded : null;
+    const call = (service: LocalService, args: Record<string, unknown>) =>
+      service.handle('request', { ...finish, args }, as(SESSION, WORKTREE));
+
+    it('refuses an incomplete finish twice, whatever the caller claims, then relays it as incomplete', async () => {
+      const { service, relayed, emitted } = setup(false, true, {
+        liveRound: guardedRound,
+        readDescription: () => COMPLETE.replace('## Acceptance criteria', ''),
+      });
+      const claimed = { summary: 'Done. Tested.', artifactIncomplete: false };
+      const first = await call(service, claimed);
+      expect(first.ok).toBe(false);
+      expect(!first.ok && first.error.code).toBe('artifact_incomplete');
+      expect(!first.ok && first.error.message).toContain(
+        '## Acceptance criteria',
+      );
+      expect((await call(service, claimed)).ok).toBe(false);
+      expect(relayed).toEqual([]);
+      expect(emitted).toEqual([]);
+      expect((await call(service, claimed)).ok).toBe(true);
+      expect(relayed[0]?.args).toEqual({
+        summary: 'Done. Tested.',
+        artifactIncomplete: true,
+      });
+    });
+
+    it('relays a complete finish as is', async () => {
+      const { service, relayed } = setup(false, true, {
+        liveRound: guardedRound,
+        readDescription: () => COMPLETE,
+      });
+      expect((await call(service, { summary: 'Done. Tested.' })).ok).toBe(true);
+      expect(relayed[0]?.args).toEqual({ summary: 'Done. Tested.' });
+    });
+
+    it('reads the description of the round’s worktree, never the caller’s cwd', async () => {
+      const read: string[] = [];
+      const { service } = setup(false, true, {
+        liveRound: guardedRound,
+        readDescription: (worktree) => {
+          read.push(worktree);
+          return COMPLETE;
+        },
+      });
+      await service.handle(
+        'request',
+        { ...finish, cwd: `${WORKTREE}/apps/api` },
+        as(SESSION, WORKTREE),
+      );
+      expect(read).toEqual([WORKTREE]);
+    });
+
+    it('starts each round without rejections', async () => {
+      let current = guarded;
+      const { service } = setup(false, true, {
+        liveRound: () => current,
+        readDescription: () => null,
+      });
+      const summary = { summary: 'Done. Tested.' };
+      expect((await call(service, summary)).ok).toBe(false);
+      expect((await call(service, summary)).ok).toBe(false);
+      current = { ...guarded, runId: 'run_2' };
+      expect((await call(service, summary)).ok).toBe(false);
+    });
+  });
+
   it('reports a refused finish_card of a live round as card_run.finish_refused', async () => {
     const { service, emitted } = setup(false, true, {
       liveRound,
@@ -470,6 +593,82 @@ describe('LocalService — card rounds after a restart (#482)', () => {
       as(SESSION, WORKTREE),
     );
     expect(emitted).toEqual([]);
+  });
+});
+
+describe('LocalService — escalate_card stops the asking round (#750 D8)', () => {
+  const WORKTREE = '/home/person/dev/.wt-app-card-abc12345';
+  const SESSION = '0b0f6f2e-8f5e-4c1e-9a43-3d6f3b1f2c11';
+  const OPUS = '9c0f7a52-6d3e-4b8a-9f1e-2a4b6c8d0e1f';
+  let current: CardRecord;
+  const asking: CardRecord = {
+    cardId: 'card_1',
+    projectId: 'prj_app',
+    root: ROOT,
+    repo: 'acme/app',
+    shortId: 'abc12345',
+    worktree: WORKTREE,
+    branch: 'fix/1-x',
+    base: 'develop',
+    tmuxSession: 'nautelle-card-abc12345',
+    runId: 'run_1',
+    phase: 'running',
+    sessionId: SESSION,
+    startedAt: '2026-10-14T09:00:00.000Z',
+  };
+  const liveRound = (cwd: string) =>
+    cwd.startsWith(WORKTREE) ? current : null;
+  const escalate = {
+    method: 'card.escalate',
+    args: { reason: 'misclassified', note: 'Needs a migration.' },
+    via: 'mcp',
+    cwd: WORKTREE,
+    ppid: 4242,
+  };
+  const relaunched = {
+    ok: true as const,
+    data: { number: 1, escalated: true, relaunched: true },
+  };
+
+  it('stops the round that asked, even when the relaunch replaced it before the answer', async () => {
+    current = asking;
+    const { service, stopped } = setup(false, true, {
+      liveRound,
+      reply: relaunched,
+      // The API's relaunch on Opus: another run, another session.
+      duringRelay: () => {
+        current = { ...asking, runId: 'run_2', sessionId: OPUS };
+      },
+    });
+    const result = await service.handle(
+      'request',
+      escalate,
+      as(SESSION, WORKTREE),
+    );
+    expect(result).toEqual(relaunched);
+    // The asking round, as it was when the call came in — never run_2.
+    expect(stopped).toEqual([
+      { cardId: 'card_1', runId: 'run_1', sessionId: SESSION },
+    ]);
+  });
+
+  it('stops nothing on a refused escalation, another method, or a session that is not the round’s', async () => {
+    current = asking;
+    const refused = setup(false, true, {
+      liveRound,
+      reply: { ok: false, error: { code: 'not_escalatable' } },
+    });
+    await refused.service.handle('request', escalate, as(SESSION, WORKTREE));
+    expect(refused.stopped).toEqual([]);
+
+    const other = setup(false, true, { liveRound, reply: relaunched });
+    await other.service.handle(
+      'request',
+      { ...escalate, method: 'card.finish', args: { summary: 'Done. x.' } },
+      as(SESSION, WORKTREE),
+    );
+    await other.service.handle('request', escalate, as('s-own', WORKTREE));
+    expect(other.stopped).toEqual([]);
   });
 });
 

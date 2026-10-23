@@ -86,7 +86,10 @@ export interface ApprovalsView {
 /** Why `inspection` is null on a detail. */
 export interface ApprovalInspectionError {
   code: string;
+  /** The headline: fixed copy for a known runner error code. */
   message: string;
+  /** The runner's own error text, secrets redacted (WI-74); absent when it sent none. */
+  detail?: string;
 }
 
 /** `GET /projects/:id/approvals/:pr`: the PR's current row, else its latest. */
@@ -151,6 +154,11 @@ export interface ApprovalsErrorBody {
   message: string;
   /** With `head_moved`: the PR's head now. */
   headSha?: string;
+  /**
+   * With `command_failed`: the runner's own error text, secrets redacted
+   * (WI-74); `message` is the fixed headline.
+   */
+  detail?: string;
 }
 
 /** Stable codes in the `error` field of an approvals route's error body. */
@@ -159,6 +167,8 @@ export const APPROVALS_ERROR = {
   approvalNotFound: 'approval_not_found',
   /** The PR is not waiting for a decision. */
   notWaiting: 'not_waiting',
+  /** The approval was closed (merged, dropped) while the decision was in flight. */
+  approvalClosed: 'approval_closed',
   /** The PR is merged or closed on GitHub. */
   prNotOpen: 'pr_not_open',
   /** D6: the `headSha` sent is not the PR's head. */

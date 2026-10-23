@@ -12,14 +12,23 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from '@andrewbehma/glass-ui/menu';
-import { APP_VERSION, type PublicUser } from '@nautelle/shared';
-import { LogOut, Shield, Sparkles, User } from 'lucide-react';
+import {
+  APP_VERSION,
+  type PublicUser,
+  presentContacts,
+} from '@nautelle/shared';
+import { Info, LogOut, Shield, Sparkles, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   accountMenuLabel,
   versionLabel,
   WHATS_NEW_HREF,
 } from '../../lib/whats-new/whats-new';
+import {
+  CONTACT_ICON,
+  contactName,
+  EXTERNAL_LINK,
+} from '../about/contact-links';
 import { isThemeMode, THEME_LABEL, THEME_MODES, type ThemeMode } from './theme';
 import { useWhatsNew } from './whats-new-context';
 
@@ -38,7 +47,7 @@ export function UnreadDot({ className }: { className: string }) {
 
 /**
  * The avatar's menu: account, admin, theme, What's new with the version
- * (C-294) and log out.
+ * (C-294), About with the author's contacts (C-293) and log out.
  */
 export function AccountMenu({
   displayName,
@@ -109,6 +118,27 @@ export function AccountMenu({
             </MenuRadioItem>
           ))}
         </MenuRadioGroup>
+        <MenuSeparator />
+        <MenuItem onSelect={() => router.push('/account/about')}>
+          <Info size={16} aria-hidden="true" />
+          About
+        </MenuItem>
+        {presentContacts().map((contact) => {
+          // C-293: the author's links, each a real anchor.
+          const Icon = CONTACT_ICON[contact.kind];
+          return (
+            <MenuItem key={contact.kind} asChild>
+              <a
+                href={contact.href}
+                {...EXTERNAL_LINK}
+                aria-label={contactName(contact)}
+              >
+                <Icon size={16} aria-hidden="true" />
+                {contact.label}
+              </a>
+            </MenuItem>
+          );
+        })}
         <MenuSeparator />
         <MenuItem tone="danger" onSelect={onLogout}>
           <LogOut size={16} aria-hidden="true" />

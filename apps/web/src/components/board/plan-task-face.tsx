@@ -4,8 +4,8 @@ import { StatusPill } from '@andrewbehma/glass-ui/status-pill';
 import { type BoardPlanTaskView, planTaskBoardLabel } from '@nautelle/shared';
 import type { ReactNode } from 'react';
 import { planTaskDesignChip, planTaskPill } from '../../lib/board/plan-tasks';
-import { safeHttpsUrl } from '../../lib/queue/format';
 import { TASK_KIND_LABEL } from '../../lib/tasks/format';
+import { githubUrl } from '../../lib/url';
 import { SelectionFrame, UnselectableMark } from './selection-box';
 import { TAP } from './tap';
 
@@ -30,8 +30,8 @@ export function PlanTaskFace({
 }) {
   const pill = planTaskPill(task);
   const design = planTaskDesignChip(task);
-  const issueHref = task.issue ? safeHttpsUrl(task.issue.url) : null;
-  const prHref = task.issue?.prUrl ? safeHttpsUrl(task.issue.prUrl) : null;
+  const issueHref = task.issue ? githubUrl(task.issue.url) : null;
+  const prHref = task.issue?.prUrl ? githubUrl(task.issue.prUrl) : null;
   return (
     <SelectionFrame>
       <div className="flex min-w-0 flex-col gap-1.5 text-sm">

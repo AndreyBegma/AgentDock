@@ -1,4 +1,4 @@
-import type { PaneDialog } from '@nautelle/shared/protocol';
+import type { PaneDialog, QuotaLimit } from '@nautelle/shared/protocol';
 import type { PaneReading } from './classify';
 
 /** `watch.sh` reports IDLE after this many empty polls in a row. */
@@ -7,7 +7,8 @@ export const IDLE_POLLS = 3;
 export type PaneChange =
   | { type: 'pane.prompt'; dialog: PaneDialog }
   | { type: 'pane.idle'; polls: number }
-  | { type: 'pane.quota_hit' }
+  | { type: 'pane.quota_hit'; limit: QuotaLimit; resetsAt: string | null }
+  | { type: 'pane.quota_resumed' }
   | { type: 'pane.busy' };
 
 type Reported = 'prompt' | 'idle' | 'quota' | 'busy' | null;
@@ -32,9 +33,15 @@ export class PaneTracker {
   next(reading: PaneReading): PaneChange[] {
     const changes: PaneChange[] = [];
     if (reading.quota && !this.quotaSeen) {
-      changes.push(this.report('quota', { type: 'pane.quota_hit' }));
+      changes.push(
+        this.report('quota', {
+          type: 'pane.quota_hit',
+          limit: reading.quota.limit,
+          resetsAt: reading.quota.resetsAt,
+        }),
+      );
     }
-    this.quotaSeen = reading.quota;
+    this.quotaSeen = reading.quota !== null;
 
     switch (reading.kind) {
       case 'dialog':

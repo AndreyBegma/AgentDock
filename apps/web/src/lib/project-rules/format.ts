@@ -1,4 +1,6 @@
 import {
+  CARD_TYPES,
+  type CardType,
   PROJECT_RULE_ERROR,
   type ProjectRuleCandidateInput,
   type ProjectRuleCandidateView,
@@ -13,6 +15,21 @@ export const SOURCE_LABEL: Record<ProjectRuleSource, string> = {
   imported: 'Imported',
   scanned: 'Scanned',
 };
+
+/** `appliesTo` with `type` ticked or not, in `CARD_TYPES` order, each once. */
+export function toggleCardType(
+  current: readonly CardType[],
+  type: CardType,
+  on: boolean,
+): CardType[] {
+  return CARD_TYPES.filter((t) => (t === type ? on : current.includes(t)));
+}
+
+/** The same set of card types, whatever the order. */
+export const sameCardTypes = (
+  a: readonly CardType[],
+  b: readonly CardType[],
+): boolean => a.length === b.length && a.every((t) => b.includes(t));
 
 export type RuleFilter = 'all' | 'enabled' | 'disabled';
 

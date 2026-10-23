@@ -4,7 +4,19 @@ import {
   actionRequestSummarySchema,
   requestableActionRequestKindSchema,
 } from '../action-requests/contracts';
+import {
+  CARD_EFFORTS,
+  CARD_ESCALATION_NOTE_MAX,
+  CARD_ESCALATION_REASONS,
+  CARD_RECOMMENDABLE_MODELS,
+} from '../assess/limits';
+import {
+  pendingQuestionSchema,
+  sessionMessageInputSchema,
+  sessionMessageOutcomeSchema,
+} from '../session-message/contracts';
 import type { Role } from './commands';
+import { issueLabelSchema } from './commands/queue';
 import { httpsGithubUrl } from './github-url';
 
 /**
@@ -29,6 +41,29 @@ export const LOCAL_MAX_CONCURRENT_PER_RUNNER = 32;
 
 /** A local request never acts with more than this role (D8). */
 export const LOCAL_ROLE_CAP: Role = 'operator';
+
+/**
+ * #845 D3: the Board's own refusals (`BOARD_ERROR`) a session's board tools
+ * answer with unchanged, so the conductor obeys them by name. `message`
+ * carries the board's message (for `move_refused`, its `BoardMoveRefusal`).
+ * The board module checks each is a `BoardErrorCode`.
+ */
+export const LOCAL_BOARD_REFUSALS = [
+  'dependency_open',
+  'dependencies_unmerged',
+  'design_not_approved',
+  'stack_design_not_approved',
+  'max_running',
+  'card_running',
+  'not_running',
+  'wrong_column',
+  'move_refused',
+  'invalid_move',
+  'card_completed',
+  'no_profile',
+  'command_unavailable',
+  'policy_refused',
+] as const;
 
 export const localErrorCodeSchema = z.enum([
   /** The method is not in this allowlist. */
@@ -55,8 +90,28 @@ export const localErrorCodeSchema = z.enum([
   'internal',
   /** `card.finish` from a session that is not a board card's worker (issue #242). */
   'not_a_card_session',
+  /**
+   * `card.escalate` (#750 D9) on an Opus round, on a card that already
+   * escalated, or in the A arm of `model-by-type`.
+   */
+  'not_escalatable',
   /** `card.track` from a session that is not a person's own `manual` one (issue #282 D1). */
   'not_a_manual_session',
+  /**
+   * `card.finish` refused by the runner's artifact guard (#445 D8): the pull
+   * request description or the summary is incomplete; `message` says what.
+   */
+  'artifact_incomplete',
+  /** #845 D5: `card.move` to `completed` — only a person accepts (`card_accept`). */
+  'completed_needs_person',
+  /**
+   * #845: `card.take` of a card another live session holds, or of a card
+   * with an active Board Run round.
+   */
+  'card_taken',
+  /** #845: `card.release` of a card the calling session neither holds nor queued. */
+  'not_taken',
+  ...LOCAL_BOARD_REFUSALS,
 ]);
 export type LocalErrorCode = z.infer<typeof localErrorCodeSchema>;
 
@@ -166,7 +221,7 @@ export const localSessionsRecentResultSchema = z.object({
 export const localIssueCreateArgsSchema = z.strictObject({
   title: z.string().min(1).max(256),
   body: z.string().max(20_000),
-  labels: z.array(z.string().min(1).max(50)).max(10).optional(),
+  labels: z.array(issueLabelSchema.max(50)).max(10).optional(),
   queue: z.boolean(),
 });
 /**
@@ -224,14 +279,50 @@ export const localCardFinishArgsSchema = z.strictObject({
   /**
    * #445 D8: set by the runner's artifact guard when it accepts a finish after
    * 2 rejections in the round; stored as `runs.artifactIncomplete`. Absent is
-   * `false`. The worker never sets it — the guard does.
+   * `false`. The worker never sets it: the daemon drops it from every caller
+   * and only its guard adds it (DA-18).
    */
   artifactIncomplete: z.boolean().optional(),
+  /**
+   * #845: a card a manual session took (`card.take`) has no worker to collect
+   * it — the session pushed and opened the pull request itself and names it
+   * here. The card moves to Finished with the PR recorded. Only a taken card's
+   * session sends it; a card worker's finish ignores it.
+   */
+  pullRequestUrl: httpsGithubUrl.optional(),
 });
 export const localCardFinishResultSchema = z.object({
   /** The card's per-project number (`C-<number>`). */
   number: z.number().int().positive(),
   finished: z.literal(true),
+  /**
+   * #845 D2: a taken card's finish takes the session's next queued card, in
+   * board order; `null` when none waits. Absent for a card worker's finish.
+   */
+  next: z.lazy(() => localTakenCardSchema.nullable()).optional(),
+});
+
+/**
+ * `card.escalate` (#750 D8, D9): the card worker's `escalate_card` tool. Like
+ * `card.finish`, the card is resolved from the request's `session.id`, never
+ * from an argument; any other session is answered `not_a_card_session`. It
+ * ends the round and — unless the card's model is a person's override —
+ * relaunches the card on Opus in a fresh session; else `not_escalatable`.
+ */
+export const localCardEscalateArgsSchema = z.strictObject({
+  reason: z.enum(CARD_ESCALATION_REASONS),
+  /** What the worker found and why; added to the next round's prompt. */
+  note: z.string().trim().min(1).max(CARD_ESCALATION_NOTE_MAX),
+});
+export const localCardEscalateResultSchema = z.object({
+  /** The card's per-project number (`C-<number>`). */
+  number: z.number().int().positive(),
+  escalated: z.literal(true),
+  /**
+   * D9: an Opus round was started. `false` is D10 — the model is a person's
+   * override, and the card waits in Finished with **Run on Opus**.
+   */
+  relaunched: z.boolean(),
 });
 
 /**
@@ -270,6 +361,350 @@ export const localCardTrackResultSchema = z.object({
   label: z.string().min(1),
   /** The card on the Board, in the web app. */
   url: z.string().min(1),
+});
+
+// #845 (ADR-0083): a person's session works the Board.
+
+/**
+ * The Board's enums as the board tools carry them; `BOARD_COLUMNS`,
+ * `CARD_ROUND_PHASES`, `CARD_PR_STATES` and `CARD_CI_STATES` in the board
+ * module are these. Defined here because the board module imports this one.
+ */
+export const LOCAL_BOARD_COLUMNS = [
+  'inbox',
+  'todo',
+  'in_progress',
+  'finished',
+  'completed',
+] as const;
+export const LOCAL_CARD_ROUND_PHASES = [
+  'queued',
+  'starting',
+  'running',
+  'waiting',
+  'background',
+  'finished',
+  'ended',
+  'failed',
+  'cancelled',
+] as const;
+export const LOCAL_CARD_PR_STATES = [
+  'open',
+  'draft',
+  'merged',
+  'closed',
+] as const;
+export const LOCAL_CARD_CI_STATES = [
+  'none',
+  'pending',
+  'green',
+  'red',
+] as const;
+/** #845 D4: `CARD_MERGE_POLICIES` in the board module; the Prisma enum `CardMergePolicy`. */
+export const LOCAL_CARD_MERGE_POLICIES = ['ask', 'agent', 'person'] as const;
+
+const boardColumnSchema = z.enum(LOCAL_BOARD_COLUMNS);
+const cardNumberSchema = z.number().int().positive();
+/** A card is named by its per-project number — `C-42` is `{ card: 42 }`. */
+const cardRefArgsSchema = z.strictObject({ card: cardNumberSchema });
+
+/** Completed cards `board.list` returns, newest first (the column is endless). */
+export const LOCAL_BOARD_LIST_COMPLETED_MAX = 20;
+/** Rounds `board.card` returns, newest first. */
+export const LOCAL_BOARD_CARD_ROUNDS_MAX = 10;
+/** Feedback on a finished card (D9 of #242): `CARD_FEEDBACK_MAX` in the board module. */
+export const LOCAL_CARD_FEEDBACK_MAX = 8_000;
+
+/**
+ * #845 D2, D10: the manual session that took a card. `alive` is the tracked
+ * session's liveness (ADR-0024 D6); a card whose session is gone stays In
+ * progress, "session ended", and Run or another `card.take` is offered.
+ */
+export const localCardTakenSchema = z.object({
+  sessionId: z.string().min(1),
+  alive: z.boolean(),
+  /** The branch the session worked the card on; `null` before it named one. */
+  branch: z.string().nullable(),
+});
+export type LocalCardTaken = z.infer<typeof localCardTakenSchema>;
+
+/** One card as `board.list` answers it. */
+export const localBoardListCardSchema = z.object({
+  number: cardNumberSchema,
+  /** `C-<number>`. */
+  label: z.string().min(1),
+  title: z.string(),
+  kind: z.enum(LOCAL_CARD_KINDS),
+  column: boardColumnSchema,
+  /** The latest round's phase; `null` before the first Run. */
+  roundPhase: z.enum(LOCAL_CARD_ROUND_PHASES).nullable(),
+  /** The latest round holds the card (`isActiveRoundPhase`). */
+  running: z.boolean(),
+  /** The round's session shows a question selector — `board.card` has it. */
+  waitingOnQuestion: z.boolean(),
+  prNumber: z.number().int().positive().nullable(),
+  prUrl: z.string().nullable(),
+  prState: z.enum(LOCAL_CARD_PR_STATES).nullable(),
+  ciState: z.enum(LOCAL_CARD_CI_STATES),
+  mergedAt: nullableIso,
+  /** CI or a protected path needs a person; nothing automated acts on it. */
+  needsPerson: z.boolean(),
+  /** The cards this one runs after, by number. */
+  dependsOn: z.array(cardNumberSchema),
+  /** Taken by a manual session (#845 D2); `null` otherwise. */
+  taken: localCardTakenSchema.nullable(),
+  /** The manual session this card is queued for (#845 D2); `null` otherwise. */
+  queuedForSessionId: z.string().min(1).nullable(),
+});
+export type LocalBoardListCard = z.infer<typeof localBoardListCardSchema>;
+
+/**
+ * `board.list` (#845): the project's cards in board order, column by column.
+ * Inbox only for a role that sees it; Completed at most
+ * `LOCAL_BOARD_LIST_COMPLETED_MAX`, newest first.
+ */
+export const localBoardListArgsSchema = z.strictObject({
+  column: boardColumnSchema.optional(),
+});
+export const localBoardListResultSchema = z.object({
+  settings: z.object({
+    maxRunning: z.number().int().positive(),
+    /** Active rounds in the project now; `card.run` past `maxRunning` is `max_running`. */
+    running: z.number().int().nonnegative(),
+    cardMergePolicy: z.enum(LOCAL_CARD_MERGE_POLICIES),
+  }),
+  cards: z.array(localBoardListCardSchema),
+});
+
+/** One round as `board.card` summarises it. */
+export const localBoardCardRoundSchema = z.object({
+  round: z.number().int().positive(),
+  trigger: z.string(),
+  phase: z.enum(LOCAL_CARD_ROUND_PHASES),
+  /** The worker's `finish_card` summary; `null` until it finished. */
+  summary: z.string().nullable(),
+  startedAt: z.iso.datetime(),
+  endedAt: nullableIso,
+});
+
+/** `board.card` (#845): one card in full. */
+export const localBoardCardResultSchema = localBoardListCardSchema.extend({
+  body: z.string(),
+  branch: z.string().nullable(),
+  issueUrl: z.string().nullable(),
+  dependencies: z.array(
+    z.object({
+      number: cardNumberSchema,
+      label: z.string().min(1),
+      column: boardColumnSchema,
+    }),
+  ),
+  /** Newest first, at most `LOCAL_BOARD_CARD_ROUNDS_MAX`. */
+  rounds: z.array(localBoardCardRoundSchema),
+  /** The failed checks while `ciState` is `red`; empty otherwise. */
+  ciChecks: z.array(
+    z.object({ name: z.string().min(1), link: z.string().nullable() }),
+  ),
+  /**
+   * The question selector the latest round's session shows (ADR-0045) — only
+   * for a project that ships content (ADR-0021); answer it with `card.message`.
+   */
+  question: pendingQuestionSchema.nullable(),
+});
+
+/**
+ * #845 ADR-0083: how long the server holds one `board.wait` — under the
+ * relay's `LOCAL_REQUEST_TIMEOUT_MS`, so a quiet board answers empty, never
+ * `timeout`. The MCP tool's own wait (D8, up to `BOARD_WAIT_TIMEOUT_MAX_SEC`)
+ * is a loop of these, each passing on the cursor.
+ */
+export const LOCAL_BOARD_WAIT_HOLD_MAX_SEC = 10;
+/** D8: the longest `board_wait` a session asks for. */
+export const BOARD_WAIT_TIMEOUT_MAX_SEC = 300;
+/** An opaque cursor, at most this long (`encodeBoardWaitCursor`). */
+export const LOCAL_BOARD_WAIT_CURSOR_MAX = 65_536;
+/** Cards one `board.wait` may narrow to. */
+export const LOCAL_BOARD_WAIT_CARDS_MAX = 50;
+
+/**
+ * `board.wait` (#845 D8): the board changes after `cursor`. Answers on the
+ * first change or after `timeoutSec` (then `events` is empty), with the next
+ * cursor either way. Without a cursor it answers at once with none, and a
+ * cursor to start from. The same cursor twice reports the same changes
+ * (a diff, not a queue — ADR-0083).
+ */
+export const localBoardWaitArgsSchema = z.strictObject({
+  cursor: z.string().min(1).max(LOCAL_BOARD_WAIT_CURSOR_MAX).optional(),
+  /** Only these cards; absent is every card outside Inbox and Completed. */
+  cards: z
+    .array(cardNumberSchema)
+    .min(1)
+    .max(LOCAL_BOARD_WAIT_CARDS_MAX)
+    .optional(),
+  timeoutSec: z
+    .number()
+    .int()
+    .min(0)
+    .max(LOCAL_BOARD_WAIT_HOLD_MAX_SEC)
+    .default(LOCAL_BOARD_WAIT_HOLD_MAX_SEC),
+});
+
+const boardWaitEventBase = {
+  card: cardNumberSchema,
+  /** `C-<number>`. */
+  label: z.string().min(1),
+  title: z.string(),
+};
+
+/**
+ * One change `board.wait` reports. `column` with `from: null` is a card that
+ * appeared, `to: null` one that was deleted.
+ */
+export const localBoardWaitEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('column'),
+    ...boardWaitEventBase,
+    from: boardColumnSchema.nullable(),
+    to: boardColumnSchema.nullable(),
+  }),
+  z.object({
+    type: z.literal('round_ended'),
+    ...boardWaitEventBase,
+    round: z.number().int().positive(),
+    /**
+     * The phase the round ended in (`finished`, `ended`, `failed`,
+     * `cancelled`); `null` when a newer round already started.
+     */
+    phase: z.enum(LOCAL_CARD_ROUND_PHASES).nullable(),
+  }),
+  z.object({
+    type: z.literal('ci'),
+    ...boardWaitEventBase,
+    from: z.enum(LOCAL_CARD_CI_STATES),
+    to: z.enum(LOCAL_CARD_CI_STATES),
+  }),
+  z.object({
+    type: z.literal('pr_merged'),
+    ...boardWaitEventBase,
+    prNumber: z.number().int().positive().nullable(),
+  }),
+  z.object({
+    type: z.literal('question'),
+    ...boardWaitEventBase,
+    question: pendingQuestionSchema,
+  }),
+]);
+export type LocalBoardWaitEvent = z.infer<typeof localBoardWaitEventSchema>;
+
+export const localBoardWaitResultSchema = z.object({
+  events: z.array(localBoardWaitEventSchema),
+  /** Pass it to the next `board.wait`; it survives a context compaction. */
+  cursor: z.string().min(1).max(LOCAL_BOARD_WAIT_CURSOR_MAX),
+});
+
+/**
+ * `card.create` (#845 D6): on the person's request the card goes to the top
+ * of To Do; a card the session proposes on its own is a `candidate` and goes
+ * to the Inbox (ADR-0058).
+ */
+export const localCardCreateArgsSchema = z.strictObject({
+  title: localCardTrackArgsSchema.shape.title,
+  body: z.string().max(LOCAL_CARD_BODY_MAX).optional(),
+  kind: z.enum(LOCAL_CARD_KINDS).optional(),
+  candidate: z.boolean().optional(),
+});
+export const localCardCreateResultSchema = localCardTrackResultSchema.extend({
+  column: boardColumnSchema,
+});
+
+/** `card.run` (#845 D1): a Board Run; the Board's refusals come back unchanged. */
+export const localCardRunArgsSchema = z.strictObject({
+  card: cardNumberSchema,
+  model: z.enum(CARD_RECOMMENDABLE_MODELS).optional(),
+  effort: z.enum(CARD_EFFORTS).optional(),
+});
+export const localCardRunResultSchema = z.object({
+  number: cardNumberSchema,
+  /** The round the Run started. */
+  round: z.number().int().positive(),
+});
+
+/**
+ * `card.move` (#845): `index` is the place in the target column, 0 the top;
+ * absent is the bottom. `completed` is always `completed_needs_person` (D5).
+ */
+export const localCardMoveArgsSchema = z.strictObject({
+  card: cardNumberSchema,
+  column: boardColumnSchema,
+  index: z.number().int().nonnegative().optional(),
+});
+export const localCardMoveResultSchema = z.object({
+  number: cardNumberSchema,
+  column: boardColumnSchema,
+});
+
+/** `card.feedback` (#845 D3): a feedback round on a Finished card. */
+export const localCardFeedbackArgsSchema = z.strictObject({
+  card: cardNumberSchema,
+  text: z.string().trim().min(1).max(LOCAL_CARD_FEEDBACK_MAX),
+});
+export const localCardFeedbackResultSchema = localCardRunResultSchema;
+
+/**
+ * `card.message` (#845 D7, ADR-0045): text to the card's running session,
+ * or the answer to its question selector — `sessionMessageInputSchema` plus
+ * the card.
+ */
+export const localCardMessageArgsSchema = z.discriminatedUnion('kind', [
+  sessionMessageInputSchema.options[0].extend({ card: cardNumberSchema }),
+  sessionMessageInputSchema.options[1].extend({ card: cardNumberSchema }),
+  sessionMessageInputSchema.options[2].extend({ card: cardNumberSchema }),
+]);
+export const localCardMessageResultSchema = z.object({
+  outcome: sessionMessageOutcomeSchema,
+});
+
+export const localCardStopResultSchema = z.object({
+  number: cardNumberSchema,
+  stopped: z.literal(true),
+});
+
+/**
+ * A card the calling session holds or waits for — what it needs to start
+ * working it (#845 D1, D2).
+ */
+export const localTakenCardSchema = z.object({
+  number: cardNumberSchema,
+  label: z.string().min(1),
+  title: z.string(),
+  body: z.string(),
+  kind: z.enum(LOCAL_CARD_KINDS),
+  /** The branch a previous session left (D10); `null` for a fresh card. */
+  branch: z.string().nullable(),
+});
+
+/**
+ * `card.take` (#845 D1, D2): a To Do card — or an In progress one whose
+ * taking session is gone (D10) — moves to In progress bound to the caller.
+ * When the caller already holds a card, this one is queued for it instead,
+ * in board order, and `state` says so. A card with an active round, or held
+ * by another live session, is `card_taken`.
+ */
+export const localCardTakeResultSchema = localTakenCardSchema.extend({
+  state: z.enum(['taken', 'queued']),
+  /** 1-based place among the caller's queued cards; `null` when taken. */
+  queuePosition: z.number().int().positive().nullable(),
+});
+
+/**
+ * `card.release` (#845 D10): the card goes back to To Do, its binding and
+ * queue marker cleared. Releasing the held card takes the next queued one,
+ * as a finish does.
+ */
+export const localCardReleaseResultSchema = z.object({
+  number: cardNumberSchema,
+  column: z.literal('todo'),
+  next: localTakenCardSchema.nullable(),
 });
 
 /**
@@ -355,9 +790,83 @@ export const localMethods = {
     minRole: 'operator',
     needsProject: true,
   },
+  'card.escalate': {
+    args: localCardEscalateArgsSchema,
+    result: localCardEscalateResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
   'card.track': {
     args: localCardTrackArgsSchema,
     result: localCardTrackResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  // #845 D9: the read methods answer any session of the project; the
+  // control methods only a person's own `manual` one (`not_a_manual_session`).
+  'board.list': {
+    args: localBoardListArgsSchema,
+    result: localBoardListResultSchema,
+    minRole: 'viewer',
+    needsProject: true,
+  },
+  'board.card': {
+    args: cardRefArgsSchema,
+    result: localBoardCardResultSchema,
+    minRole: 'viewer',
+    needsProject: true,
+  },
+  'board.wait': {
+    args: localBoardWaitArgsSchema,
+    result: localBoardWaitResultSchema,
+    minRole: 'viewer',
+    needsProject: true,
+  },
+  'card.create': {
+    args: localCardCreateArgsSchema,
+    result: localCardCreateResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.run': {
+    args: localCardRunArgsSchema,
+    result: localCardRunResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.move': {
+    args: localCardMoveArgsSchema,
+    result: localCardMoveResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.feedback': {
+    args: localCardFeedbackArgsSchema,
+    result: localCardFeedbackResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.message': {
+    args: localCardMessageArgsSchema,
+    result: localCardMessageResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.stop': {
+    args: cardRefArgsSchema,
+    result: localCardStopResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.take': {
+    args: cardRefArgsSchema,
+    result: localCardTakeResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.release': {
+    args: cardRefArgsSchema,
+    result: localCardReleaseResultSchema,
     minRole: 'operator',
     needsProject: true,
   },

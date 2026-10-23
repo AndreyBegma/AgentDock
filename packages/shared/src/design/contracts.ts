@@ -6,12 +6,19 @@ import type {
   DesignProgressStage,
 } from './progress';
 import type {
+  DesignConformance,
+  DesignFrameKind,
+  DesignTemplate,
+} from './templates';
+import type {
   DesignCommentKind,
   DesignTheme,
   TaskDesignStatus,
+  UiProfileScreen,
   UiProfileSnippet,
   UiProfileSource,
   UiProfileStatus,
+  UiProfileStyleRule,
   ViewportPreset,
 } from './types';
 
@@ -47,7 +54,26 @@ export interface UiProfileVersionView {
   /** The person behind a manual version. */
   author: DesignUserRef | null;
   createdAt: string;
+  /** #752: the approved-screen library, newest first. */
+  screens: UiProfileScreen[];
+  /** #752: style rules learned from design comments, or written by a person. */
+  styleRules: UiProfileStyleRule[];
+  /** #752: the approved revision a `memory` version learned from. */
+  learnedFromRevisionId: string | null;
+  /** #752: what the learn dropped — invalid or duplicate snippets. */
+  learnNotes: string | null;
+  /**
+   * #752: the designs `screens` and `styleRules` came from, by design id —
+   * this project's only. A design deleted since has no entry.
+   */
+  designs: Record<string, UiProfileDesignRef>;
 }
+
+/** #752: where a library entry or a style rule came from. */
+export type UiProfileDesignRef =
+  | { kind: 'card'; number: number; title: string }
+  | { kind: 'stack'; number: number; title: string }
+  | { kind: 'task'; planId: string; taskKey: string; title: string };
 
 /** A row of the version list, without the heavy fields. */
 export interface UiProfileVersionSummary {
@@ -80,6 +106,10 @@ export interface UiProfileUpdateRequest {
   snippets: UiProfileSnippet[];
   /** Default: the current version's. */
   hasUi?: boolean;
+  /** #752 A5: the library after an admin's edit; default: the current version's. */
+  screens?: UiProfileScreen[];
+  /** #752 A5: the style rules after an admin's edit; default: the current version's. */
+  styleRules?: UiProfileStyleRule[];
 }
 
 /** `POST /projects/:id/ui-profile/rebuild` (operator). */
@@ -93,6 +123,8 @@ export interface UiProfileRebuildResult {
 export interface DesignSettingsView {
   viewports: ViewportPreset[];
   defaultSkills: string[];
+  /** #752 A6: design prompts read the approved screens and style rules. */
+  useMemory: boolean;
   /** False when no row exists and the defaults are shown. */
   saved: boolean;
   updatedBy: DesignUserRef | null;
@@ -103,6 +135,8 @@ export interface DesignSettingsView {
 export interface DesignSettingsUpdateRequest {
   viewports: ViewportPreset[];
   defaultSkills: string[];
+  /** #752 A6: default: unchanged (`true` without a row). */
+  useMemory?: boolean;
 }
 
 // A task's design (D1–D4, D9, D10)
@@ -119,6 +153,10 @@ export interface DesignFrameView {
   slug: string;
   /** `GET /design-revisions/:id/frames/:position/html`, through the web's `/api` rewrite. */
   htmlUrl: string;
+  /** #833: `legacy` for a frame stored before templates. */
+  kind: DesignFrameKind;
+  /** #833: the template frame it fills (`breakdown`, `flow_step-2`); null for none. */
+  templateFrameKey: string | null;
 }
 
 /** A design revision of one variant (`design_revisions` row), without its HTML. */
@@ -135,6 +173,13 @@ export interface DesignRevisionView {
   htmlUrl: string;
   /** #441: one or more, in order. */
   frames: DesignFrameView[];
+  /** #833: the template it was drawn by; null on a revision stored before templates. */
+  templateKey: string | null;
+  /**
+   * #833 D7: how its frames follow the template; null on a legacy revision,
+   * which is never checked and shows no "not per template" badge.
+   */
+  conformance: DesignConformance | null;
   createdAt: string;
 }
 
@@ -215,6 +260,11 @@ export interface TaskDesignView extends TaskDesignSummary {
   profileId: string | null;
   approvedBy: DesignUserRef | null;
   approvedAt: string | null;
+  /**
+   * #833: the template the next turn draws by — the owner's choice (or
+   * `page`), with the project's override merged in.
+   */
+  template: DesignTemplate;
   /** Every revision of every variant, oldest first. */
   revisions: DesignRevisionView[];
   comments: DesignCommentView[];
@@ -270,6 +320,8 @@ export interface DesignFailureView {
 export interface TaskDesignPatchRequest {
   needed?: boolean;
   variantCount?: number;
+  /** #833 D8: a template key of the project; sets `templateSource` to `person`. */
+  templateKey?: string;
   /** Edits the skills by hand: the design keeps this set (#604). */
   skills?: string[];
   /** #604: drop a hand edit; the design follows the project default again. Not with `skills`. */

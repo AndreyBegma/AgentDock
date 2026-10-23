@@ -13,8 +13,8 @@ export interface AuthorContact {
 
 /**
  * The author's links (C-293) — one source for the web app, the docs and the
- * landing. LinkedIn waits for its URL and email for the Nautelle domain; both
- * stay here empty so that filling `href` is the whole change.
+ * landing. LinkedIn waits for its URL and stays here empty so that filling
+ * `href` is the whole change.
  */
 export const AUTHOR_CONTACTS: readonly AuthorContact[] = [
   {
@@ -30,7 +30,12 @@ export const AUTHOR_CONTACTS: readonly AuthorContact[] = [
     href: 'https://t.me/abegma',
   },
   { kind: 'linkedin', label: 'LinkedIn', handle: '', href: '' },
-  { kind: 'email', label: 'Email', handle: '', href: '' },
+  {
+    kind: 'email',
+    label: 'Email',
+    handle: 'abegma137@gmail.com',
+    href: 'mailto:abegma137@gmail.com',
+  },
 ];
 
 /** The contacts that have a link, in order; an entry without one is skipped. */

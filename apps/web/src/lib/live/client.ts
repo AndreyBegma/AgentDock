@@ -8,6 +8,7 @@ import {
   liveServerMessageSchema,
 } from '@nautelle/shared';
 import { type Reachability, reachability } from './reachability';
+import { liveSocketUrl } from './url';
 
 /** What the status dot shows: connected, trying again, or given up. */
 export type LiveStatus = 'connected' | 'reconnecting' | 'offline';
@@ -276,14 +277,12 @@ export class LiveClient {
   }
 }
 
-const DEFAULT_LIVE_URL = 'ws://localhost:8180/live';
-
 let shared: LiveClient | null = null;
 
 /** The tab's client; browser only. */
 export function getLiveClient(): LiveClient {
   shared ??= new LiveClient({
-    url: process.env.NEXT_PUBLIC_LIVE_URL ?? DEFAULT_LIVE_URL,
+    url: liveSocketUrl(),
     createSocket: (url) => new WebSocket(url) as unknown as LiveSocket,
   });
   return shared;

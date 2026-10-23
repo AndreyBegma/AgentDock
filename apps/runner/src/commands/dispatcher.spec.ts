@@ -11,6 +11,7 @@ import {
 import { permissivePolicy, sameRealpath } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger } from '../testing/fixtures';
+import { DEDUP_TTL_MS } from './dedup';
 import { type CommandHandlers, createDispatcher } from './dispatcher';
 import { CommandFailure } from './failure';
 import { createHandlers } from './handlers';
@@ -142,6 +143,125 @@ describe('command dispatcher', () => {
     await Bun.sleep(0);
     clock.advance(DEFAULT_COMMAND_TIMEOUT_MS);
     expect((await pending).error?.code).toBe('timeout');
+  });
+
+  describe('a timeout aborts the handler (#740 D5)', () => {
+    it('aborts the signal and kills a child the handler spawned', async () => {
+      let seen: AbortSignal | undefined;
+      let child: ReturnType<typeof Bun.spawn> | undefined;
+      const { clock, dispatch } = setup({
+        'runner.ping': async (_args, signal) => {
+          seen = signal;
+          child = Bun.spawn(['sleep', '30'], { signal });
+          await child.exited;
+          return { pong: true, ts: 'never' };
+        },
+      });
+      const pending = dispatch({
+        type: 'command',
+        id: 'c_abort',
+        name: 'runner.ping',
+        args: {},
+      });
+      await Bun.sleep(0);
+      expect(seen?.aborted).toBe(false);
+      clock.advance(DEFAULT_COMMAND_TIMEOUT_MS);
+
+      expect((await pending).error?.code).toBe('timeout');
+      expect(seen?.aborted).toBe(true);
+      await child?.exited;
+      expect(child?.killed).toBe(true);
+    });
+
+    it('forgets a timed-out id, so a retry runs fresh', async () => {
+      let calls = 0;
+      const { clock, dispatch } = setup({
+        'runner.ping': () => {
+          calls += 1;
+          return calls === 1
+            ? new Promise(() => {})
+            : { pong: true, ts: '2026-10-07T18:00:00.000Z' };
+        },
+      });
+      const message = {
+        type: 'command',
+        id: 'c_retry',
+        name: 'runner.ping',
+        args: {},
+      } as const;
+      const first = dispatch(message);
+      await Bun.sleep(0);
+      clock.advance(DEFAULT_COMMAND_TIMEOUT_MS);
+      expect((await first).error?.code).toBe('timeout');
+      await Bun.sleep(0);
+
+      expect((await dispatch(message)).ok).toBe(true);
+      expect(calls).toBe(2);
+    });
+  });
+
+  describe('a repeated command id (#740 D3)', () => {
+    const ping = (id: string) =>
+      ({ type: 'command', id, name: 'runner.ping', args: {} }) as const;
+
+    it('runs the handler once; both dispatches get the same result', async () => {
+      let calls = 0;
+      const { dispatch } = setup({
+        'runner.ping': async () => {
+          calls += 1;
+          await Bun.sleep(1);
+          return { pong: true, ts: `2026-10-07T18:00:0${calls}.000Z` };
+        },
+      });
+      const [first, second] = await Promise.all([
+        dispatch(ping('c_dup')),
+        dispatch(ping('c_dup')),
+      ]);
+      const third = await dispatch(ping('c_dup'));
+
+      expect(calls).toBe(1);
+      expect(second).toEqual(first);
+      expect(third).toEqual(first);
+    });
+
+    it('runs it again once the 1 h TTL has passed', async () => {
+      let calls = 0;
+      const { clock, dispatch } = setup({
+        'runner.ping': () => {
+          calls += 1;
+          return { pong: true, ts: '2026-10-07T18:00:00.000Z' };
+        },
+      });
+      await dispatch(ping('c_ttl'));
+      clock.advance(DEDUP_TTL_MS - 1);
+      await dispatch(ping('c_ttl'));
+      expect(calls).toBe(1);
+
+      clock.advance(1);
+      await dispatch(ping('c_ttl'));
+      expect(calls).toBe(2);
+    });
+
+    it('runs a known id with other content as new, with a warning', async () => {
+      let calls = 0;
+      const { dispatch, lines } = setup({
+        'runner.ping': () => {
+          calls += 1;
+          return { pong: true, ts: '2026-10-07T18:00:00.000Z' };
+        },
+      });
+      await dispatch(ping('c_same'));
+      const other = await dispatch({
+        type: 'command',
+        id: 'c_same',
+        name: 'runner.unknown',
+        args: {},
+      });
+
+      expect(calls).toBe(1);
+      expect(other.error?.code).toBe('unknown_command');
+      expect(lines.join('\n')).toContain('a known id with other content');
+    });
   });
 
   it('answers the code of a CommandFailure instead of internal', async () => {
@@ -335,8 +455,13 @@ describe('command dispatcher', () => {
         phase: 'queued',
       });
       expect(
-        (await run('plan.cancel', { planId: 'plan_1', turnId: 'turn_1' }))
-          .output,
+        (
+          await run('plan.cancel', {
+            planId: 'plan_1',
+            turnId: 'turn_1',
+            projectId: 'prj_1',
+          })
+        ).output,
       ).toEqual({ cancelled: true });
       expect(seen).toEqual(['turn', 'cancel']);
     });

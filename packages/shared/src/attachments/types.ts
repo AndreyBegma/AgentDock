@@ -110,6 +110,17 @@ export const isAttachmentText = (bytes: Uint8Array): boolean => {
   }
 };
 
+const mimeOf = (
+  head: Uint8Array,
+  name: string,
+  isText: () => boolean,
+): AttachmentMime | null => {
+  const signed = attachmentSignatureMime(head);
+  if (signed !== null) return signed;
+  const text = ATTACHMENT_TEXT_EXTENSIONS[attachmentExtension(name)];
+  return text !== undefined && isText() ? text : null;
+};
+
 /**
  * D5: the type an upload is stored with, from its whole content; `null` is
  * `unsupported_type`. A binary signature wins over the name (a PNG named
@@ -120,12 +131,22 @@ export const isAttachmentText = (bytes: Uint8Array): boolean => {
 export const detectAttachmentMime = (
   bytes: Uint8Array,
   name: string,
-): AttachmentMime | null => {
-  const signed = attachmentSignatureMime(bytes);
-  if (signed !== null) return signed;
-  const text = ATTACHMENT_TEXT_EXTENSIONS[attachmentExtension(name)];
-  return text !== undefined && isAttachmentText(bytes) ? text : null;
-};
+): AttachmentMime | null => mimeOf(bytes, name, () => isAttachmentText(bytes));
+
+/**
+ * What a streamed upload was checked for, chunk by chunk (#156): its first
+ * `ATTACHMENT_SIGNATURE_BYTES` and whether the whole is `isAttachmentText`.
+ */
+export interface AttachmentScan {
+  head: Uint8Array;
+  text: boolean;
+}
+
+/** `detectAttachmentMime` of a file never held whole in memory (#156). */
+export const detectScannedAttachmentMime = (
+  scan: AttachmentScan,
+  name: string,
+): AttachmentMime | null => mimeOf(scan.head, name, () => scan.text);
 
 const INLINE: ReadonlySet<string> = new Set(ATTACHMENT_IMAGE_MIMES);
 

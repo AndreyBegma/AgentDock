@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import {
   CARD_RUN_EVENT_TYPES,
   cardRunEventDataSchemas,
+  cardRunQuotaDataSchema,
+  isCardQuotaEventType,
   isCardRunEventType,
 } from './cards';
 
@@ -52,5 +54,45 @@ describe('card_run.phase_changed', () => {
     expect(CARD_RUN_EVENT_TYPES).toEqual(['card_run.phase_changed']);
     expect(isCardRunEventType('card_run.phase_changed')).toBe(true);
     expect(isCardRunEventType('skill_run.phase_changed')).toBe(false);
+  });
+});
+
+describe('card_run.quota (#741)', () => {
+  const quota = {
+    cardId: data.cardId,
+    runId: data.runId,
+    projectId: data.projectId,
+    at: '2026-10-21T10:00:00.000Z',
+    limit: 'session' as const,
+    resetsAt: '2026-10-21T15:00:00.000Z',
+  };
+
+  it('carries the limit and its reset, and is not a resume by default', () => {
+    expect(cardRunQuotaDataSchema.parse(quota)).toEqual({
+      ...quota,
+      resumed: false,
+    });
+  });
+
+  it('allows a banner with no reset time', () => {
+    expect(
+      cardRunQuotaDataSchema.safeParse({ ...quota, resetsAt: null }).success,
+    ).toBe(true);
+  });
+
+  it('refuses an unknown limit kind or a reset that is not a time', () => {
+    expect(
+      cardRunQuotaDataSchema.safeParse({ ...quota, limit: 'monthly' }).success,
+    ).toBe(false);
+    expect(
+      cardRunQuotaDataSchema.safeParse({ ...quota, resetsAt: 'Mon 9am' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('is its own event type', () => {
+    expect(isCardQuotaEventType('card_run.quota')).toBe(true);
+    expect(isCardRunEventType('card_run.quota')).toBe(false);
+    expect(isCardQuotaEventType('card_run.question')).toBe(false);
   });
 });

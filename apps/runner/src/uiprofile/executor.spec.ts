@@ -376,7 +376,17 @@ describe.skipIf(!tmuxInstalled)(
       for (let i = 0; i < 200 && !existsSync(join(t.recordDir, '0')); i++) {
         await Bun.sleep(25);
       }
-      expect(await t.executor.cancel({ runId: 'run_b1' })).toEqual({
+      // C-161: a cancel naming another project is refused; the build keeps running.
+      expect(
+        await codeOf(
+          t.executor.cancel({ runId: 'run_b1', projectId: 'prj_other' }),
+        ),
+      ).toBe('not_found');
+      expect(finishedOf(t.events, 'run_b1')).toBeUndefined();
+      expect(t.phases('run_b1')).toEqual(['queued', 'running']);
+      expect(
+        await t.executor.cancel({ runId: 'run_b1', projectId: 'prj_widget' }),
+      ).toEqual({
         cancelled: true,
       });
       const done = finishedOf(t.events, 'run_b1');
@@ -384,7 +394,9 @@ describe.skipIf(!tmuxInstalled)(
       expect(t.phases('run_b1')).toEqual(['queued', 'running', 'cancelled']);
       expect(existsSync(t.worktree)).toBe(false);
       // Already over: nothing to cancel, and no second end.
-      expect(await t.executor.cancel({ runId: 'run_b1' })).toEqual({
+      expect(
+        await t.executor.cancel({ runId: 'run_b1', projectId: 'prj_widget' }),
+      ).toEqual({
         cancelled: false,
       });
     });
@@ -395,7 +407,9 @@ describe.skipIf(!tmuxInstalled)(
       expect(t.slots.tryAcquire('other:1')).toBe(true);
       expect(t.slots.tryAcquire('other:2')).toBe(true);
       expect(await t.executor.run(t.args())).toEqual({ phase: 'queued' });
-      expect(await t.executor.cancel({ runId: 'run_b1' })).toEqual({
+      expect(
+        await t.executor.cancel({ runId: 'run_b1', projectId: 'prj_widget' }),
+      ).toEqual({
         cancelled: true,
       });
       expect(finishedOf(t.events, 'run_b1')?.phase).toBe('cancelled');
@@ -409,9 +423,11 @@ describe.skipIf(!tmuxInstalled)(
 
     it('answers cancel of an unknown run with not_found', async () => {
       const t = await setup();
-      expect(await codeOf(t.executor.cancel({ runId: 'run_zzz' }))).toBe(
-        'not_found',
-      );
+      expect(
+        await codeOf(
+          t.executor.cancel({ runId: 'run_zzz', projectId: 'prj_widget' }),
+        ),
+      ).toBe('not_found');
     });
 
     it('answers the run log of a build it knows and nothing for another', async () => {

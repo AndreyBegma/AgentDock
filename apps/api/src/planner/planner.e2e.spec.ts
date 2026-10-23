@@ -109,6 +109,19 @@ describe('planner (e2e)', () => {
     });
   });
 
+  it('cancels a turn with its project, so the runner can refuse another project (C-161)', async () => {
+    const plan = await h.createPlan('batch');
+    const turn = await h.activeTurn(plan.id);
+    const cancelled = await h.author.send(
+      'post',
+      `${h.base(plan.id)}/turns/${turn.id}/cancel`,
+    );
+    expect(cancelled.status).toBeLessThan(300);
+    expect(h.sentOf('plan.cancel')).toEqual([
+      { planId: plan.id, turnId: turn.id, projectId: h.projectId },
+    ]);
+  });
+
   describe('the batch flow (D1–D8)', () => {
     it('creates, decomposes, refuses needs_talk, grills, writes, reviews and sends with issue_body', async () => {
       const created = await h.createPlan('batch');
@@ -241,7 +254,7 @@ describe('planner (e2e)', () => {
       expect((await h.auditOf('plan.created'))[0].targetId).toBe(created.id);
       expect(
         (await h.auditOf('plan.task_reviewed')).map((a) => [
-          (a.after as { key: string }).key,
+          (a.after as { task: string }).task,
           a.result,
         ]),
       ).toEqual([

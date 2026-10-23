@@ -6,6 +6,7 @@ import { CommandFailure } from '../commands/failure';
 import { memoryLogger } from '../testing/fixtures';
 import { REAL_PROCESS_TIMEOUT_MS } from '../testing/projects';
 import { CardExecutor } from './executor';
+import { CardStore } from './record';
 import { cardsWorkspace } from './testing';
 
 setDefaultTimeout(REAL_PROCESS_TIMEOUT_MS * 2);
@@ -76,6 +77,7 @@ describe('card.collect in a terminal session cwd (#282 D3)', () => {
       staged: ['src/pairing.ts'],
       ahead: 2,
       pushed: true,
+      protectedPaths: [],
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
       prState: 'open',
@@ -165,10 +167,96 @@ describe('card.collect of a card whose worktree card.close removed (#344)', () =
     expect(await executor.collect(fleet)).toEqual({
       ahead: 1,
       pushed: true,
+      protectedPaths: [],
       prNumber: 7,
       prUrl: 'https://github.com/acme/widget/pull/7',
       prState: 'open',
     });
     expect(await originHead()).toBe(head);
+  });
+});
+
+describe('stopRound after escalate_card (#750 D8)', () => {
+  const ASKING = '3bb1739e-1a1c-4baa-b8b4-a4b1e6700361';
+  const OPUS = '9c0f7a52-6d3e-4b8a-9f1e-2a4b6c8d0e1f';
+  const round = (f: Awaited<ReturnType<typeof cardsWorkspace>>) => ({
+    cardId: 'card_1',
+    projectId: f.project.id,
+    root: f.root,
+    repo: 'acme/widget',
+    shortId: 'ab12cd34',
+    worktree: join(f.ws, '.wt-widget-card-ab12cd34'),
+    branch: BRANCH,
+    base: 'main',
+    tmuxSession: 'nautelle-card-ab12cd34',
+    runId: 'run_1',
+    phase: 'running' as const,
+    sessionId: ASKING,
+    startedAt: '2026-10-21T12:00:00.000Z',
+  });
+
+  // Without tmux, as on CI: the record is the round, and nothing touches a
+  // real tmux server.
+  const withoutTmux = async () => {
+    const { f } = await setup();
+    const executor = new CardExecutor({
+      deps: f.deps((binary, args, options) =>
+        binary === 'tmux'
+          ? Promise.resolve(null)
+          : f.exec(binary, args, options),
+      ),
+      cardsDir: join(f.ws, 'state', 'cards'),
+      selfCommand: ['true'],
+      attachmentSource: { server: 'http://127.0.0.1:1', token: 'test' },
+      emit: () => {},
+      log: memoryLogger().log,
+    });
+    return { f, executor };
+  };
+
+  it('never stops the round that replaced the asking one', async () => {
+    const { f, executor } = await withoutTmux();
+    const store = new CardStore(join(f.ws, 'state', 'cards'));
+    // The API's relaunch on Opus came first: another run, another session.
+    store.save({ ...round(f), runId: 'run_2', sessionId: OPUS });
+    expect(
+      await executor.stopRound({
+        cardId: 'card_1',
+        runId: 'run_1',
+        sessionId: ASKING,
+      }),
+    ).toEqual({ stopped: false });
+    // The same run id with another session is not the asking round either.
+    expect(
+      await executor.stopRound({
+        cardId: 'card_1',
+        runId: 'run_2',
+        sessionId: ASKING,
+      }),
+    ).toEqual({ stopped: false });
+    expect(store.load('card_1')?.phase).toBe('running');
+  });
+
+  it('stops the asking round while it is still the card’s round, tmux or not', async () => {
+    const { f, executor } = await withoutTmux();
+    const store = new CardStore(join(f.ws, 'state', 'cards'));
+    store.save(round(f));
+    // No tmux to read: no session to kill, and the round still stops.
+    expect(
+      await executor.stopRound({
+        cardId: 'card_1',
+        runId: 'run_1',
+        sessionId: ASKING,
+      }),
+    ).toEqual({ stopped: false });
+    expect(store.load('card_1')?.phase).toBe('stopped');
+    // Once stopped, a second call does nothing.
+    expect(
+      await executor.stopRound({
+        cardId: 'card_1',
+        runId: 'run_1',
+        sessionId: ASKING,
+      }),
+    ).toEqual({ stopped: false });
   });
 });

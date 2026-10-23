@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fleetFixture } from '../../fleet/testing';
 import { tempDir } from '../../testing/fixtures';
-import { BoardWatcher } from './board';
+import { BOARD_FILE_MAX_BYTES, BoardWatcher } from './board';
 import { parseBoard } from './parse-board';
 import { parseBrief } from './parse-brief';
 
@@ -246,6 +246,22 @@ describe('BoardWatcher', () => {
       line: 5,
       reason: 'table header is not followed by a separator row',
     });
+  });
+
+  it('reports a board over the size cap without reading it (C-161)', () => {
+    const { watcher, events, put } = setup();
+    const big = put(
+      '2026-10-08',
+      'round-1000.md',
+      'x'.repeat(BOARD_FILE_MAX_BYTES + 1),
+    );
+    watcher.scan();
+    expect(events.take().map((e) => e.data)).toEqual([
+      {
+        file: big,
+        reason: `the file holds ${BOARD_FILE_MAX_BYTES + 1} bytes; at most ${BOARD_FILE_MAX_BYTES} are read`,
+      },
+    ]);
   });
 
   it('rereads a board that changed', () => {

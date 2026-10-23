@@ -196,6 +196,7 @@ describe('presentation', () => {
   test('links must be in-app paths', () => {
     expect(safeLink('/projects/p1/history/r1')).toBe('/projects/p1/history/r1');
     expect(safeLink('//evil.example')).toBeUndefined();
+    expect(safeLink('/\\evil.example')).toBeUndefined();
     expect(safeLink('https://evil.example')).toBeUndefined();
     expect(safeLink('javascript:alert(1)')).toBeUndefined();
     expect(safeLink(null)).toBeUndefined();
@@ -317,6 +318,25 @@ describe('itemTitle', () => {
     });
     expect(itemMeta(titled)).toContain('PR #12');
     expect(toTimelineItem(titled).title).toBe('i9: pull request open');
+  });
+
+  test('a long title still gives up its trailing URL', () => {
+    const lead = 'x'.repeat(1_000);
+    expect(
+      itemTitle(item({ title: `${lead} — https://github.com/a/b/pull/12` })),
+    ).toEqual({ title: lead, prNumber: 12 });
+  });
+
+  // WI-61: the trailing-URL pattern ran over the whole title, quadratic on a
+  // long run of blanks or of `/pull/` segments.
+  test.each([
+    ['blanks', ' '.repeat(100_000)],
+    ['pull segments', `https://${'/pull/1'.repeat(14_286)}x y`],
+  ])('reads a 100 KB title of %s in under 50 ms', (_, title) => {
+    const started = performance.now();
+    itemTitle(item({ title }));
+    prLink(item({ title, data: {} }));
+    expect(performance.now() - started).toBeLessThan(50);
   });
 });
 

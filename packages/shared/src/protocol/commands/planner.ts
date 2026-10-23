@@ -39,10 +39,11 @@ export const PLAN_QUEUE_ISSUES_MAX = 50;
  * `plan.publish_specs`: one spec per feature task and, per task with an
  * approved design (spec 223 D16), one file per frame (#441) — a plan has at
  * most 12 tasks, and a design's frames are at most `DESIGN_TOTAL_MAX_BYTES`
- * together (#686).
+ * together (#686) and at most `DESIGN_FRAMES_MAX` (32) in number (DA-07), so
+ * every task's frames fit.
  */
 export const PLAN_PUBLISH_SPECS_MAX = 12;
-export const PLAN_PUBLISH_DESIGNS_MAX = 256;
+export const PLAN_PUBLISH_DESIGNS_MAX = 12 * 32;
 export const PLAN_PUBLISH_FILES_MAX =
   PLAN_PUBLISH_SPECS_MAX + PLAN_PUBLISH_DESIGNS_MAX;
 export const PLAN_SPEC_FILE_MAX_BYTES = 256 * 1024;
@@ -211,9 +212,11 @@ export type PlanTurnResult = z.infer<typeof planTurnResultSchema>;
 
 // plan.cancel
 
+/** `projectId` lets the runner refuse a turn of another project (`not_found`). */
 export const planCancelArgsSchema = z.strictObject({
   planId: planIdSchema,
   turnId: planIdSchema,
+  projectId: z.string().min(1),
 });
 export type PlanCancelArgs = z.infer<typeof planCancelArgsSchema>;
 

@@ -1,18 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CARD_PR_DESCRIPTION_FILE } from '@nautelle/shared';
-import type { CardRunArgs } from '@nautelle/shared/protocol';
+import type { CardRunArgs, LocalErrorCode } from '@nautelle/shared/protocol';
 
 /**
- * #445 D8: the artifact guard on `finish_card`. A card launched with Token
- * saver on starts its `nautelle` MCP server as `mcp --finish-guard
- * [--issue <n>]`; that server checks the worker's pull request description
- * and summary before it relays `card.finish`. One MCP process lives as long
- * as one claude process — one round — so the rejections are counted there.
+ * #445 D8: the artifact guard on `finish_card`. A card round launched with
+ * Token saver on is recorded as guarded (`CardRecord.finishGuard`); the
+ * daemon, on its side of the local socket, checks the worker's pull request
+ * description and summary before it relays `card.finish` (DR-10) — a process
+ * that calls the socket directly meets the same guard. The rejections are
+ * counted per round, and `artifactIncomplete` is only ever the guard's
+ * (DA-18).
  */
-export const FINISH_GUARD_FLAG = '--finish-guard';
-export const FINISH_GUARD_ISSUE_FLAG = '--issue';
-
 /** D8: after this many rejections in a round the finish is accepted. */
 export const FINISH_GUARD_MAX_REJECTIONS = 2;
 
@@ -23,7 +22,8 @@ export const FINISH_GUARD_SECTIONS = [
 ] as const;
 
 /** The tool error code of a refused finish. */
-export const ARTIFACT_INCOMPLETE = 'artifact_incomplete';
+export const ARTIFACT_INCOMPLETE =
+  'artifact_incomplete' satisfies LocalErrorCode;
 
 /**
  * The card's issue, which `card.run` does not carry as a field: the draft
@@ -40,28 +40,24 @@ export const cardIssueNumber = (
   return found ? Number(found[1]) : null;
 };
 
-/** The arguments after `mcp` for a guarded card round. */
-export const finishGuardArgs = (issueNumber: number | null): string[] => [
-  FINISH_GUARD_FLAG,
-  ...(issueNumber === null
-    ? []
-    : [FINISH_GUARD_ISSUE_FLAG, String(issueNumber)]),
-];
-
 export interface FinishGuardOptions {
   issueNumber: number | null;
 }
 
-/** `mcp`'s own arguments: the guard, or `null` without `--finish-guard`. */
-export const parseFinishGuardArgs = (
-  args: readonly string[],
-): FinishGuardOptions | null => {
-  if (!args.includes(FINISH_GUARD_FLAG)) return null;
-  const at = args.indexOf(FINISH_GUARD_ISSUE_FLAG);
-  const value = at === -1 ? undefined : args[at + 1];
-  const issueNumber =
-    value !== undefined && /^[1-9]\d{0,9}$/.test(value) ? Number(value) : null;
-  return { issueNumber };
+/**
+ * Marks the round guarded when it launches with Token saver on, with the
+ * card's issue; clears it otherwise.
+ */
+export const guardFinish = (
+  record: { finishGuard?: FinishGuardOptions },
+  tokenSaver: unknown,
+  args: Pick<CardRunArgs, 'pullRequest' | 'prompt'>,
+): void => {
+  if (tokenSaver) {
+    record.finishGuard = { issueNumber: cardIssueNumber(args) };
+  } else {
+    delete record.finishGuard;
+  }
 };
 
 /** Sentences: text ending in `.`, `!` or `?` (or the end), at least one letter or digit. */

@@ -14,6 +14,7 @@ const render = (stackBlock: string | null) =>
         name: null,
         role: 'operator',
         status: 'active',
+        twoFactorEnabled: false,
       }}
     >
       <GeneratePanel

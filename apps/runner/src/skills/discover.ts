@@ -184,14 +184,14 @@ export const copySkillFiles = (
   files: readonly SkillFile[],
   dest: string,
 ): void => {
-  mkdirSync(dest, { recursive: true, mode: 0o755 });
+  mkdirSync(dest, { recursive: true, mode: 0o700 });
   for (const file of files) {
     const from = join(sourceDir, file.path);
     const stat = lstatSync(from);
     if (!stat.isFile()) throw new Error(`${file.path} is not a regular file`);
     const to = join(dest, file.path);
-    mkdirSync(dirname(to), { recursive: true, mode: 0o755 });
+    mkdirSync(dirname(to), { recursive: true, mode: 0o700 });
     writeFileSync(to, readFileSync(from));
-    chmodSync(to, stat.mode & 0o111 ? 0o755 : 0o644);
+    chmodSync(to, stat.mode & 0o111 ? 0o700 : 0o600);
   }
 };

@@ -1,5 +1,6 @@
 import type { IncomingMessage } from 'node:http';
 import {
+  type CommandResultMessage,
   MAX_EVENTS_BATCH_BYTES,
   PROTOCOL_VERSION,
   RUNNER_CLOSE_CODES,
@@ -7,11 +8,14 @@ import {
   type RunnerMessage,
   runnerCommandsOf,
   runnerMessageSchema,
+  SERVER_FEATURES,
 } from '@nautelle/shared/protocol';
 import { Inject, Logger } from '@nestjs/common';
 import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import type { RawData, WebSocket } from 'ws';
+import { clientIp } from '../common/client-ip';
 import { bearerToken } from './credentials';
+import { commandResultOf } from './runner-command-result';
 import { RunnerConnectHooks } from './runner-connect-hooks';
 import {
   LiveConnection,
@@ -36,9 +40,9 @@ const byteLength = (data: RawData): number =>
     ? data.reduce((sum, chunk) => sum + chunk.byteLength, 0)
     : data.byteLength;
 
-/** As the terminal gateway reads it: the socket's peer and its user agent. */
+/** As the terminal gateway reads it: the client IP and its user agent. */
 const peerOf = (request: IncomingMessage): RunnerPeer => ({
-  ip: request.socket.remoteAddress ?? null,
+  ip: clientIp(request) ?? null,
   userAgent: request.headers['user-agent'] ?? null,
 });
 
@@ -185,16 +189,18 @@ class RunnerSocket {
         await this.deps.ingest.heartbeat(runnerId, message.profiles);
         return;
       case 'events': {
+        // #740 D1: results first — ingest strips their output before storing.
+        for (const event of message.events) {
+          const result = commandResultOf(event);
+          if (result) this.result(runnerId, result);
+        }
         const acked = await this.deps.ingest.events(runnerId, message.events);
         live.send({ type: 'ack', seq: Number(acked) });
         return;
       }
       case 'command.result':
-        if (!live.settle(message)) {
-          this.deps.logger.debug(
-            `runner ${runnerId}: result for a command nobody awaits`,
-          );
-        }
+        // A runner that has not seen `command_results_spooled` (#740 D6).
+        this.result(runnerId, message);
         return;
       case 'command.progress':
         // Streaming command output lands with the item that uses it.
@@ -212,6 +218,24 @@ class RunnerSocket {
       case 'local.request':
         this.local(runnerId, live, message);
         return;
+    }
+  }
+
+  /**
+   * Settles the waiter of a `command.result`, whichever socket of the runner
+   * carried it (#740 D2). A resend of a settled one is expected (D3); one
+   * nobody awaits — its caller gave up, or it never was — is logged and
+   * emits nothing (D4).
+   */
+  private result(runnerId: string, message: CommandResultMessage): void {
+    const { outcome, name } = this.deps.connections.settle(runnerId, message);
+    const what = `${name ?? 'unknown command'} ${message.id} (ok: ${message.ok})`;
+    if (outcome === 'repeat') {
+      this.deps.logger.debug(`runner ${runnerId}: repeated result of ${what}`);
+    } else if (outcome === 'unawaited') {
+      this.deps.logger.warn(
+        `runner ${runnerId}: result of ${what} arrived with nobody awaiting it`,
+      );
     }
   }
 
@@ -261,7 +285,13 @@ class RunnerSocket {
       if (this.closed) return;
       this.release();
       replaced = this.deps.connections.attach(live);
-      live.send({ type: 'welcome', runnerId, config, ackedSeq: Number(acked) });
+      live.send({
+        type: 'welcome',
+        runnerId,
+        config,
+        ackedSeq: Number(acked),
+        features: [SERVER_FEATURES.commandResultsSpooled],
+      });
     });
     if (this.closed) return;
     // After the welcome: a `subscribe` sent from here is the runner's first.

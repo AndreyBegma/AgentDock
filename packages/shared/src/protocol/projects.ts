@@ -3,12 +3,40 @@ import { stewardRunnerConfigSchema } from '../steward/contracts';
 import { TEXT_PATH_MAX } from './bounded';
 import { httpsGithubUrl } from './github-url';
 
-/** An absolute POSIX path. Runners run on Linux and macOS only. */
+/** True when `text` holds a C0 control character (NUL, newline, …) or DEL. */
+export const hasControlCharacter = (text: string): boolean => {
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return true;
+  }
+  return false;
+};
+
+/** True when `path` has a `..` segment, which could climb out of a root (L-08). */
+export const hasParentSegment = (path: string): boolean =>
+  path.split('/').includes('..');
+
+const utf8Bytes = (text: string): number =>
+  new TextEncoder().encode(text).length;
+
+/**
+ * An absolute POSIX path. Runners run on Linux and macOS only. L-08: no `..`
+ * segment, no control character and at most `TEXT_PATH_MAX` UTF-8 bytes, so a
+ * path cannot point a runner outside the root it names or garble a log line.
+ */
 export const absolutePathSchema = z
   .string()
   .min(1)
-  .max(TEXT_PATH_MAX)
-  .refine((p) => p.startsWith('/'), { message: 'must be an absolute path' });
+  .refine((p) => p.startsWith('/'), { message: 'must be an absolute path' })
+  .refine((p) => !hasParentSegment(p), {
+    message: 'must not have a ".." segment',
+  })
+  .refine((p) => !hasControlCharacter(p), {
+    message: 'must not have a control character',
+  })
+  .refine((p) => utf8Bytes(p) <= TEXT_PATH_MAX, {
+    message: `must be at most ${TEXT_PATH_MAX} bytes`,
+  });
 
 /**
  * The GitHub App's health for a project (spec 27 D11, D12): `healthy` lets
@@ -123,7 +151,7 @@ export const projectInspectionSchema = z.object({
    * The absolute main checkout. For a linked worktree it is the main
    * checkout's path — the one to connect instead.
    */
-  root: z.string().min(1),
+  root: absolutePathSchema,
   gitCommonDir: z.string().min(1),
   /** False for a linked worktree or a subdirectory: refused on connect (`not_main_checkout`). */
   isMainCheckout: z.boolean(),
@@ -135,6 +163,12 @@ export const projectInspectionSchema = z.object({
   }),
   baseBranch: z.string().min(1),
   baseSource: baseSourceSchema,
+  /**
+   * C-148: the repository's default branch — `gh repo view`, else
+   * `origin/HEAD` — whatever the base is; null when neither answered. Absent
+   * from a runner older than the field.
+   */
+  defaultBranch: z.string().min(1).nullable().optional(),
   codeSentinelConfig: z.object({
     /** The `orchestrator` block of `.code-analyzer-config.json`, verbatim. */
     orchestrator: z.record(z.string(), z.unknown()).optional(),

@@ -212,7 +212,7 @@ export class BoardFleetService
 
   /** Brings the project's `fleet` cards in line with its slots and ready issues. */
   async mirror(projectId: string): Promise<void> {
-    const { created, moves, touched } = await this.prisma.$transaction(
+    const { created, removed, moves, touched } = await this.prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`board-fleet:${projectId}`}))`;
         return this.reconcile(tx, projectId);
@@ -230,6 +230,22 @@ export class BoardFleetService
           source: 'fleet',
           issue: card.fleetIssue,
           slot: card.fleetSlot,
+        },
+        result: 'ok',
+      });
+    }
+    // C-187: a card removed because its open issue left the ready queue.
+    for (const card of removed) {
+      await this.audit.record({
+        ...BOARD_SYSTEM_ACTOR.ctx,
+        action: 'card.fleet_removed',
+        target: { type: 'board_card', id: card.id },
+        projectId,
+        before: {
+          number: card.number,
+          title: card.title,
+          issue: card.fleetIssue,
+          reason: 'left_queue',
         },
         result: 'ok',
       });
@@ -254,6 +270,7 @@ export class BoardFleetService
     projectId: string,
   ): Promise<{
     created: BoardCard[];
+    removed: BoardCard[];
     moves: { number: number; to: BoardColumn }[];
     touched: string[];
   }> {
@@ -290,6 +307,7 @@ export class BoardFleetService
     for (const { number } of closed) settled.add(number);
 
     const created: BoardCard[] = [];
+    const removed: BoardCard[] = [];
     const moves: { number: number; to: BoardColumn }[] = [];
     const touched: string[] = [];
 
@@ -414,11 +432,12 @@ export class BoardFleetService
           moves.push({ number: card.number, to: 'finished' });
         } else {
           await tx.boardCard.delete({ where: { id: card.id } });
+          removed.push(card);
           touched.push(card.id);
         }
       }
     }
-    return { created, moves, touched };
+    return { created, removed, moves, touched };
   }
 
   /**

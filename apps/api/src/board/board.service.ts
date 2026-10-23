@@ -1,5 +1,6 @@
 import {
   type AcceptBoardCardResponse,
+  armForMode,
   BOARD_COLUMNS,
   BOARD_COMPLETED_PAGE_SIZE,
   BOARD_ERROR,
@@ -22,7 +23,6 @@ import {
   profileAgentdockOf,
   type Role,
 } from '@nautelle/shared';
-import { roleAtLeast } from '@nautelle/shared/protocol';
 import {
   BadRequestException,
   Injectable,
@@ -34,6 +34,7 @@ import { CardAssessor } from '../assess/card-assessor';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { projectDesignTemplateKeys } from '../design/design-store';
 import { usageByRun } from '../history/run-usage';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
@@ -41,6 +42,7 @@ import { assertIssueLinkable } from '../steward/issue-link';
 import { stewardChipsFor } from '../steward/steward-chips';
 import { TextNormalizer } from '../text/text-normalizer';
 import { TextOwners } from '../text/text-owners';
+import { TokenEconomyService } from '../token-economy/token-economy.service';
 import { tokenSaverFactsOf } from '../token-saver/token-saver-facts';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardDependencies } from './board-dependencies.service';
@@ -69,15 +71,10 @@ import type {
   UpdateBoardCardDto,
   UpdateBoardSettingsDto,
 } from './dto';
+import { hiddenFrom, seesInbox } from './inbox-access';
+import { type CardModelByTypeArm, MODEL_BY_TYPE } from './launch-choice';
 
 const USER_REF = { select: { id: true, email: true } } as const;
-
-/**
- * #244 D8: Inbox cards are content-derived, so only operators and above see
- * them (ADR-0021 §5). A role left out is the board's own read: everything.
- */
-const seesInbox = (role: Role | undefined): boolean =>
-  role === undefined || roleAtLeast(role, 'operator');
 
 /**
  * #282 D4: holds the fleet's `FleetCardEdits` port. The fleet module imports
@@ -123,6 +120,7 @@ export class BoardService implements OnModuleInit {
     private readonly profiles: RuntimeProfileResolver,
     private readonly dependencies: BoardDependencies,
     private readonly stacks: BoardStacks,
+    private readonly economy: TokenEconomyService,
   ) {}
 
   /**
@@ -181,6 +179,7 @@ export class BoardService implements OnModuleInit {
         text === undefined ? [] : [{ field, text }],
       ),
       {
+        // #833 D8: the template is classified in the same step as the kind.
         classifyKind:
           card.kindSource === 'auto' &&
           card.branch === null &&
@@ -288,14 +287,56 @@ export class BoardService implements OnModuleInit {
         pullRequests: true,
       },
     });
-    if (!card || (card.column === 'inbox' && !seesInbox(role))) {
+    if (!card || hiddenFrom(card, role)) {
       throw boardError(404, BOARD_ERROR.notFound, 'Card not found');
     }
-    const [facts, attachments] = await Promise.all([
+    const [facts, attachments, byType] = await Promise.all([
       this.facts([card]),
       this.attachments.views(card.id),
+      this.modelByTypeOf(card),
     ]);
-    return toCardDetail(card, facts, attachments);
+    return toCardDetail(card, facts, attachments, byType);
+  }
+
+  /**
+   * #750 D3, D5: the card's B arm of `model-by-type` with the class a launch
+   * maps — so the popover preselects what Run defaults to. The arm is the
+   * drawn one; before the first round, the one the launch will draw
+   * (`armForMode`). A card that ran before the technique existed follows its
+   * current mode, as `TokenEconomyService.cardFlags` does. `null` is arm A.
+   */
+  private async modelByTypeOf(
+    card: CardWithRounds,
+  ): Promise<CardModelByTypeArm | null> {
+    const drawn = await this.prisma.cardTechniqueArm.findUnique({
+      where: {
+        cardId_technique: { cardId: card.id, technique: MODEL_BY_TYPE },
+      },
+      select: { arm: true },
+    });
+    let arm = drawn?.arm;
+    if (arm === undefined) {
+      const def = this.economy.techniques.find((t) => t.key === MODEL_BY_TYPE);
+      if (!def) return null;
+      const mode =
+        (await this.economy.modes(card.projectId)).find(
+          (m) => m.technique === MODEL_BY_TYPE,
+        )?.mode ?? def.defaultMode;
+      arm =
+        card.rounds.length > 0
+          ? mode === 'on'
+            ? 'b'
+            : 'a'
+          : armForMode(
+              mode,
+              card.id,
+              MODEL_BY_TYPE,
+              (await this.economy.settings(card.projectId)).bSharePercent,
+            );
+    }
+    return arm === 'b'
+      ? { workClass: await this.assessor.currentWorkClass(card.id) }
+      : null;
   }
 
   /** Active rounds of the project now (D13). */
@@ -390,7 +431,8 @@ export class BoardService implements OnModuleInit {
       dependencies: deps,
       stacks,
       // #445: each round run's savings and artifact-guard flag.
-      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds),
+      // #748 D1: and the figure of each card's tracked session.
+      tokenSaver: await tokenSaverFactsOf(this.prisma, runIds, trackedIds),
       // #447 D15: the live Steward incident of each card's latest round.
       steward: await stewardChipsFor(
         this.prisma,
@@ -620,6 +662,19 @@ export class BoardService implements OnModuleInit {
           boardError(422, BOARD_ERROR.noProfile, message, details),
       );
     }
+    // #833 D8: one of the project's templates, else 422 before anything is written.
+    if (
+      fields.designTemplate !== undefined &&
+      !(await projectDesignTemplateKeys(this.prisma, projectId)).includes(
+        fields.designTemplate,
+      )
+    ) {
+      throw boardError(
+        400,
+        BOARD_ERROR.invalidDesignTemplate,
+        'designTemplate is not a design template of this project',
+      );
+    }
     // #447 D8: only an open issue of the project's repository; null unlinks.
     const issueLink =
       fields.issueNumber === undefined
@@ -659,6 +714,13 @@ export class BoardService implements OnModuleInit {
       ...(fields.kind !== undefined ? { kind: fields.kind } : {}),
       // #271 D9: a kind the person sets is theirs from now on.
       ...(fields.kind !== undefined ? { kindSource: 'person' as const } : {}),
+      // #833 D8: a template the person sets is theirs from now on.
+      ...(fields.designTemplate !== undefined
+        ? {
+            designTemplate: fields.designTemplate,
+            designTemplateSource: 'person' as const,
+          }
+        : {}),
       // #359 D4: the issue follows the kind, unless the person sets it too.
       ...(fields.issueOnRun !== undefined
         ? { issueOnRun: fields.issueOnRun }
@@ -678,6 +740,17 @@ export class BoardService implements OnModuleInit {
         : {}),
       ...(issueLink ?? {}),
     };
+    // C-181 (D-09): a person who edits what an armed card runs becomes whom
+    // its Auto-run runs as — never someone else's authority on their text.
+    const armed = await this.prisma.boardCard.findUniqueOrThrow({
+      where: { id: card.id },
+      select: { autoRunWhenReady: true, autoRunArmedById: true },
+    });
+    const reowned =
+      armed.autoRunWhenReady &&
+      actor.userId !== null &&
+      armed.autoRunArmedById !== actor.userId &&
+      Object.keys(data).length > 0;
     await this.prisma.boardCard.update({
       where: { id: card.id },
       data: {
@@ -686,6 +759,7 @@ export class BoardService implements OnModuleInit {
         ...(data.title !== undefined
           ? { fingerprint: captureFingerprint(data.title) }
           : {}),
+        ...(reowned ? { autoRunArmedById: actor.userId } : {}),
       },
     });
     const before = Object.fromEntries(
@@ -699,6 +773,14 @@ export class BoardService implements OnModuleInit {
       before,
       after: { number, ...data },
       result: 'ok',
+      ...(reowned
+        ? {
+            meta: {
+              autoRunReowned: true,
+              previousArmedById: armed.autoRunArmedById,
+            },
+          }
+        : {}),
     });
     this.work.publish(projectId, card.id);
     // #271 D8: only what changed; editing the English text is a save too.
@@ -793,7 +875,8 @@ export class BoardService implements OnModuleInit {
   /**
    * #443: Auto-run when ready — accepting the last open dependency starts the
    * Run (`BoardAutoRun`). Turning it on does not start a card that is
-   * already ready; that one is run by hand.
+   * already ready; that one is run by hand. C-181 (D-09): turning it on
+   * records who did — the Run runs as them.
    */
   private async toggleAutoRun(
     card: CardWithRounds,
@@ -803,7 +886,10 @@ export class BoardService implements OnModuleInit {
     if (card.autoRunWhenReady === on) return;
     await this.prisma.boardCard.update({
       where: { id: card.id },
-      data: { autoRunWhenReady: on },
+      data: {
+        autoRunWhenReady: on,
+        autoRunArmedById: on ? actor.userId : null,
+      },
     });
     await this.audit.record({
       ...actor.ctx,
@@ -1339,6 +1425,9 @@ export class BoardService implements OnModuleInit {
       ...(dto.backgroundStallMinutes !== undefined
         ? { backgroundStallMinutes: dto.backgroundStallMinutes }
         : {}),
+      ...(dto.cardMergePolicy !== undefined
+        ? { cardMergePolicy: dto.cardMergePolicy }
+        : {}),
       updatedById: actor.userId,
     };
     const row = await this.prisma.boardSettings.upsert({
@@ -1360,6 +1449,7 @@ export class BoardService implements OnModuleInit {
         autoCollectTracked: before.autoCollectTracked,
         autoMergeCards: before.autoMergeCards,
         backgroundStallMinutes: before.backgroundStallMinutes,
+        cardMergePolicy: before.cardMergePolicy,
       },
       after: {
         issueOnRun: row.issueOnRun,
@@ -1370,6 +1460,7 @@ export class BoardService implements OnModuleInit {
         autoCollectTracked: row.autoCollectTracked,
         autoMergeCards: row.autoMergeCards,
         backgroundStallMinutes: row.backgroundStallMinutes,
+        cardMergePolicy: row.cardMergePolicy,
       },
       result: 'ok',
     });

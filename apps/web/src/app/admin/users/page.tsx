@@ -2,7 +2,6 @@
 
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
-import { ConfirmDialog } from '@andrewbehma/glass-ui/confirm-dialog';
 import { EmptyState } from '@andrewbehma/glass-ui/empty-state';
 import { Select } from '@andrewbehma/glass-ui/field';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
@@ -23,6 +22,7 @@ import {
 } from '@nautelle/shared';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
+import { ConfirmGate } from '../../../components/confirm/confirm-gate';
 import { PageHeader } from '../../../components/page-header/page-header';
 import { AsyncSection } from '../../../components/prerequisites/async-section';
 import { DisabledReason } from '../../../components/prerequisites/disabled-reason';
@@ -34,14 +34,14 @@ import { useErrorToast } from '../../../lib/section/use-error-toast';
 import { useSection } from '../../../lib/section/use-section';
 import {
   defaultUsersTab,
-  deleteUserCopy,
   OWN_ROW_REASON,
   ROLE_HINT,
   ROLE_LABEL,
-  roleChangeCopy,
   roleChangeNeedsConfirm,
 } from '../../../lib/users/format';
+import { type Confirmation, confirmationCopy } from './confirmation';
 import { RegistrationCard } from './registration-card';
+import { TwoFactorPolicyCard } from './two-factor-policy-card';
 
 const TABS: { status: UserStatus; label: string }[] = [
   { status: 'pending', label: 'Pending' },
@@ -49,43 +49,6 @@ const TABS: { status: UserStatus; label: string }[] = [
   { status: 'disabled', label: 'Disabled' },
   { status: 'rejected', label: 'Rejected' },
 ];
-
-type Confirmation =
-  | { user: AdminUser; action: 'reject' | 'disable' | 'delete' }
-  | { user: AdminUser; action: 'role'; role: Role };
-
-const CONFIRM_COPY: Record<
-  'reject' | 'disable' | 'delete',
-  { title: string; verb: string; text: (u: AdminUser) => string }
-> = {
-  reject: {
-    title: 'Reject this registration?',
-    verb: 'Reject',
-    text: (u) =>
-      `${u.email} will not be able to sign in or register again until you delete the account.`,
-  },
-  disable: {
-    title: 'Disable this account?',
-    verb: 'Disable',
-    text: (u) =>
-      `${u.email} will be signed out everywhere immediately. Everything they own stays; Enable brings the account back.`,
-  },
-  delete: {
-    title: 'Delete this account?',
-    verb: 'Delete',
-    text: deleteUserCopy,
-  },
-};
-
-const confirmCopy = (confirm: Confirmation) =>
-  confirm.action === 'role'
-    ? { ...roleChangeCopy(confirm.user, confirm.role), danger: false }
-    : {
-        title: CONFIRM_COPY[confirm.action].title,
-        verb: CONFIRM_COPY[confirm.action].verb,
-        text: CONFIRM_COPY[confirm.action].text(confirm.user),
-        danger: true,
-      };
 
 /** What the empty tab means, and for Pending, why nobody may be arriving. */
 function EmptyTab({
@@ -168,11 +131,11 @@ function UsersTable({ viewer }: { viewer: string }) {
 
   const roleOf = (user: AdminUser): Role => roles[user.id] ?? user.role;
 
-  const approve = (user: AdminUser) =>
+  const approve = (user: AdminUser, role: Role) =>
     run(() =>
       api(`/admin/users/${user.id}/approve`, {
         method: 'POST',
-        body: { role: roleOf(user) },
+        body: { role },
       }),
     );
 
@@ -207,10 +170,19 @@ function UsersTable({ viewer }: { viewer: string }) {
         await changeRole(confirm.user, confirm.role);
         return;
       }
+      if (confirm.action === 'approve') {
+        await approve(confirm.user, confirm.role);
+        return;
+      }
       const { user, action } = confirm;
       await run(() => {
         if (action === 'reject') {
           return api(`/admin/users/${user.id}/reject`, { method: 'POST' });
+        }
+        if (action === 'reset_two_factor') {
+          return api(`/admin/users/${user.id}/two-factor`, {
+            method: 'DELETE',
+          });
         }
         if (action === 'disable') {
           return api(`/admin/users/${user.id}`, {
@@ -246,8 +218,6 @@ function UsersTable({ viewer }: { viewer: string }) {
     </div>
   );
 
-  const copy = confirm ? confirmCopy(confirm) : undefined;
-
   const renderTable = (list: AdminUser[]) => (
     <ScrollX className="relative">
       <Table>
@@ -274,6 +244,9 @@ function UsersTable({ viewer }: { viewer: string }) {
                     {own ? (
                       <Badge className="ml-2" tone="neutral" label="you" />
                     ) : null}
+                    {user.twoFactorEnabled ? (
+                      <Badge className="ml-2" tone="ok" label="2FA" />
+                    ) : null}
                   </TableCell>
                   <TableCell>{user.name ?? '—'}</TableCell>
                   <TableCell>
@@ -295,7 +268,13 @@ function UsersTable({ viewer }: { viewer: string }) {
                           <Button
                             variant="glass"
                             size="sm"
-                            onClick={() => approve(user)}
+                            onClick={() =>
+                              setConfirm({
+                                user,
+                                action: 'approve',
+                                role: roleOf(user),
+                              })
+                            }
                           >
                             Approve
                           </Button>
@@ -312,6 +291,17 @@ function UsersTable({ viewer }: { viewer: string }) {
                       ) : null}
                       {own ? (
                         <DisabledReason>{OWN_ROW_REASON}</DisabledReason>
+                      ) : null}
+                      {user.twoFactorEnabled && !own ? (
+                        <Button
+                          variant="glass"
+                          size="sm"
+                          onClick={() =>
+                            setConfirm({ user, action: 'reset_two_factor' })
+                          }
+                        >
+                          Reset 2FA
+                        </Button>
                       ) : null}
                       {user.status === 'active' && !own ? (
                         <Button
@@ -357,8 +347,9 @@ function UsersTable({ viewer }: { viewer: string }) {
 
   return (
     <>
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col gap-4">
         <RegistrationCard section={registration} />
+        <TwoFactorPolicyCard />
       </div>
 
       <TabGroup
@@ -405,20 +396,13 @@ function UsersTable({ viewer }: { viewer: string }) {
         </TabPanel>
       </TabGroup>
 
-      {copy ? (
-        <ConfirmDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setConfirm(undefined);
-          }}
-          title={copy.title}
-          consequence={copy.text}
-          verb={copy.verb}
-          tone={copy.danger ? 'danger' : 'default'}
-          busy={confirming}
-          onConfirm={execute}
-        />
-      ) : null}
+      <ConfirmGate
+        pending={confirm}
+        copy={confirmationCopy}
+        busy={confirming}
+        onConfirm={() => void execute()}
+        onCancel={() => setConfirm(undefined)}
+      />
     </>
   );
 }

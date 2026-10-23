@@ -106,7 +106,11 @@ describe('design stage (e2e)', () => {
     expect(writes).toHaveLength(1);
     const writePrompt = h.turnPrompts().at(-1) ?? '';
     expect(writePrompt).toContain('## Approved design');
-    expect(writePrompt).toContain('docs/design/<issue>-task-t1/1/mockup.html');
+    // #833: the page template's two frames.
+    expect(writePrompt).toContain('docs/design/<issue>-task-t1/1/screen.html');
+    expect(writePrompt).toContain(
+      'docs/design/<issue>-task-t1/1/breakdown.html',
+    );
 
     const detail = await h.detail(plan.id);
     expect(detail.tasks.find((t) => t.key === 't1')?.status).toBe('ready');
@@ -311,10 +315,13 @@ describe('design stage (e2e)', () => {
     await generate(plan.id);
     await h.finish(
       plan.id,
-      designResult(
-        { taskKey: 't1', variant: 1 },
-        `<!doctype html><html><body>${body}</body></html>`,
-      ),
+      designResult({ taskKey: 't1', variant: 1 }, [
+        {
+          name: 'Screen',
+          kind: 'screen',
+          html: `<!doctype html><html><body>${body}</body></html>`,
+        },
+      ]),
     );
     const turn = await h.ctx.prisma.planTurn.findFirstOrThrow({
       where: { planId: plan.id, action: 'design' },
@@ -420,8 +427,13 @@ describe('design stage (e2e)', () => {
     const stored = await h.ctx.prisma.designFrame.findMany({
       where: { revisionId: revision.id },
     });
-    expect(stored.map((f) => [f.position, f.name, f.html])).toEqual([
-      [0, 'Mockup', MOCKUP],
+    expect(
+      stored
+        .sort((a, b) => a.position - b.position)
+        .map((f) => [f.position, f.name, f.kind, f.templateFrameKey, f.html]),
+    ).toEqual([
+      [0, 'Screen', 'screen', 'screen', MOCKUP],
+      [1, 'Breakdown', 'breakdown', 'breakdown', MOCKUP],
     ]);
     expect(
       (
@@ -618,7 +630,7 @@ describe('design stage (e2e)', () => {
       block({
         action: 'write',
         taskKey: 't1',
-        document: `${FEATURE_DOC}\n## Design\n\nThe mockup is \`docs/specs/<issue>-task-t1/design/1/mockup.html\`.\n`,
+        document: `${FEATURE_DOC}\n## Design\n\nThe mockup is \`docs/specs/<issue>-task-t1/design/1/screen.html\`.\n`,
         assumptions: [],
       }),
     );
@@ -633,10 +645,11 @@ describe('design stage (e2e)', () => {
     const files = publish.files as { path: string; content: string }[];
     expect(files.map((f) => f.path)).toEqual([
       'docs/specs/101-task-t1.md',
-      'docs/specs/101-task-t1/design/1/mockup.html',
+      'docs/specs/101-task-t1/design/1/screen.html',
+      'docs/specs/101-task-t1/design/1/breakdown.html',
     ]);
     expect(files[0].content).toContain(
-      '`docs/specs/101-task-t1/design/1/mockup.html`',
+      '`docs/specs/101-task-t1/design/1/screen.html`',
     );
     expect(files[1].content).toBe(MOCKUP);
     expect(files[1].content).not.toContain(MOCKUP_PIN_HELPER_ATTRIBUTE);
@@ -657,11 +670,24 @@ describe('design stage (e2e)', () => {
   });
 
   // #441: a design of several named frames.
+  // #833: the page template's screen, breakdown and optional states.
   const FRAMES = [
-    { name: 'Board page', html: MOCKUP.replace('Export', 'Board') },
-    { name: 'Card tile', html: MOCKUP.replace('Export', 'Tile') },
-    { name: 'Card tile!', html: MOCKUP.replace('Export', 'Tile 2') },
-  ];
+    {
+      name: 'Board page',
+      kind: 'screen',
+      html: MOCKUP.replace('Export', 'Board'),
+    },
+    {
+      name: 'Card tile',
+      kind: 'breakdown',
+      html: MOCKUP.replace('Export', 'Tile'),
+    },
+    {
+      name: 'Card tile!',
+      kind: 'states',
+      html: MOCKUP.replace('Export', 'Tile 2'),
+    },
+  ] as const;
 
   it('stores the frames of a turn in order, serves each, and keeps a comment on its frame into the next Revise (#441)', async () => {
     await h.seedProfile();
@@ -678,20 +704,33 @@ describe('design stage (e2e)', () => {
         name: 'Board page',
         slug: 'board-page',
         htmlUrl: `/api/design-revisions/${revision.id}/frames/0/html`,
+        kind: 'screen',
+        templateFrameKey: 'screen',
       },
       {
         position: 1,
         name: 'Card tile',
         slug: 'card-tile',
         htmlUrl: `/api/design-revisions/${revision.id}/frames/1/html`,
+        kind: 'breakdown',
+        templateFrameKey: 'breakdown',
       },
       {
         position: 2,
         name: 'Card tile!',
         slug: 'card-tile-2',
         htmlUrl: `/api/design-revisions/${revision.id}/frames/2/html`,
+        kind: 'states',
+        templateFrameKey: 'states',
       },
     ]);
+    expect(revision.templateKey).toBe('page');
+    expect(revision.conformance).toEqual({
+      ok: true,
+      missing: [],
+      extra: [],
+      misplaced: [],
+    });
     const tile = await h.author.get(
       `/design-revisions/${revision.id}/frames/1/html`,
     );
@@ -740,7 +779,7 @@ describe('design stage (e2e)', () => {
     expect((await h.author.send('post', `${base}/revise`)).status).toBe(201);
     const prompt = h.turnPrompts().at(-1) ?? '';
     expect(prompt).toContain(
-      'Its frames, in order: "Board page", "Card tile", "Card tile!".',
+      'Its frames, in order: "Board page" (screen), "Card tile" (breakdown), "Card tile!" (states).',
     );
     expect(prompt).toContain('"frame": "Card tile"');
     expect(prompt).toContain(pin.id);
@@ -771,7 +810,11 @@ describe('design stage (e2e)', () => {
           addressed: [pin.id],
           kept: ['Board page', 'Card tile!'],
         },
-        [FRAMES[0], { name: 'Card tile', html: retile }, FRAMES[2]],
+        [
+          FRAMES[0],
+          { name: 'Card tile', kind: 'breakdown', html: retile },
+          FRAMES[2],
+        ],
       ),
     );
     const next = (await design(plan.id)).revisions.find(
@@ -824,8 +867,13 @@ describe('design stage (e2e)', () => {
         name: 'Mockup',
         slug: 'mockup',
         htmlUrl: `/api/design-revisions/${legacy.id}/frames/0/html`,
+        kind: 'legacy',
+        templateFrameKey: null,
       },
     ]);
+    // #833: a legacy revision is never checked — no "not per template" badge.
+    expect(read?.templateKey).toBeNull();
+    expect(read?.conformance).toBeNull();
     for (const url of [
       `/design-revisions/${legacy.id}/html`,
       `/design-revisions/${legacy.id}/frames/0/html`,
@@ -859,7 +907,7 @@ describe('design stage (e2e)', () => {
     ).toBe(400);
     expect((await h.author.send('post', `${base}/revise`)).status).toBe(201);
     const prompt = h.turnPrompts().at(-1) ?? '';
-    expect(prompt).toContain('Its frames, in order: "Mockup".');
+    expect(prompt).toContain('Its frames, in order: "Mockup" (legacy).');
     expect(prompt).toContain('"frame": "Mockup"');
 
     // Approved, the legacy revision publishes as its one frame.
@@ -1037,6 +1085,20 @@ describe('design stage (e2e)', () => {
     expect(turn.status).toBe(409);
     expect(turn.body.error).toBe('budget_exceeded');
     expect((await design(plan.id)).status).toBe('idle');
+  });
+
+  it('two parallel rebuilds start one build; the other is 409 (L-28)', async () => {
+    await h.seedProfile();
+    const rebuild = () =>
+      h.author.send('post', `/projects/${h.projectId}/ui-profile/rebuild`);
+    const responses = await Promise.all([rebuild(), rebuild()]);
+    expect(responses.map((r) => r.status).sort((a, b) => a - b)).toEqual([
+      201, 409,
+    ]);
+    expect(
+      await h.ctx.prisma.run.count({ where: { kind: 'ui_profile' } }),
+    ).toBe(1);
+    expect(h.designSent('uiprofile.build')).toHaveLength(1);
   });
 
   it('refuses a rebuild with runner_outdated when the runner does not serve uiprofile.build, creating no run (#233)', async () => {

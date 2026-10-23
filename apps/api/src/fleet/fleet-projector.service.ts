@@ -166,6 +166,7 @@ export class FleetProjector {
       case 'pane.prompt':
       case 'pane.idle':
       case 'pane.quota_hit':
+      case 'pane.quota_resumed':
       case 'pane.busy':
         return event.data.target === 'orchestrator'
           ? rounds.orchestrator(applied as Applied<OrchestratorEvent>)
@@ -187,6 +188,7 @@ const PLUGIN_ECHOED_TYPES: ReadonlySet<FleetEvent['type']> = new Set([
   'pane.prompt',
   'pane.idle',
   'pane.quota_hit',
+  'pane.quota_resumed',
   'pane.busy',
   'worktree.changed',
   'commit.trailer_found',

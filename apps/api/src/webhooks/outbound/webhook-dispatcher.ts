@@ -6,6 +6,7 @@ import {
   type WebhookEventType,
   webhookEnvelopeId,
 } from '@nautelle/shared';
+import { API_EVENT_SOURCE } from '@nautelle/shared/protocol';
 import {
   Inject,
   Injectable,
@@ -31,6 +32,11 @@ const HOLE_GRACE_MS = 10_000;
 /** The plugin channel is live when it sent an event in this window (spec 16 D8). */
 const PLUGIN_CHANNEL_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TRANSACTION_TIMEOUT_MS = 60_000;
+/** Catalogue types only the API emits (ADR-0014). */
+const API_ORIGINATED_TYPES: ReadonlySet<string> = new Set([
+  'schedule.failed',
+  'schedule.disabled',
+]);
 
 const EVENT_SELECT = {
   id: true,
@@ -158,10 +164,7 @@ export class WebhookDispatcher
     if (cursor === state.eventsCursor) return 0;
 
     const passed = events.filter(
-      (event) =>
-        event.id <= cursor &&
-        event.type !== 'webhook.test' &&
-        isWebhookEventType(event.type),
+      (event) => event.id <= cursor && isForwardable(event),
     );
     const created = passed.length > 0 ? await this.dispatch(tx, passed) : 0;
     await tx.webhookDispatcherState.update({
@@ -243,6 +246,22 @@ export class WebhookDispatcher
     return live;
   }
 }
+
+/**
+ * Whether an `events` row may reach a subscriber. `webhook.test` and the
+ * `schedule.*` types are the API's own (ADR-0014): a runner can write an event
+ * of that type, so only a row the API emitted is forwarded.
+ */
+export const isForwardable = (
+  event: Pick<EventRow, 'type' | 'source'>,
+): boolean => {
+  if (event.type === 'webhook.test') return false;
+  if (!isWebhookEventType(event.type)) return false;
+  if (API_ORIGINATED_TYPES.has(event.type)) {
+    return event.source === API_EVENT_SOURCE;
+  }
+  return true;
+};
 
 /**
  * Event → project: `(runnerId, rootPath)` first; `repo` only when exactly one

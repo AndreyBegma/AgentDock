@@ -46,6 +46,63 @@ does not install ([ADR-0049](../../docs/adr/0049-runner-releases-are-signed-and-
 first, so it works on a clean checkout. Releasing is in
 [deploy/README.md](../../deploy/README.md#releasing-the-runner).
 
+## Updating
+
+The API reads the latest released `nautelle-runner` from the npm registry
+(`registry.npmjs.org`) once an hour, in the background, through the same
+outbound guard as webhooks, and keeps the last good answer when a read fails.
+A version counts as released only when the meta package and all four platform
+packages report it as their `latest`; a prerelease is never offered. It
+compares that with the version each runner reported when it connected (an
+offline runner keeps its last one) and puts the result on the runner reads as
+`update: { current, latest, outdated }` — `null` when the runner never
+reported a version or the API has not read the registry yet. Versions compare
+by major, minor and patch only.
+
+When your runner is behind, the web app says so on every page ("Your runner
+`<hostname>` is on 0.14.0 — 0.15.0 is out.") until you dismiss it for that
+release, and Runners marks it **Update available**. To update, on the
+runner's machine:
+
+```sh
+npm i -g nautelle-runner@<version>
+systemctl --user restart nautelle-runner                   # Linux (install-service)
+launchctl kickstart -k gui/$(id -u)/com.nautelle.runner    # macOS (install-service)
+```
+
+With Homebrew: `brew upgrade nautelle-runner && brew services restart
+nautelle-runner`. What changed is in [CHANGELOG.md](CHANGELOG.md).
+
+## Update prompt
+
+While a command you type runs (`pair`, `status`, `profiles`, `policy`,
+`install-service`, `setup`, `away`, `version`, `help`), the runner asks npm
+for the latest `nautelle-runner` and for the platform package
+`nautelle-runner-<os>-<arch>`, with a 1.5 s timeout. A version counts only
+when both packages have it. When the command has finished and a newer version
+is ready, it asks:
+
+```text
+Update nautelle-runner 0.14.0 → 0.15.0? [Y/n/never for this version]
+```
+
+Enter or `y` runs the global install with the package manager that installed
+the runner: `npm install -g`, `bun add -g`, `pnpm add -g` or
+`yarn global add` (a runner installed under fnm counts as npm). For a
+Homebrew install it prints `brew upgrade nautelle-runner` instead, and for any
+other binary, whose manager is unknown, the npm command. A failed install prints the error. Either way, the
+exit code is the command's own. After a successful install, when the runner's
+systemd unit or launchd agent is installed and active, it says that the daemon
+still runs the old version and prints the command that restarts it; it never
+restarts the daemon itself. `never` writes the version to
+`~/.config/nautelle/update.json` and asks again only for a newer one.
+
+The check never delays the command or changes its output, and it makes no
+request at all unless stdin and stdout are both a terminal. It stays silent
+under `CI`, in the daemon (`run`), in the MCP server, hooks and the other
+commands Claude Code starts, under `npx`, `bunx` and `pnpm dlx`, and with
+`NAUTELLE_NO_UPDATE_CHECK=1`.
+
 ## Upgrading to 0.13
 
 0.13 adds the runner-local security policy
@@ -123,6 +180,7 @@ unsuccessful exit.
 | What | Where |
 |---|---|
 | Config (mode 0600) | `$XDG_CONFIG_HOME/agentdock/runner.json`, default `~/.config/nautelle/runner.json` |
+| Update prompt | `update.json` beside `runner.json`: the version answered "never" |
 | Event spool | `$XDG_STATE_HOME/agentdock/spool/`, default `~/.local/state/nautelle/spool/` |
 | Transcript offsets | `$XDG_STATE_HOME/agentdock/offsets.json`: how far each agent transcript was read |
 | `events.jsonl` offsets | `$XDG_STATE_HOME/agentdock/events-offsets.json`: byte offset and inode per project ([spec 16](../../docs/specs/16-consume-code-sentinel-events.md)); `fleet.eventsPollSeconds` (default 5) in `runner.json` sets the poll fallback |
@@ -135,6 +193,7 @@ unsuccessful exit.
 | Variable | Effect |
 |---|---|
 | `NAUTELLE_LOG` | `debug` \| `info` (default) \| `warn` \| `error`; logs are JSON lines on stderr, the token redacted |
+| `NAUTELLE_NO_UPDATE_CHECK` | `1` turns the [update prompt](#update-prompt) off; `CI` does too |
 | `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` | where the files above live |
 | `CODEX_HOME` | the codex profile `profiles --detect` proposes |
 
@@ -152,7 +211,17 @@ telemetry on reports each LLM request as it happens, before its transcript is
 read. It speaks OTLP/HTTP only (`application/x-protobuf` or
 `application/json`, optionally gzip) on `POST /v1/logs`. `/v1/metrics` and
 `/v1/traces` are accepted and discarded. Connections from anything but
-loopback are refused, and so are bodies over 4 MiB.
+loopback are refused, and so are bodies over 4 MiB and requests with more than
+5000 log records (413).
+
+Every request must carry the header `x-nautelle-otlp-token` with the token kept
+in `~/.local/state/nautelle/otlp.key` (created 0600 on first start); without it
+the receiver answers 401. A `Host` other than `127.0.0.1:<port>` or
+`localhost:<port>` gets 421, which stops a web page that rebinds its own name to
+the loopback address. The runner adds the header to every session it launches,
+and `nautelle-runner setup claude` writes it into `settings.json` next to the
+endpoint. Deleting the file revokes the token: the runner makes a new one on its
+next start, and `setup claude` has to be run again.
 
 Only `claude_code.api_request` records are read. Each one becomes one
 `llm.request` carrying model, request id, token counts, duration and the
@@ -167,6 +236,7 @@ CLAUDE_CODE_ENABLE_TELEMETRY=1 \
 OTEL_LOGS_EXPORTER=otlp \
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 \
+OTEL_EXPORTER_OTLP_HEADERS="x-nautelle-otlp-token=$(cat ~/.local/state/nautelle/otlp.key)" \
 OTEL_RESOURCE_ATTRIBUTES=agentdock.project=<id>,agentdock.slot=<slot>,agentdock.issue=<n>,agentdock.run=<run> \
 claude
 ```

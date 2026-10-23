@@ -1,3 +1,5 @@
+import type { CardType } from '../prefix/contracts';
+
 /**
  * Per-project coding rules (issue #528, stack S-2): short instructions a card
  * worker follows on one project. The API stores them in the control plane —
@@ -26,6 +28,8 @@ export interface ProjectRuleView {
   /** 0-based; the list is served in this order. */
   position: number;
   source: ProjectRuleSource;
+  /** #751 B5: the card types it applies to; empty is all. */
+  appliesTo: CardType[];
   createdAt: string;
   updatedAt: string;
 }
@@ -44,6 +48,8 @@ export interface ProjectRuleUpdateRequest {
   title?: string;
   description?: string;
   enabled?: boolean;
+  /** #751 B5: `CARD_TYPES`, each once; empty is all. */
+  appliesTo?: CardType[];
 }
 
 /** `PUT /projects/:id/rules/order` — every rule of the project, once each. */

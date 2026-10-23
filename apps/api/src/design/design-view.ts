@@ -15,6 +15,7 @@ import { loadDesignProgress } from './design-progress';
 import {
   type DesignKey,
   designSkillsOf,
+  designTemplateFor,
   designWhere,
   installedOf,
 } from './design-store';
@@ -38,12 +39,13 @@ export const loadDesignView = async (
   if (!row) {
     throw designError(404, DESIGN_ERROR.notFound, 'Design not found');
   }
-  const [settings, progress] = await Promise.all([
+  const [settings, progress, template] = await Promise.all([
     prisma.designSettings.findUnique({
       where: { projectId: project.id },
       select: { viewports: true, defaultSkills: true },
     }),
     loadDesignProgress(prisma, project.id, owner, row),
+    designTemplateFor(prisma, row.id),
   ]);
   // #604: a design that follows the default shows today's default.
   const defaultSkills = settings?.defaultSkills ?? [];
@@ -57,5 +59,6 @@ export const loadDesignView = async (
       ? viewportsOf(settings.viewports)
       : [...DEFAULT_VIEWPORTS],
     ...progress,
+    template,
   });
 };

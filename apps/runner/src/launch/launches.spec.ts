@@ -160,7 +160,7 @@ describe('card worker launch (#445)', () => {
     }
   });
 
-  it('carries the injected hooks, the filter hook, nautelle with the guard, and the scout', () => {
+  it('carries the injected hooks, the filter hook, nautelle (the daemon guards finish_card), and the scout', () => {
     const ts = cardTokenSaver(
       profile,
       { ...args, tokenSaver: ON },
@@ -181,7 +181,7 @@ describe('card worker launch (#445)', () => {
     expect(serversOf(ts)).toEqual({
       nautelle: {
         command: SELF[0],
-        args: ['mcp', '--finish-guard', '--issue', '12'],
+        args: ['mcp'],
       },
       playwright: { command: 'pw' },
     });

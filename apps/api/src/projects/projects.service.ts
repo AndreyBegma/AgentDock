@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import {
   type DocsSourceOverrideRequest,
   effectiveProjectRole,
@@ -7,6 +8,7 @@ import {
   type Role,
 } from '@nautelle/shared';
 import {
+  hasParentSegment,
   type ProjectInspection,
   repoRelativeDirSchema,
 } from '@nautelle/shared/protocol';
@@ -58,10 +60,28 @@ const remoteRepoData = (
       ? { repo: remote }
       : { repo: remote, githubRepoId: null };
 
+/**
+ * C-148: the default branch an inspection reports. A runner older than the
+ * field reports none; its base is the default branch only when it came from
+ * `origin/HEAD` or `gh` — a configured or guessed base leaves it unknown.
+ */
+export const inspectedDefaultBranch = (
+  inspection: Pick<
+    ProjectInspection,
+    'baseBranch' | 'baseSource' | 'defaultBranch'
+  >,
+): string | null =>
+  inspection.defaultBranch !== undefined
+    ? inspection.defaultBranch
+    : inspection.baseSource === 'origin_head' || inspection.baseSource === 'gh'
+      ? inspection.baseBranch
+      : null;
+
 /** The columns an inspection sets on a project, at connect and on refresh. */
 const inspectionData = (inspection: ProjectInspection) => ({
   baseBranch: inspection.baseBranch,
   baseSource: inspection.baseSource,
+  defaultBranch: inspectedDefaultBranch(inspection),
   codeSentinelConfig: inspection.codeSentinelConfig as Prisma.InputJsonValue,
   hasClaudeMd: inspection.hasClaudeMd,
   hasAgentsMd: inspection.hasAgentsMd,
@@ -473,8 +493,9 @@ const invalid = (message: string) =>
  */
 export const manualDocsData = (
   rootPath: string,
-  { kind, localPath, repo, specDir }: DocsSourceOverrideRequest,
+  { kind, localPath: given, repo, specDir }: DocsSourceOverrideRequest,
 ) => {
+  const localPath = given ? localPathOf(given) : given;
   switch (kind) {
     case 'in_repo':
       if (!localPath || repo) {
@@ -513,6 +534,20 @@ export const manualDocsData = (
     manual: true,
     specDir: folder,
   };
+};
+
+/**
+ * L-08: the docs root as stored — normalised, without a trailing `/`, so the
+ * in-repo prefix check compares like with like. A `..` segment is refused
+ * before normalising: `<root>/../..` must not pass, nor fold into a path that
+ * happens to land back inside the root.
+ */
+const localPathOf = (localPath: string): string => {
+  if (hasParentSegment(localPath)) {
+    throw invalid('localPath must not have a ".." segment');
+  }
+  const normalized = posix.normalize(localPath);
+  return normalized.length > 1 ? normalized.replace(/\/+$/, '') : normalized;
 };
 
 /**

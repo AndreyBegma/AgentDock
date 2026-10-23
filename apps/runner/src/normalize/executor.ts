@@ -24,9 +24,11 @@ import type { Env } from '../env';
 import { resolveFleetProject } from '../fleet/project';
 import {
   type TextCallLaunchOptions,
+  textCallArgs,
   textCallTokenSaver,
 } from '../launch/token-saver';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import { cutBytes } from '../planner/result';
 import { profileOf, type SkillsDeps } from '../skills/deps';
 import { runEnv } from '../skills/run/launch';
@@ -42,7 +44,7 @@ export interface NormalizeExecutorOptions extends TextCallLaunchOptions {
   env: Env;
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   spawn?: CaptureSpawn;
 }
 
@@ -135,12 +137,9 @@ export class NormalizeExecutor {
     for (const [key, value] of Object.entries(this.options.env)) {
       if (value !== undefined) env[key] = value;
     }
-    Object.assign(
-      env,
-      runEnv(profile, args, this.options.otlpPort?.() ?? null),
-    );
+    Object.assign(env, runEnv(profile, args, this.options.otlp?.() ?? null));
     Object.assign(env, HOOKS_OFF_ENV);
-    // #445: off or absent launches exactly as before.
+    // #445: off or absent launches without the filter; C-179: never with an MCP server.
     const tokenSaver = textCallTokenSaver(
       this.options,
       profile,
@@ -156,7 +155,7 @@ export class NormalizeExecutor {
         command: [
           profile.binary ?? profile.runtime,
           ...profile.args,
-          ...(tokenSaver?.args ?? []),
+          ...textCallArgs(tokenSaver),
           ...CAPTURE_CLAUDE_FLAGS,
           '--model',
           args.model,

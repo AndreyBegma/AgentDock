@@ -15,15 +15,18 @@ import {
   uiProfileBuildPhaseChangedDataSchema,
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
+import type { CaptureSpawn } from '../capture/executor';
 import { type Cancel, isoNow } from '../clock';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
 import { watchedProject } from '../control/target';
 import { TmuxControl } from '../control/tmux';
+import type { Env } from '../env';
 import { resolveFleetProject } from '../fleet/project';
 import { type RunNotes, runWorkKey } from '../handoff/runs';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import {
   readTail,
   STREAM_TAIL_BYTES,
@@ -47,6 +50,7 @@ import {
   readJson,
   writeJsonAtomic,
 } from '../skills/run/record';
+import { UiProfileLearner } from './learn';
 
 /** How often running builds are checked for an exit, a vanish or a timeout. */
 export const UIPROFILE_TICK_MS = 2000;
@@ -77,7 +81,7 @@ export const uiProfileLaunchSpec = (
   build: Pick<UiProfileBuildArgs, 'model' | 'projectId' | 'runId'>,
   worktree: string,
   promptFile: string,
-  otlpPort: number | null,
+  otlp: OtlpEndpoint | null,
   tokenSaver?: TokenSaverLaunch | null,
 ): LaunchSpec => ({
   binary: profile.binary ?? profile.runtime,
@@ -93,7 +97,7 @@ export const uiProfileLaunchSpec = (
     'stream-json',
     '--verbose',
   ],
-  env: { ...runEnv(profile, build, otlpPort), ...(tokenSaver?.env ?? {}) },
+  env: { ...runEnv(profile, build, otlp), ...(tokenSaver?.env ?? {}) },
   cwd: worktree,
   stdin: promptFile,
 });
@@ -155,13 +159,19 @@ export interface UiProfileExecutorOptions {
   slots: RunSlots;
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   tickMs?: number;
   /**
    * #449: notes of interrupted builds. With Token saver on, a build of the
    * same work picks up the last interrupted attempt's note.
    */
   runNotes?: RunNotes;
+  /** #752: default `uiprofile-learn` beside `buildsDir`. */
+  learnDir?: string;
+  /** #752: the learn's environment; default the runner's own. */
+  env?: Env;
+  /** #752: tests replace the learn's process. */
+  learnSpawn?: CaptureSpawn;
 }
 
 const slotId = (build: BuildRecord): string => `uiprofile:${build.runId}`;
@@ -186,8 +196,20 @@ export class UiProfileBuildExecutor {
   private cancelTick: Cancel = () => {};
   private offFree: () => void = () => {};
 
+  /** #752: `uiprofile.learn`, in `uiprofile-learn` beside the builds. */
+  readonly learner: UiProfileLearner;
+
   constructor(private readonly options: UiProfileExecutorOptions) {
     this.tmux = new TmuxControl(options.deps.exec, options.tmuxServer ?? []);
+    this.learner = new UiProfileLearner({
+      deps: options.deps,
+      learnDir:
+        options.learnDir ?? join(dirname(options.buildsDir), 'uiprofile-learn'),
+      env: options.env ?? process.env,
+      log: options.log,
+      otlp: options.otlp,
+      spawn: options.learnSpawn,
+    });
   }
 
   /** Picks up the builds a previous runner left, then starts the timer. */
@@ -220,6 +242,7 @@ export class UiProfileBuildExecutor {
   stop(): void {
     this.cancelTick();
     this.offFree();
+    this.learner.stop();
   }
 
   /** A build by its `runs` row, for the run log (#183). */
@@ -303,10 +326,14 @@ export class UiProfileBuildExecutor {
   /**
    * `uiprofile.cancel` (#275 D5): a queued build leaves the queue, a preparing
    * one is flagged, a running one loses its session; each ends `cancelled`.
+   * A build of another project is `not_found` and keeps going.
    */
   async cancel(args: UiProfileCancelArgs): Promise<UiProfileCancelResult> {
-    if (!this.record(args.runId)) {
-      throw new CommandFailure('not_found', `no build ${args.runId}`);
+    if (this.record(args.runId)?.projectId !== args.projectId) {
+      throw new CommandFailure(
+        'not_found',
+        `no build ${args.runId} in ${args.projectId}`,
+      );
     }
     const live = this.active.get(args.runId);
     if (!live || this.busy.has(args.runId)) return { cancelled: false };
@@ -411,7 +438,7 @@ export class UiProfileBuildExecutor {
         build,
         build.worktree,
         join(this.dir(build.runId), PROMPT_FILE),
-        this.options.otlpPort?.() ?? null,
+        this.options.otlp?.() ?? null,
         uiProfileTokenSaver(
           profile,
           build,

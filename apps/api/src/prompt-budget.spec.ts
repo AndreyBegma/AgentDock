@@ -1,4 +1,5 @@
 import {
+  BUILTIN_DESIGN_TEMPLATES,
   type PlanQuestion,
   type PlanTurnAction,
   plannerOutputContract,
@@ -64,6 +65,7 @@ const design: DesignPromptContext = {
   profile: null,
   skills: [],
   comments: [],
+  template: BUILTIN_DESIGN_TEMPLATES[0],
 };
 
 const planInstructions = readDefaultPlannerInstructions();
@@ -100,13 +102,15 @@ const turn = (action: PlanTurnAction, brief: string): PromptInput => ({
 });
 
 /** Tokens per plan turn with a one-line brief; the real instructions and the output contract are in it. */
+// #833: the design contract names frame kinds (+~30 tokens on every v2
+// turn), and a design turn carries its template's "Frames to draw" (+~200).
 const PLAN_TURN_BUDGET: Record<PlanTurnAction, number> = {
-  clarify: 3950,
-  decompose: 3950,
-  grill: 3950,
-  write: 3950,
-  revise: 3950,
-  design: 4050,
+  clarify: 4000,
+  decompose: 4000,
+  grill: 4000,
+  write: 4000,
+  revise: 4000,
+  design: 4300,
   intake: 2700,
   discuss: 700,
 };
@@ -166,8 +170,8 @@ describe('prompt budgets — design turns (C-254)', () => {
     });
 
   it('stay within their budgets', () => {
-    expect(tokens(card('Add login'))).toBeLessThanOrEqual(3950);
-    expect(tokens(stack('Redesign the board'))).toBeLessThanOrEqual(4000);
+    expect(tokens(card('Add login'))).toBeLessThanOrEqual(4200);
+    expect(tokens(stack('Redesign the board'))).toBeLessThanOrEqual(4250);
   });
 
   it('share the instructions and the contract across two different cards', () => {

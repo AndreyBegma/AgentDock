@@ -11,7 +11,10 @@ export type TelegramLinkView =
   | { status: 'error' }
   | { status: 'ready'; state: TelegramLinkStatus };
 
-/** The caller's own Telegram link: state, start linking, unlink. */
+/**
+ * The caller's own Telegram link: state, start linking, confirm or turn away
+ * the chat that redeemed the code (C-147), unlink.
+ */
 export function useTelegramLink() {
   const [view, setView] = useState<TelegramLinkView>({ status: 'loading' });
   const [busy, setBusy] = useState(false);
@@ -61,5 +64,39 @@ export function useTelegramLink() {
     }
   }, [load, showError]);
 
-  return { view, busy, reload: load, start, unlink };
+  /** Activates the waiting chat `id`; nothing reaches a chat before this. */
+  const confirm = useCallback(
+    async (id: string) => {
+      setBusy(true);
+      try {
+        const state = await api<TelegramLinkStatus>(
+          '/notifications/telegram/link/confirm',
+          { method: 'POST', body: { id } },
+        );
+        setView({ status: 'ready', state });
+        toast.success('Telegram linked.');
+      } catch (error) {
+        showError(describeErrorHint(error));
+        await load();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load, showError],
+  );
+
+  const decline = useCallback(async () => {
+    setBusy(true);
+    try {
+      await api('/notifications/telegram/link/pending', { method: 'DELETE' });
+      await load();
+      toast.success('The Telegram chat was turned away.');
+    } catch (error) {
+      showError(describeErrorHint(error));
+    } finally {
+      setBusy(false);
+    }
+  }, [load, showError]);
+
+  return { view, busy, reload: load, start, confirm, decline, unlink };
 }

@@ -31,7 +31,6 @@ import {
   tokenSaverConfigSchema,
   UNFILTERED_FILTER_IDS,
 } from './contracts';
-import { estimateTokensSaved, estimateUsdSaved } from './estimate';
 
 const row: FilterStatRow = {
   id: 'r1',
@@ -394,16 +393,31 @@ describe('runnerPredatesFilterReasons (#648)', () => {
   });
 });
 
-describe('the estimate (#445 D12)', () => {
-  it('is bytes / 4, rounded, never negative', () => {
-    expect(estimateTokensSaved(40_000, 3_000)).toBe(9_250);
-    expect(estimateTokensSaved(10, 10)).toBe(0);
-    expect(estimateTokensSaved(3, 5)).toBe(0);
+describe('filter.stats session (#748 D5)', () => {
+  const manual: FilterStatRow = { ...row, runId: null, runKind: 'manual' };
+
+  it('accepts a session on a batch of manual rows, and none (older runner)', () => {
+    expect(
+      filterStatsDataSchema.safeParse({ rows: [manual], session: 'abc-123_X' })
+        .success,
+    ).toBe(true);
+    expect(filterStatsDataSchema.safeParse({ rows: [manual] }).success).toBe(
+      true,
+    );
   });
 
-  it('prices tokens at a per-token input price', () => {
-    expect(estimateUsdSaved(1_000_000, '0.000003')).toBeCloseTo(3, 10);
-    expect(estimateUsdSaved(1_000, 'not a number')).toBe(0);
-    expect(estimateUsdSaved(1_000, '-1')).toBe(0);
+  it('rejects a session beside a non-manual row', () => {
+    expect(
+      filterStatsDataSchema.safeParse({ rows: [manual, row], session: 'abc' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects a session that is not a bare id', () => {
+    for (const session of ['', '../x', 'a b', 'a'.repeat(129)]) {
+      expect(
+        filterStatsDataSchema.safeParse({ rows: [manual], session }).success,
+      ).toBe(false);
+    }
   });
 });

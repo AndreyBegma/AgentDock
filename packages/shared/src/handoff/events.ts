@@ -14,7 +14,8 @@ import {
  * Context handoff's runner events (#449). They travel in the ordinary
  * `events` stream with `source: "runner"` — no new message type (the #445
  * and #447 precedent). `data.projectId` repeats the envelope's project so
- * the API matches the card or the run without a lookup.
+ * the API matches the card or the run without a lookup — and checks it
+ * against the row it finds. The `data` schemas are strict (C-183).
  */
 
 export const HANDOFF_UPDATED_EVENT = 'handoff.updated';
@@ -36,7 +37,7 @@ export type HandoffSubject = z.infer<typeof handoffSubjectSchema>;
  * never leaves the machine. Carries the whole note, not a diff.
  */
 export const handoffUpdatedDataSchema = z
-  .object({
+  .strictObject({
     projectId: z.string().min(1),
     at: z.iso.datetime(),
     subject: handoffSubjectSchema,
@@ -54,7 +55,7 @@ export type HandoffUpdatedData = z.infer<typeof handoffUpdatedDataSchema>;
  * earlier round, so it can still be resumed.
  */
 export const roundRestartDataSchema = z
-  .object({
+  .strictObject({
     projectId: z.string().min(1),
     cardId: cardIdSchema,
     /** The round's run; the API resolves the round from it. */
@@ -88,7 +89,7 @@ const int32 = z.number().int().nonnegative().max(2_147_483_647);
  * D9: the round's warm-up — input tokens and ms from its start to its first
  * file edit. Sent once, at that edit; a round that never edits sends none.
  */
-export const roundWarmupDataSchema = z.object({
+export const roundWarmupDataSchema = z.strictObject({
   projectId: z.string().min(1),
   cardId: cardIdSchema,
   runId: skillRunIdSchema,

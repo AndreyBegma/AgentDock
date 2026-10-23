@@ -186,6 +186,45 @@ describe('notifications API (e2e)', () => {
       expect(page.items[0].muted).toBe(true);
       expect(page.unreadCount).toBe(0);
     });
+
+    it('hides the rows of a project the caller was removed from (C-149)', async () => {
+      const ada = await signIn('ada@example.com', 'operator');
+      await prompts('a', 'b');
+      const at = new Date();
+      await ctx.prisma.notification.create({
+        data: {
+          userId: ada.id,
+          kind: 'runner.offline',
+          title: 'Runner offline',
+          body: 'No project',
+          firstAt: at,
+          lastAt: at,
+        },
+      });
+      const before = (await ada.session.get('/notifications').expect(200))
+        .body as NotificationPage;
+      expect(before.items).toHaveLength(3);
+      expect(before.unreadCount).toBe(3);
+      const [hidden] = await ctx.prisma.notification.findMany({
+        where: { userId: ada.id, projectId },
+      });
+
+      await ctx.prisma.projectMember.deleteMany({
+        where: { userId: ada.id, projectId },
+      });
+
+      const after = (await ada.session.get('/notifications').expect(200))
+        .body as NotificationPage;
+      expect(after.items.map((n) => n.projectId)).toEqual([null]);
+      expect(after.unreadCount).toBe(1);
+      const unread = (
+        await ada.session.get('/notifications?unread=true').expect(200)
+      ).body as NotificationPage;
+      expect(unread.items.map((n) => n.projectId)).toEqual([null]);
+      await ada.session
+        .send('post', `/notifications/${hidden.id}/read`)
+        .expect(404);
+    });
   });
 
   describe('rules', () => {

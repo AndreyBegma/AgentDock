@@ -16,6 +16,7 @@ import {
 import {
   API_EVENT_SOURCE,
   EVENTS_DUPLICATE_EVENT,
+  EVENTS_FORGED_EVENT,
   paneDialogSchema,
   parseFleetEvent,
   type RunnerEvent,
@@ -71,6 +72,7 @@ const PLUGIN_ECHOED_TYPES: ReadonlySet<string> = new Set([
 /** Never notify: bookkeeping rows of spec 16. */
 const NEVER: ReadonlySet<string> = new Set([
   EVENTS_DUPLICATE_EVENT,
+  EVENTS_FORGED_EVENT,
   'events.unparsed',
 ]);
 
@@ -180,12 +182,16 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
           page: 'fleet',
         };
       }
+      const resetsAt = (parsed.event.data as { resetsAt?: string | null })
+        .resetsAt;
       return {
         kind: 'quota.hit',
         slot: target === 'orchestrator' ? null : slot,
         issue,
         title: `${subject} hit its usage limit`,
-        body: 'The quota banner is on screen; the session waits until the limit resets.',
+        body: resetsAt
+          ? `The quota banner is on screen; the session waits until the limit resets at ${resetsAt.slice(0, 16).replace('T', ' ')} UTC.`
+          : 'The quota banner is on screen; the session waits until the limit resets.',
         page: 'fleet',
       };
     }

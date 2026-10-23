@@ -1,4 +1,9 @@
-import type { ModelPriceInput } from '@nautelle/shared';
+import {
+  checkSafePattern,
+  compileMatchPattern,
+  type ModelPriceInput,
+  testBounded,
+} from '@nautelle/shared';
 
 /** Provider by the name's family; the price list itself carries no provider. */
 const PROVIDERS: { provider: string; pattern: RegExp }[] = [
@@ -26,14 +31,15 @@ export function providerOf(modelName: string): string {
   );
 }
 
-/** A model's pattern matches a model id the account has used. A bad regex matches nothing. */
+/** A model's pattern matches a model id the account has used. A bad or unsafe regex matches nothing. */
 export function isUsed(
   model: Pick<ModelPriceInput, 'matchPattern'>,
   usedModels: readonly string[],
 ): boolean {
+  if (!checkSafePattern(model.matchPattern, 'i').ok) return false;
   try {
-    const pattern = new RegExp(model.matchPattern, 'i');
-    return usedModels.some((used) => pattern.test(used));
+    const pattern = compileMatchPattern(model.matchPattern);
+    return usedModels.some((used) => testBounded(pattern, used));
   } catch {
     return false;
   }

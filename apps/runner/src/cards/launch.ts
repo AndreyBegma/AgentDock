@@ -8,9 +8,10 @@ import type {
 import type { ConfigProfile } from '../config';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { SESSION_TOKEN_ENV } from '../local/session-tokens';
+import { CARD_ESCALATE_ENV } from '../mcp/tools';
+import type { OtlpEndpoint } from '../otlp/token';
 import { runEnv } from '../skills/run/launch';
 import type { LaunchSpec } from '../skills/run/record';
-import { cardIssueNumber, finishGuardArgs } from './finish-guard';
 import {
   type CardWiring,
   type CardWiringFiles,
@@ -105,11 +106,32 @@ export const cardArgv = (
 });
 
 /**
+ * #750 D6: Claude Code's env override of the session's effort. Checked
+ * against Claude Code 2.1.306: `--effort` wins over a settings `effortLevel`,
+ * but this env wins over `--effort` — so a round with an effort sets it too,
+ * over whatever the profile's env says.
+ */
+export const CLAUDE_EFFORT_ENV = 'CLAUDE_CODE_EFFORT_LEVEL';
+
+/**
+ * #750: what the round's env adds for its effort and for `escalate_card`
+ * (D8). The MCP server reads `CARD_ESCALATE_ENV` from the session's env, so
+ * it reaches it under every wiring — plugin, injected or Token saver.
+ */
+const roundEnv = (
+  args: Partial<Pick<CardRunArgs, 'effort' | 'escalate'>>,
+): Record<string, string> => ({
+  ...(args.effort ? { [CLAUDE_EFFORT_ENV]: args.effort } : {}),
+  ...(args.escalate ? { [CARD_ESCALATE_ENV]: '1' } : {}),
+});
+
+/**
  * What `exec-run` starts in the card's tmux session. The round's `runId` is
  * in the resource attributes, so the cost of a resumed session is booked to
  * the round that resumed it; the card's own env (#389) is set over the
  * profile's, and with it the session's token (#113), which its hooks and its
- * MCP server present to the daemon.
+ * MCP server present to the daemon, and the round's effort and escalation
+ * (#750).
  */
 export const cardLaunchSpec = (
   profile: ConfigProfile,
@@ -123,18 +145,19 @@ export const cardLaunchSpec = (
     | 'runId'
     | 'shortId'
   > &
-    Partial<Pick<CardRunArgs, 'effort'>>,
+    Partial<Pick<CardRunArgs, 'effort' | 'escalate'>>,
   worktree: string,
-  otlpPort: number | null,
+  otlp: OtlpEndpoint | null,
   wiring?: CardWiringFiles,
   tokenSaver?: TokenSaverLaunch | null,
   sessionToken?: string,
 ): LaunchSpec => ({
   ...cardArgv(profile, args, wiring, tokenSaver),
   env: {
-    ...runEnv(profile, args, otlpPort),
+    ...runEnv(profile, args, otlp),
     ...cardEnv(args.shortId),
     ...(tokenSaver?.env ?? {}),
+    ...roundEnv(args),
     ...(sessionToken ? { [SESSION_TOKEN_ENV]: sessionToken } : {}),
   },
   cwd: worktree,
@@ -143,16 +166,18 @@ export const cardLaunchSpec = (
 
 /**
  * #445: the card round's Token saver — the filter hook over the injected
- * hooks (a plugin profile keeps its own), `nautelle` with the artifact
- * guard (D8), the scout, and the round dir for the filter's files. `null`
- * when it is off: the round launches as before.
+ * hooks (a plugin profile keeps its own), `nautelle` (the daemon runs its
+ * artifact guard, D8), the scout, and the round dir for the filter's files. `null`
+ * when it is off: the round launches as before. #751: the prefix is measured
+ * in the card's worktree, and its frozen selection and overlays applied.
  */
 export const cardTokenSaver = (
   profile: ConfigProfile,
   args: Pick<
     CardRunArgs,
     'tokenSaver' | 'runId' | 'projectId' | 'pullRequest' | 'prompt'
-  >,
+  > &
+    Partial<Pick<CardRunArgs, 'root' | 'shortId'>>,
   home: string,
   roundDir: string,
   selfCommand: readonly string[],
@@ -167,8 +192,16 @@ export const cardTokenSaver = (
     runKind: 'card',
     projectId: args.projectId,
     runId: args.runId,
-    runnerMcp: finishGuardArgs(cardIssueNumber(args)),
+    // DR-10: the daemon guards `finish_card` (`CardRecord.finishGuard`).
+    runnerMcp: [],
     scout: true,
+    techniques: args.tokenSaver?.techniques,
+    cwd:
+      args.root !== undefined && args.shortId !== undefined
+        ? cardWorktreePath(args.root, args.shortId)
+        : undefined,
+    prompt: args.prompt,
+    prefix: args.tokenSaver?.prefix,
     baseSettings:
       wiring.wiring === 'injected' ? cardHooksSettings(selfCommand) : undefined,
   });

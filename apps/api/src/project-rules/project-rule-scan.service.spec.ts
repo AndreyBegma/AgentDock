@@ -24,6 +24,7 @@ const rule = (
   enabled: true,
   position: 0,
   source: 'scanned',
+  appliesTo: [],
   createdAt: '2026-10-17T10:00:00.000Z',
   updatedAt: '2026-10-17T10:00:00.000Z',
 });

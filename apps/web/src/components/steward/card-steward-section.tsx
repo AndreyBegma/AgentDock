@@ -14,7 +14,6 @@ import {
 } from '@nautelle/shared';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Time } from '../../lib/format/time';
-import { safeHttpsUrl } from '../../lib/queue/format';
 import { useSection } from '../../lib/section/use-section';
 import { fetchCardIncidents, linkCardIssue } from '../../lib/steward/actions';
 import {
@@ -25,6 +24,7 @@ import {
   INCIDENT_STATUS_TONE,
   parseIssueInput,
 } from '../../lib/steward/format';
+import { githubUrl } from '../../lib/url';
 
 const capitalize = (text: string): string =>
   text.charAt(0).toUpperCase() + text.slice(1);
@@ -88,7 +88,7 @@ function IssueLink({
     canOperate && suggestion !== null && suggestion !== card.issueNumber
       ? suggestion
       : null;
-  const issueHref = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
+  const issueHref = card.issueUrl ? githubUrl(card.issueUrl) : null;
 
   const submit = async (text: string) => {
     const parsed = parseIssueInput(text);

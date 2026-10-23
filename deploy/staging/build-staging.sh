@@ -14,6 +14,7 @@ docker build --pull \
   --label agentdock.stage=staging \
   -t agentdock-api:staging \
   -f apps/api/Dockerfile .
+sh deploy/staging/check-api-image.sh agentdock-api:staging
 
 echo "Building agentdock-web:staging ($REVISION)"
 docker build --pull \

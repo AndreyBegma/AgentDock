@@ -5,6 +5,7 @@ import {
   DESIGN_ERROR,
   type DesignCommentRequest,
   PLANNER_ERROR,
+  type Role,
   type TaskDesignPatchRequest,
   type TaskDesignView,
 } from '@nautelle/shared';
@@ -22,6 +23,7 @@ import { AuditService } from '../audit/audit.service';
 import { autoRunFailureOf, cardNotFound } from '../board/board-error';
 import { BoardRoundsService } from '../board/board-rounds.service';
 import { BoardStacks } from '../board/board-stacks';
+import { hiddenFrom } from '../board/inbox-access';
 import { PrismaService } from '../database/prisma.service';
 import { CardDesignTurnService } from '../planner/card-design-turn.service';
 import { callerOf, type PlanActor } from '../planner/plan.service';
@@ -39,16 +41,20 @@ import { busyStatusOf, type DesignOwner } from './design-owner';
 import {
   batchOf,
   commentAnchor,
+  completeBatchOf,
   type DesignTurnPlan,
   withDesign,
 } from './design-rules';
 import {
+  conformanceOfRow,
   type DesignKey,
   defaultSkillsOf,
   designWhere,
   followsDefaultSkills,
+  projectDesignTemplateKeys,
 } from './design-store';
 import { loadDesignView } from './design-view';
+import { UiProfileLearner } from './learn/ui-profile-learner';
 import { type ProfileReadiness, UiProfileService } from './ui-profile.service';
 import type { WaitingDesign } from './ui-profile-mapper';
 
@@ -98,6 +104,7 @@ export class DesignService implements OnModuleInit {
     private readonly text: TextNormalizer,
     private readonly textOwners: TextOwners,
     private readonly assessor: CardAssessor,
+    private readonly learner: UiProfileLearner,
   ) {}
 
   /** #271: a comment's English body lands as its design's live event. */
@@ -170,6 +177,11 @@ export class DesignService implements OnModuleInit {
     await this.reviseOf(await this.taskOwner(plan, key, 'change'), actor);
   }
 
+  /** #833 D7: `POST …/design/complete` — the repair turn by hand. */
+  async complete(plan: Plan, key: string, actor: PlanActor): Promise<void> {
+    await this.completeOf(await this.taskOwner(plan, key, 'change'), actor);
+  }
+
   /** `POST …/design/comments` (D9). */
   async comment(
     plan: Plan,
@@ -200,9 +212,18 @@ export class DesignService implements OnModuleInit {
 
   // ─── Board card (#243) ─────────────────────────────────────────────────────
 
-  /** `GET …/board/cards/:number/design`: any project viewer (D8). */
-  async cardView(projectId: string, number: number): Promise<TaskDesignView> {
+  /**
+   * `GET …/board/cards/:number/design`: any project viewer (D8), but an Inbox
+   * card's only for operators (#244 D8). A write answers its design with no
+   * role: the caller already holds operator.
+   */
+  async cardView(
+    projectId: string,
+    number: number,
+    role?: Role,
+  ): Promise<TaskDesignView> {
     const card = await this.card(projectId, number);
+    if (hiddenFrom(card, role)) throw cardNotFound();
     const project = await this.store.project(projectId);
     return loadDesignView(this.prisma, project, { cardId: card.id });
   }
@@ -249,6 +270,16 @@ export class DesignService implements OnModuleInit {
     await this.stacks.assertStackApproved(owner.target.id);
     await this.rememberLaunch(owner, projectId, number, launch);
     await this.reviseOf(owner, actor);
+  }
+
+  async cardComplete(
+    projectId: string,
+    number: number,
+    actor: PlanActor,
+  ): Promise<void> {
+    const owner = await this.cardOwner(projectId, number);
+    await this.stacks.assertStackApproved(owner.target.id);
+    await this.completeOf(owner, actor);
   }
 
   /**
@@ -344,6 +375,14 @@ export class DesignService implements OnModuleInit {
     await this.reviseOf(await this.stackOwner(projectId, number), actor);
   }
 
+  async stackComplete(
+    projectId: string,
+    number: number,
+    actor: PlanActor,
+  ): Promise<void> {
+    await this.completeOf(await this.stackOwner(projectId, number), actor);
+  }
+
   async stackComment(
     projectId: string,
     number: number,
@@ -403,6 +442,28 @@ export class DesignService implements OnModuleInit {
     ) {
       throw approvedAlready();
     }
+    if (request.templateKey !== undefined) {
+      if (existing?.status === 'approved') throw approvedAlready();
+      if (
+        !(
+          await projectDesignTemplateKeys(this.prisma, owner.projectId)
+        ).includes(request.templateKey)
+      ) {
+        throw designError(
+          400,
+          DESIGN_ERROR.invalidArgs,
+          'templateKey is not a design template of this project',
+        );
+      }
+    }
+    // A plan task's and a stack's template live on the design (#833 D8).
+    const template =
+      request.templateKey !== undefined && !('cardId' in owner.key)
+        ? {
+            templateKey: request.templateKey,
+            templateSource: 'person' as const,
+          }
+        : {};
     const skills =
       request.skills !== undefined
         ? { skills: request.skills, skillsEdited: true }
@@ -420,6 +481,7 @@ export class DesignService implements OnModuleInit {
             ...(request.variantCount !== undefined
               ? { variantCount: request.variantCount }
               : {}),
+            ...template,
             ...skills,
           },
         })
@@ -428,9 +490,20 @@ export class DesignService implements OnModuleInit {
             ...owner.key,
             needed: request.needed ?? false,
             variantCount: request.variantCount ?? 1,
+            ...template,
             ...skills,
           },
         });
+    // A card's template is the card's own (D8): the person's choice there.
+    if (request.templateKey !== undefined && 'cardId' in owner.key) {
+      await this.prisma.boardCard.update({
+        where: { id: owner.key.cardId },
+        data: {
+          designTemplate: request.templateKey,
+          designTemplateSource: 'person',
+        },
+      });
+    }
     await owner.gate(design);
     const before = existing?.needed ?? false;
     if (design.needed !== before) {
@@ -612,6 +685,9 @@ export class DesignService implements OnModuleInit {
       },
       result: 'ok',
     });
+    // #752 A1: the profile learns from it in the background; queuing never
+    // fails the approval, and the approval never waits on the learn.
+    await this.learner.request(design.id, revision.id);
     owner.publish();
     await owner.onApproved(approved, actor);
   }
@@ -812,6 +888,73 @@ export class DesignService implements OnModuleInit {
     });
   }
 
+  /**
+   * #833 D7: Complete — the repair turn by hand, for every variant whose
+   * latest revision does not follow its template. It draws from the profile
+   * those revisions were drawn from: a repair fixes the frames, not the style.
+   */
+  private async completeOf(
+    owner: DesignOwner,
+    actor: PlanActor,
+  ): Promise<void> {
+    const design = await this.drawable(owner);
+    const revisions = await this.prisma.designRevision.findMany({
+      where: { designId: design.id, archived: false },
+      orderBy: { revision: 'desc' },
+      select: { id: true, variant: true, conformance: true },
+    });
+    const latest = new Map<number, (typeof revisions)[number]>();
+    for (const r of revisions)
+      if (!latest.has(r.variant)) latest.set(r.variant, r);
+    const off = [...latest.values()].filter(
+      (r) => conformanceOfRow(r.conformance)?.ok === false,
+    );
+    const batch = completeBatchOf(
+      off.map((r) => r.variant),
+      design.profileId,
+    );
+    if (!batch) {
+      throw designError(
+        409,
+        DESIGN_ERROR.invalidArgs,
+        'Every variant follows its template; there is nothing to complete',
+      );
+    }
+    await owner.assertIdle();
+    const project = await this.store.project(owner.projectId);
+    this.commands.assertServed(
+      project.runnerId,
+      RUNNER_FEATURE_COMMANDS.design,
+    );
+    const claimed = await this.prisma.taskDesign.updateMany({
+      where: { id: design.id, status: design.status },
+      data: { status: busyStatusOf('revise'), busySince: new Date() },
+    });
+    if (claimed.count === 0) throw busy();
+    owner.publish();
+    let turnId: string;
+    try {
+      turnId = await owner.runTurn(batch, callerOf(actor));
+    } catch (error) {
+      await settleDesign(this.prisma, owner.key);
+      owner.publish();
+      throw error;
+    }
+    await this.audit.record({
+      ...actor.ctx,
+      action: 'design.completed',
+      target: owner.target,
+      projectId: owner.projectId,
+      after: {
+        ...owner.label,
+        revisions: off.map((r) => r.id),
+        variants: off.map((r) => r.variant),
+        turnId,
+      },
+      result: 'ok',
+    });
+  }
+
   /** A design that takes a Generate or a Revise now. */
   private async drawable(owner: DesignOwner): Promise<TaskDesign> {
     const design = await this.designOf(owner);
@@ -866,7 +1009,7 @@ export class DesignService implements OnModuleInit {
       key: { planId: plan.id, taskKey: key },
       projectId: plan.projectId,
       target: { type: 'plan', id: plan.id },
-      label: { key },
+      label: { task: key },
       gate: async (design) => {
         status = await this.gateTask(task, design);
       },

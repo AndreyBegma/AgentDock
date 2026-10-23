@@ -1,5 +1,5 @@
-import { createHash, randomBytes } from 'node:crypto';
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import {
@@ -14,7 +14,7 @@ import {
   attachmentContentPath,
   attachmentDisplayName,
   type CardAttachmentBrief,
-  detectAttachmentMime,
+  detectScannedAttachmentMime,
   isAttachmentMime,
   type Role,
 } from '@nautelle/shared';
@@ -29,6 +29,7 @@ import {
 import type { Attachment, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
+import { hiddenFrom } from '../board/inbox-access';
 import { PrismaService } from '../database/prisma.service';
 import {
   bearerToken,
@@ -46,6 +47,7 @@ import {
   type AttachmentsOptions,
 } from './attachments-options';
 import { ATTACHMENT_ID_PATTERN } from './dto';
+import { type ScannedUpload, scanBytes } from './upload-storage';
 
 type Db = PrismaService | Prisma.TransactionClient;
 
@@ -56,11 +58,13 @@ export interface AttachmentActor {
   ctx: AuditContext;
 }
 
-/** What multer's disk storage hands the upload route (D12). */
-export interface UploadedAttachment {
+/**
+ * What `TempFileStorage` hands the upload route (D12): the temporary file,
+ * and what was learned of its bytes while they streamed to it (#156).
+ */
+export interface UploadedAttachment extends ScannedUpload {
   originalname: string;
   path: string;
-  size: number;
 }
 
 const UPLOADER = {
@@ -84,9 +88,6 @@ const mimeOf = (row: Attachment): AttachmentMime => {
   }
   return row.mime;
 };
-
-const sha256 = (bytes: Uint8Array): string =>
-  createHash('sha256').update(bytes).digest('hex');
 
 /** One card's attachments as the board needs them (#309 D9, D10). */
 export interface CardAttachments {
@@ -150,9 +151,11 @@ export class AttachmentsService {
 
   /**
    * `POST /attachments` (D3, D4, D5, D12): checks the uploaded temporary file
-   * by its content, then stores it pending — bound to the project and the
-   * uploader until a card claims it. The quota is checked under a per-project
-   * lock, so concurrent uploads cannot both squeeze under it.
+   * by its content — scanned while it streamed, never read back whole (#156)
+   * — then stores it pending, bound to the project and the uploader until a
+   * card claims it. The uploader's pending bytes (#156) and the project's
+   * quota are checked under per-user and per-project locks, so concurrent
+   * uploads cannot both squeeze under either.
    */
   async upload(
     projectId: string,
@@ -164,10 +167,8 @@ export class AttachmentsService {
     }
     try {
       if (file.size > ATTACHMENT_MAX_BYTES) throw this.tooLarge();
-      const bytes = new Uint8Array(await readFile(file.path));
-      if (bytes.byteLength > ATTACHMENT_MAX_BYTES) throw this.tooLarge();
       const name = attachmentDisplayName(file.originalname);
-      const mime = detectAttachmentMime(bytes, file.originalname);
+      const mime = detectScannedAttachmentMime(file, file.originalname);
       if (mime === null) {
         throw attachmentRefused(
           ATTACHMENT_REFUSAL.unsupportedType,
@@ -176,12 +177,16 @@ export class AttachmentsService {
       }
       const now = new Date();
       const row = await this.prisma.$transaction(async (tx) => {
+        // Always the user's lock before the project's: no lock-order deadlock.
+        if (actor.userId !== null) {
+          await this.assertPendingRoom(tx, actor.userId, file.size, now);
+        }
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attachments-quota:${projectId}`}))`;
         const used = await tx.attachment.aggregate({
           where: { projectId },
           _sum: { size: true },
         });
-        const total = (used._sum.size ?? 0) + bytes.byteLength;
+        const total = (used._sum.size ?? 0) + file.size;
         if (total > this.options.projectQuotaBytes) {
           throw attachmentRefused(
             ATTACHMENT_REFUSAL.quotaExceeded,
@@ -194,8 +199,8 @@ export class AttachmentsService {
             uploaderId: actor.userId,
             name,
             mime,
-            size: bytes.byteLength,
-            sha256: sha256(bytes),
+            size: file.size,
+            sha256: file.sha256,
             expiresAt: new Date(now.getTime() + ATTACHMENT_PENDING_TTL_MS),
             createdAt: now,
           },
@@ -222,6 +227,37 @@ export class AttachmentsService {
   }
 
   /**
+   * #156: refuses with 413 when the user's unclaimed, unexpired uploads — in
+   * any project — and this one would hold more than `userPendingBytes`, so
+   * one member cannot fill the project's quota with uploads no card claims.
+   */
+  private async assertPendingRoom(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    adding: number,
+    now: Date,
+  ): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attachments-pending:${userId}`}))`;
+    const pending = await tx.attachment.aggregate({
+      where: {
+        uploaderId: userId,
+        cardId: null,
+        planId: null,
+        expiresAt: { gt: now },
+      },
+      _sum: { size: true },
+    });
+    if ((pending._sum.size ?? 0) + adding > this.options.userPendingBytes) {
+      throw new AttachmentFailure(
+        413,
+        ATTACHMENT_ERROR.attachmentError,
+        'You have too many uploads not yet attached to a card',
+        ATTACHMENT_REFUSAL.pendingExceeded,
+      );
+    }
+  }
+
+  /**
    * #594: `upload` for bytes that did not come through the upload route — a
    * Telegram photo. They go through the same temporary file, checks and quota.
    */
@@ -239,7 +275,7 @@ export class AttachmentsService {
     await writeFile(path, bytes, { flag: 'wx' });
     return this.upload(
       projectId,
-      { originalname: name, path, size: bytes.byteLength },
+      { originalname: name, path, ...scanBytes(bytes) },
       actor,
     );
   }
@@ -253,17 +289,24 @@ export class AttachmentsService {
 
   /**
    * `GET …/content` (D8): any member reads a claimed attachment; a pending
-   * one is its uploader's alone until a card claims it.
+   * one is its uploader's alone until a card claims it. An Inbox card's is
+   * only an operator's (#244 D8).
    */
   async content(
     projectId: string,
     id: string,
     userId: string,
+    role: Role,
   ): Promise<AttachmentContent> {
     const row = await this.prisma.attachment.findFirst({
       where: { id, projectId },
+      include: { card: { select: { column: true } } },
     });
-    if (!row || (row.cardId === null && row.uploaderId !== userId)) {
+    if (
+      !row ||
+      (row.cardId === null && row.uploaderId !== userId) ||
+      (row.card && hiddenFrom(row.card, role))
+    ) {
       throw attachmentNotFound();
     }
     return this.bytesOf(row);

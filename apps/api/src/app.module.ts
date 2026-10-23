@@ -17,6 +17,8 @@ import { CaptureModule } from './capture';
 import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
 import { DesignModule } from './design/design.module';
+import { UiProfileLearnModule } from './design/learn/learn.module';
+import { DesignTemplatesModule } from './design-templates/design-templates.module';
 import { FleetModule } from './fleet';
 import { GitHubAppModule } from './github-app';
 import { HandoffModule } from './handoff';
@@ -28,6 +30,7 @@ import { LocalModule } from './local';
 import { NotificationsModule } from './notifications';
 import { PaneModule } from './pane';
 import { PlannerModule } from './planner';
+import { PrefixModule } from './prefix/prefix.module';
 import { PricesModule } from './prices/prices.module';
 import { ProjectRulesModule } from './project-rules';
 import { ProjectsModule } from './projects/projects.module';
@@ -44,6 +47,7 @@ import { TelegramModule } from './telegram';
 import { TerminalModule } from './terminal';
 import { TerminalSetupModule } from './terminal-setup';
 import { TextModule } from './text';
+import { TokenEconomyModule } from './token-economy';
 import { TokenSaverModule } from './token-saver';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
@@ -89,6 +93,8 @@ import { WorkflowsModule } from './workflows';
     ReadinessModule,
     // Spec 223: the design stage, on top of the Planner.
     DesignModule,
+    // Issue #833: a project's design frame templates.
+    DesignTemplatesModule,
     // Issue #242: the project Board and its card workers.
     BoardModule,
     // Issue #244: candidate cards from manual sessions, into the Inbox.
@@ -99,6 +105,8 @@ import { WorkflowsModule } from './workflows';
     TextModule,
     // Issue #445: Token saver. Global: every launch sender asks it what to send.
     TokenSaverModule,
+    // Issue #746: Token economy — A/B per technique, usage facts, the report.
+    TokenEconomyModule,
     // Issue #447: Steward — incidents, safe automatic fixes, escalation.
     StewardModule,
     // Issue #449: Context handoff — note copies, person edits, restarts.
@@ -106,6 +114,12 @@ import { WorkflowsModule } from './workflows';
     // Issue #322: a card's model recommended on the runner. Global, and here
     // alone: its conditional queue must not be registered while the graph loads.
     AssessModule,
+    // Issue #752: the UI profile learns from approvals. Global, and here alone,
+    // for the same reason.
+    UiProfileLearnModule,
+    // Issue #751: the launch prefix — measurement, overlays, compressed rules.
+    // Global, and here alone, for the same reason.
+    PrefixModule,
     // Issue #309: attachments on board cards. Global, and `forRoot()` here:
     // its conditional queue must not be registered while the graph loads.
     AttachmentsModule.forRoot(),

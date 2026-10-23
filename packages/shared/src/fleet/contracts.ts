@@ -63,6 +63,12 @@ export interface SlotSummary {
   ahead: number | null;
   behind: number | null;
   dirty: boolean | null;
+  /**
+   * #741: the limit its quota banner names and when it resets (ISO-8601), set
+   * while the slot waits on the banner. Optional so older fixtures stay valid.
+   */
+  quotaLimit?: string | null;
+  quotaResetsAt?: string | null;
   startedAt: string;
   endedAt: string | null;
   updatedAt: string;

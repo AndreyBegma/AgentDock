@@ -8,6 +8,7 @@ const user = (id: string, role: AuthUser['role']): AuthUser => ({
   name: null,
   role,
   status: 'active',
+  twoFactorEnabled: false,
 });
 
 describe('cookieFrom', () => {

@@ -108,6 +108,26 @@ describe('maskText', () => {
       roundTrip(text);
     }
   });
+
+  it('splits a path at a slash only after a path character', () => {
+    expect(maskText('see a./b now').spans).toEqual([]);
+    expect(maskText('see a./b/c, now').spans).toEqual(['a./b/c']);
+  });
+
+  // WI-61: these runs made a pattern rescan the text from every position
+  // inside them — seconds on 100 KB.
+  it.each([
+    ['a run of letters', 'a'.repeat(100_000)],
+    ['a run of scheme characters', 'a-+'.repeat(33_334)],
+    ['a run of e-mail characters', 'a%'.repeat(50_000)],
+    ['a path that never ends cleanly', ` ${'a/'.repeat(50_000)}é`],
+    ['a path split after punctuation', ` ${'a./'.repeat(33_334)}é`],
+    ['an unclosed placeholder run', '⟦'.repeat(100_000)],
+  ])('masks %s of 100 KB in under 50 ms', (_, text) => {
+    const started = performance.now();
+    roundTrip(text);
+    expect(performance.now() - started).toBeLessThan(50);
+  });
 });
 
 describe('checkPlaceholders', () => {

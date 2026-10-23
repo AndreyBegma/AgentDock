@@ -7,6 +7,7 @@ import {
   cardAutoMergeDefault,
   cardAutoMergeEnabled,
   cardCiChecksOf,
+  cardCiMergeable,
   cardCiStateOf,
   cardDraftPullRequest,
   cardFollowUpBranch,
@@ -62,6 +63,36 @@ describe('cardCiStateOf (#359 D5)', () => {
   });
 });
 
+describe('cardCiMergeable (C-182)', () => {
+  it('is false without checks', () => {
+    expect(cardCiMergeable([])).toBe(false);
+  });
+
+  it('is false with a cancelled or skipped check, though the state is green', () => {
+    const cancelled = [check('a', 'pass'), check('b', 'cancel')];
+    const skipped = [check('a', 'pass'), check('b', 'skipping')];
+    expect(cardCiStateOf(cancelled)).toBe('green');
+    expect(cardCiMergeable(cancelled)).toBe(false);
+    expect(cardCiStateOf(skipped)).toBe('green');
+    expect(cardCiMergeable(skipped)).toBe(false);
+  });
+
+  it('is false while a check runs or after one failed', () => {
+    expect(cardCiMergeable([check('a', 'pass'), check('b', 'pending')])).toBe(
+      false,
+    );
+    expect(cardCiMergeable([check('a', 'pass'), check('b', 'fail')])).toBe(
+      false,
+    );
+  });
+
+  it('is true when every check passed', () => {
+    expect(cardCiMergeable([check('a', 'pass'), check('b', 'pass')])).toBe(
+      true,
+    );
+  });
+});
+
 describe('failedCardChecks and cardCiChecksOf (#359 D5)', () => {
   it('keeps the failed checks, name and link, in order and bounded', () => {
     const checks = [
@@ -97,10 +128,10 @@ describe('failedCardChecks and cardCiChecksOf (#359 D5)', () => {
 });
 
 describe('auto-merge default (#359 D7)', () => {
-  it('is on for develop and off for main or master', () => {
-    expect(cardAutoMergeDefault('develop')).toBe(true);
-    expect(cardAutoMergeDefault('main')).toBe(false);
-    expect(cardAutoMergeDefault('master')).toBe(false);
+  it('is on for an integration base and off for the default branch', () => {
+    expect(cardAutoMergeDefault('develop', 'main')).toBe(true);
+    expect(cardAutoMergeDefault('main', 'main')).toBe(false);
+    expect(cardAutoMergeDefault('master', 'master')).toBe(false);
   });
 
   it('follows the repository default branch when it is known', () => {
@@ -108,8 +139,19 @@ describe('auto-merge default (#359 D7)', () => {
     expect(cardAutoMergeDefault('main', 'trunk')).toBe(true);
   });
 
+  // C-148: a default branch not named main is no longer missed by name.
+  it('is off for a trunk default with base trunk', () => {
+    expect(cardAutoMergeDefault('trunk', 'trunk')).toBe(false);
+  });
+
+  it('is off while the default branch is unknown', () => {
+    expect(cardAutoMergeDefault('develop')).toBe(false);
+    expect(cardAutoMergeDefault('develop', null)).toBe(false);
+    expect(cardAutoMergeEnabled(null, 'develop', null)).toBe(false);
+  });
+
   it('the stored switch wins over the default', () => {
-    expect(cardAutoMergeEnabled(null, 'develop')).toBe(true);
+    expect(cardAutoMergeEnabled(null, 'develop', 'main')).toBe(true);
     expect(cardAutoMergeEnabled(false, 'develop')).toBe(false);
     expect(cardAutoMergeEnabled(true, 'main')).toBe(true);
   });

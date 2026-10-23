@@ -75,19 +75,31 @@ const TAIL = '[^\\s()\\[\\]{}<>"\'`.,;:!?]';
 const PATH_CHAR = '[A-Za-z0-9_.~:@%+=,;!?#$&*^|\\/\\\\-]';
 /** Not the last character of a path: sentence punctuation. */
 const PATH_TAIL = '[A-Za-z0-9_~@%+=#$&*^|\\/\\\\-]';
+/** A path character other than a slash. */
+const PATH_PLAIN = '[A-Za-z0-9_.~:@%+=,;!?#$&*^|-]';
+/** A slash a path may split at: not right after sentence punctuation. */
+const PATH_SLASH = '(?<![.:,;!?])[\\/\\\\]';
 
+/*
+ * WI-61: no pattern may rescan a long run from every position inside it, or
+ * 100 KB of text stalls the event loop. A URL scheme and an e-mail address
+ * start only where their run of characters does (a lookbehind); a placeholder
+ * holds no `⟦`; a path takes everything before its first slash it may split
+ * at in one piece (a lookahead read back with `\k`), so a path that fails is
+ * not retried at every earlier slash.
+ */
 const SPAN_PATTERNS = [
   // Inline code.
   '``[^\\n]+?``',
   '`[^`\\n]+`',
   // A placeholder-shaped text already in the input.
-  '⟦[^⟧\\n]*⟧',
+  '⟦[^⟦⟧\\n]*⟧',
   // URLs.
-  `(?:[A-Za-z][A-Za-z0-9+.-]*://|www\\.)(?:${TOKEN}*${TAIL})?`,
+  `(?:(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*://|www\\.)(?:${TOKEN}*${TAIL})?`,
   // E-mail addresses.
-  `${B}[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}${E}`,
+  `(?<![\\p{L}\\p{N}_.%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}${E}`,
   // Paths: an ASCII token holding a slash or a backslash.
-  `(?<![^\\s(\\[{<"'])(?:${PATH_CHAR}*${PATH_TAIL})?[\\/\\\\](?:${PATH_CHAR}*${PATH_TAIL})?(?![^\\s()\\[\\]{}<>"'\`.,;:!?])`,
+  `(?<![^\\s(\\[{<"'])(?=(?<pathHead>(?:${PATH_PLAIN}*[.:,;!?][\\/\\\\])*${PATH_PLAIN}*))\\k<pathHead>${PATH_SLASH}(?:${PATH_CHAR}*${PATH_TAIL})?(?![^\\s()\\[\\]{}<>"'\`.,;:!?])`,
   // Dotfiles: `.env`, `.github`.
   `(?<![^\\s(\\[{<"'])\\.[A-Za-z0-9][A-Za-z0-9_.-]*[A-Za-z0-9]`,
   // References: #123, C-12.

@@ -138,7 +138,15 @@ steps:
           fi
         done
       # A block scalar: the message's ': ' would make a plain item a map.
+      # npm processes a new version for a few minutes after publish, and
+      # deprecate answers "No version found" (a warning, exit 0) until it is
+      # visible, so wait for the version and fail the step if it never shows.
       - |
+        for i in $(seq 1 40); do
+          if npm view "agentdock-runner@$${version}" version >/dev/null 2>&1; then break; fi
+          sleep 15
+        done
+        npm view "agentdock-runner@$${version}" version >/dev/null 2>&1 || { echo "agentdock-runner@$${version} never became visible; deprecate it by hand"; exit 1; }
         npm deprecate "agentdock-runner@$${version}" 'Renamed to nautelle-runner: npm i -g nautelle-runner (ADR-0073)'
 
   - name: homebrew-tap

@@ -101,6 +101,32 @@ describe('card.run args', () => {
     ).toBe(false);
   });
 
+  // C-148 (L-31): a card branch may not name the default branch.
+  it('refuses a branch without a card prefix', () => {
+    for (const branch of [
+      'main',
+      'master',
+      'trunk',
+      'develop',
+      'card/',
+      'release/1.0',
+      'cards/x',
+    ]) {
+      expect(cardRunArgsSchema.safeParse({ ...runArgs, branch }).success).toBe(
+        false,
+      );
+    }
+    for (const branch of [
+      'card/c12-add-login',
+      'feat/34-login',
+      'fix/34-login',
+    ]) {
+      expect(cardRunArgsSchema.safeParse({ ...runArgs, branch }).success).toBe(
+        true,
+      );
+    }
+  });
+
   it('bounds the prompt in bytes and refuses NUL', () => {
     expect(
       cardRunArgsSchema.safeParse({
@@ -236,6 +262,37 @@ describe('card.stop, card.collect, card.close', () => {
     expect(
       cardCollectArgsSchema.safeParse({ ...args, number: 0 }).success,
     ).toBe(false);
+    // C-148: a worktree collect pushes a card branch only.
+    const unprefixed = cardCollectArgsSchema.safeParse({
+      ...args,
+      branch: 'main',
+    });
+    expect(unprefixed.success).toBe(false);
+    expect(unprefixed.error?.issues[0]?.path).toEqual(['branch']);
+  });
+
+  it('collect of a terminal session keeps its own branch name (C-148)', () => {
+    expect(
+      cardCollectArgsSchema.safeParse({
+        ...target,
+        root: '/home/me/app',
+        base: 'develop',
+        branch: 'my-work',
+        cwd: '/home/me/app',
+        number: 12,
+        title: 'Mine',
+        body: '',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('collect reports the protected paths it pushed (C-148)', () => {
+    const parsed = cardCollectResultSchema.safeParse({
+      ahead: 1,
+      pushed: true,
+      protectedPaths: ['.woodpecker/pipeline.yml'],
+    });
+    expect(parsed.data?.protectedPaths).toEqual(['.woodpecker/pipeline.yml']);
   });
 
   it('collect takes a terminal session cwd (#282 D3): absolute only, never on the base', () => {

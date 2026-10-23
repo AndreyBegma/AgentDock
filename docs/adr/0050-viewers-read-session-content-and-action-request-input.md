@@ -18,4 +18,5 @@ ADR-0021 §5 and `docs/architecture/security.md` said session content is readabl
 ## Consequences
 
 - Viewers can read prompts and code excerpts that survived redaction; redaction is pattern-based, so the project setting's help text keeps its warning.
-- Code, tests and documents now state one policy.
+- Code, tests and documents now state one policy. Card C-154 pins it with an e2e test per read path — session content, live panes, command-run `args`, slot conversations, skill-run args, report and patch, schedule target args, plan-turn input and result, and an accepted card's `captureWhy` — each showing a viewer reads the content and a non-member gets 404.
+- The one read a viewer does not get is the board's Inbox: it is the triage queue only operators act on (ADR-0026 §6), not a content rule. Once accepted, a card and its `captureWhy` are visible to every member.

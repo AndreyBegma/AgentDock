@@ -17,9 +17,11 @@ import type { Env } from '../env';
 import { resolveFleetProject } from '../fleet/project';
 import {
   type TextCallLaunchOptions,
+  textCallArgs,
   textCallTokenSaver,
 } from '../launch/token-saver';
 import { errorMessage, type Logger } from '../log';
+import type { OtlpEndpoint } from '../otlp/token';
 import { redact } from '../pane/redact';
 import { cutBytes } from '../planner/result';
 import { profileOf, type SkillsDeps } from '../skills/deps';
@@ -62,6 +64,35 @@ export type CaptureSpawn = (spec: {
   stdinFile: string;
 }) => CaptureProcess;
 
+/**
+ * The most of stdout kept: the final `result` message, at most
+ * `CAPTURE_RESULT_MAX_BYTES` of text, is its last line, so a tail this long
+ * holds it with room to spare. stderr is only read for its last line.
+ */
+export const CAPTURE_STDOUT_MAX_BYTES = 8 * 1024 * 1024;
+export const CAPTURE_STDERR_MAX_BYTES = 64 * 1024;
+
+/**
+ * The last `maxBytes` of `stream`, as text: whatever came before is dropped as
+ * it arrives, so a child that writes without end never grows the runner.
+ */
+export const readTail = async (
+  stream: ReadableStream<Uint8Array>,
+  maxBytes: number,
+): Promise<string> => {
+  const chunks: Uint8Array[] = [];
+  let held = 0;
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+    held += chunk.length;
+    while (held - (chunks[0]?.length ?? 0) >= maxBytes) {
+      held -= chunks.shift()?.length ?? 0;
+    }
+  }
+  const all = Buffer.concat(chunks);
+  return all.subarray(Math.max(0, all.length - maxBytes)).toString('utf8');
+};
+
 export const bunSpawn: CaptureSpawn = ({ command, cwd, env, stdinFile }) => {
   const proc = Bun.spawn([...command], {
     cwd,
@@ -72,8 +103,8 @@ export const bunSpawn: CaptureSpawn = ({ command, cwd, env, stdinFile }) => {
   });
   return {
     exited: proc.exited.then((code) => (proc.signalCode ? null : code)),
-    stdout: new Response(proc.stdout).text(),
-    stderr: new Response(proc.stderr).text(),
+    stdout: readTail(proc.stdout, CAPTURE_STDOUT_MAX_BYTES),
+    stderr: readTail(proc.stderr, CAPTURE_STDERR_MAX_BYTES),
     kill: () => proc.kill('SIGKILL'),
   };
 };
@@ -86,7 +117,7 @@ export interface CaptureExecutorOptions extends TextCallLaunchOptions {
   env: Env;
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   spawn?: CaptureSpawn;
 }
 
@@ -193,12 +224,9 @@ export class CaptureExecutor {
     for (const [key, value] of Object.entries(this.options.env)) {
       if (value !== undefined) env[key] = value;
     }
-    Object.assign(
-      env,
-      runEnv(profile, args, this.options.otlpPort?.() ?? null),
-    );
+    Object.assign(env, runEnv(profile, args, this.options.otlp?.() ?? null));
     Object.assign(env, HOOKS_OFF_ENV);
-    // #445: off or absent launches exactly as before.
+    // #445: off or absent launches without the filter; C-179: never with an MCP server.
     const tokenSaver = textCallTokenSaver(
       this.options,
       profile,
@@ -214,7 +242,7 @@ export class CaptureExecutor {
         command: [
           profile.binary ?? profile.runtime,
           ...profile.args,
-          ...(tokenSaver?.args ?? []),
+          ...textCallArgs(tokenSaver),
           ...CAPTURE_CLAUDE_FLAGS,
           '--model',
           args.model,

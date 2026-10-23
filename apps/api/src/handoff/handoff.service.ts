@@ -77,7 +77,10 @@ export class HandoffService {
     if (!card.project.shipSessionContent) {
       return { shipContent: false, note: null };
     }
-    return { shipContent: true, note: viewOf(await this.rowOf(card.id)) };
+    return {
+      shipContent: true,
+      note: viewOf(await this.rowOf(projectId, card.id)),
+    };
   }
 
   /**
@@ -104,8 +107,8 @@ export class HandoffService {
     if (!validation.ok) throw this.invalid(validation.reasons);
     this.assertServes(card.project.runnerId, card.project.runner.capabilities);
 
-    const key = { subjectKind: 'card' as const, subjectId: card.id };
-    const prevRow = await this.rowOf(card.id);
+    const key = { projectId, subjectKind: 'card' as const, subjectId: card.id };
+    const prevRow = await this.rowOf(projectId, card.id);
     const prev = prevRow ? storedNoteOf(prevRow) : null;
     if (prevRow && !prev) {
       this.logger.error(
@@ -126,8 +129,8 @@ export class HandoffService {
       updatedBy: 'person' as const,
     };
     const stored = await this.prisma.handoffNote.upsert({
-      where: { subjectKind_subjectId: key },
-      create: { ...key, projectId, ...fields },
+      where: { projectId_subjectKind_subjectId: key },
+      create: { ...key, cardId: card.id, ...fields },
       update: fields,
       select: NOTE_SELECT,
     });
@@ -211,10 +214,14 @@ export class HandoffService {
     return card;
   }
 
-  private rowOf(cardId: string): Promise<NoteRow | null> {
+  private rowOf(projectId: string, cardId: string): Promise<NoteRow | null> {
     return this.prisma.handoffNote.findUnique({
       where: {
-        subjectKind_subjectId: { subjectKind: 'card', subjectId: cardId },
+        projectId_subjectKind_subjectId: {
+          projectId,
+          subjectKind: 'card',
+          subjectId: cardId,
+        },
       },
       select: NOTE_SELECT,
     });

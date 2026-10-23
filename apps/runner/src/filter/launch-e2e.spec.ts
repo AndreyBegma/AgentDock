@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { FilterStatRow } from '@nautelle/shared';
-import type { UnsequencedEvent } from '@nautelle/shared/protocol';
+import { FILTER_STATS_EVENT, type FilterStatRow } from '@nautelle/shared';
+import {
+  PREFIX_MEASURED_EVENT,
+  type UnsequencedEvent,
+} from '@nautelle/shared/protocol';
 import { tokenSaverLaunch } from '../launch/token-saver';
 import { createLogger } from '../log';
 import { tempDir } from '../testing/fixtures';
@@ -59,6 +62,7 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
         os: 'linux',
         now: Date.now,
         rules: () => ({ allow: [], deny: [], ask: [] }),
+        managedPolicy: () => false,
       },
     );
     expect(
@@ -99,9 +103,14 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
       now: () => new Date(),
     });
     await reader.poll();
-    expect(events).toHaveLength(1);
-    expect(events[0]?.project?.repo).toBe('acme/prj_a');
-    const rows = (events[0]?.data as { rows: FilterStatRow[] }).rows;
+    // #751: the launch's prefix record goes out in the same pass.
+    expect(events.map((e) => e.type).sort()).toEqual([
+      FILTER_STATS_EVENT,
+      PREFIX_MEASURED_EVENT,
+    ]);
+    const stats = events.find((e) => e.type === FILTER_STATS_EVENT);
+    expect(stats?.project?.repo).toBe('acme/prj_a');
+    const rows = (stats?.data as { rows: FilterStatRow[] }).rows;
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       runId: 'run_1',
@@ -148,6 +157,7 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
         os: 'linux',
         now: Date.now,
         rules: () => ({ allow: [], deny: [], ask: [] }),
+        managedPolicy: () => false,
       },
     );
     const output = (JSON.parse(out) as HookOutput).hookSpecificOutput;
@@ -184,7 +194,10 @@ describe('Token saver, launch to stats row (#445 DR-02)', () => {
       now: () => new Date(),
     });
     await reader.poll();
-    const rows = (events[0]?.data as { rows: FilterStatRow[] }).rows;
+    // #751: the run dir's prefix record is sent in the same pass, in
+    // directory order — pick the stats batch by type.
+    const stats = events.find((e) => e.type === FILTER_STATS_EVENT);
+    const rows = (stats?.data as { rows: FilterStatRow[] }).rows;
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       runKind,

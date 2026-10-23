@@ -227,11 +227,13 @@ export const stewardRunnerConfigOf = (
 
 /**
  * The attribution lines that stop a card's push. Matched per line and
- * case-insensitively, as git trailers are written either way.
+ * case-insensitively, as git trailers are written either way. Indentation is
+ * `[ \t]*`, never `\s*`: `\s` also matches newlines, and a message of many
+ * blank lines then costs quadratic time in the push guard (DA-06).
  */
 export const STEWARD_TRAILER_PATTERNS: readonly RegExp[] = [
-  /^\s*Co-Authored-By:\s*Claude\b/im,
-  /^\s*Claude-Session:/im,
+  /^[ \t]*Co-Authored-By:[ \t]*Claude\b/im,
+  /^[ \t]*Claude-Session:/im,
   /Generated with \[?Claude Code\]?/i,
 ];
 

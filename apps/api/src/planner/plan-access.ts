@@ -12,6 +12,20 @@ export const readablePlanWhere = (userId: string): Prisma.PlanWhereInput => ({
   OR: [{ authorId: userId }, { visibility: 'project' }],
 });
 
+/**
+ * Runs the caller may see in history (L-24): every run but a turn of a plan
+ * `readablePlanWhere` hides. A card's or a stack's design turn has no plan and
+ * stays visible. Usage applies the same rule in SQL (`UsageQueryService`).
+ */
+export const readableRunWhere = (userId: string): Prisma.RunWhereInput => ({
+  OR: [
+    { kind: { not: 'plan' } },
+    { planTurn: { is: null } },
+    { planTurn: { is: { planId: null } } },
+    { planTurn: { is: { plan: { is: readablePlanWhere(userId) } } } },
+  ],
+});
+
 /** One plan of a project, if the caller may read it. */
 export const readablePlan = (
   userId: string,

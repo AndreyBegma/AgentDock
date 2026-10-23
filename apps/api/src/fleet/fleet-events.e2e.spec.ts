@@ -482,9 +482,10 @@ describe('fleet from events.jsonl (e2e)', () => {
       s.prNumber,
       s.prChecks,
     ]);
+    // The plugin's rollup is advisory: checks come from the runner's `gh` (C-169).
     expect(listed.sort()).toEqual([
       ['i42', 'opus', 'plan_ready', null, null],
-      ['i43', 'sonnet', 'pr_open', 51, 'green'],
+      ['i43', 'sonnet', 'pr_open', 51, null],
     ]);
     expect(await runs('i40')).toBe(0);
     expect((await detail('i42')).startedAt).toBe(at(4));

@@ -11,17 +11,24 @@ import {
   type OtlpLogRecord,
 } from './decode';
 import { type EnvelopeProject, mapLogRecords, recordProjectId } from './map';
+import { OTLP_TOKEN_HEADER, type OtlpEndpoint, tokenMatches } from './token';
 
 /** D16: a request body larger than this is refused, compressed or inflated. */
 export const MAX_BODY_BYTES = 4 * 1024 * 1024;
 /** D11: loopback only, always. The port is the only thing configuration picks. */
 export const OTLP_HOST = '127.0.0.1';
 export const DEFAULT_OTLP_HTTP_PORT = 4318;
+/** L-30: a logs request with more records than this is refused whole. */
+export const MAX_RECORDS_PER_REQUEST = 5000;
 
 const PROTOBUF = 'application/x-protobuf';
 const JSON_TYPE = 'application/json';
 
 export interface ReceiverDeps {
+  /** The port it listens on; the only one a `Host` header may name (L-30). */
+  port: number;
+  /** L-30: the token every request carries in `x-nautelle-otlp-token`. */
+  token: string;
   emit: (event: UnsequencedEvent) => void;
   /** Envelope projects for the `agentdock.project` ids of one request (D14). */
   projects: (ids: Iterable<string>) => Promise<Map<string, EnvelopeProject>>;
@@ -128,8 +135,17 @@ const projectIds = (
 };
 
 /**
+ * L-30: `127.0.0.1:<port>` or `localhost:<port>` only, so a page that
+ * rebinds its own name to 127.0.0.1 is refused.
+ */
+const hostAllowed = (host: string | null, port: number): boolean =>
+  host !== null &&
+  [`${OTLP_HOST}:${port}`, `localhost:${port}`].includes(host.toLowerCase());
+
+/**
  * One OTLP/HTTP request (D11, D16). `peer` is the remote address; anything
- * but loopback is refused before the body is read.
+ * but loopback, another `Host` or a missing token is refused before the body
+ * is read (L-30).
  */
 export const handleOtlpRequest = async (
   request: Request,
@@ -137,6 +153,12 @@ export const handleOtlpRequest = async (
   deps: ReceiverDeps,
 ): Promise<Response> => {
   if (!isLoopback(peer)) return failure(403, 'loopback only');
+  if (!hostAllowed(request.headers.get('host'), deps.port)) {
+    return failure(421, 'unexpected host');
+  }
+  if (!tokenMatches(request.headers.get(OTLP_TOKEN_HEADER), deps.token)) {
+    return failure(401, `missing or wrong ${OTLP_TOKEN_HEADER}`);
+  }
   const { pathname } = new URL(request.url);
   const known =
     pathname === '/v1/logs' ||
@@ -174,6 +196,9 @@ export const handleOtlpRequest = async (
   } catch (error) {
     if (error instanceof OtlpDecodeError) return failure(400, error.message);
     throw error;
+  }
+  if (records.length > MAX_RECORDS_PER_REQUEST) {
+    return failure(413, `over ${MAX_RECORDS_PER_REQUEST} records`);
   }
 
   const projects = await deps.projects(projectIds(records, deps));
@@ -214,6 +239,12 @@ export class OtlpReceiver {
     return this.server?.port ?? null;
   }
 
+  /** The port and the token an exporter needs, once started (L-30). */
+  get endpoint(): OtlpEndpoint | null {
+    const port = this.port;
+    return port ? { port, token: this.options.token } : null;
+  }
+
   /** Binds the port. Throws when it cannot — the caller decides what then. */
   start(): number {
     const options = this.options;
@@ -223,11 +254,10 @@ export class OtlpReceiver {
       // Bun's own guard; the handler enforces the cap on streamed bodies too.
       maxRequestBodySize: MAX_BODY_BYTES,
       fetch: (request, srv) =>
-        handleOtlpRequest(
-          request,
-          srv.requestIP(request)?.address ?? null,
-          options,
-        ).catch((error: unknown) => {
+        handleOtlpRequest(request, srv.requestIP(request)?.address ?? null, {
+          ...options,
+          port: srv.port ?? options.port,
+        }).catch((error: unknown) => {
           options.log.error('otlp: request failed', {
             error: errorMessage(error),
           });

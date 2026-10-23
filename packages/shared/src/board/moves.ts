@@ -82,7 +82,9 @@ export interface BoardMoveInput {
   autoCollect?: boolean;
   /**
    * #282 D1: a `terminal` card's tracked session is alive — it is the
-   * worker, so no Run is offered. Default `false`.
+   * worker, so no Run is offered. #845 D10: the same for a card a manual
+   * session took (`card.take`), whatever its source; once that session is
+   * gone, Run is offered again. Default `false`.
    */
   trackingAlive?: boolean;
   /**
@@ -187,7 +189,7 @@ export const boardMoveRule = (move: BoardMoveInput): BoardMoveDecision => {
   const offerRun =
     source === 'person' &&
     cardSource !== 'fleet' &&
-    !(cardSource === 'terminal' && move.trackingAlive === true) &&
+    move.trackingAlive !== true &&
     to === 'in_progress' &&
     (from === 'todo' || from === 'finished') &&
     !active;

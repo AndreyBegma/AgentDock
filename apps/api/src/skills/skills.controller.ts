@@ -190,8 +190,9 @@ export class ProjectSkillsController {
   @Get('skill-runs/:runId')
   detail(
     @ProjectAccess() access: ResolvedProjectAccess,
+    @CurrentUser() user: AuthUser,
     @Param('runId') runId: string,
   ): Promise<SkillRunDetail> {
-    return this.skillRuns.detail(access.projectId, runId);
+    return this.skillRuns.detail(user.id, access.projectId, runId);
   }
 }

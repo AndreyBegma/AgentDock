@@ -10,7 +10,8 @@ import type { CaptureProcess, CaptureSpawn } from '../capture/executor';
 import { CAPTURE_CLAUDE_FLAGS } from '../capture/executor';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
-import { expectTextCallWired } from '../launch/testing';
+import { expectTextCallWired, strictMcpServersOf } from '../launch/testing';
+import { NO_MCP_ARGS } from '../launch/token-saver';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger, tempDir } from '../testing/fixtures';
 import { NormalizeExecutor } from './executor';
@@ -26,6 +27,7 @@ interface Call {
   env: Record<string, string>;
   stdin: string;
   dirExistedAtStart: boolean;
+  mcpServers: Record<string, unknown> | null;
 }
 
 interface Script {
@@ -58,6 +60,7 @@ const setup = (script: Script = { stdout: resultLine('ok') }) => {
       env: spec.env,
       stdin: readFileSync(spec.stdinFile, 'utf8'),
       dirExistedAtStart: existsSync(spec.cwd),
+      mcpServers: strictMcpServersOf(spec.command),
     });
     let finish: (code: number | null) => void = () => {};
     const exited = new Promise<number | null>((resolve) => {
@@ -158,6 +161,19 @@ describe('NormalizeExecutor — Token saver (#445)', () => {
     const call = t.calls[0] as Call;
     expectTextCallWired(call, call.cwd, 'text_normalize');
   });
+
+  it('loads no MCP server, with Token saver off or a non-empty allowlist (C-179)', async () => {
+    for (const tokenSaver of [
+      undefined,
+      { enabled: false, mcpAllow: ['playwright'] },
+      { enabled: true, mcpAllow: ['playwright'] },
+    ]) {
+      const t = setup();
+      await t.executor.run(t.args({ tokenSaver }));
+      await t.finished();
+      expect(t.calls[0]?.mcpServers).toEqual({});
+    }
+  });
 });
 
 describe('NormalizeExecutor (#271 D4)', () => {
@@ -170,6 +186,7 @@ describe('NormalizeExecutor (#271 D4)', () => {
     expect(call.command).toEqual([
       '/usr/bin/claude',
       '--strict-mcp-config',
+      ...NO_MCP_ARGS,
       ...CAPTURE_CLAUDE_FLAGS,
       '--model',
       'haiku',

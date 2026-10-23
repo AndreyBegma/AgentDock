@@ -7,6 +7,7 @@ import {
 } from './engine';
 import { switchedOffFamilies } from './env';
 import {
+  hasManagedPolicy,
   type PermissionRules,
   permissionFor,
   readRules,
@@ -80,6 +81,8 @@ export interface HookDeps {
   random?: () => number;
   /** The permission rules; read from the settings files by default. */
   rules?: (sources: SettingsSources) => PermissionRules | null;
+  /** Whether a managed policy exists (DR-06); checked on disk by default. */
+  managedPolicy?: (sources: SettingsSources) => boolean;
 }
 
 const WATCH_FLAGS = /^--(watch|watchAll|watch-all|hot|serve)(=.*)?$/;
@@ -197,6 +200,11 @@ export const decideHook = (
     projectDir: deps.env.CLAUDE_PROJECT_DIR || cwd,
     os: deps.os,
   };
+  // DR-06: a managed policy may hold rules the hook cannot read (MDM,
+  // server-delivered), so its mere presence leaves the command as written.
+  if ((deps.managedPolicy ?? hasManagedPolicy)(sources)) {
+    return leave('managed policy');
+  }
   const rules = (deps.rules ?? ((s) => readRules(settingsFiles(s))))(sources);
   if (!rules) return leave('unreadable settings');
   const verdict = permissionFor(rules, mode, command, parsed);

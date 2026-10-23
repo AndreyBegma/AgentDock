@@ -21,6 +21,11 @@ const profile: UiProfileVersionView = {
   runId: 'run-1',
   author: null,
   createdAt: '2026-10-14T10:00:00.000Z',
+  screens: [],
+  styleRules: [],
+  learnedFromRevisionId: null,
+  learnNotes: null,
+  designs: {},
 };
 
 describe('readProfileForm', () => {

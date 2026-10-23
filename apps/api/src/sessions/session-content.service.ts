@@ -60,13 +60,16 @@ export class SessionContentService {
   }
 
   /**
-   * Admin purge: every content row of the project, and what card capture
-   * derived from content (#244 D8): its Inbox cards and its capture rows.
-   * Accepted cards are the person's and stay, unlinked from their capture.
+   * Admin purge: every content row of the project, its handoff notes'
+   * copies (C-186: content under the same opt-in, ADR-0021), and what card
+   * capture derived from content (#244 D8): its Inbox cards and its capture
+   * rows. Accepted cards are the person's and stay, unlinked from their
+   * capture.
    */
   async purge(projectId: string, ctx: AuditContext): Promise<void> {
-    const [content, inbox, captures] = await this.prisma.$transaction([
+    const [content, notes, inbox, captures] = await this.prisma.$transaction([
       this.prisma.sessionContent.deleteMany({ where: { projectId } }),
+      this.prisma.handoffNote.deleteMany({ where: { projectId } }),
       this.prisma.boardCard.deleteMany({
         where: { projectId, column: 'inbox' },
       }),
@@ -79,6 +82,7 @@ export class SessionContentService {
       projectId,
       after: {
         count: content.count,
+        handoffNotes: notes.count,
         inboxCards: inbox.count,
         captures: captures.count,
       },

@@ -153,9 +153,13 @@ export class HandoffSink implements RunnerEventSink, OnModuleInit {
     // D4, ADR-0021: a project that keeps content on the machine has no copy.
     if (!subject.shipContent) return;
 
-    const key = { subjectKind: subject.kind, subjectId: subject.id };
+    const key = {
+      projectId: subject.projectId,
+      subjectKind: subject.kind,
+      subjectId: subject.id,
+    };
     const row = await this.prisma.handoffNote.findUnique({
-      where: { subjectKind_subjectId: key },
+      where: { projectId_subjectKind_subjectId: key },
       select: { content: true, personLines: true, updatedBy: true },
     });
     const stored = row ? storedNoteOf(row) : null;
@@ -179,8 +183,14 @@ export class HandoffSink implements RunnerEventSink, OnModuleInit {
       updatedBy: update.updatedBy,
     };
     await this.prisma.handoffNote.upsert({
-      where: { subjectKind_subjectId: key },
-      create: { ...key, projectId: subject.projectId, ...fields },
+      where: { projectId_subjectKind_subjectId: key },
+      create: {
+        ...key,
+        ...(subject.kind === 'card'
+          ? { cardId: subject.id }
+          : { runId: subject.id }),
+        ...fields,
+      },
       update: fields,
     });
     if (subject.kind === 'card') {

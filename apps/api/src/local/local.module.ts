@@ -10,6 +10,7 @@ import { RunnersModule } from '../runners/runners.module';
 import { ActionRequestExpiryJob } from './action-request-expiry.job';
 import { ActionRequestsController } from './action-requests.controller';
 import { ActionRequestsService } from './action-requests.service';
+import { LocalBoardHandlers } from './local-board-handlers';
 import { LocalHandlers } from './local-handlers';
 import { LOCAL_OPTIONS, localOptionsFromEnv } from './local-options';
 import { LocalRequestRouter } from './local-request-router';
@@ -41,6 +42,8 @@ import { LocalRequestRouter } from './local-request-router';
     { provide: LOCAL_OPTIONS, useFactory: () => localOptionsFromEnv() },
     ActionRequestsService,
     ActionRequestExpiryJob,
+    // #845: a person's session works the Board.
+    LocalBoardHandlers,
     LocalHandlers,
     LocalRequestRouter,
   ],

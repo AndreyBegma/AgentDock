@@ -30,7 +30,11 @@ import {
   SourceThrottledFilter,
   setSessionCookies,
 } from '../auth';
-import { TelegramBotTokenDto, TelegramSignInDto } from './dto';
+import {
+  TelegramBotTokenDto,
+  TelegramLinkConfirmDto,
+  TelegramSignInDto,
+} from './dto';
 import { TelegramIntegrationService } from './telegram-integration.service';
 import { TelegramLinkingService } from './telegram-linking.service';
 import { TelegramWebAppService } from './telegram-web-app.service';
@@ -58,6 +62,27 @@ export class TelegramLinkController {
     @AuditCtx() ctx: AuditContext,
   ): Promise<void> {
     return this.linking.unlink(user, ctx);
+  }
+
+  /** C-147: only this activates the chat that redeemed the code. */
+  @Post('confirm')
+  @HttpCode(200)
+  confirm(
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+    @Body() dto: TelegramLinkConfirmDto,
+  ): Promise<TelegramLinkStatus> {
+    return this.linking.confirm(user, dto.id, ctx);
+  }
+
+  /** C-147: turns the waiting chat away. */
+  @Delete('pending')
+  @HttpCode(204)
+  decline(
+    @CurrentUser() user: AuthUser,
+    @AuditCtx() ctx: AuditContext,
+  ): Promise<void> {
+    return this.linking.decline(user, ctx);
   }
 }
 

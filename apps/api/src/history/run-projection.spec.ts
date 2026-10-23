@@ -21,6 +21,8 @@ const slot = (fields: Partial<Slot> = {}): Slot => ({
   status: 'running',
   sessionAlive: true,
   pane: 'busy',
+  quotaLimit: null,
+  quotaResetsAt: null,
   worktreeExists: true,
   ahead: null,
   behind: null,

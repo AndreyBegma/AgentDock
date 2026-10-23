@@ -9,9 +9,12 @@ import {
   describeErrorHint,
   errorText,
   errorToastOptions,
+  isSafeApiPath,
   RESTARTING_READ_MESSAGE,
   RESTARTING_WRITE_MESSAGE,
   toErrorHint,
+  UNSAFE_PATH_MESSAGE,
+  UnsafeApiPathError,
 } from './api';
 import { reachability } from './live/reachability';
 
@@ -181,11 +184,71 @@ describe('surviving an API restart (spec 353)', () => {
     expect(reachability.isUnreachable()).toBe(false);
   });
 
+  test('a malformed csrf cookie does not throw and the write goes out without it', async () => {
+    (globalThis as { document?: unknown }).document = {
+      cookie: 'other=1; ad_csrf=%E0%A4%A',
+    };
+    const headers: (HeadersInit | undefined)[] = [];
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      headers.push(init?.headers);
+      return json({});
+    }) as unknown as typeof fetch;
+    await api('/x', { method: 'POST', body: {} });
+    expect(headers).toHaveLength(1);
+    expect(JSON.stringify(headers[0])).not.toContain('x-csrf-token');
+  });
+
   test('other 5xx answers are the server’s, not an outage', async () => {
     const calls = script(json({ message: 'boom' }, 500));
     const error = await api('/x').catch((e: unknown) => e);
     expect(calls).toEqual(['GET']);
     expect((error as ApiError).status).toBe(500);
     expect(error).not.toBeInstanceOf(ApiUnreachableError);
+  });
+});
+
+describe('refusing a path that leaves its route (C-165)', () => {
+  const realFetch = globalThis.fetch;
+  let calls: string[] = [];
+
+  beforeEach(() => {
+    calls = [];
+    globalThis.fetch = (async (url: unknown) => {
+      calls.push(String(url));
+      return new Response('{}', { status: 200 });
+    }) as unknown as typeof fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  test('an encoded ../ in an id throws before fetch is called', async () => {
+    const error = await api('/projects/x/plans/a%2F..%2Fb', {
+      method: 'POST',
+      body: {},
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UnsafeApiPathError);
+    expect(describeError(error)).toBe(UNSAFE_PATH_MESSAGE);
+    expect(calls).toEqual([]);
+  });
+
+  test.each([
+    '/projects/x/plans/../budgets',
+    '/projects/x/plans/..',
+    '/projects/x/./plans',
+    '/projects/x\\plans',
+    '/projects/x/plans/%2e%2e',
+    '/projects/x/plans/a%5Cb',
+    'projects/x',
+  ])('%s is refused', async (path) => {
+    expect(isSafeApiPath(path)).toBe(false);
+    await expect(api(path)).rejects.toBeInstanceOf(UnsafeApiPathError);
+    expect(calls).toEqual([]);
+  });
+
+  test('an ordinary path, and encoded slashes in the query, go out', async () => {
+    expect(isSafeApiPath('/projects/c1/plans/c2/tasks/t1.2')).toBe(true);
+    await api('/projects/c1/board/captures?cursor=a%2Fb..');
+    expect(calls).toEqual(['/api/projects/c1/board/captures?cursor=a%2Fb..']);
   });
 });

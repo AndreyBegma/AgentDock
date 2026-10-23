@@ -80,6 +80,9 @@ describe('textFieldView', () => {
     expect(
       textFieldView(owner, row('done'), { ...f, outcome: 'rejected' }),
     ).toMatchObject({ status: 'not_normalized', reason: 'rejected' });
+    expect(
+      textFieldView(owner, row('done'), { ...f, outcome: 'too_long' }),
+    ).toMatchObject({ status: 'not_normalized', reason: 'too_long' });
   });
 });
 

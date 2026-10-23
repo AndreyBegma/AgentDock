@@ -19,6 +19,7 @@ import { watchedProject } from '../../control/target';
 import { TmuxControl } from '../../control/tmux';
 import { resolveFleetProject } from '../../fleet/project';
 import { errorMessage, type Logger } from '../../log';
+import type { OtlpEndpoint } from '../../otlp/token';
 import { type RunSlots, SharedRunSlots } from '../../planner/slots';
 import {
   GH_TIMEOUT_MS,
@@ -59,7 +60,7 @@ export interface ExecutorOptions {
   emit: (event: UnsequencedEvent) => void;
   log: Logger;
   /** The OTLP receiver's bound port, null when it is off (D9). */
-  otlpPort?: () => number | null;
+  otlp?: () => OtlpEndpoint | null;
   tickMs?: number;
   cleanupMs?: number;
 }
@@ -395,7 +396,7 @@ export class SkillRunExecutor {
           profile,
           record,
           record.worktree,
-          this.options.otlpPort?.() ?? null,
+          this.options.otlp?.() ?? null,
           skillTokenSaver(
             profile,
             record,

@@ -3,7 +3,6 @@
 import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button, buttonClassName } from '@andrewbehma/glass-ui/button';
-import { Card } from '@andrewbehma/glass-ui/card';
 import { Chip } from '@andrewbehma/glass-ui/chip';
 import { CodeBlock } from '@andrewbehma/glass-ui/code-block';
 import { Field, Input, Select, Textarea } from '@andrewbehma/glass-ui/field';
@@ -19,7 +18,9 @@ import {
   BOARD_CARD_TITLE_MAX,
   type BoardCardDetail,
   type BoardCardKind,
+  type BoardCardView,
   CARD_FEEDBACK_MAX,
+  type CardEscalationView,
   type CardPrTarget,
   type CardRoundView,
   isActiveRoundPhase,
@@ -37,6 +38,12 @@ import {
 import { useAttachmentUploads } from '../../lib/attachments/use-attachment-uploads';
 import { fetchCard, sendFeedback, updateCard } from '../../lib/board/actions';
 import { runWaitsFor } from '../../lib/board/dependencies';
+import {
+  escalationAsk,
+  escalationTitle,
+  RUN_ON_OPUS_MODEL,
+  waitsForOpus,
+} from '../../lib/board/escalation';
 import {
   AUTO_COLLECT_HINT,
   AUTO_COLLECT_LABEL,
@@ -78,13 +85,24 @@ import {
   prTargetNotice,
   prTargetText,
 } from '../../lib/board/pull-request';
-import { ciBanner, pullRequestRows } from '../../lib/board/shipping';
+import {
+  ciBanner,
+  ciDot,
+  protectedPathsBanner,
+  pullRequestRows,
+} from '../../lib/board/shipping';
+import {
+  SESSION_ENDED_TEXT,
+  takenSessionHref,
+  takenState,
+} from '../../lib/board/taken';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
-import { safeHttpsUrl } from '../../lib/queue/format';
 import { useReadiness } from '../../lib/readiness/use-readiness';
 import { cardSessionMessenger } from '../../lib/session-message/actions';
 import { type TextNotes, useTextNotes } from '../../lib/text/use-text-notes';
+import { savedLabel } from '../../lib/token-saver/format';
+import { externalHttpsUrl, githubUrl } from '../../lib/url';
 import { SummaryPanel } from '../ai/summary-panel';
 import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
@@ -100,6 +118,7 @@ import { CardStewardSection } from '../steward/card-steward-section';
 import { NormalizedNote } from '../text/normalized-note';
 import { DescriptionIncompleteBadge } from '../token-saver/description-incomplete-badge';
 import { FilterBreakdown } from '../token-saver/filter-breakdown';
+import { SavedBadge } from '../token-saver/saved-badge';
 import { CardDependenciesSection } from './card-dependencies';
 import { CardDescription } from './card-description';
 import { ApproveRunLink, CardDesignSection } from './card-design';
@@ -108,6 +127,12 @@ import {
   AutoRunSection,
   CardOptionToggles,
 } from './card-options';
+import {
+  type CardTab,
+  CardTabs,
+  DEFAULT_CARD_TAB,
+  useCardTab,
+} from './card-tabs';
 import { CardHandoffSection } from './handoff/card-handoff-section';
 import { LaunchPopover } from './launch-popover';
 import { MovePicker } from './move-picker';
@@ -234,13 +259,13 @@ function roundItems(
 }
 
 function Links({ card }: { card: BoardCardDetail }) {
-  const pr = card.prUrl ? safeHttpsUrl(card.prUrl) : null;
-  const issue = card.issueUrl ? safeHttpsUrl(card.issueUrl) : null;
+  const pr = card.prUrl ? githubUrl(card.prUrl) : null;
+  const issue = card.issueUrl ? githubUrl(card.issueUrl) : null;
   // #379: the spec's pull request in an external docs repository.
   const spec = card.specPr
     ? {
         label: `Spec ${card.specPr.repo}#${card.specPr.number}`,
-        href: safeHttpsUrl(card.specPr.url),
+        href: githubUrl(card.specPr.url),
       }
     : null;
   const items = [
@@ -280,7 +305,7 @@ function PullRequestList({ card }: { card: BoardCardDetail }) {
   return (
     <ul className="flex flex-col gap-1 text-sm" aria-label="Pull requests">
       {rows.map((row) => {
-        const href = safeHttpsUrl(row.url);
+        const href = githubUrl(row.url);
         const text = `PR #${row.number} · ${row.state}`;
         return (
           <li key={row.number} className="flex flex-wrap gap-2">
@@ -304,6 +329,32 @@ function PullRequestList({ card }: { card: BoardCardDetail }) {
   );
 }
 
+/** #845 D2, D10: which manual session took or queued the card, and that it ended. */
+function TakenLine({ card }: { card: BoardCardView }) {
+  const state = takenState(card);
+  const href = takenSessionHref(card);
+  if (!state) return null;
+  return (
+    <p className="text-xs text-ink-2">
+      {state.text}
+      {state.kind === 'taken' && !state.alive
+        ? ` · ${SESSION_ENDED_TEXT}`
+        : null}
+      {href ? (
+        <>
+          {' · '}
+          <NextLink
+            href={href}
+            className="text-accent-ink underline-offset-2 hover:underline"
+          >
+            Open the session
+          </NextLink>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
 /** #359 D6: automation stopped on a red CI — names the failed checks and what the person can do. */
 function CiStoppedBanner({ card }: { card: BoardCardDetail }) {
   const banner = ciBanner(card);
@@ -315,7 +366,7 @@ function CiStoppedBanner({ card }: { card: BoardCardDetail }) {
         {banner.checks.length > 0 ? (
           <ul className="list-disc pl-4">
             {banner.checks.map((check) => {
-              const href = check.link ? safeHttpsUrl(check.link) : null;
+              const href = check.link ? externalHttpsUrl(check.link) : null;
               return (
                 <li key={check.name}>
                   {href ? (
@@ -330,6 +381,26 @@ function CiStoppedBanner({ card }: { card: BoardCardDetail }) {
             })}
           </ul>
         ) : null}
+        <span>{banner.hint}</span>
+      </div>
+    </Banner>
+  );
+}
+
+/** C-148: the card's push changed protected paths — only a person merges it. */
+function ProtectedPathsBanner({ card }: { card: BoardCardDetail }) {
+  const banner = protectedPathsBanner(card);
+  if (!banner) return null;
+  return (
+    <Banner tone="warn" title={banner.title}>
+      <div className="flex flex-col gap-1">
+        <ul className="list-disc pl-4">
+          {banner.paths.map((path) => (
+            <li key={path} className="font-mono">
+              {path}
+            </li>
+          ))}
+        </ul>
         <span>{banner.hint}</span>
       </div>
     </Banner>
@@ -405,6 +476,32 @@ export function CardBranchLine({
  * #709: a stacked PR's target, prominent on the sheet — and a warning once the
  * dependency's own PR has merged; nothing for a PR into the base.
  */
+/**
+ * #750 D9, D10: the card's escalation to Opus. While it waits for a person
+ * (D10) it is the ask beside **Run on Opus**; otherwise the record of it.
+ */
+export function EscalationRow({
+  card,
+  escalation,
+}: {
+  card: Pick<BoardCardDetail, 'model'>;
+  escalation: CardEscalationView;
+}) {
+  if (waitsForOpus({ ...card, escalation })) {
+    return (
+      <Banner tone="warn" title={escalationAsk(escalation)}>
+        <span className="whitespace-pre-wrap">{escalation.note}</span>
+      </Banner>
+    );
+  }
+  return (
+    <p className="text-xs text-ink-2">
+      <span className="font-medium">{escalationTitle(escalation)}</span> ·{' '}
+      {escalation.note}
+    </p>
+  );
+}
+
 export function PrTargetBanner({ target }: { target: CardPrTarget | null }) {
   const notice = prTargetNotice(target);
   return notice ? <Banner tone={notice.tone}>{notice.text}</Banner> : null;
@@ -456,9 +553,77 @@ export function cardSheetFooter({
 }
 
 /**
- * One card's detail (#273 D17, #431): Run, Design, Rounds, then the Card form.
- * `sheet` is the side sheet's one column with Save pinned; `page` is the full
- * page, two columns at full width with Save in the header. Same sections.
+ * The end of the Run row: the card's total cost, then its token saving
+ * (#778); either stands alone, and with neither nothing is drawn.
+ */
+export function RunMoney({ card }: { card: BoardCardView }) {
+  const total = formatCost(card.costUsd);
+  if (!total && !savedLabel(card.tokenSaved)) return null;
+  return (
+    <span className="ml-auto flex items-center gap-2">
+      {total ? <span className="tabular-nums text-ink-2">{total}</span> : null}
+      <SavedBadge saved={card.tokenSaved} />
+    </span>
+  );
+}
+
+/** The card's pull request as a link, with its CI dot; nothing without a PR. */
+export function CardPrChip({ card }: { card: BoardCardView }) {
+  if (card.prNumber === null) return null;
+  const dot = ciDot(card);
+  const href = card.prUrl ? githubUrl(card.prUrl) : null;
+  const text = prChipText(card) ?? `PR #${card.prNumber}`;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="underline-offset-2 hover:underline"
+        >
+          {text}
+        </a>
+      ) : (
+        <span>{text}</span>
+      )}
+      {dot ? (
+        <span
+          role="img"
+          aria-label={dot.label}
+          title={dot.label}
+          className="inline-flex"
+        >
+          <Badge tone={dot.tone} dot />
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * The header's one meta line: where the card is, its run status, its pull
+ * request with CI, and what it cost. Wraps on a phone instead of overflowing.
+ */
+export function CardHeaderMeta({ card }: { card: BoardCardView }) {
+  const pill = roundPill(card.round);
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
+      {pill ? (
+        <StatusPill size="sm" status={pill.status} label={pill.label} />
+      ) : null}
+      <CardPrChip card={card} />
+      <RunMoney card={card} />
+    </div>
+  );
+}
+
+/**
+ * One card's detail (#273 D17, #431): a compact header (status, pull request,
+ * cost, Move, Run, Open as page) above the tabs Overview, Rounds, Files and
+ * Edit. `sheet` is the side or bottom sheet with Save pinned; `page` is the
+ * full page with Save in the header. Same header, same tabs.
  */
 export function CardDetailBody({
   layout = 'sheet',
@@ -471,6 +636,8 @@ export function CardDetailBody({
   runnerName,
   onSaved,
   onClose,
+  tab: tabProp,
+  onTabChange,
 }: {
   layout?: 'sheet' | 'page';
   sheetTitle: string;
@@ -483,8 +650,17 @@ export function CardDetailBody({
   onSaved: () => void;
   /** The sheet's way out, for the phone back bar. */
   onClose?: () => void;
+  /**
+   * The selected tab, kept by the caller so a new round (which remounts the
+   * body) does not lose it; without it the body keeps its own.
+   */
+  tab?: CardTab;
+  onTabChange?: (tab: CardTab) => void;
 }) {
   const narrow = useNarrow();
+  const [ownTab, setOwnTab] = useState<CardTab>(DEFAULT_CARD_TAB);
+  const tab = tabProp ?? ownTab;
+  const setTab = onTabChange ?? setOwnTab;
   const [picking, setPicking] = useState(false);
   // #515: the same move a drag makes; the sheet has no board, so no optimistic drop.
   const move = useCardMove({
@@ -608,21 +784,111 @@ export function CardDetailBody({
   const noPr = noPrBanner(card);
 
   const pageHref = boardCardPageHref(projectId, card.number);
+  // The Run row: in the header, so it is reachable without scrolling.
+  const runActions = canOperate ? (
+    <div className="flex flex-wrap gap-2">
+      {canAccept(card) ? (
+        <Button
+          variant="solid"
+          disabled={actions.busy}
+          onClick={() => actions.accept(card)}
+        >
+          Accept
+        </Button>
+      ) : null}
+      {canRun(card) || canRetry(card) ? (
+        <LaunchPopover
+          projectId={projectId}
+          card={card}
+          kind="work"
+          label={canRetry(card) ? 'Run again' : 'Run'}
+          variant={card.column === 'todo' ? 'solid' : 'glass'}
+          disabled={
+            actions.busy ||
+            runBlocked ||
+            stackGate !== null ||
+            waitsFor !== null
+          }
+          describedBy={
+            stackGate
+              ? 'board-stack-gate'
+              : waitsFor
+                ? 'board-run-waits'
+                : runBlocked
+                  ? 'board-run-reason'
+                  : undefined
+          }
+          onLaunch={async (request) => {
+            // The toast says why; a refusal keeps the popover open.
+            if (!(await actions.run(card, request))) {
+              throw new Error('run refused');
+            }
+          }}
+        />
+      ) : null}
+      {waitsForOpus(card) && (canRun(card) || canRetry(card)) ? (
+        // #750 D10: a launch like Run, so operator-only like it.
+        <Button
+          variant="solid"
+          disabled={
+            actions.busy ||
+            runBlocked ||
+            stackGate !== null ||
+            waitsFor !== null
+          }
+          onClick={() => void actions.run(card, { model: RUN_ON_OPUS_MODEL })}
+        >
+          Run on Opus
+        </Button>
+      ) : null}
+      {offer ? (
+        <ApproveRunLink
+          projectId={projectId}
+          card={card}
+          offer={offer}
+          variant={card.column === 'todo' ? 'solid' : 'glass'}
+          describedBy="board-approve-run-reason"
+        />
+      ) : null}
+      {canMarkFinished(card) ? (
+        <Button
+          variant="glass"
+          disabled={actions.busy}
+          onClick={() => actions.markFinished(card)}
+        >
+          Mark finished
+        </Button>
+      ) : null}
+      {canStop(card) ? (
+        <Button
+          variant="glass"
+          disabled={actions.busy}
+          onClick={() => actions.askStop(card)}
+        >
+          Stop
+        </Button>
+      ) : null}
+      {card.sessionId ? (
+        terminal.state === 'available' ? (
+          <Button variant="glass" onClick={terminal.open}>
+            Open terminal
+          </Button>
+        ) : (
+          <Button variant="glass" disabled title={terminal.reason}>
+            Open terminal
+          </Button>
+        )
+      ) : null}
+    </div>
+  ) : null;
+  // The header carries the status, the pull request and the cost; a column with
+  // nothing else to say leaves this section empty, and `empty:hidden` drops it.
   const runSection = (
-    <section aria-label="Run" className="flex flex-col gap-4">
-      <SectionHeader title="Run" headingLevel={3} />
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium">{COLUMN_TITLE[card.column]}</span>
-        {pill ? (
-          <StatusPill size="sm" status={pill.status} label={pill.label} />
-        ) : null}
-        {total ? (
-          <span className="ml-auto tabular-nums text-ink-2">{total}</span>
-        ) : null}
-      </div>
+    <section aria-label="Run" className="flex flex-col gap-4 empty:hidden">
       <Links card={card} />
       <PullRequestList card={card} />
       <CiStoppedBanner card={card} />
+      <ProtectedPathsBanner card={card} />
       {canCreatePr(card) ? (
         <div className="flex flex-col gap-2">
           <Banner tone={noPr.tone}>{noPr.text}</Banner>
@@ -683,6 +949,7 @@ export function CardDetailBody({
           <p>{trackedStatusText(card)}</p>
         </div>
       ) : null}
+      {takenState(card) ? <TakenLine card={card} /> : null}
       {card.fleet ? (
         <div className="flex flex-col gap-1 text-xs text-ink-2">
           <p>
@@ -706,6 +973,9 @@ export function CardDetailBody({
       ) : null}
       <CardBranchLine branch={card.branch} target={card.prTarget} />
       <PrTargetBanner target={card.prTarget} />
+      {card.escalation ? (
+        <EscalationRow card={card} escalation={card.escalation} />
+      ) : null}
       {card.round?.hooksMissing
         ? (() => {
             const notice = hooksNotice(card, card.round);
@@ -744,87 +1014,6 @@ export function CardDetailBody({
         </Banner>
       ) : null}
 
-      {canOperate ? (
-        <div className="flex flex-wrap gap-2">
-          {canAccept(card) ? (
-            <Button
-              variant="solid"
-              disabled={actions.busy}
-              onClick={() => actions.accept(card)}
-            >
-              Accept
-            </Button>
-          ) : null}
-          {canRun(card) || canRetry(card) ? (
-            <LaunchPopover
-              projectId={projectId}
-              card={card}
-              kind="work"
-              label={canRetry(card) ? 'Run again' : 'Run'}
-              variant={card.column === 'todo' ? 'solid' : 'glass'}
-              disabled={
-                actions.busy ||
-                runBlocked ||
-                stackGate !== null ||
-                waitsFor !== null
-              }
-              describedBy={
-                stackGate
-                  ? 'board-stack-gate'
-                  : waitsFor
-                    ? 'board-run-waits'
-                    : runBlocked
-                      ? 'board-run-reason'
-                      : undefined
-              }
-              onLaunch={async (request) => {
-                // The toast says why; a refusal keeps the popover open.
-                if (!(await actions.run(card, request))) {
-                  throw new Error('run refused');
-                }
-              }}
-            />
-          ) : null}
-          {offer ? (
-            <ApproveRunLink
-              projectId={projectId}
-              card={card}
-              offer={offer}
-              variant={card.column === 'todo' ? 'solid' : 'glass'}
-              describedBy="board-approve-run-reason"
-            />
-          ) : null}
-          {canMarkFinished(card) ? (
-            <Button
-              variant="glass"
-              disabled={actions.busy}
-              onClick={() => actions.markFinished(card)}
-            >
-              Mark finished
-            </Button>
-          ) : null}
-          {canStop(card) ? (
-            <Button
-              variant="glass"
-              disabled={actions.busy}
-              onClick={() => actions.askStop(card)}
-            >
-              Stop
-            </Button>
-          ) : null}
-          {card.sessionId ? (
-            terminal.state === 'available' ? (
-              <Button variant="glass" onClick={terminal.open}>
-                Open terminal
-              </Button>
-            ) : (
-              <Button variant="glass" disabled title={terminal.reason}>
-                Open terminal
-              </Button>
-            )
-          ) : null}
-        </div>
-      ) : null}
       {canOperate && (canRun(card) || canRetry(card)) ? (
         <div className="-mt-3">
           <ReadinessNotice
@@ -1158,11 +1347,37 @@ export function CardDetailBody({
     </>
   ) : null;
 
+  // A section with nothing to show is `null`, and its tab is not drawn.
+  const overview = (
+    <div className="flex min-w-0 flex-col gap-6">
+      {triageSection}
+      {runSection}
+      {summarySection}
+      {designSection}
+      {dependenciesSection}
+      {autoRunSection}
+      {stewardSection}
+      {handoffSection}
+    </div>
+  );
+  const hasFiles = cardFiles.length > 0 || filesEditable;
+  const tabs = (
+    <CardTabs
+      tab={tab}
+      onTabChange={setTab}
+      roundCount={card.rounds.length}
+      panels={{
+        overview,
+        rounds: card.rounds.length > 0 ? roundsSection : null,
+        files: hasFiles ? attachmentsSection : null,
+        edit: cardForm,
+      }}
+    />
+  );
+
   if (layout === 'page') {
-    const panel = (node: ReactNode) =>
-      node ? <Card pad="md">{node}</Card> : null;
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6">
         <PageHeader
           className="mb-0"
           eyebrow={`Board card · ${card.label} · ${KIND_LABEL[card.kind]}`}
@@ -1173,9 +1388,10 @@ export function CardDetailBody({
             ) : undefined
           }
           meta={
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
               <span>{COLUMN_TITLE[card.column]}</span>
               {card.round ? <span>Round {card.rounds.length}</span> : null}
+              <CardPrChip card={card} />
               {total ? (
                 <span className="tabular-nums">{total} spent</span>
               ) : null}
@@ -1186,8 +1402,9 @@ export function CardDetailBody({
           }
           actions={
             canOperate ? (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {moveButton}
+                {runActions}
                 {actionButtons}
               </div>
             ) : (
@@ -1195,26 +1412,7 @@ export function CardDetailBody({
             )
           }
         />
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <div className="flex min-w-0 flex-col gap-6">
-            {triageSection}
-            {panel(cardForm)}
-            {panel(roundsSection)}
-          </div>
-          <aside
-            aria-label="Card status"
-            className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4"
-          >
-            {panel(runSection)}
-            {panel(summarySection)}
-            {panel(designSection)}
-            {panel(dependenciesSection)}
-            {panel(autoRunSection)}
-            {panel(stewardSection)}
-            {panel(handoffSection)}
-            {panel(attachmentsSection)}
-          </aside>
-        </div>
+        {tabs}
       </div>
     );
   }
@@ -1232,30 +1430,28 @@ export function CardDetailBody({
       })}
     >
       <InitialFocus />
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between gap-2">
-          {moveButton}
-          {narrow ? null : (
-            <NextLink
-              href={pageHref}
-              className={buttonClassName({ variant: 'ghost', size: 'sm' })}
-            >
-              Open as page
-              <ExternalLink aria-hidden="true" className="size-4" />
-            </NextLink>
-          )}
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex flex-col gap-3">
+          <CardHeaderMeta card={card} />
+          <div className="flex flex-wrap items-center gap-2">
+            {moveButton}
+            {runActions}
+            {narrow ? null : (
+              <NextLink
+                href={pageHref}
+                className={buttonClassName({
+                  variant: 'ghost',
+                  size: 'sm',
+                  className: 'ms-auto',
+                })}
+              >
+                Open as page
+                <ExternalLink aria-hidden="true" className="size-4" />
+              </NextLink>
+            )}
+          </div>
         </div>
-        {triageSection}
-        {runSection}
-        {summarySection}
-        {designSection}
-        {dependenciesSection}
-        {autoRunSection}
-        {roundsSection}
-        {stewardSection}
-        {handoffSection}
-        {attachmentsSection}
-        {cardForm}
+        {tabs}
       </div>
     </SheetContent>
   );
@@ -1288,6 +1484,7 @@ export function CardSheet({
   const narrow = useNarrow();
   const [card, setCard] = useState<BoardCardDetail>();
   const [error, setError] = useState<string>();
+  const [tab, setTab] = useCardTab(number);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: version is a refetch trigger
   useEffect(() => {
@@ -1336,6 +1533,8 @@ export function CardSheet({
             runnerName={runnerName}
             onSaved={onChanged}
             onClose={close}
+            tab={tab}
+            onTabChange={setTab}
           />
         ) : (
           <SheetContent

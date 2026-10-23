@@ -5,3 +5,5 @@ export * from './limits';
 export * from './mask';
 export * from './normalize-contract';
 export * from './normalize-prompt';
+export * from './redact';
+export * from './shell';

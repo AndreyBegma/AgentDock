@@ -141,12 +141,7 @@ export class RunnerSettingsController {
       { localUserId: dto.localUserId, awayMode: dto.awayMode },
       { userId: user.id, isAdmin: user.role === 'admin', ctx },
     );
-    return {
-      id: runner.id,
-      name: runner.name,
-      localUserId: runner.localUserId,
-      awayMode: runner.awayMode,
-    };
+    return this.settings.toView(runner);
   }
 }
 

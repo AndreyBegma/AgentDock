@@ -5,6 +5,7 @@ import {
   HOOK_SESSION_STARTED_EVENT,
   type HookEventType,
   hookEventDataSchemas,
+  isHookEventType,
   isLocalMethodName,
   type LocalErrorCode,
   localMethods,
@@ -14,6 +15,7 @@ import {
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { correlateCwd } from '../adapters/correlate';
+import { ARTIFACT_INCOMPLETE, FinishGuard } from '../cards/finish-guard';
 import type { CardRecord } from '../cards/record';
 import { errorMessage, type Logger } from '../log';
 import type { EnvelopeProject } from '../otlp/map';
@@ -40,6 +42,13 @@ import {
   localPingArgsSchema,
   localRequestArgsSchema,
 } from './types';
+
+/** #750 D8: the round whose worker called `escalate_card`, as it was then. */
+export interface EscalatedRound {
+  cardId: string;
+  runId: string;
+  sessionId: string;
+}
 
 export interface LocalServiceDeps {
   projects: () => readonly WatchedProject[];
@@ -72,6 +81,14 @@ export interface LocalServiceDeps {
    * store on disk — it outlives a daemon restart, the hook sessions do not.
    */
   liveRound?: (cwd: string) => CardRecord | null;
+  /**
+   * #750 D8: stop this round once `escalate_card` has answered its worker —
+   * only while it is still the card's round in that session (the executor
+   * checks), so the API's relaunch on Opus is never stopped.
+   */
+  stopRoundSoon?: (round: EscalatedRound) => void;
+  /** #445 D8: a worktree's pull request description; read from disk by default. */
+  readDescription?: (worktree: string) => string | null;
   now: () => string;
   log: Logger;
 }
@@ -128,6 +145,12 @@ const refused = (
  * `SessionStart` registers without a token — and is answered with one.
  */
 export class LocalService {
+  /** #445 D8, DR-10: each card's guard for its current round, by card id. */
+  private readonly finishGuards = new Map<
+    string,
+    { runId: string; guard: FinishGuard }
+  >();
+
   constructor(private readonly deps: LocalServiceDeps) {}
 
   async handle(
@@ -185,6 +208,15 @@ export class LocalService {
     args: unknown,
     caller: LocalCaller,
   ): Promise<LocalResult<LocalEventResult>> {
+    // Any process of a session can call: only the hook types go on (C-169).
+    const claimed = (args as { type?: unknown } | null)?.type;
+    if (typeof claimed === 'string' && !isHookEventType(claimed)) {
+      this.deps.log.warn('local: refused an event type outside the hooks', {
+        type: claimed.slice(0, 64),
+        peerPid: caller.peerPid,
+      });
+      return refused(`${claimed.slice(0, 64)} is not a hook event`);
+    }
     const parsed = localEventArgsSchema.safeParse(args);
     if (!parsed.success) {
       return localFail('invalid_args', z.prettifyError(parsed.error));
@@ -366,13 +398,28 @@ export class LocalService {
     const { binding } = auth.data;
     const projects = this.deps.projects();
     const projectId = correlateCwd(binding.cwd, projects).projectId;
+    // #750 D8: the asking round is fixed before the call — the API may start
+    // the relaunch on Opus before it answers.
+    const asking =
+      input.method === 'card.escalate'
+        ? this.escalatingRound(binding.cwd, binding.sessionId)
+        : null;
+    let relayed = this.gate(input);
+    if (input.method === 'card.finish') {
+      const guarded = this.guardFinish(binding, relayed);
+      if (!guarded.ok) return guarded;
+      relayed = guarded.data;
+    }
     const result = await this.deps.relay({
       method: input.method,
-      args: this.gate(input),
+      args: relayed,
       ...(projectId ? { projectId } : {}),
       session: { runtime: 'claude', id: binding.sessionId },
       via: input.via,
     });
+    if (input.method === 'card.escalate' && result.ok && asking) {
+      this.deps.stopRoundSoon?.(asking);
+    }
     if (input.method === 'card.finish' && !result.ok) {
       // #482: the round of the session's worktree, from the card store.
       const round = this.deps.liveRound?.(binding.cwd) ?? null;
@@ -381,6 +428,64 @@ export class LocalService {
       }
     }
     return result;
+  }
+
+  /**
+   * #445 D8 on the daemon's side of the socket (DR-10): a guarded round's
+   * incomplete finish is refused with what is missing, twice; the third goes
+   * on with `artifactIncomplete: true`. Whatever the caller claims about
+   * `artifactIncomplete` is dropped — only the guard sets it (DA-18).
+   */
+  private guardFinish(
+    binding: SessionBinding,
+    args: unknown,
+  ): LocalResult<unknown> {
+    if (typeof args !== 'object' || args === null)
+      return { ok: true, data: args };
+    const { artifactIncomplete: _claimed, ...rest } = args as Record<
+      string,
+      unknown
+    >;
+    const round = this.deps.liveRound?.(binding.cwd) ?? null;
+    if (!round?.finishGuard || round.sessionId !== binding.sessionId) {
+      return { ok: true, data: rest };
+    }
+    let guard = this.finishGuards.get(round.cardId);
+    if (guard?.runId !== round.runId) {
+      // A new round starts with no rejections.
+      guard = {
+        runId: round.runId,
+        guard: new FinishGuard({
+          ...round.finishGuard,
+          worktree: round.worktree,
+          ...(this.deps.readDescription
+            ? { read: this.deps.readDescription }
+            : {}),
+        }),
+      };
+      this.finishGuards.set(round.cardId, guard);
+    }
+    const summary = typeof rest.summary === 'string' ? rest.summary : '';
+    const decision = guard.guard.check(summary);
+    if (decision.kind === 'reject') {
+      return localFail(ARTIFACT_INCOMPLETE, decision.message);
+    }
+    return {
+      ok: true,
+      data: decision.artifactIncomplete
+        ? { ...rest, artifactIncomplete: true }
+        : rest,
+    };
+  }
+
+  /** #750 D8: the live round of the caller's worktree, if it is the caller's session. */
+  private escalatingRound(
+    cwd: string,
+    sessionId: string,
+  ): EscalatedRound | null {
+    const round = this.deps.liveRound?.(cwd) ?? null;
+    if (!round || round.sessionId !== sessionId) return null;
+    return { cardId: round.cardId, runId: round.runId, sessionId };
   }
 
   /**

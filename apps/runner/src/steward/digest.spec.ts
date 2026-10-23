@@ -102,7 +102,7 @@ const setup = (
     log: memoryLogger().log,
     profiles: () => PROFILES,
     watchedProjects: () => [project],
-    otlpPort: () => 4318,
+    otlp: () => ({ port: 4318, token: 'otlp-token' }),
     spawn,
   });
   const failure = async (work: Promise<unknown>) =>

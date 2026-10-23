@@ -31,6 +31,44 @@ export type CardEffort = (typeof CARD_EFFORTS)[number];
 export const CARD_CI_FIX_MODEL = 'sonnet';
 export const CARD_CI_FIX_EFFORT: CardEffort = 'low';
 
+/**
+ * #750 D1 (ADR-0076): what the card's work still has to decide —
+ * `mechanical` executes a clear decision, `deciding` still has to make one,
+ * `unsure` is neither shown. A missing, failed or out-of-contract assessment
+ * counts as `unsure`.
+ */
+export const CARD_WORK_CLASSES = ['mechanical', 'deciding', 'unsure'] as const;
+export type CardWorkClass = (typeof CARD_WORK_CLASSES)[number];
+
+/**
+ * #750 D2: the closed list of deciding signals. Any one of them makes the
+ * class `deciding`, whatever the model said.
+ */
+export const CARD_DECIDING_SIGNALS = [
+  /** A database schema, a migration, or a stored format. */
+  'schema',
+  /** Authentication, authorization, roles. */
+  'auth',
+  /** Data isolation between projects, organizations or users. */
+  'tenancy',
+  /** Billing, prices, budgets that stop spend. */
+  'payments',
+  /** Deleting or purging stored data, or a destructive git operation. */
+  'deletion',
+  /** A `bug` card whose root cause is not shown in the card. */
+  'bug_cause_unknown',
+  /** No existing pattern in the project to follow. */
+  'no_precedent',
+] as const;
+export type CardDecidingSignal = (typeof CARD_DECIDING_SIGNALS)[number];
+
+/** #750 D8: why a card worker calls `escalate_card`. */
+export const CARD_ESCALATION_REASONS = ['misclassified', 'gave_up'] as const;
+export type CardEscalationReason = (typeof CARD_ESCALATION_REASONS)[number];
+
+/** #750 D8: the `escalate_card` note on what the worker found and why. */
+export const CARD_ESCALATION_NOTE_MAX = 2000;
+
 /** A recommendation's one-line reason, in English (D6). */
 export const CARD_ASSESS_REASON_MAX = 160;
 

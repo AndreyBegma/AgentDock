@@ -108,11 +108,9 @@ Requirements: [Bun](https://bun.sh) 1.4.0+, Node.js 24+ and Docker.
 ```sh
 git clone https://github.com/AndreyBegma/Nautelle && cd Nautelle
 bun install
-cp docker/.env.example docker/.env
-cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 
-bun run db:setup       # PostgreSQL :5421, Redis :6421, migrations, seed
+bun run db:setup       # docker/.env + apps/api/.env with generated passwords, PostgreSQL 127.0.0.1:5421, Redis 127.0.0.1:6421, migrations, seed
 bun run admin:create   # the first admin
 bun run start:dev      # API http://localhost:8180 · web http://localhost:3517
 ```

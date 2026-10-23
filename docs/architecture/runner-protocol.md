@@ -451,6 +451,9 @@ token counts only: no prompt, response, thinking or tool-argument text (D9).
 - `projectId` and `slot` are the adapter's correlation (D6). `projectId` comes
   from the watch list; the API stores it only when that project belongs to the
   sending runner, otherwise the session has no project.
+- The runner sends these only for a session inside a watched root, the ones
+  that correlate to a project (ADR-0078). A session that leaves every root is
+  sent one `session.observed` without a project, then nothing.
 - A subagent is linked by `parent` on its own `session.observed`, by
   `childSessionId` on the spawning `tool.call`, or both. It takes its parent's
   project and slot.
@@ -913,7 +916,18 @@ daemon relays their request. Schemas are in `local.ts`.
 | `handoff.create` | operator | `title, body, branch` | an issue queued for the fleet, plus `manual.handoff` |
 | `action.request` | operator | `kind, args, summary` | a pending action request (spec 201 D18) |
 | `away.set` | operator | `on` | the runner's away mode; needs no project |
-| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6). An MCP caller's session is the one whose `claude` pid a `SessionStart` reported, else (#482) the session of the live card round whose worktree holds the caller's cwd — read from the card store on disk, so it survives a daemon restart — else the one live session in that cwd. A refused `card.finish` from a live round's worktree is also sent as `card_run.finish_refused` |
+| `board.list` | viewer | `column?` | the project's cards: number, title, kind, column, running, PR and CI state, `taken`/`queuedForSessionId`, plus `cardMergePolicy` (#845) |
+| `board.card` | viewer | `card` | one card: body, dependencies, rounds summary, PR, CI, pending question (#845) |
+| `board.wait` | viewer | `cursor?, cards?, holdSec ≤ 10` | events after the cursor (`column`, `round_ended`, `ci`, `pr_merged`, `question`) and the next cursor; the server holds ≤ `LOCAL_BOARD_WAIT_HOLD_MAX_SEC` (10 s, under the 15 s relay timeout) and the MCP tool `board_wait` loops it up to 300 s (ADR-0083) |
+| `card.create` | operator | `title, body?, kind?, candidate?` | a card in To Do, or a candidate in the Inbox (ADR-0058); manual sessions only (`not_a_manual_session`) |
+| `card.run` | operator | `card, model?, effort?` | a Board Run; Board refusals (`LOCAL_BOARD_REFUSALS`) passed through verbatim; manual sessions only |
+| `card.move` | operator | `card, column, index?` | the move; `completed` is refused `completed_needs_person`; manual sessions only |
+| `card.feedback` | operator | `card, text` | a feedback round on a Finished card; manual sessions only |
+| `card.message` | operator | `card` + a session message (`text` / `option` / `other`, `questionKey`) | the message to the card's session (ADR-0045); manual sessions only |
+| `card.stop` | operator | `card` | stops the card's round; manual sessions only |
+| `card.take` | operator | `card` | binds the card to the calling session and moves it to In progress, or queues it when the session already holds one (`card_taken` when another live session or a Run holds it); manual sessions only |
+| `card.release` | operator | `card` | back to To Do, binding and queue marker cleared (`not_taken`); manual sessions only |
+| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard), `pullRequestUrl?` (#845: a taken card's pull request; the answer's `next?` is the session's next queued card) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6). An MCP caller's session is the one whose `claude` pid a `SessionStart` reported, else (#482) the session of the live card round whose worktree holds the caller's cwd — read from the card store on disk, so it survives a daemon restart — else the one live session in that cwd. A refused `card.finish` from a live round's worktree is also sent as `card_run.finish_refused` |
 
 ```json
 {
@@ -989,6 +1003,10 @@ command takes a shell string.
 Schemas in `projects.ts`; the rules are [spec 10](../specs/10-projects.md)
 D2–D8 and D10.
 
+- Every absolute path of the protocol (`absolutePathSchema`: a command's
+  `root` or `path`, a watched project's `root`, an inspection's `root`) starts
+  with `/`, has no `..` segment and no control character, and is at most
+  4096 UTF-8 bytes (C-139, L-08).
 - `project.inspect { path }` takes any existing absolute directory and is
   admin-only. It never refuses a git checkout that is not the main one: it
   reports `isMainCheckout: false` with `root` set to the main checkout to
@@ -1536,7 +1554,12 @@ carry no `projectId`: the API resolves the project.
 **On `card.finish`.** The runner's artifact guard (D8) may send
 `artifactIncomplete: true` when it accepts a finish after 2 rejections in the
 round. The API stores it as `runs.artifactIncomplete`, and the card shows
-**Description incomplete**.
+**Description incomplete**. The guard runs in the daemon, on its side of the
+local socket (DR-10): a round launched with Token saver on is recorded as
+guarded, and every `card.finish` from its session meets the guard, whether it
+comes from the `nautelle` MCP server or straight from the socket. A refusal is
+the local error `artifact_incomplete`, with what is missing. The daemon drops
+an `artifactIncomplete` that a caller sends; only the guard sets it (DA-18).
 
 ### Steward
 
@@ -1642,7 +1665,7 @@ with its runner handler.
 |---|---|---|
 | `session.nudge` | `projectId`, `subject` (card round or run), `text` — exactly `STEWARD_NUDGE_TEXT` | `{ sent }`; `false` when the pane shows no idle prompt or the session is gone — nothing is typed |
 | `session.dismiss` | `projectId`, `subject`, `dialogId` from `STEWARD_DIALOG_IDS` | `{ dismissed }`; `false` when the pane no longer shows that dialog |
-| `card.resume` | `cardId`, `projectId`, `runId`, `root`, `base`, `shortId`, `branch`, `sessionId`, `profileKey`, `model`, `permissionMode`, `pullRequest?`, `tokenSaver?` — the round's `card.run` facts | `{ outcome: "resumed" \| "alive" \| "no_worktree", tmuxSession? }` |
+| `card.resume` | `cardId`, `projectId`, `runId`, `root`, `base`, `shortId`, `branch`, `sessionId`, `profileKey`, `model`, `permissionMode`, `pullRequest?`, `tokenSaver?` — the round's `card.run` facts. The runner launches in the mode it recorded at the round's `card.run` and refuses a `permissionMode` that differs (`invalid_args`), or a round with none recorded (`not_found`) (DA-15) | `{ outcome: "resumed" \| "alive" \| "no_worktree", tmuxSession? }` |
 | `digest.compose` | `runId` (the API's `steward` run), `projectId`, `sessionId`, `profileKey`, `model` — always `haiku`, `trigger`, `projectName`, `done` / `stuck` / `waiting` — each `{ total, items }` with at most `DIGEST_COMPOSE_ITEMS_MAX` (20) items of `{ label, title, reason }`, `spendUsd` | `{ prose }` — one line, at most `DIGEST_PROSE_MAX` (600) characters |
 
 - **Nudge (D9).** The text is "The previous response was cut off by an
@@ -1704,10 +1727,16 @@ reaches the API only when `projects[].shipContent` is true (ADR-0021).
 **Person lines (D7).** The lines a person wrote are instructions: the agent
 never rewrites them. They travel as `personLines`, sorted 1-based inclusive
 `{ from, to }` ranges of `content.split('\n')` that never touch, never covering
-a blank line. On disk each carries the suffix ` <!-- person -->`
-(`markPersonLines` / `splitPersonMarks`). The runner refuses an agent rewrite
-that drops or changes one (`personLinesKept`); the API marks a person's edit
-with `markPersonEdit` against the note it holds.
+a blank line. On disk and in a session's context each carries the suffix
+` <!-- person -->` (`markPersonLines`). The marks are output only: the stored
+ranges are the one record of a person's lines (DA-05), so every reader of a
+note — the runner reading the file, the API taking an event or a person's
+edit — drops anything that reads as a mark, in any case or spacing and
+anywhere in a line (`stripPersonMarks`), and `markPersonLines` strips again
+before it marks. The runner refuses an agent rewrite that drops or changes a
+person line and re-anchors the ranges by finding each line's text again
+(`personLinesKept`); the API marks a person's edit with `markPersonEdit`
+against the note it holds.
 
 **The `handoff.updated` event.** In the ordinary `events` stream,
 `source: "runner"`, sent **only** when the project ships content. The whole

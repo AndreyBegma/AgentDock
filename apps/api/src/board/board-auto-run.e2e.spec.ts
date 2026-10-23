@@ -4,7 +4,6 @@ import {
   type BoardCardView,
   type BoardView,
 } from '@nautelle/shared';
-import { userActor } from '../audit/audit.types';
 import { BudgetGate } from '../budgets/budget-gate';
 import { BoardAutoRun } from './board-auto-run';
 import { BoardWorld } from './testing/board-e2e';
@@ -42,12 +41,6 @@ describe('card readiness and auto-run (e2e, #443)', () => {
   };
   const detail = async (number: number) =>
     (await w.viewer.get(cardPath(number))).body as BoardCardDetail;
-
-  const operator = () => ({
-    userId: w.operatorId,
-    role: 'operator' as const,
-    ctx: { actor: userActor(w.operatorId) },
-  });
 
   /** Cards A and B, and C that runs after both. */
   const world = async () => {
@@ -283,10 +276,9 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       });
 
       const auto = w.ctx.app.get(BoardAutoRun);
-      const actor = operator();
       await Promise.all(
         Array.from({ length: 5 }, (_, i) =>
-          auto.afterSatisfied(w.a, i % 2 === 0 ? a : b, actor),
+          auto.afterSatisfied(w.a, i % 2 === 0 ? a : b),
         ),
       );
 
@@ -303,7 +295,7 @@ describe('card readiness and auto-run (e2e, #443)', () => {
         data: { column: 'completed', completedAt: new Date() },
       });
       expect((await w.runCard(c.number)).status).toBe(200);
-      await w.ctx.app.get(BoardAutoRun).afterSatisfied(w.a, b, operator());
+      await w.ctx.app.get(BoardAutoRun).afterSatisfied(w.a, b);
       expect(w.sent('card.run')).toHaveLength(1);
       expect((await w.card(c.number)).rounds).toHaveLength(1);
     });
@@ -372,6 +364,168 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       } finally {
         check.mockRestore();
       }
+    });
+  });
+
+  /**
+   * C-181 (D-09, D-10): an auto-run runs as the person who armed it — or who
+   * last edited the armed card — never as whoever moved the dependency.
+   */
+  describe('the principal (C-181)', () => {
+    const adminAccept = (number: number) =>
+      w.admin.send('post', `${cardPath(number)}/move`, {
+        column: 'completed',
+        index: 0,
+      });
+    const adminId = async () =>
+      (
+        await w.ctx.prisma.user.findUniqueOrThrow({
+          where: { email: 'admin@x.test' },
+        })
+      ).id;
+    const bypassByDefault = () =>
+      w.ctx.prisma.projectOrchestratorSettings.upsert({
+        where: { projectId: w.a },
+        create: { projectId: w.a, permissionMode: 'bypassPermissions' },
+        update: { permissionMode: 'bypassPermissions' },
+      });
+
+    it('runs as the operator who armed it when an admin accepts, charged to the operator', async () => {
+      const { a, b, c } = await world();
+      await autoRun(c.number);
+      await adminAccept(a.number);
+      await adminAccept(b.number);
+      await w.work.settled();
+
+      expect(w.sent('card.run')).toHaveLength(1);
+      const card = await w.card(c.number);
+      expect(card.rounds[0]).toMatchObject({ authorId: w.operatorId });
+      const run = await w.ctx.prisma.run.findUniqueOrThrow({
+        where: { id: card.rounds[0].runId },
+      });
+      expect(run).toMatchObject({
+        triggeredByType: 'user',
+        triggeredById: w.operatorId,
+      });
+      const [started] = await w.audit('card.run_started');
+      expect(started).toMatchObject({
+        actorType: 'system',
+        actorOnBehalfOfId: w.operatorId,
+      });
+    });
+
+    it('never runs an operator-armed card in bypass, whoever accepts the dependency', async () => {
+      await bypassByDefault();
+      const { a, b, c } = await world();
+      await autoRun(c.number);
+      await adminAccept(a.number);
+      await adminAccept(b.number);
+      await w.work.settled();
+
+      expect(w.sent('card.run')).toEqual([]);
+      expect((await w.card(c.number)).rounds).toEqual([]);
+      expect((await detail(c.number)).autoRunFailure).toMatchObject({
+        message: expect.stringContaining('bypassPermissions'),
+        after: b.number,
+      });
+      const [failed] = await w.audit('card.auto_run_failed');
+      expect(failed).toMatchObject({
+        actorType: 'system',
+        actorOnBehalfOfId: w.operatorId,
+        result: 'error',
+      });
+    });
+
+    it('an admin-armed card runs in bypass; once an operator edits it, it runs as the operator', async () => {
+      await bypassByDefault();
+      const { a, b, c } = await world();
+      const armed = await w.admin.send('patch', cardPath(c.number), {
+        autoRunWhenReady: true,
+      });
+      expect(armed.status).toBe(200);
+      expect((await w.card(c.number)).autoRunArmedById).toBe(await adminId());
+
+      const edit = await w.operator.send('patch', cardPath(c.number), {
+        body: 'Delete the production database.',
+      });
+      expect(edit.status).toBe(200);
+      expect((await w.card(c.number)).autoRunArmedById).toBe(w.operatorId);
+      const edits = await w.audit('card.updated');
+      expect(edits[edits.length - 1]).toMatchObject({
+        actorUserId: w.operatorId,
+        meta: { autoRunReowned: true, previousArmedById: await adminId() },
+      });
+
+      await adminAccept(a.number);
+      await adminAccept(b.number);
+      await w.work.settled();
+      expect(w.sent('card.run')).toEqual([]);
+      expect((await detail(c.number)).autoRunFailure?.message).toContain(
+        'bypassPermissions',
+      );
+    });
+
+    it('an admin-armed card nobody else edited runs in bypass', async () => {
+      await bypassByDefault();
+      const { a, b, c } = await world();
+      await w.admin.send('patch', cardPath(c.number), {
+        autoRunWhenReady: true,
+      });
+      await accept(a.number);
+      await accept(b.number);
+      await w.work.settled();
+
+      expect(w.sent('card.run')).toEqual([
+        expect.objectContaining({ permissionMode: 'bypassPermissions' }),
+      ]);
+      expect((await w.card(c.number)).rounds[0].authorId).toBe(await adminId());
+    });
+
+    it("the arming operator's user budget stops it, not the accepting admin's", async () => {
+      const gate = w.ctx.app.get(BudgetGate);
+      const check = jest
+        .spyOn(gate, 'check')
+        .mockImplementation(async ({ userId }) =>
+          userId === w.operatorId
+            ? {
+                allowed: false,
+                budgetId: 'b1',
+                scope: 'user',
+                resetsAt: new Date('2026-11-01T00:00:00Z'),
+              }
+            : { allowed: true },
+        );
+      try {
+        const { a, b, c } = await world();
+        await autoRun(c.number);
+        await adminAccept(a.number);
+        await adminAccept(b.number);
+        await w.work.settled();
+
+        expect(w.sent('card.run')).toEqual([]);
+        expect((await detail(c.number)).autoRunFailure).toMatchObject({
+          code: BOARD_ERROR.budgetExceeded,
+          after: b.number,
+        });
+      } finally {
+        check.mockRestore();
+      }
+    });
+
+    it('is refused when the arming person no longer runs cards on the project', async () => {
+      const { a, b, c } = await world();
+      await autoRun(c.number);
+      await w.ctx.prisma.projectMember.deleteMany({
+        where: { projectId: w.a, userId: w.operatorId },
+      });
+      await adminAccept(a.number);
+      await adminAccept(b.number);
+      await w.work.settled();
+
+      expect(w.sent('card.run')).toEqual([]);
+      expect((await detail(c.number)).autoRunFailure?.message).toContain(
+        'no longer runs cards',
+      );
     });
   });
 });

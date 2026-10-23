@@ -36,11 +36,11 @@ describe('design stop (e2e)', () => {
     const stopped = await h.author.send('post', `${base}/stop`);
     expect(stopped.status).toBe(200);
     expect(h.sentOf('plan.cancel')).toEqual([
-      { planId: plan.id, turnId: turn.id },
+      { planId: plan.id, turnId: turn.id, projectId: h.projectId },
     ]);
     const [record] = await h.auditOf('design.stopped');
     expect(record.after).toMatchObject({
-      key: 't1',
+      task: 't1',
       stage: 'draw',
       runId: turn.runId,
       turnId: turn.id,
@@ -64,7 +64,7 @@ describe('design stop (e2e)', () => {
 
     expect((await cardStop(card.number)).status).toBe(200);
     expect(h.sentOf('plan.cancel')).toEqual([
-      { planId: card.id, turnId: turn.id },
+      { planId: card.id, turnId: turn.id, projectId: h.projectId },
     ]);
     expect((await h.auditOf('design.stopped')).length).toBe(1);
   });
@@ -78,7 +78,9 @@ describe('design stop (e2e)', () => {
     expect(stopped.status).toBe(200);
     expect((stopped.body as TaskDesignView).status).toBe('idle');
     expect((stopped.body as TaskDesignView).progress).toBeNull();
-    expect(h.designSent('uiprofile.cancel')).toEqual([{ runId: build.id }]);
+    expect(h.designSent('uiprofile.cancel')).toEqual([
+      { runId: build.id, projectId: h.projectId },
+    ]);
     const run = await h.ctx.prisma.run.findUniqueOrThrow({
       where: { id: build.id },
     });
@@ -150,6 +152,56 @@ describe('design stop (e2e)', () => {
     const [record] = await h.auditOf('design.stopped');
     expect(record.after).toMatchObject({ number: card.number, stage: null });
     expect((await cardGenerate(card.number)).status).toBe(201);
+  });
+
+  it('keeps a design busy while a turn the runner did not answer in time may run, and Stop cancels it (#840)', async () => {
+    await h.seedProfile();
+    const card = await h.designedCard();
+    h.handlers['plan.turn'] = () => ({ status: 'unknown' });
+    expect((await cardGenerate(card.number)).status).toBe(504);
+    const turn = await h.activeCardTurn(card.id);
+
+    const busy = await h.cardDesign(card.number);
+    expect(busy.status).toBe('generating');
+    expect(busy.activeTurnId).toBe(turn.id);
+    expect(busy.progress).toMatchObject({
+      stage: 'draw',
+      phase: 'queued',
+      turnId: turn.id,
+    });
+    expect(busy.lastFailure).toBeNull();
+
+    expect((await cardStop(card.number)).status).toBe(200);
+    expect(h.sentOf('plan.cancel')).toEqual([
+      { planId: card.id, turnId: turn.id, projectId: h.projectId },
+    ]);
+    await h.endTurn(card.id, 'cancelled', 'cancelled by the operator');
+    const rest = await h.cardDesign(card.number);
+    expect(rest.status).toBe('idle');
+    expect(rest.activeTurnId).toBeNull();
+    expect(rest.progress).toBeNull();
+    expect(rest.lastFailure).toMatchObject({
+      stage: 'draw',
+      reason: 'stopped',
+    });
+  });
+
+  it('stops a turn still running on a design whose status already rests (#840)', async () => {
+    await h.seedProfile();
+    const card = await h.designedCard();
+    expect((await cardGenerate(card.number)).status).toBe(201);
+    const turn = await h.activeCardTurn(card.id);
+    await h.ctx.prisma.taskDesign.update({
+      where: { cardId: card.id },
+      data: { status: 'idle', busySince: null },
+    });
+    const view = await h.cardDesign(card.number);
+    expect(view.progress).toMatchObject({ turnId: turn.id });
+
+    expect((await cardStop(card.number)).status).toBe(200);
+    expect(h.sentOf('plan.cancel')).toEqual([
+      { planId: card.id, turnId: turn.id, projectId: h.projectId },
+    ]);
   });
 
   it('is 403 for a viewer and 404 for a non-member; a viewer reads progress', async () => {

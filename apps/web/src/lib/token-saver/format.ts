@@ -93,15 +93,24 @@ export function formatSavedTokens(tokens: number): string {
 }
 
 /**
- * The card face's chip text (D13): `saved ≈ $0.41`. Nothing when the round
- * saved nothing — a card without filtered commands shows no chip.
+ * The card face's chip text, tokens first (#746 D7, amending #445 D13):
+ * `saved ≈ 42k tok · $0.13`, `saved ≈ 900 tok · <$0.01`, and the tokens alone
+ * when the round could not be priced. Nothing when the round saved nothing —
+ * a card without filtered commands shows no chip.
  */
 export function savedLabel(
   saved: TokenSavedView | null | undefined,
 ): string | null {
   if (!saved || saved.estimateTokens <= 0) return null;
-  return `saved ${formatSavedUsd(saved.estimateUsd)}`;
+  const tokens = `saved ≈ ${formatTokens(saved.estimateTokens)} tok`;
+  return saved.estimateUsd > 0
+    ? `${tokens} · ${formatCost(saved.estimateUsd)}`
+    : tokens;
 }
+
+/** #746 D6: how the badge's dollars are priced, for its title. */
+export const SAVED_PRICING_NOTE =
+  'an estimate: bytes ÷ 4, priced as one cache write plus a cache read on each turn left in the session';
 
 /** A 0–1 rate as a whole percent; `0%` for nothing, `<1%` for a trace. */
 export function formatRate(rate: number): string {

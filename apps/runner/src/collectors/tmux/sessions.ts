@@ -5,6 +5,7 @@ import {
   AGENT_FILE_MAX_BYTES,
   readRegularFileInside,
 } from '../../fs/safe-read';
+import type { QuotaResumer } from '../../quota/resume';
 import { classifyPane } from './classify';
 import { sessionPanes, type TmuxPane } from './tmux';
 import { type PaneChange, PaneTracker } from './tracker';
@@ -22,6 +23,17 @@ export interface SlotSessionsOptions {
   emit: FleetEmitter;
   /** Captures a pane's visible text; null when it cannot. */
   capture: (paneId: string) => Promise<string | null>;
+  /** The clock a banner's reset time is read against. Defaults to the system's. */
+  now?: () => number;
+  /**
+   * Resumes a slot's session when its limit resets (spec 741 D4). Absent: the
+   * limit is reported and nothing is typed.
+   */
+  resume?: {
+    resumer: QuotaResumer;
+    /** Types `text` into the pane, then submits it. */
+    type: (paneId: string, text: string) => Promise<void>;
+  };
 }
 
 /** Emits a tracker's changes for one pane, as slot or orchestrator events. */
@@ -98,6 +110,7 @@ export class SlotSessions {
     for (const [slot, live] of this.live) {
       if (sessions.get(slot) === live.session) continue;
       this.live.delete(slot);
+      this.options.resume?.resumer.forget(`slot:${slot}`);
       emit(
         'session.vanished',
         { name: live.session },
@@ -118,11 +131,21 @@ export class SlotSessions {
       const live = this.live.get(slot);
       const text = await this.options.capture(pane.paneId);
       if (!live || text === null) continue;
-      emitPaneChanges(emit, live.tracker.next(classifyPane(text)), {
-        target: 'slot',
-        slot,
-        issue: book.issue(slot),
+      const reading = classifyPane(text, {
+        now: new Date(this.options.now?.() ?? Date.now()),
       });
+      const scope = { target: 'slot' as const, slot, issue: book.issue(slot) };
+      emitPaneChanges(emit, live.tracker.next(reading), scope);
+      const { resume } = this.options;
+      resume?.resumer.observe(
+        `slot:${slot}`,
+        reading.quota,
+        {
+          capture: () => this.options.capture(pane.paneId),
+          type: (typed) => resume.type(pane.paneId, typed),
+        },
+        () => emitPaneChanges(emit, [{ type: 'pane.quota_resumed' }], scope),
+      );
     }
   }
 }

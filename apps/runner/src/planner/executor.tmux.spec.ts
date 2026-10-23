@@ -76,7 +76,7 @@ case "$FAKE_MODE" in
     sleep 60 ;;
   fail) echo 'Error: No conversation found with session ID' >&2; exit 2 ;;
   big) printf '{"type":"result","subtype":"success","is_error":false,"result":"%s"}\\n' "$(head -c 200000 /dev/zero | tr '\\0' a)"; exit 0 ;;
-  huge) printf '{"type":"result","subtype":"success","is_error":false,"result":"%s"}\\n' "$(head -c 2200000 /dev/zero | tr '\\0' a)"; exit 0 ;;
+  huge) printf '{"type":"result","subtype":"success","is_error":false,"result":"%s"}\\n' "$(head -c 2700000 /dev/zero | tr '\\0' a)"; exit 0 ;;
 esac
 echo '{"type":"result","subtype":"success","is_error":false,"result":"Planned.\\n\`\`\`agentdock-plan\\n{}\\n\`\`\`"}'
 `;
@@ -579,7 +579,11 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
         ),
       ),
     ).toBe('busy');
-    await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' });
+    await t.executor.cancel({
+      planId: 'plan_1',
+      turnId: 'turn_1',
+      projectId: 'prj_widget',
+    });
   });
 
   it('plan.cancel kills the turn session; a finished or unknown turn is not cancelled', async () => {
@@ -588,8 +592,25 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     for (let i = 0; i < 200 && t.calls() === 0; i++) await Bun.sleep(25);
     expect(await t.sessions()).toEqual(['nautelle-plan-pln00001']);
 
+    // C-161: a cancel naming another project is refused; the turn keeps running.
     expect(
-      await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' }),
+      await codeOf(
+        t.executor.cancel({
+          planId: 'plan_1',
+          turnId: 'turn_1',
+          projectId: 'prj_other',
+        }),
+      ),
+    ).toBe('not_found');
+    expect(await t.sessions()).toEqual(['nautelle-plan-pln00001']);
+    expect(t.finished('turn_1')).toBeUndefined();
+
+    expect(
+      await t.executor.cancel({
+        planId: 'plan_1',
+        turnId: 'turn_1',
+        projectId: 'prj_widget',
+      }),
     ).toEqual({ cancelled: true });
     expect(await t.sessions()).toEqual([]);
     expect(t.finished('turn_1')).toMatchObject({
@@ -597,10 +618,20 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
       sessionId: S1,
     });
     expect(
-      await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' }),
+      await t.executor.cancel({
+        planId: 'plan_1',
+        turnId: 'turn_1',
+        projectId: 'prj_widget',
+      }),
     ).toEqual({ cancelled: false });
     expect(
-      await codeOf(t.executor.cancel({ planId: 'plan_1', turnId: 'nope' })),
+      await codeOf(
+        t.executor.cancel({
+          planId: 'plan_1',
+          turnId: 'nope',
+          projectId: 'prj_widget',
+        }),
+      ),
     ).toBe('not_found');
     // The slot is free again: a next turn runs at once.
     expect(
@@ -622,7 +653,11 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     for (let i = 0; i < 200 && t.calls() === 0; i++) await Bun.sleep(25);
     await Bun.sleep(100);
     expect(
-      await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' }),
+      await t.executor.cancel({
+        planId: 'plan_1',
+        turnId: 'turn_1',
+        projectId: 'prj_widget',
+      }),
     ).toEqual({ cancelled: true });
     const note = join(
       t.f.ws,
@@ -672,7 +707,11 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     const t = await setup();
     await t.executor.run(t.args({ profileKey: 'claude-talkslow' }));
     for (let i = 0; i < 200 && t.calls() === 0; i++) await Bun.sleep(25);
-    await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' });
+    await t.executor.cancel({
+      planId: 'plan_1',
+      turnId: 'turn_1',
+      projectId: 'prj_widget',
+    });
     await Bun.sleep(50);
     expect(t.haikuPrompts).toEqual([]);
     expect(existsSync(t.notesDir)).toBe(false);
@@ -820,7 +859,11 @@ describe.skipIf(!tmuxInstalled)('plan turns (real tmux, fake claude)', () => {
     expect(await runs.run(skillArgs)).toEqual({ phase: 'queued' });
     for (let i = 0; i < 200 && t.calls() === 0; i++) await Bun.sleep(25);
     expect(runs.record('run_s1')?.phase).toBe('queued');
-    await t.executor.cancel({ planId: 'plan_1', turnId: 'turn_1' });
+    await t.executor.cancel({
+      planId: 'plan_1',
+      turnId: 'turn_1',
+      projectId: 'prj_widget',
+    });
     // The freed slot started it.
     expect(runs.record('run_s1')?.phase).not.toBe('queued');
 

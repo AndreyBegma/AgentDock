@@ -23,6 +23,7 @@ import {
   isWorktreeGoneError,
   noPrBanner,
   parseCardParam,
+  parseLinkedPlans,
   parseMaxRunning,
   roundPill,
   toItem,
@@ -396,6 +397,21 @@ describe('hooksNotice (#281 D6, #367 D3/D4)', () => {
     expect(notice.commands[0]?.label).toContain('claude-work');
   });
 
+  test('C-177: the profile key is one shell word in the command', () => {
+    for (const round of [
+      { wiring: null },
+      { wiring: null, hooksCause: 'no_plugin', hooksProfile: "a'b $&;x" },
+    ] as const) {
+      const notice = hooksNotice(
+        { source: 'terminal', profileKey: "a'b $&;x" },
+        round,
+      );
+      expect(notice.commands.map((c) => c.code)).toEqual([
+        `nautelle-runner setup claude --profile 'a'\\''b $&;x'`,
+      ]);
+    }
+  });
+
   test('#348: no_plugin names the profile and its setup command, no placeholder', () => {
     for (const source of ['manual', 'terminal'] as const) {
       const notice = hooksNotice(
@@ -514,5 +530,36 @@ describe('describeBoardError for dependencies (#638, #636)', () => {
     expect(describeBoardError(refused('dependency_open'))).toBe(
       'A card it depends on has no ready pull request yet.',
     );
+  });
+});
+
+describe('parseLinkedPlans (C-165)', () => {
+  test('a traversal in ?planPanel= opens no panel', () => {
+    // `URLSearchParams` decodes it to `../../Q`, the path it would have hit.
+    const linked = parseLinkedPlans(
+      new URLSearchParams('planPanel=..%2F..%2FQ'),
+    );
+    expect(linked.planPanelId).toBeUndefined();
+  });
+
+  test('only ids pass, for the intake, the panel and the discussion', () => {
+    expect(
+      parseLinkedPlans(
+        new URLSearchParams(
+          'intake=cmvb25vkn01i501o68v2unmem&planPanel=c2&discussion=a.b',
+        ),
+      ),
+    ).toEqual({
+      intakeId: 'cmvb25vkn01i501o68v2unmem',
+      planPanelId: 'c2',
+      discussionId: undefined,
+    });
+    expect(
+      parseLinkedPlans(new URLSearchParams('intake=..&planPanel=')),
+    ).toEqual({
+      intakeId: undefined,
+      planPanelId: undefined,
+      discussionId: undefined,
+    });
   });
 });

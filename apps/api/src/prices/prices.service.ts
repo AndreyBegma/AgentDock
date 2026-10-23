@@ -1,10 +1,12 @@
-import type {
-  CurrentPricesResponse,
-  ModelPriceInput,
-  PriceSource,
-  PriceTestResponse,
-  PriceVersionListResponse,
-  PriceVersionSummary,
+import {
+  type CurrentPricesResponse,
+  checkSafePattern,
+  type ModelPriceInput,
+  type PriceSource,
+  type PriceTestResponse,
+  type PriceVersionListResponse,
+  type PriceVersionSummary,
+  SAFE_PATTERN_MESSAGES,
 } from '@nautelle/shared';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
@@ -14,7 +16,7 @@ import { PrismaService } from '../database/prisma.service';
 import { usageError } from '../usage/usage-error';
 import { toModelPrice } from './cost.service';
 import type { CreatePriceVersionDto, PriceTestDto } from './dto';
-import { compilePattern, compilePrices, priceRequest } from './pricing';
+import { compilePrices, priceRequest } from './pricing';
 
 /** Serializes version creation: each takes the next `number`. */
 const VERSION_LOCK = 13_014;
@@ -54,13 +56,12 @@ const modelSelect = {
 
 /** Refuses a model price the pricer could not use (D3): a bad regex, not exactly one default tier. */
 const checkModelPrice = (price: ModelPriceInput): void => {
-  try {
-    compilePattern(price.matchPattern);
-  } catch {
+  const pattern = checkSafePattern(price.matchPattern, 'i');
+  if (!pattern.ok) {
     throw usageError(
       400,
       'invalid_price',
-      `${price.modelName}: matchPattern is not a valid regular expression`,
+      `${price.modelName}: matchPattern ${SAFE_PATTERN_MESSAGES[pattern.reason]}`,
     );
   }
   const defaults = price.tiers.filter((t) => t.isDefault).length;

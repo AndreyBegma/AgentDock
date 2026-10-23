@@ -155,6 +155,7 @@ export const testOptions = (
   appUrl: 'http://web.test',
   apiBase: 'http://github.test',
   debounceMs: 300,
+  resyncWindowMs: 60_000,
   healthIntervalMs: 60_000,
   autoStart: false,
   requestTimeoutMs: 2_000,

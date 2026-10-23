@@ -511,12 +511,47 @@ describe('merge approval queue (e2e)', () => {
       expect(response.body.error).toBe('approval_not_found');
     });
 
+    it('answers 400 to a PR number beyond int4, not 500', async () => {
+      const detail = await operatorOfA.get(
+        `/projects/${a}/approvals/99999999999`,
+      );
+      expect(detail.status).toBe(400);
+      const approve = await operatorOfA.send(
+        'post',
+        `/projects/${a}/approvals/99999999999/approve`,
+        { headSha: H1 },
+      );
+      expect(approve.status).toBe(400);
+      expect(commands.approve).not.toHaveBeenCalled();
+    });
+
     it('answers 409 not_waiting to a second approval of the same head', async () => {
       expect((await approve(H1)).status).toBe(200);
       const again = await approve(H1);
       expect(again.status).toBe(409);
       expect(again.body.error).toBe('not_waiting');
       expect(commands.approve).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers 409 approval_closed when the row closes while the decision is sent, and keeps it closed (L-11)', async () => {
+      jest.mocked(commands.approve).mockImplementation(async () => {
+        await ctx.prisma.mergeApproval.updateMany({
+          where: { projectId: a, prNumber: PR },
+          data: { status: 'merged' },
+        });
+        return signal;
+      });
+      const response = await approve(H1);
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('approval_closed');
+      expect(await rows()).toEqual([
+        expect.objectContaining({ status: 'merged', headSha: null }),
+      ]);
+      const [record] = await audits('approval.approve');
+      expect(record).toMatchObject({
+        result: 'denied',
+        after: { pr: PR, headSha: H1, decision: 'approved' },
+      });
     });
 
     it('answers 503 command_unavailable when the runner does not answer (real RunnerCommandService, no runner connected), and records the error', async () => {

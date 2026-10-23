@@ -26,6 +26,8 @@ import { api, describeError } from '../../lib/api';
 import { useLiveStatus } from '../../lib/live/use-live';
 import { Assistant } from '../assistant/assistant';
 import { AskBoardDialog } from '../board-ai/ask-board-dialog';
+import { RunnerUpdateNotice } from '../runners/runner-update-notice';
+import { useRunnerUpdate } from '../runners/use-runner-update';
 import { AccountMenu } from './account-menu';
 import { Capsule } from './capsule';
 import { crumbsFor, pageTitleOf } from './crumbs';
@@ -140,6 +142,8 @@ export function AppShell({
   const { status, closeCode } = useLiveStatus();
   const live = useLivePaused();
   const restarting = useServerRestarting();
+  // C-328: the caller's own runner is behind the latest release.
+  const runnerUpdate = useRunnerUpdate();
   useEffect(() => {
     if (status === 'offline' && closeCode === LIVE_CLOSE_CODES.unauthorized) {
       router.replace('/login');
@@ -337,6 +341,13 @@ export function AppShell({
                 >
                   This page may be out of date.
                 </Banner>
+              ) : null}
+
+              {runnerUpdate.notice ? (
+                <RunnerUpdateNotice
+                  notice={runnerUpdate.notice}
+                  onDismiss={runnerUpdate.dismiss}
+                />
               ) : null}
 
               <main

@@ -8,12 +8,20 @@ export const AUDIT_ACTIONS = [
   'auth.register',
   'auth.password_change',
   'auth.session_revoke',
+  /** C-189: two-factor sign-in turned on, off, or given new recovery codes. */
+  'auth.two_factor_enable',
+  'auth.two_factor_disable',
+  'auth.two_factor_recovery_codes',
   'user.create',
   'user.approve',
   'user.reject',
   'user.update',
   'user.delete',
+  /** C-189: an admin turned off another account's two-factor sign-in. */
+  'user.two_factor_reset',
   'settings.registration',
+  /** C-189: an admin changed whether admins must use two-factor sign-in. */
+  'settings.two_factor',
   'runner.create',
   'runner.pairing_code',
   'runner.pair',
@@ -38,6 +46,11 @@ export const AUDIT_ACTIONS = [
   'project.docs_source_reset',
   /** A GitHub App delivery found the project's repository under a new name. */
   'project.repo_rename',
+  /**
+   * #751 B9, B12: a prefix overlay proposed, approved, rejected or turned into
+   * a pull-request card — `meta.change`, `meta.part`; never the content.
+   */
+  'project.prefix_overlay',
   'prices.version_create',
   'prices.recompute',
   'issue.create',
@@ -58,6 +71,10 @@ export const AUDIT_ACTIONS = [
   'telegram.configure',
   'telegram.clear',
   'telegram.link',
+  /** C-147: a chat redeemed a link code and waits for confirmation in the app (`after: { username }`). */
+  'telegram.link_request',
+  /** C-147: the user turned a waiting chat away in the app. */
+  'telegram.link_decline',
   'telegram.unlink',
   'telegram.approval',
   'telegram.project',
@@ -105,6 +122,8 @@ export const AUDIT_ACTIONS = [
   'plan.revised',
   'plan.sent',
   'plan.task_reviewed',
+  /** #409, DA-16: a New work split confirmed, by the person who confirmed it. */
+  'plan.split_confirmed',
   /** #592 (ADR-0058): a New work candidate edited by hand (`meta.candidateId`). */
   'plan.candidate_edited',
   /** #592: a New work candidate rejected; no card was made. */
@@ -115,7 +134,13 @@ export const AUDIT_ACTIONS = [
   'design.generated',
   'design.revised',
   'design.approved',
+  /** #833 D7: Complete — `after` `{revisions, variants, turnId}`. */
+  'design.completed',
   'design.settings_updated',
+  /** #833 D9: a project's frame template created, updated or deleted. */
+  'design.template_created',
+  'design.template_updated',
+  'design.template_deleted',
   /** #275 D5: `meta` `{stage, runId, turnId?}`. */
   'design.stopped',
   'uiprofile.built',
@@ -137,10 +162,17 @@ export const AUDIT_ACTIONS = [
   /** #652: Stop removed the stack run's queue (`after: { number, removed }`). */
   'stack.run_stopped',
   'card.deleted',
+  /**
+   * C-187: the fleet mirror removed a slotless To Do card whose open issue
+   * left the ready queue (system actor, `before: { number, title, issue, reason }`).
+   */
+  'card.fleet_removed',
   'card.moved',
   'card.run_started',
   'card.feedback',
   'card.finished',
+  // #750 D9: the worker's `escalate_card` (reason, model, relaunched).
+  'card.escalated',
   'card.accepted',
   'card.stopped',
   /** #243 D10: the card's Continue after design switch. */
@@ -238,13 +270,15 @@ export type AuditResult = (typeof AUDIT_RESULTS)[number];
  * `throttled`: the source must wait after its own failures (C-109). `locked`
  * only appears in records written before C-109 removed the account lock.
  * `telegram_*`: a Mini App sign-in (#580) with unsigned or stale `initData`,
- * or from a Telegram user no account is linked to.
+ * or from a Telegram user no account is linked to. `two_factor_invalid`: the
+ * password was right and the code was not (C-189).
  */
 export const LOGIN_DENIED_REASONS = [
   'invalid_credentials',
   'throttled',
   'locked',
   'pending_approval',
+  'two_factor_invalid',
   'telegram_invalid',
   'telegram_not_linked',
 ] as const;

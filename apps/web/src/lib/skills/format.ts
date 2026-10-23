@@ -19,8 +19,8 @@ import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { describeBudgetExceededError } from '../budgets/format';
 import { updateRunnerText } from '../control/format';
-import { safeHttpsUrl } from '../fleet/format';
 import { runsHref } from '../history/format';
+import { githubUrl } from '../url';
 
 type Tone = 'ok' | 'warn' | 'danger' | 'neutral';
 
@@ -407,7 +407,7 @@ export function installOutcome(run: {
         prUrl: null,
       };
     case 'ok': {
-      const prUrl = safeHttpsUrl(
+      const prUrl = githubUrl(
         typeof run.result?.prUrl === 'string' ? run.result.prUrl : null,
       );
       return {

@@ -4,6 +4,8 @@ import {
   DESIGN_COMMENT_MAX,
   DESIGN_SELECTOR_MAX,
   DESIGN_SKILLS_MAX,
+  DESIGN_TEMPLATE_KEY_MAX,
+  DESIGN_TEMPLATE_KEY_PATTERN,
   DESIGN_THEMES,
   DESIGN_VARIANTS_MAX,
   DESIGN_VARIANTS_MIN,
@@ -18,10 +20,18 @@ import {
   type DesignTheme,
   type TaskDesignPatchRequest,
   UI_PROFILE_KIT_MAX_BYTES,
+  UI_PROFILE_RULE_COMMENTS_MAX,
+  UI_PROFILE_SCREEN_NAME_MAX,
+  UI_PROFILE_SCREEN_SUMMARY_MAX,
+  UI_PROFILE_SCREENS_MAX,
   UI_PROFILE_SNIPPET_MAX_BYTES,
   UI_PROFILE_SNIPPET_NAME_MAX,
   UI_PROFILE_SNIPPETS_MAX,
+  UI_PROFILE_STYLE_RULE_MAX,
+  UI_PROFILE_STYLE_RULES_MAX,
   UI_PROFILE_SUMMARY_MAX,
+  type UiProfileScreen,
+  type UiProfileStyleRule,
   type UiProfileUpdateRequest,
   type ViewportPreset,
 } from '@nautelle/shared';
@@ -33,6 +43,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsISO8601,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -93,6 +104,14 @@ export class TaskDesignPatchDto implements TaskDesignPatchRequest {
   @Min(DESIGN_VARIANTS_MIN)
   @Max(DESIGN_VARIANTS_MAX)
   variantCount?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(DESIGN_TEMPLATE_KEY_MAX)
+  @Matches(DESIGN_TEMPLATE_KEY_PATTERN, {
+    message: 'templateKey is not a template key',
+  })
+  templateKey?: string;
 
   @IsOptional()
   @IsArray()
@@ -200,6 +219,71 @@ export class UiProfileUpdateDto implements UiProfileUpdateRequest {
   @IsOptional()
   @IsBoolean()
   hasUi?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(UI_PROFILE_SCREENS_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => UiProfileScreenDto)
+  screens?: UiProfileScreenDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(UI_PROFILE_STYLE_RULES_MAX)
+  @ValidateNested({ each: true })
+  @Type(() => UiProfileStyleRuleDto)
+  styleRules?: UiProfileStyleRuleDto[];
+}
+
+/** #752 A5: one library entry, as an admin's edit sends it back. */
+export class UiProfileScreenDto implements UiProfileScreen {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(ID_MAX_LENGTH)
+  designId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(ID_MAX_LENGTH)
+  revisionId!: string;
+
+  @IsString()
+  @Matches(/\S/, { message: 'name must not be blank' })
+  @MaxLength(UI_PROFILE_SCREEN_NAME_MAX)
+  name!: string;
+
+  @IsString()
+  @Matches(/\S/, { message: 'summary must not be blank' })
+  @MaxLength(UI_PROFILE_SCREEN_SUMMARY_MAX)
+  summary!: string;
+
+  @IsArray()
+  @ArrayMaxSize(UI_PROFILE_SNIPPETS_MAX)
+  @IsString({ each: true })
+  @MaxLength(UI_PROFILE_SNIPPET_NAME_MAX, { each: true })
+  snippetsUsed!: string[];
+
+  @IsISO8601()
+  approvedAt!: string;
+}
+
+/** #752 A5: one style rule, as an admin's edit sends it back. */
+export class UiProfileStyleRuleDto implements UiProfileStyleRule {
+  @IsString()
+  @Matches(/\S/, { message: 'text must not be blank' })
+  @MaxLength(UI_PROFILE_STYLE_RULE_MAX)
+  text!: string;
+
+  @IsArray()
+  @ArrayMaxSize(UI_PROFILE_RULE_COMMENTS_MAX)
+  @IsString({ each: true })
+  @MaxLength(ID_MAX_LENGTH, { each: true })
+  commentIds!: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(ID_MAX_LENGTH)
+  designId!: string | null;
 }
 
 /** `GET /projects/:projectId/ui-profile/versions?version=`. */
@@ -250,4 +334,9 @@ export class DesignSettingsDto implements DesignSettingsUpdateRequest {
     message: 'each skill must be an installed skill invocation',
   })
   defaultSkills!: string[];
+
+  /** #752 A6. */
+  @IsOptional()
+  @IsBoolean()
+  useMemory?: boolean;
 }

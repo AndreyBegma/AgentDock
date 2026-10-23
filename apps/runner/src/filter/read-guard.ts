@@ -10,6 +10,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, extname, isAbsolute, join } from 'node:path';
+import { TECHNIQUE_READ_GUARD_400, techniqueOn } from './env';
+import { renderOutline } from './outline';
 import { type StatsTarget, statsTarget, writeStat } from './stats';
 
 /**
@@ -36,6 +38,8 @@ import { type StatsTarget, statsTarget, writeStat } from './stats';
 export const READ_GUARD_BYTES = 64 * 1024;
 /** …or over this many lines, whichever comes first. */
 export const READ_GUARD_LINES = 1500;
+/** …and over this many under the `read-guard-400` technique (#747 D9). */
+export const READ_GUARD_LINES_TIGHT = 400;
 
 export const READ_GUARD_ID = 'tool/read-guard';
 export const READ_DEDUP_ID = 'tool/read-dedup';
@@ -142,8 +146,13 @@ export const readKey = (
 const isWholeRead = (input: ReadInput): boolean =>
   input.offset == null && input.limit == null && input.pages == null;
 
-/** Line count of a text file's first `SCAN_BYTES`; `null` for binary. */
-const scanLines = (path: string, size: number): number | null => {
+interface Scan {
+  lines: number;
+  bytes: Buffer;
+}
+
+/** A text file's first `SCAN_BYTES` and its line count; `null` for binary. */
+const scan = (path: string, size: number): Scan | null => {
   const fd = openSync(path, 'r');
   try {
     const buffer = Buffer.alloc(Math.min(size, SCAN_BYTES));
@@ -152,11 +161,18 @@ const scanLines = (path: string, size: number): number | null => {
     if (bytes.subarray(0, BINARY_PROBE).includes(0)) return null;
     let lines = 0;
     for (const byte of bytes) if (byte === 10) lines++;
-    return read > 0 && bytes[read - 1] !== 10 ? lines + 1 : lines;
+    return {
+      lines: read > 0 && bytes[read - 1] !== 10 ? lines + 1 : lines,
+      bytes,
+    };
   } finally {
     closeSync(fd);
   }
 };
+
+/** Line count of a text file's first `SCAN_BYTES`; `null` for binary. */
+const scanLines = (path: string, size: number): number | null =>
+  scan(path, size)?.lines ?? null;
 
 /** What a read of `input` would return, in bytes, roughly. */
 const estimateBytes = (input: ReadInput, path: string, size: number) => {
@@ -178,6 +194,23 @@ export const guardMessage = (
   `Nautelle token saver: ${path} is ${lines.toLocaleString('en-US')} lines (${kib(size)}) — not read whole. ` +
   'Read the part you need with offset/limit (Grep finds the line), or ask the `scout` agent to search it. ' +
   'Repeat the same call to read it all.';
+
+/**
+ * The refusal under `read-guard-400` (#747 D9): the same notice with the
+ * file's outline. "at least" when the file is past the scan.
+ */
+export const guardMessageWithOutline = (
+  path: string,
+  size: number,
+  scanned: Scan,
+): string => {
+  const atLeast = size > SCAN_BYTES ? 'at least ' : '';
+  return [
+    `Nautelle token saver: ${path} is ${atLeast}${scanned.lines.toLocaleString('en-US')} lines (${kib(size)}) — not read whole.`,
+    ...renderOutline(scanned.bytes.toString('utf8'), path),
+    'Read the part you need with offset/limit (Grep finds the line), or ask the `scout` agent to search it. Repeat the same call to read it all.',
+  ].join('\n');
+};
 
 export const dedupMessage = (path: string, since: number): string =>
   `Nautelle token saver: ${path} (this range) is already in your context since ${new Date(since).toISOString().slice(11, 19)} UTC and has not changed. ` +
@@ -243,10 +276,14 @@ const beforeRead = (
   if (!isWholeRead(input) || MEDIA.has(extname(path).toLowerCase())) {
     return null;
   }
-  const lines = scanLines(path, stat.size);
-  if (lines === null) return null;
-  if (stat.size <= READ_GUARD_BYTES && lines <= READ_GUARD_LINES) return null;
-  const reason = guardMessage(path, stat.size, lines);
+  const scanned = scan(path, stat.size);
+  if (scanned === null) return null;
+  const tight = techniqueOn(deps.env, TECHNIQUE_READ_GUARD_400);
+  const limit = tight ? READ_GUARD_LINES_TIGHT : READ_GUARD_LINES;
+  if (stat.size <= READ_GUARD_BYTES && scanned.lines <= limit) return null;
+  const reason = tight
+    ? guardMessageWithOutline(path, stat.size, scanned)
+    : guardMessage(path, stat.size, scanned.lines);
   const kept = Buffer.byteLength(reason);
   memory.denied[key] = { kind: 'guard' };
   saveMemory(file, memory);

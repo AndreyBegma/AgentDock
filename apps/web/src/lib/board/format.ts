@@ -33,6 +33,7 @@ import {
   isWorktreeGoneError,
   MOVE_REFUSAL_TEXT,
   ownsWorker,
+  shellWord,
 } from '@nautelle/shared';
 import type {
   CardRunWiringReason,
@@ -41,6 +42,7 @@ import type {
 import { describePolicyRefusal } from '@/lib/runners/policy';
 import { ApiError, describeError } from '../api';
 import { STAGE_LABEL } from '../fleet/graph';
+import { entityIdOrUndefined } from '../ids';
 import { describeNoProfile } from '../readiness/copy';
 import {
   PROFILES_LIST_COMMAND,
@@ -175,6 +177,22 @@ export const parseCardParam = (raw: string | null): number | undefined => {
   const n = Number(raw);
   return n > 0 ? n : undefined;
 };
+
+/**
+ * The plans the Board's URL links to (#337, #409, #590): the New work intake
+ * (`?intake=`), an earlier plan's panel (`?planPanel=`) and a discussion
+ * (`?discussion=`). Each reaches API paths, writes included, so a value that
+ * is not an id is dropped and its dialog stays closed (C-165).
+ */
+export function parseLinkedPlans(params: {
+  get: (key: string) => string | null;
+}): { intakeId?: string; planPanelId?: string; discussionId?: string } {
+  return {
+    intakeId: entityIdOrUndefined(params.get('intake')),
+    planPanelId: entityIdOrUndefined(params.get('planPanel')),
+    discussionId: entityIdOrUndefined(params.get('discussion')),
+  };
+}
 
 /**
  * Every column in `BOARD_COLUMNS` order, even if the API left one out — except
@@ -528,13 +546,22 @@ const WIRING_REASON_TEXT: Record<CardRunWiringReason, string> = {
 /** The profile placeholder of `SETUP_CLAUDE_COMMAND`. */
 const PROFILE_PLACEHOLDER = '<key>';
 
+/**
+ * C-177: the setup command for one profile, its key as one shell word. A
+ * replacer function, so a `$&` in the key is not read as a pattern.
+ */
+const setupCommandFor = (profileKey: string): string =>
+  SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, () =>
+    shellWord(profileKey),
+  );
+
 /** The setup commands of a terminal or fleet card, naming its profile if known. */
 const setupCommands = (profileKey: string | null) =>
   profileKey
     ? ([
         {
           label: `Set up profile ${profileKey}, then restart its sessions`,
-          code: SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, profileKey),
+          code: setupCommandFor(profileKey),
         },
       ] as const)
     : ([
@@ -583,7 +610,7 @@ export const hooksNotice = (
         commands: [
           {
             label: 'Set up the profile, then restart its sessions',
-            code: SETUP_CLAUDE_COMMAND.replace(PROFILE_PLACEHOLDER, profile),
+            code: setupCommandFor(profile),
           },
         ],
         guide: true,

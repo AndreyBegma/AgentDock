@@ -29,6 +29,7 @@ scripts/      — db-start-docker.sh (up → migrate → seed)
 | `bun run build` | build everything (turbo, cached) |
 | `bun run lint` / `bun run test` | lint (Biome) / tests (Jest in api) |
 | `bun run check` | Biome lint + format + import order, no writes |
+| `bun run check:secrets` | gitleaks over the git history with `.gitleaks.toml` (local gitleaks, else Docker); the CI `secrets` step runs the same scan |
 | `bun run db:migrate` | `prisma migrate dev` — create and apply a migration |
 | `bun run db:generate` | regenerate the Prisma client |
 | `bun run db:studio` | Prisma Studio |

@@ -10,26 +10,59 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { type CrumbNames, planLabel, sessionLabel } from './crumbs';
 
+/**
+ * A segment of the pathname as it goes into an API path: decoded once, then
+ * encoded, so `a%2F..%2Fb` stays one segment; null when it does not decode
+ * (C-165).
+ */
+function apiSegment(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    return encodeURIComponent(decodeURIComponent(raw));
+  } catch {
+    return null;
+  }
+}
+
+/** The GET for `id` at `path`, or null when a segment does not decode. */
+function detail(
+  id: string | undefined,
+  build: (...segments: string[]) => string,
+  ...raw: (string | undefined)[]
+): { id: string; path: string } | null {
+  const segments = raw.map(apiSegment);
+  if (segments.some((s) => s === null)) return null;
+  return { id: id ?? '', path: build(...(segments as string[])) };
+}
+
 /** The detail page at `pathname`, if it is one whose name needs a GET. */
-function detailOf(pathname: string): { id: string; path: string } | null {
+export function detailOf(
+  pathname: string,
+): { id: string; path: string } | null {
   const skillRun = /^\/projects\/([^/]+)\/skills\/runs\/([^/]+)$/.exec(
     pathname,
   );
   if (skillRun) {
-    return {
-      id: skillRun[2] ?? '',
-      path: `/projects/${skillRun[1]}/skill-runs/${skillRun[2]}`,
-    };
+    return detail(
+      skillRun[2],
+      (project, run) => `/projects/${project}/skill-runs/${run}`,
+      skillRun[1],
+      skillRun[2],
+    );
   }
   const plan = /^\/projects\/([^/]+)\/planner\/([^/]+)$/.exec(pathname);
   if (plan) {
-    return {
-      id: plan[2] ?? '',
-      path: `/projects/${plan[1]}/plans/${plan[2]}`,
-    };
+    return detail(
+      plan[2],
+      (project, id) => `/projects/${project}/plans/${id}`,
+      plan[1],
+      plan[2],
+    );
   }
   const session = /^\/sessions\/([^/]+)$/.exec(pathname);
-  if (session) return { id: session[1] ?? '', path: `/sessions/${session[1]}` };
+  if (session) {
+    return detail(session[1], (id) => `/sessions/${id}`, session[1]);
+  }
   return null;
 }
 

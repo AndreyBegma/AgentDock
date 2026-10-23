@@ -16,3 +16,6 @@ process.env.DEEPL_API_KEY = '';
 // ADR-0059: never the real master key from `.env`; the LLM suites set their own
 // before the app starts.
 process.env.LLM_SECRETS_KEY = '';
+// C-174: the audit chain is keyed in every suite, as it is when deployed; the
+// audit suite unsets it to write the unkeyed records of an older chain.
+process.env.AUDIT_HMAC_KEY = 'e2e-audit-chain-key-not-a-real-secret-0000';

@@ -294,8 +294,11 @@ const EVENT_RULES: Record<string, EventRule> = {
   'pane.quota_hit': {
     category: 'fleet',
     severity: fixed('danger'),
-    title: (ctx) => `${who(ctx)} hit the quota`,
-    keep: ['target'],
+    title: (ctx) => {
+      const resetsAt = str(ctx.data, 'resetsAt');
+      return `${who(ctx)} hit the quota${resetsAt ? `, resets ${resetsAt.slice(0, 16).replace('T', ' ')} UTC` : ''}`;
+    },
+    keep: ['target', 'limit', 'resetsAt'],
   },
   // Only Code Sentinel's own `cs-*` sessions are fleet news (D3).
   'session.vanished': {
@@ -366,6 +369,7 @@ export const PLUGIN_ECHOED_EVENT_TYPES: ReadonlySet<string> = new Set([
   'pane.prompt',
   'pane.idle',
   'pane.quota_hit',
+  'pane.quota_resumed',
   'pane.busy',
   'worktree.changed',
   'commit.trailer_found',
@@ -435,7 +439,9 @@ const AUDIT_TITLES: Record<string, string> = {
   'user.reject': 'User rejected',
   'user.update': 'User updated',
   'user.delete': 'User deleted',
+  'user.two_factor_reset': 'User two-factor sign-in reset',
   'settings.registration': 'Registration settings changed',
+  'settings.two_factor': 'Two-factor requirement changed',
   'runner.create': 'Runner created',
   'runner.pairing_code': 'Runner pairing code issued',
   'runner.pair': 'Runner paired',
@@ -464,6 +470,7 @@ const AUDIT_TITLES: Record<string, string> = {
   'action_request.decided': 'Action request decided',
   'action_request.executed': 'Requested action executed',
   'session_content.purged': 'Session content purged',
+  'card.fleet_removed': 'Fleet card removed: its issue left the queue',
 };
 
 /** Every audit action the feed shows — the projector's `action IN (…)` filter. */

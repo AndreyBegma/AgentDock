@@ -304,6 +304,43 @@ describe('New work intake splits (e2e, #409)', () => {
     expect(await cardsOf(plan.id)).toHaveLength(0);
   });
 
+  it('credits the operator who confirms a shared intake, not its author (DA-16)', async () => {
+    const plan = await proposed();
+    const shared = await h.author.send(
+      'post',
+      `${h.base(plan.id)}/visibility`,
+      { visibility: 'project' },
+    );
+    expect(shared.status).toBe(200);
+    const other = await h.ctx.prisma.user.findUniqueOrThrow({
+      where: { email: 'other@example.com' },
+    });
+    const response = await confirm(
+      plan.id,
+      {
+        turnId: plan.intake?.split?.turnId,
+        cards: [
+          { index: 0, title: 'Export the board as CSV', kind: 'feature' },
+        ],
+      },
+      h.other,
+    );
+    expect(response.status).toBe(201);
+    const [confirmed, ...rest] = await h.auditOf('plan.split_confirmed');
+    expect(rest).toHaveLength(0);
+    expect(confirmed).toMatchObject({
+      actorUserId: other.id,
+      targetId: plan.id,
+      projectId: h.projectId,
+      result: 'ok',
+    });
+
+    const accepted = await h.acceptAll(plan.id, h.other);
+    expect(accepted.status).toBe(200);
+    const cards = await cardsOf(plan.id);
+    expect(cards.map((c) => c.createdById)).toEqual([other.id]);
+  });
+
   it('a viewer cannot confirm; a non-intake plan has no split', async () => {
     const plan = await proposed();
     const viewer = await confirm(

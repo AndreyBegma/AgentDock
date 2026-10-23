@@ -8,7 +8,8 @@ import type {
 } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { ConfigProfile } from '../config';
-import { expectTextCallWired } from '../launch/testing';
+import { expectTextCallWired, strictMcpServersOf } from '../launch/testing';
+import { NO_MCP_ARGS } from '../launch/token-saver';
 import { FakeClock } from '../testing/fake-clock';
 import { fakeExec, memoryLogger, tempDir } from '../testing/fixtures';
 import {
@@ -16,6 +17,7 @@ import {
   CaptureExecutor,
   type CaptureProcess,
   type CaptureSpawn,
+  readTail,
 } from './executor';
 
 const SESSION = '11111111-1111-4111-8111-111111111111';
@@ -29,6 +31,7 @@ interface Call {
   env: Record<string, string>;
   stdin: string;
   dirExistedAtStart: boolean;
+  mcpServers: Record<string, unknown> | null;
 }
 
 interface Script {
@@ -61,6 +64,7 @@ const setup = (script: Script = { stdout: resultLine('ok') }) => {
       env: spec.env,
       stdin: readFileSync(spec.stdinFile, 'utf8'),
       dirExistedAtStart: existsSync(spec.cwd),
+      mcpServers: strictMcpServersOf(spec.command),
     });
     let finish: (code: number | null) => void = () => {};
     const exited = new Promise<number | null>((resolve) => {
@@ -161,6 +165,19 @@ describe('CaptureExecutor — Token saver (#445)', () => {
     const call = t.calls[0] as Call;
     expectTextCallWired(call, call.cwd, 'card_capture');
   });
+
+  it('loads no MCP server, with Token saver off or a non-empty allowlist (C-179)', async () => {
+    for (const tokenSaver of [
+      undefined,
+      { enabled: false, mcpAllow: ['playwright'] },
+      { enabled: true, mcpAllow: ['playwright'] },
+    ]) {
+      const t = setup();
+      await t.executor.run(t.args({ tokenSaver }));
+      await t.finished();
+      expect(t.calls[0]?.mcpServers).toEqual({});
+    }
+  });
 });
 
 describe('CaptureExecutor (#244 D4)', () => {
@@ -182,6 +199,7 @@ describe('CaptureExecutor (#244 D4)', () => {
     expect(call.command).toEqual([
       '/usr/bin/claude',
       '--strict-mcp-config',
+      ...NO_MCP_ARGS,
       ...CAPTURE_CLAUDE_FLAGS,
       '--model',
       'haiku',
@@ -311,5 +329,29 @@ describe('CaptureExecutor (#244 D4)', () => {
       },
     });
     expect(await codeOf(inside.run(t.args()))).toBe('path_not_allowed');
+  });
+});
+
+describe('readTail (C-161)', () => {
+  const streamOf = (chunks: string[]) =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(Buffer.from(chunk));
+        controller.close();
+      },
+    });
+
+  it('keeps everything under the cap', async () => {
+    expect(await readTail(streamOf(['ab', 'cd']), 10)).toBe('abcd');
+  });
+
+  it('keeps only the last bytes of a stream longer than the cap', async () => {
+    const chunks = Array.from({ length: 1000 }, (_, i) =>
+      `${i % 10}`.repeat(100),
+    );
+    chunks.push('{"type":"result"}');
+    const tail = await readTail(streamOf(chunks), 64);
+    expect(tail).toHaveLength(64);
+    expect(tail.endsWith('{"type":"result"}')).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
 import { expect } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TokenSaverRunKind } from '@nautelle/shared';
 import { FILTER_RUN_KIND_ENV, LAUNCH_SETTINGS_ENV } from '../filter/env';
@@ -34,6 +35,22 @@ export interface SeenLaunch {
   command: readonly string[];
   env: Record<string, string>;
 }
+
+/**
+ * C-179: the MCP servers a headless text call loads, read at spawn — the run
+ * dir that holds Token saver's file is gone once the call ends. `null` when
+ * the launch has no strict MCP config: it would load the profile's own.
+ */
+export const strictMcpServersOf = (
+  command: readonly string[],
+): Record<string, unknown> | null => {
+  const at = command.indexOf('--mcp-config');
+  if (at < 1 || command[at - 1] !== '--strict-mcp-config') return null;
+  if (command.lastIndexOf('--mcp-config') !== at) return null;
+  const value = command[at + 1] ?? '';
+  const json = value.startsWith('{') ? value : readFileSync(value, 'utf8');
+  return JSON.parse(json).mcpServers;
+};
 
 /**
  * #445: a headless text call with Token saver on carries the settings and a

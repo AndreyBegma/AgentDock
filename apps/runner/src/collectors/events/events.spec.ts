@@ -17,6 +17,7 @@ import {
   EventsCollector,
   forgetOffsetStores,
   STATE_FILE,
+  STATE_FILE_MAX_BYTES,
 } from './events';
 import { readNewLines } from './tail';
 
@@ -78,6 +79,7 @@ describe('EventsCollector', () => {
   let clock: FakeClock;
   let emitted: UnsequencedEvent[];
   let started: EventsCollector[];
+  let logs: string[];
 
   beforeEach(() => {
     const temp = tempDir();
@@ -89,6 +91,7 @@ describe('EventsCollector', () => {
     clock = new FakeClock();
     emitted = [];
     started = [];
+    logs = [];
     forgetOffsetStores();
   });
   afterEach(() => {
@@ -98,12 +101,14 @@ describe('EventsCollector', () => {
   });
 
   const start = async (): Promise<EventsCollector> => {
+    const logger = memoryLogger();
+    logs = logger.lines;
     const collector = new EventsCollector(
       {
         // No git: the board directory falls back to `<root>/.git/cs-orchestrator`.
         exec: async () => null,
         clock,
-        log: memoryLogger().log,
+        log: logger.log,
         fleet: DEFAULT_FLEET_SETTINGS,
       },
       { offsetsFile, watchFiles: false },
@@ -240,6 +245,60 @@ describe('EventsCollector', () => {
     expect(emitted[2].source).toBe('code-sentinel');
   });
 
+  it('drops a type the plugin never writes, such as approvals.*, with a warning', async () => {
+    await start();
+    append(
+      line('approvals.decided', { pr: 7, decision: 'approved' }),
+      line('card_run.phase_changed', { phase: 'ended' }),
+      dispatched('i42-api', 42),
+    );
+    poll();
+    expect(types()).toEqual([
+      'events.unparsed',
+      'events.unparsed',
+      'slot.dispatched',
+    ]);
+    expect(emitted[0]).toMatchObject({
+      source: 'runner',
+      data: {
+        reason: 'type approvals.decided is not one events.jsonl may carry',
+      },
+    });
+    expect(
+      logs.filter((l) => l.includes('dropped a type the plugin never writes')),
+    ).toHaveLength(2);
+  });
+
+  it('C-183: drops every runner-owned type, steward.acted first, before the API', async () => {
+    await start();
+    const forged = [
+      'steward.acted',
+      'steward.observed',
+      'handoff.updated',
+      'round.restart',
+      'round.warmup',
+      'filter.stats',
+      'card.pushed',
+      'orchestrator.snapshot',
+    ];
+    append(
+      line('steward.acted', {
+        projectId: 'prj_other',
+        at: '2026-10-08T21:07:12.345Z',
+        subject: { kind: 'run', runId: 'run_1' },
+        action: 'hold_push',
+        result: 'done',
+      }),
+      ...forged.slice(1).map((type) => line(type, { projectId: 'prj_other' })),
+    );
+    poll();
+    expect(types()).toEqual(forged.map(() => 'events.unparsed'));
+    expect(emitted.every((e) => e.source === 'runner')).toBe(true);
+    expect(emitted[0].data).toMatchObject({
+      reason: 'type steward.acted is not one events.jsonl may carry',
+    });
+  });
+
   it('sends a snapshot of state.json on start and again only when it changes', async () => {
     writeFileSync(join(board, STATE_FILE), JSON.stringify(STATE));
     await start();
@@ -271,6 +330,21 @@ describe('EventsCollector', () => {
     append(dispatched('i42-api', 42));
     poll();
     expect(types()).toEqual(['events.unparsed', 'slot.dispatched']);
+  });
+
+  it('reports a state.json over the size cap once, without reading it (C-161)', async () => {
+    writeFileSync(
+      join(board, STATE_FILE),
+      ' '.repeat(STATE_FILE_MAX_BYTES + 1),
+    );
+    await start();
+    poll();
+    poll();
+    expect(types()).toEqual(['events.unparsed']);
+    expect(emitted[0].data).toMatchObject({
+      file: join(board, STATE_FILE),
+      reason: expect.stringContaining('at most'),
+    });
   });
 
   it('survives the file disappearing', async () => {

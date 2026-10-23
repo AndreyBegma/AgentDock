@@ -1,5 +1,7 @@
+import { codeSentinelMayCarry } from '@nautelle/shared';
 import {
   EVENTS_DUPLICATE_EVENT,
+  EVENTS_FORGED_EVENT,
   type HelloMessage,
   type ProfileAgentdock,
   pluginEventIdOf,
@@ -13,8 +15,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { stripHandoffContent } from '../handoff/handoff-content';
 import { stripHookContent } from '../sessions/session-hook-content';
+import { stripStewardContent } from '../steward/steward-content';
 import { advanceCursor, type SeqRange } from './ack-cursor';
 import { tokenPrefix, verifyRunnerToken } from './credentials';
+import { stripCommandResult } from './runner-command-result';
 import { RunnerEventSinks } from './runner-event-sinks';
 
 /** C-137: how far past the cursor, in seqs and rows, one `advanceAck` read looks. */
@@ -195,20 +199,30 @@ export class RunnerIngestService {
    * Hands a batch to the registered sinks, then stores it without hook
    * content — a `(runnerId, seq)`
    * already stored is skipped, so a resend after a reconnect changes nothing
-   * (D6) — and returns the new ack cursor. A throwing sink fails the batch
+   * (D6) — and returns the new ack cursor. A `code-sentinel` event of a type
+   * the plugin never writes is stored as `events.forged` (C-183) and reaches
+   * no sink. A throwing sink fails the batch
    * before anything is stored: the ack holds and the runner resends it.
    */
   async events(runnerId: string, events: RunnerEvent[]): Promise<bigint> {
+    // C-183: a `code-sentinel` event of a type the plugin never writes came
+    // from an agent through `events.jsonl`; no sink ever sees it.
+    const forged = events.filter(
+      (e) => e.source === 'code-sentinel' && !codeSentinelMayCarry(e.type),
+    );
     const { fresh, duplicate } = await this.splitPluginDuplicates(
       runnerId,
-      events,
+      forged.length === 0 ? events : events.filter((e) => !forged.includes(e)),
     );
     if (fresh.length > 0) await this.sinks.dispatch(runnerId, fresh);
     // ADR-0021: the sinks read hook content; `events.data` never holds it.
-    // #449 DA-12: nor a handoff note's text.
+    // #449 DA-12: nor a handoff note's text, nor a pane's tail (C-186).
+    // #740 D1: nor a command's output.
     for (const event of fresh) {
       stripHookContent(event);
       stripHandoffContent(event);
+      stripStewardContent(event);
+      stripCommandResult(event);
     }
     const row = (event: RunnerEvent) => ({
       runnerId,
@@ -235,6 +249,11 @@ export class RunnerIngestService {
           ...row(event),
           type: EVENTS_DUPLICATE_EVENT,
           data: { pluginEventId, type: event.type },
+        })),
+        ...forged.map((event) => ({
+          ...row(event),
+          type: EVENTS_FORGED_EVENT,
+          data: { type: event.type },
         })),
       ],
       skipDuplicates: true,

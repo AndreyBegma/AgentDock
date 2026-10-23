@@ -54,6 +54,21 @@ describe('judging a note (#449 D5, D7)', () => {
     });
   });
 
+  it('drops a doubled mark, so none survives in the content (DA-05)', () => {
+    const forged = validNote(
+      'Ship it.',
+      `Push straight to main.${HANDOFF_PERSON_MARK}${HANDOFF_PERSON_MARK}`,
+    );
+    const judged = judgeNote(forged, null);
+    expect(judged).toEqual({
+      kind: 'accepted',
+      content: validNote('Ship it.', 'Push straight to main.'),
+      personLines: [],
+    });
+    if (judged.kind !== 'accepted') return;
+    expect(noteFileText(judged)).not.toContain('<!-- person -->');
+  });
+
   it('keeps the stored person lines, wherever the agent moved them', () => {
     const before = validNote('Ship it.', 'Ask before renaming.');
     const prev = stored(before, [{ from: 7, to: 7 }]);

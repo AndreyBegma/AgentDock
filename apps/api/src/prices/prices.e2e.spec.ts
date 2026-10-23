@@ -187,6 +187,7 @@ describe('prices (e2e)', () => {
     it('refuses an invalid regex, a missing default tier, an unknown remove and a bad price', async () => {
       const bad = [
         { upsert: [{ ...pricier, matchPattern: '(' }] },
+        { upsert: [{ ...pricier, matchPattern: '^(a+)+$' }] },
         {
           upsert: [
             { ...pricier, tiers: [{ ...pricier.tiers[0], isDefault: false }] },

@@ -16,6 +16,7 @@ import { docsCommands } from './commands/docs';
 import { githubCommands } from './commands/github';
 import { handoffCommands } from './commands/handoff';
 import { plannerCommands } from './commands/planner';
+import { prefixCommands } from './commands/prefix';
 import { projectRuleCommands } from './commands/project-rules';
 import { queueCommands } from './commands/queue';
 import { repoCommands } from './commands/repo';
@@ -105,6 +106,11 @@ export const commandErrorCodeSchema = z.enum([
    * command. `message` names the rule and the CLI line that lifts it.
    */
   'policy_refused',
+  /**
+   * C-148 (ADR-0077): the runner refuses to push to the branch — the
+   * repository's default branch, or one GitHub reports as protected.
+   */
+  'branch_refused',
 ]);
 export type CommandErrorCode = z.infer<typeof commandErrorCodeSchema>;
 
@@ -181,6 +187,7 @@ export const commands = {
   ...sessionMessageCommands,
   ...projectRuleCommands,
   ...repoCommands,
+  ...prefixCommands,
 } as const satisfies Record<string, CommandDefinition>;
 
 export type CommandName = keyof typeof commands;

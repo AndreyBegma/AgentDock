@@ -1,8 +1,10 @@
-import type {
-  AdminRunner,
-  AdminRunnerEvent,
-  AdminRuntimeProfile,
-  RunnerStatus,
+import {
+  type AdminRunner,
+  type AdminRunnerEvent,
+  type AdminRuntimeProfile,
+  type LocalRunner,
+  type RunnerStatus,
+  runnerUpdate,
 } from '@nautelle/shared';
 import {
   type Capabilities,
@@ -16,6 +18,8 @@ export const toAdminRunner = (
   runner: Runner,
   status: RunnerStatus,
   profilesCount: number,
+  /** The latest `nautelle-runner` release, when known (C-328). */
+  latest: string | null,
 ): AdminRunner => ({
   id: runner.id,
   name: runner.name,
@@ -33,6 +37,24 @@ export const toAdminRunner = (
   // Spec 201 D8, D17.
   localUserId: runner.localUserId,
   awayMode: runner.awayMode,
+  update: runnerUpdate(runner.version, latest),
+});
+
+/** A runner its local user sees (spec 201), with the version check (C-328). */
+export const toLocalRunner = (
+  runner: Pick<
+    Runner,
+    'id' | 'name' | 'localUserId' | 'awayMode' | 'hostname' | 'version'
+  >,
+  latest: string | null,
+): LocalRunner => ({
+  id: runner.id,
+  name: runner.name,
+  localUserId: runner.localUserId,
+  awayMode: runner.awayMode,
+  hostname: runner.hostname,
+  version: runner.version,
+  update: runnerUpdate(runner.version, latest),
 });
 
 /**

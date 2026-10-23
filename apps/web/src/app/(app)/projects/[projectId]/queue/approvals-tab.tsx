@@ -53,15 +53,15 @@ import {
 } from '../../../../../lib/approvals/needs-you';
 import { CHECKS_LABEL, CHECKS_TONE } from '../../../../../lib/fleet/format';
 import { Time } from '../../../../../lib/format/time';
-import { safeHttpsUrl } from '../../../../../lib/queue/format';
 import type { Section as SectionData } from '../../../../../lib/section/use-section';
+import { githubUrl } from '../../../../../lib/url';
 import { ApprovalPane, ApprovalSheet } from './approval-sheet';
 
 /** Below 44 px a decision is a miss on a phone; from tablet up, the row's size. */
 const THUMB = 'max-tablet:min-h-11 max-tablet:flex-1';
 
 function PrLink({ item }: { item: ApprovalItemView }) {
-  const href = safeHttpsUrl(item.url);
+  const href = githubUrl(item.url);
   return href ? (
     <a
       href={href}

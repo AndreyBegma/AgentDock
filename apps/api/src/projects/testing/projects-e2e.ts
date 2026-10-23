@@ -21,6 +21,7 @@ export const inspection = (
   },
   baseBranch: 'develop',
   baseSource: 'config',
+  defaultBranch: 'main',
   codeSentinelConfig: { orchestrator: { base: 'develop' } },
   hasClaudeMd: true,
   hasAgentsMd: false,

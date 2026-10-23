@@ -16,9 +16,8 @@ import {
 import { Logger } from '@nestjs/common';
 import { type OnGatewayConnection, WebSocketGateway } from '@nestjs/websockets';
 import { type RawData, WebSocket } from 'ws';
-import type { RequestOrigin } from '../audit/audit.types';
 import { SessionService } from '../auth';
-import { cookieFrom, originAllowed } from '../live/handshake';
+import { cookieFrom, originAllowed, upgradeOrigin } from '../live/handshake';
 import { allowedLiveOrigin } from '../live/live-options';
 import { ProjectAccessService } from '../projects';
 import {
@@ -54,11 +53,6 @@ const sizeFrom = (params: URLSearchParams) => {
     rows: rows.success ? rows.data : TERMINAL_DEFAULT_SIZE.rows,
   };
 };
-
-const originOf = (request: IncomingMessage): RequestOrigin => ({
-  ip: request.socket.remoteAddress,
-  userAgent: request.headers['user-agent'],
-});
 
 /**
  * One `/terminal` socket, from upgrade to close (spec 29 D5, D6). Frames are
@@ -161,7 +155,7 @@ class TerminalSocket implements TerminalBrowser {
       grant,
       user: { id: auth.user.id, email: auth.user.email },
       sessionToken: token,
-      origin: originOf(this.request),
+      origin: upgradeOrigin(this.request),
       ...sizeFrom(params),
       browser: this,
     });

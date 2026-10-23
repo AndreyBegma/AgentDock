@@ -163,6 +163,7 @@ export class TelegramIntegrationService {
     const [links] = await this.prisma.$transaction([
       this.prisma.telegramLink.deleteMany({}),
       this.prisma.telegramLinkCode.deleteMany({ where: { usedAt: null } }),
+      this.prisma.telegramPendingLink.deleteMany({}),
       this.prisma.notificationMatcherState.updateMany({
         data: { telegramUpdateOffset: 0n },
       }),
