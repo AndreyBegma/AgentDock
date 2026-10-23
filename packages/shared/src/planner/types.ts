@@ -3,6 +3,10 @@ import { attachmentIdSchema } from '../attachments/contracts';
 import { ATTACHMENTS_PER_CARD_MAX } from '../attachments/limits';
 import { DESIGN_FRAME_NAME_MAX, DESIGN_FRAMES_MAX } from '../design/frames';
 import { DESIGN_RATIONALE_MAX, DESIGN_TITLE_MAX } from '../design/limits';
+import {
+  type DesignFrameKind,
+  designFrameKindSchema,
+} from '../design/templates';
 import { designSuggestionSchema, designVariantSchema } from '../design/types';
 import { LOCAL_CARD_BODY_MAX } from '../protocol/local';
 
@@ -433,6 +437,23 @@ export type ReviseOutput = z.infer<typeof reviseOutputSchema>;
 /** DA-08: a frame name reaches prompts and file names, so it is one line. */
 const frameNameSchema = lineText(DESIGN_FRAME_NAME_MAX, 'a frame name');
 
+/**
+ * #833 D13: a frame of `frames` names its kind; a plain name is still
+ * accepted and reads as `legacy`, which fails conformance on a templated
+ * design.
+ */
+export const designFrameEntrySchema = z.union([
+  frameNameSchema,
+  z.strictObject({ name: frameNameSchema, kind: designFrameKindSchema }),
+]);
+export type DesignFrameEntry = z.infer<typeof designFrameEntrySchema>;
+
+/** A `frames` entry's name and kind. */
+export const frameEntryOf = (
+  entry: DesignFrameEntry,
+): { name: string; kind: DesignFrameKind } =>
+  typeof entry === 'string' ? { name: entry, kind: 'legacy' } : entry;
+
 export const designOutputSchema = z.strictObject({
   action: z.literal('design'),
   taskKey: planTaskKeySchema,
@@ -440,7 +461,11 @@ export const designOutputSchema = z.strictObject({
   title: text(DESIGN_TITLE_MAX),
   rationale: text(DESIGN_RATIONALE_MAX),
   addressed: z.array(z.string().min(1).max(64)).max(100),
-  frames: z.array(frameNameSchema).min(1).max(DESIGN_FRAMES_MAX).optional(),
+  frames: z
+    .array(designFrameEntrySchema)
+    .min(1)
+    .max(DESIGN_FRAMES_MAX)
+    .optional(),
   /**
    * #628: on a revise, the frames of `frames` the turn leaves as the previous
    * revision drew them — they have no design block; the API copies them.

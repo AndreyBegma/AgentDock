@@ -4,6 +4,7 @@ import {
   type ActionRequestSummary,
   actionRequestArgsSchemas,
   boundPrOf,
+  cardAcceptArgsOf,
   issueQueueArgsOf,
   type PrApproveBoundArgs,
   prDiffUrl,
@@ -28,6 +29,7 @@ export const KIND_LABEL: Record<ActionRequestKind, string> = {
   orchestrator_stop: 'Stop the orchestrator',
   pr_approve: 'Approve a pull request',
   issue_queue: 'Queue an issue for the fleet',
+  card_accept: 'Accept a card',
 };
 
 export const STATUS_LABEL: Record<ActionRequestStatus, string> = {
@@ -83,6 +85,18 @@ export const prApproveArgs = (
 /** An `issue_queue` request's issue (C-112); null for any other kind or bad args. */
 export const issueQueueArgs = issueQueueArgsOf;
 
+/** A `card_accept` request's card as the API read it (#845 D5); null for any other kind or bad args. */
+export const cardAcceptArgs = cardAcceptArgsOf;
+
+/** "and merge #12" after a `card_accept` request's title; null when it asks no merge. */
+export const cardAcceptMergeText = (
+  request: Pick<ActionRequestSummary, 'kind' | 'args'>,
+): string | null => {
+  const card = cardAcceptArgs(request);
+  if (!card?.merge) return null;
+  return card.prNumber === null ? 'and merge' : `and merge #${card.prNumber}`;
+};
+
 /** What the request asks for, as a short title. */
 export const requestTitle = (request: ActionRequestSummary): string => {
   switch (request.kind) {
@@ -109,6 +123,12 @@ export const requestTitle = (request: ActionRequestSummary): string => {
       return start.success && start.data.mode === 'next'
         ? 'Dispatch the next issue'
         : KIND_LABEL.orchestrator_start;
+    }
+    case 'card_accept': {
+      const card = cardAcceptArgs(request);
+      return card
+        ? `Accept C-${card.card} ${card.title}`.trimEnd()
+        : KIND_LABEL.card_accept;
     }
     default:
       return KIND_LABEL[request.kind];

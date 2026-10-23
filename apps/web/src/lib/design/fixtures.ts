@@ -3,7 +3,7 @@ import type {
   DesignRevisionView,
   TaskDesignView,
 } from '@nautelle/shared';
-import { DEFAULT_VIEWPORTS } from '@nautelle/shared';
+import { BUILTIN_DESIGN_TEMPLATES, DEFAULT_VIEWPORTS } from '@nautelle/shared';
 
 /** Design fixtures for the tests: one task, two variants, under review. */
 
@@ -14,6 +14,8 @@ export const framesOf = (id: string, names: readonly string[]) =>
     name,
     slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
     htmlUrl: `/api/design-revisions/${id}/frames/${position}/html`,
+    kind: 'legacy' as const,
+    templateFrameKey: null,
   }));
 
 export const revision = (
@@ -35,8 +37,12 @@ export const revision = (
         name: 'Mockup',
         slug: 'mockup',
         htmlUrl: `/api/design-revisions/${id}/frames/0/html`,
+        kind: 'legacy',
+        templateFrameKey: null,
       },
     ],
+    templateKey: null,
+    conformance: null,
     createdAt: '2026-10-14T10:00:00.000Z',
     ...over,
   };
@@ -78,6 +84,7 @@ export const design = (over: Partial<TaskDesignView> = {}): TaskDesignView => ({
   profileId: 'profile-1',
   approvedBy: null,
   approvedAt: null,
+  template: BUILTIN_DESIGN_TEMPLATES[0],
   revisions: [
     revision(),
     revision({ id: 'rev-1-2', revision: 2 }),

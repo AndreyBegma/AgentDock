@@ -131,10 +131,13 @@ describe('card design (e2e, #243)', () => {
       'design_forbidden_feature',
     ],
     [
-      designResult(
-        { taskKey: KEY, variant: 1 },
-        `<!doctype html><html><body><p>${'x'.repeat(161 * 1024)}</p></body></html>`,
-      ),
+      designResult({ taskKey: KEY, variant: 1 }, [
+        {
+          name: 'Screen',
+          kind: 'screen',
+          html: `<!doctype html><html><body><p>${'x'.repeat(161 * 1024)}</p></body></html>`,
+        },
+      ]),
       'design_too_large',
     ],
     [
@@ -194,13 +197,15 @@ describe('card design (e2e, #243)', () => {
     const frames = [
       {
         name: 'Page',
+        kind: 'screen',
         html: '<!doctype html><html><body><h1>Login page</h1><p>PAGE-BODY</p></body></html>',
       },
       {
         name: 'Form',
+        kind: 'breakdown',
         html: '<!doctype html><html><body><p>FORM-BODY</p></body></html>',
       },
-    ];
+    ] as const;
     await h.finishCard(
       card.id,
       designResult({ taskKey: KEY, variant: 1 }, frames),
@@ -235,7 +240,11 @@ describe('card design (e2e, #243)', () => {
       card.id,
       designResult({ taskKey: KEY, variant: 1, kept: ['Page'] }, [
         frames[0],
-        { name: 'Form', html: frames[1].html.replace('FORM', 'LABELLED') },
+        {
+          name: 'Form',
+          kind: 'breakdown',
+          html: frames[1].html.replace('FORM', 'LABELLED'),
+        },
       ]),
     );
     const next = (await h.cardDesign(card.number)).revisions.find(

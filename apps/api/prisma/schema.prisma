@@ -85,6 +85,7 @@ model User {
   planTurns                   PlanTurn[]
   uiProfilesAuthored          UiProfile[]
   designSettingsUpdated       DesignSettings[]
+  designTemplatesUpdated      DesignTemplate[]
   taskDesignsApproved         TaskDesign[]
   designComments              DesignComment[]
   boardCardsCreated           BoardCard[]                   @relation("BoardCardCreatedBy")
@@ -496,6 +497,7 @@ model Project {
   actionRequests         ActionRequest[]
   uiProfiles             UiProfile[]
   designSettings         DesignSettings?
+  designTemplates        DesignTemplate[]
   boardCards             BoardCard[]
   boardStacks            BoardStack[]
   boardSettings          BoardSettings?
@@ -825,6 +827,8 @@ model AgentSession {
   cardCaptures         CardCapture[]
   capturedCards        BoardCard[]           @relation("BoardCardSourceSession")
   trackedCard          BoardCard?            @relation("BoardCardTrackedSession")
+  /// #845 D2: the cards this session took while holding another.
+  queuedCards          BoardCard[]           @relation("BoardCardQueuedForSession")
   usageFact            RunUsageFact?
   tokenSaverStats      TokenSaverStat[]
 
@@ -1042,6 +1046,8 @@ enum ActionRequestKind {
   orchestrator_stop
   pr_approve
   issue_queue
+  /// #845 D5: a session asks a person to accept a Finished card.
+  card_accept
 }
 
 enum ActionRequestStatus {
@@ -2829,41 +2835,88 @@ model DesignSettings {
   @@map("design_settings")
 }
 
+/// #833 D9 (ADR-0082): a project's frame template — an override of a
+/// built-in (`page`, `component`, `flow`) under its key, or the project's own.
+/// `definition` holds the frames, validated by the shared
+/// `designTemplateSchema`.
+model DesignTemplate {
+  id          String   @id @default(cuid())
+  projectId   String
+  key         String
+  name        String
+  definition  Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, key])
+  @@map("design_templates")
+}
+
+/// #833 D8: who chose a design's template — the model, or a person, whose
+/// choice the model never overrides.
+enum DesignTemplateChoice {
+  auto
+  person
+}
+
+/// #833 (ADR-0082): a frame's kind; `legacy` for a frame stored before
+/// templates, which is never checked.
+enum DesignFrameKind {
+  screen
+  breakdown
+  states
+  in_context
+  anatomy
+  state_grid
+  flow_map
+  flow_step
+  mobile
+  custom
+  legacy
+}
+
 /// A task's design, keyed by `(planId, taskKey)` — not by a `plan_tasks` row,
 /// which is versioned per plan version while the design carries across them.
 /// A design has exactly one owner (ADR-0025): a plan task (`planId` and
 /// `taskKey`) or a board card (`cardId`) — CHECK `task_designs_owner_check`.
 model TaskDesign {
-  id                 String           @id @default(cuid())
+  id                 String               @id @default(cuid())
   planId             String?
   taskKey            String?
-  cardId             String?          @unique
+  cardId             String?              @unique
   /// #480 (ADR-0044): a stack's shared design, drawn for the whole result.
-  stackId            String?          @unique
+  stackId            String?              @unique
   /// The person's switch (D2); starts as the planner's suggestion.
   needed             Boolean
   /// Whether the planner suggested it, and why (D2).
-  suggested          Boolean          @default(false)
+  suggested          Boolean              @default(false)
   suggestionWhy      String?
   /// 1–3 (D4), checked by the DTO and the contract.
-  variantCount       Int              @default(1)
+  variantCount       Int                  @default(1)
   /// What the latest turns applied, or the project default when it was
   /// copied. While `skillsEdited` is false and nothing is drawn, the design
   /// follows `design_settings.defaultSkills` instead (#604).
-  skills             String[]         @default([])
+  skills             String[]             @default([])
   /// #604: the skills were chosen by hand on this design's panel; a change of
   /// the project default no longer reaches it.
-  skillsEdited       Boolean          @default(false)
+  skillsEdited       Boolean              @default(false)
   /// The profile version the latest revisions were drawn from.
   profileId          String?
-  status             TaskDesignStatus @default(idle)
-  approvedRevisionId String?          @unique
+  status             TaskDesignStatus     @default(idle)
+  approvedRevisionId String?              @unique
   approvedById       String?
   approvedAt         DateTime?
   /// #275 D2: when the current Generate or Revise started; null at rest.
   busySince          DateTime?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  /// #833 D8: a plan task's or a stack's template; null follows `page`. A
+  /// card's design reads `BoardCard.designTemplate` instead.
+  templateKey        String?
+  templateSource     DesignTemplateChoice @default(auto)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
   plan             Plan?            @relation(fields: [planId], references: [id], onDelete: Cascade)
   card             BoardCard?       @relation(fields: [cardId], references: [id], onDelete: Cascade)
@@ -2882,20 +2935,27 @@ model TaskDesign {
 /// drew. A variant not picked on approve is `archived` — readable, never
 /// published.
 model DesignRevision {
-  id        String   @id @default(cuid())
-  designId  String
+  id           String   @id @default(cuid())
+  designId     String
   /// 1–3.
-  variant   Int
-  revision  Int
-  title     String
-  rationale String
+  variant      Int
+  revision     Int
+  title        String
+  rationale    String
   /// The one validated mockup of a revision stored before #441, without the
   /// pin helper; it reads as a single frame named `Mockup`. Null on a revision
   /// with frames (`design_frames`).
-  html      String?
-  turnId    String
-  archived  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  html         String?
+  turnId       String
+  archived     Boolean  @default(false)
+  /// #833: the template in effect when it was drawn; null before templates.
+  templateKey  String?
+  /// #833 D7: `{ ok, missing, extra, misplaced, reason? }` (shared
+  /// `DesignConformance`); null on a revision that was never checked.
+  conformance  Json?
+  /// #833 D7: the repair turn started for it — at most one automatic repair.
+  repairTurnId String?
+  createdAt    DateTime @default(now())
 
   design            TaskDesign      @relation("TaskDesignRevisions", fields: [designId], references: [id], onDelete: Cascade)
   turn              PlanTurn        @relation(fields: [turnId], references: [id], onDelete: Cascade)
@@ -2913,14 +2973,18 @@ model DesignRevision {
 /// frames keep the order the turn drew them in; together at most
 /// `DESIGN_HTML_MAX_BYTES`, without the pin helper.
 model DesignFrame {
-  id         String @id @default(cuid())
-  revisionId String
+  id               String          @id @default(cuid())
+  revisionId       String
   /// 0-based.
-  position   Int
-  name       String
+  position         Int
+  name             String
   /// The published file's stem, distinct within the revision.
-  slug       String
-  html       String
+  slug             String
+  html             String
+  /// #833: the kind the turn named; `legacy` for a frame stored before.
+  kind             DesignFrameKind @default(legacy)
+  /// #833: the template frame it fills (`breakdown`, `flow_step-2`).
+  templateFrameKey String?
 
   revision DesignRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
 
@@ -3083,6 +3147,17 @@ enum CardEscalationReason {
   gave_up
 }
 
+/// Shared `CARD_MERGE_POLICIES` (#845 D4): who merges a finished card's green
+/// pull request when a person's session conducts a Board Run.
+enum CardMergePolicy {
+  /// The conductor asks the person once at the start of a run.
+  ask
+  /// The conductor merges a green, `CLEAN` pull request itself.
+  agent
+  /// Only a person merges.
+  person
+}
+
 /// A work item Nautelle owns (ADR-0024), not a GitHub issue. Each Run or
 /// feedback is a round with its own `runs` row (D4).
 model BoardCard {
@@ -3100,6 +3175,10 @@ model BoardCard {
   /// #271 D9: `auto` lets the normalization classify `kind` until the first
   /// Run fixes the branch; a person setting kind makes it `person`.
   kindSource              CardKindSource        @default(auto)
+  /// #833 D8: the design's frame template; null follows `page`. The
+  /// normalizer sets it while `designTemplateSource` is `auto`.
+  designTemplate          String?
+  designTemplateSource    DesignTemplateChoice  @default(auto)
   column                  BoardColumn           @default(todo)
   /// Fractional index inside the column (D3).
   position                Float
@@ -3254,6 +3333,12 @@ model BoardCard {
   /// #282 D1: the manual session a `terminal` card tracks; unique, so a
   /// second `card.track` of the session updates its card.
   trackedSessionId        String?               @unique
+  /// #845 D2: the manual session this card waits for — it took the card while
+  /// holding another; promoted in board order when that one finishes.
+  queuedForSessionId      String?
+  /// #845 D10: the branch a taken card is worked on, kept after the taking
+  /// session ends so another session or Run can continue it.
+  takenBranch             String?
   /// #282 D3: Automatic work — collect when the tracked session finishes.
   /// Starts from `board_settings.autoCollectTracked`.
   autoCollect             Boolean               @default(false)
@@ -3289,6 +3374,7 @@ model BoardCard {
   plan                 Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
   stage                BoardStackStage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
   trackedSession       AgentSession?          @relation("BoardCardTrackedSession", fields: [trackedSessionId], references: [id], onDelete: SetNull)
+  queuedForSession     AgentSession?          @relation("BoardCardQueuedForSession", fields: [queuedForSessionId], references: [id], onDelete: SetNull)
   createdBy            User?                  @relation("BoardCardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   movedBy              User?                  @relation("BoardCardMovedBy", fields: [movedById], references: [id], onDelete: SetNull)
   completedBy          User?                  @relation("BoardCardCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
@@ -3330,6 +3416,7 @@ model BoardCard {
   @@index([planId])
   @@index([stageId])
   @@index([prBaseCardId])
+  @@index([queuedForSessionId])
   @@map("board_cards")
 }
 
@@ -3682,26 +3769,29 @@ model Attachment {
 
 /// A project's board settings (D2, D13). No row: the defaults.
 model BoardSettings {
-  projectId              String   @id
-  issueOnRun             Boolean  @default(false)
-  specOnRun              Boolean  @default(false)
+  projectId              String          @id
+  issueOnRun             Boolean         @default(false)
+  specOnRun              Boolean         @default(false)
   /// 1–10, checked by the DTO.
-  maxRunning             Int      @default(3)
+  maxRunning             Int             @default(3)
   /// #244 D10: on only while the project's `shipSessionContent` is on;
   /// turning content off turns it off.
-  captureEnabled         Boolean  @default(false)
+  captureEnabled         Boolean         @default(false)
   /// Shared `CAPTURE_MODELS`: `haiku` or `sonnet`, checked by the DTO.
-  captureModel           String   @default("haiku")
+  captureModel           String          @default("haiku")
   /// #282 D3: the `autoCollect` a new `terminal` card starts with.
-  autoCollectTracked     Boolean  @default(false)
+  autoCollectTracked     Boolean         @default(false)
   /// #359 D7: merge a card's PR on entering Finished. `null` is the default:
   /// on for a base other than the default branch (shared `cardAutoMergeDefault`).
   autoMergeCards         Boolean?
+  /// #845 D4: who merges a finished card's pull request when a person's
+  /// session conducts the Board.
+  cardMergePolicy        CardMergePolicy @default(ask)
   /// #390: minutes in `background` before `card.background_stalled`; 5–1440,
   /// checked by the DTO.
-  backgroundStallMinutes Int      @default(30)
+  backgroundStallMinutes Int             @default(30)
   updatedById            String?
-  updatedAt              DateTime @updatedAt
+  updatedAt              DateTime        @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)

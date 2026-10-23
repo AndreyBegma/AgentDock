@@ -34,6 +34,7 @@ import {
 import { framePath } from '../../lib/design/frames';
 import { stackDesignHref } from '../../lib/design/href';
 import { isStarting } from '../../lib/design/progress';
+import { compareColumns } from '../../lib/design/templates';
 import type { DesignBusy } from '../../lib/design/use-design';
 import { useElementWidth } from '../../lib/design/use-element-width';
 import {
@@ -56,6 +57,8 @@ import { useWide } from '../../lib/slot/use-wide';
 import { LaunchPopover } from '../board/launch-popover';
 import { ApproveDialog } from './approve-dialog';
 import { CommentsPanel } from './comments-panel';
+import { CompareGrid } from './compare-grid';
+import { ConformanceBadge } from './conformance-badge';
 import { DesignFailure } from './design-failure';
 import { DesignProgress, DesignStarting } from './design-progress';
 import { FrameStrip, frameKey } from './frame-strip';
@@ -71,6 +74,8 @@ export interface DesignViewerActions {
   comment: (body: DesignCommentRequest) => Promise<unknown>;
   revise: (body?: CardDesignLaunchRequest) => Promise<unknown>;
   approve: (body: { revisionId: string }) => Promise<unknown>;
+  /** #833 D7: the repair turn by hand. */
+  complete: () => Promise<unknown>;
   stop: () => Promise<unknown>;
 }
 
@@ -125,6 +130,8 @@ export function DesignViewer({
   );
   const [approveOpen, setApproveOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // #833 D11: the same frame of every variant side by side.
+  const [compare, setCompare] = useState(false);
   // While the frame's edge is dragged the width lives here; the URL takes it
   // once, on release.
   const [drag, setDrag] = useState<FrameDrag | null>(null);
@@ -217,6 +224,19 @@ export function DesignViewer({
     onChange({ kind: 'frame', frame: next });
   };
   const variants = variantsOf(design.revisions);
+  const comparing = compare && variants.length > 1;
+  const templateKey = state.revision?.templateKey ?? null;
+  const templateName =
+    templateKey === null
+      ? null
+      : templateKey === design.template.key
+        ? design.template.name
+        : templateKey;
+  const completeReason =
+    writeBlock ??
+    (design.progress || isStarting(design) || busy !== null
+      ? 'A design turn is running.'
+      : null);
   const openCount = design.comments.filter(isOpen).length;
 
   const draftNumber = pinNumbers(design.comments, revisionId).size + 1;
@@ -421,6 +441,13 @@ export function DesignViewer({
                 if (!on) setDraft(null);
               }}
             />
+            <ConformanceBadge
+              conformance={state.revision.conformance}
+              canComplete={canOperate}
+              completing={busy === 'complete'}
+              disabledReason={completeReason}
+              onComplete={() => void actions.complete().catch(() => {})}
+            />
             <FrameStrip
               frames={frames}
               frame={state.frame}
@@ -428,7 +455,30 @@ export function DesignViewer({
               comments={openCommentsByFrame(design.comments, revisionId)}
               pinned={framesWithOpenPins(design.comments, revisionId)}
               onFrame={selectFrame}
+              templateName={templateName}
+              compare={
+                variants.length > 1
+                  ? { on: comparing, onToggle: () => setCompare(!compare) }
+                  : undefined
+              }
             />
+            {comparing ? (
+              <CompareGrid
+                columns={compareColumns(
+                  design.revisions,
+                  variants,
+                  state.frame,
+                )}
+                preset={{ width: view.width, height: state.viewport.height }}
+                theme={state.theme}
+                position={state.frame}
+                variantInView={state.variant}
+                onPick={(variant) => {
+                  setCompare(false);
+                  onChange({ kind: 'variant', variant });
+                }}
+              />
+            ) : null}
             {phone && pinMode && writeBlock === null ? (
               <p
                 role="status"
@@ -438,7 +488,7 @@ export function DesignViewer({
               </p>
             ) : null}
             {/* #441: one panel per frame; only the one in view renders its mockup. */}
-            {frames.map((f) => (
+            {(comparing ? [] : frames).map((f) => (
               <TabPanel key={f.position} value={String(f.position)}>
                 {/* D1: the box is the scaled size, the mockup inside keeps its layout size. */}
                 <div ref={measure} className="w-full min-w-0 shrink-0">

@@ -916,7 +916,18 @@ daemon relays their request. Schemas are in `local.ts`.
 | `handoff.create` | operator | `title, body, branch` | an issue queued for the fleet, plus `manual.handoff` |
 | `action.request` | operator | `kind, args, summary` | a pending action request (spec 201 D18) |
 | `away.set` | operator | `on` | the runner's away mode; needs no project |
-| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6). An MCP caller's session is the one whose `claude` pid a `SessionStart` reported, else (#482) the session of the live card round whose worktree holds the caller's cwd — read from the card store on disk, so it survives a daemon restart — else the one live session in that cwd. A refused `card.finish` from a live round's worktree is also sent as `card_run.finish_refused` |
+| `board.list` | viewer | `column?` | the project's cards: number, title, kind, column, running, PR and CI state, `taken`/`queuedForSessionId`, plus `cardMergePolicy` (#845) |
+| `board.card` | viewer | `card` | one card: body, dependencies, rounds summary, PR, CI, pending question (#845) |
+| `board.wait` | viewer | `cursor?, cards?, holdSec ≤ 10` | events after the cursor (`column`, `round_ended`, `ci`, `pr_merged`, `question`) and the next cursor; the server holds ≤ `LOCAL_BOARD_WAIT_HOLD_MAX_SEC` (10 s, under the 15 s relay timeout) and the MCP tool `board_wait` loops it up to 300 s (ADR-0083) |
+| `card.create` | operator | `title, body?, kind?, candidate?` | a card in To Do, or a candidate in the Inbox (ADR-0058); manual sessions only (`not_a_manual_session`) |
+| `card.run` | operator | `card, model?, effort?` | a Board Run; Board refusals (`LOCAL_BOARD_REFUSALS`) passed through verbatim; manual sessions only |
+| `card.move` | operator | `card, column, index?` | the move; `completed` is refused `completed_needs_person`; manual sessions only |
+| `card.feedback` | operator | `card, text` | a feedback round on a Finished card; manual sessions only |
+| `card.message` | operator | `card` + a session message (`text` / `option` / `other`, `questionKey`) | the message to the card's session (ADR-0045); manual sessions only |
+| `card.stop` | operator | `card` | stops the card's round; manual sessions only |
+| `card.take` | operator | `card` | binds the card to the calling session and moves it to In progress, or queues it when the session already holds one (`card_taken` when another live session or a Run holds it); manual sessions only |
+| `card.release` | operator | `card` | back to To Do, binding and queue marker cleared (`not_taken`); manual sessions only |
+| `card.finish` | operator | `summary` (≤ 4 000), `artifactIncomplete?` (#445 D8, set by the runner's artifact guard), `pullRequestUrl?` (#845: a taken card's pull request; the answer's `next?` is the session's next queued card) | `{ number, finished: true }`; the card is the one whose session uuid is the request's `session.id`, else `not_a_card_session` (issue #242 D6). An MCP caller's session is the one whose `claude` pid a `SessionStart` reported, else (#482) the session of the live card round whose worktree holds the caller's cwd — read from the card store on disk, so it survives a daemon restart — else the one live session in that cwd. A refused `card.finish` from a live round's worktree is also sent as `card_run.finish_refused` |
 
 ```json
 {
@@ -1272,7 +1283,7 @@ Every command needs an operator.
 
 | Command | Args | Result |
 |---|---|---|
-| `card.run` | `cardId, runId, projectId, root, base, shortId (^[a-z0-9]{8}$), branch, session { id (uuid), resume }, prompt (≤ 64 KiB, no NUL), files? ([{ path, content }] ≤ 4, repository-relative, each ≤ 192 KiB), profileKey, model, permissionMode` | `{ phase: starting\|running, tmuxSession }`, timeout 60 s |
+| `card.run` | `cardId, runId, projectId, root, base, shortId (^[a-z0-9]{8}$), branch, session { id (uuid), resume }, prompt (≤ 64 KiB, no NUL), files? ([{ path, content }] ≤ 4, repository-relative, each ≤ 192 KiB), profileKey, model, permissionMode, startBranch? (#854: a card branch ≠ `branch`, never with `newBranch`)` | `{ phase: starting\|running, tmuxSession, branch?, startBranchSkipped?: not_on_origin\|fetch_failed\|worktree_dirty\|branch_checked_out\|branch_diverged }`, timeout 60 s |
 | `card.stop` | `cardId, projectId` | `{ stopped }`, timeout 15 s |
 | `card.collect` | `cardId, projectId, root, base, branch, number, title (one line), body (≤ 16 KiB)` | `{ ahead, pushed, prNumber?, prUrl? }`, timeout 180 s |
 | `card.close` | `cardId, projectId, removeWorktree` | `{ stopped, worktreeRemoved, branchDeleted }`, timeout 30 s |
@@ -1285,6 +1296,18 @@ Every command needs an operator.
   `claude --resume <id>`) with `--model` and `--permission-mode`; the prompt is
   one argv element, never a shell string. An interactive `exec-run` inherits
   stdio (the tmux pane is the terminal) and still writes `exit.json`.
+- **Start branch (#854).** `startBranch` is the branch a session-gone taken
+  card was worked on (ADR-0083 §4). When origin has it, the card's worktree is
+  put on it from `origin/<startBranch>` — an existing clean worktree is
+  switched; a local branch of that name is used when it equals, trails
+  (fast-forwarded) or leads origin — and the round works, pushes and collects
+  there; the result's `branch` names it. Otherwise nothing changes, the round
+  launches on `branch` and `startBranchSkipped` says why. `card.run` args are
+  strict, so the API sends `startBranch` only to a runner that advertises
+  `cardStartBranch`; it then makes `startBranch` the card's branch and clears
+  `takenBranch`, and the round's `card.run_started` audit records `branch`,
+  `takenBranch` and any `startBranchSkipped` (the API's own reasons:
+  `runner_outdated`, `not_a_card_branch`, `follow_up`).
 - **Collect.** Commits leftovers as `chore: card C-<number> work in progress`,
   pushes, and opens a PR into `base` when none is open for `branch` (else
   pushes only). `ahead: 0` is "No changes".

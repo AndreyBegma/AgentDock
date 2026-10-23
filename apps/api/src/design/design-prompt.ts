@@ -1,6 +1,10 @@
 import {
   cardLabel,
+  DESIGN_SERVICE_FRAME_KINDS,
   type DesignCommentKind,
+  type DesignConformance,
+  type DesignFrameKind,
+  type DesignTemplate,
   type DesignTheme,
   designBytes,
   PLANNER_BLOCK_TAG,
@@ -69,8 +73,15 @@ export interface DesignPromptContext {
     revision: number;
     title: string;
     rationale: string;
-    frames: { name: string; html: string }[];
+    frames: { name: string; kind?: DesignFrameKind; html: string }[];
   } | null;
+  /** #833 (ADR-0082): the template the turn draws by, resolved for the project. */
+  template: DesignTemplate;
+  /**
+   * #833 D7: on a repair turn, how the previous revision is off its
+   * template; null on any other turn.
+   */
+  repair?: DesignConformance | null;
   profile: DesignPromptProfile | null;
   /** The design skills to apply, installed ones only (D15). */
   skills: string[];
@@ -339,6 +350,71 @@ const previousSections = (
 };
 
 /**
+ * #833 (ADR-0082): the template's enabled frames, numbered, each with its
+ * name, kind, whether it is required, and what to draw; the step limit of a
+ * repeated frame; and D4's rule that service frames share the screen's kit.
+ * `fitDesignPrompt` never drops it: it is no part of what a fitting step
+ * trims.
+ */
+export const framesToDrawSections = (template: DesignTemplate): string[] => {
+  const frames = template.frames.filter((f) => f.enabled);
+  const lines = frames.map((f, i) => {
+    const kind =
+      f.kind === 'custom'
+        ? `kind \`custom\`, named exactly "${f.name}"`
+        : `kind \`${f.kind}\``;
+    const need = f.required ? 'required' : 'optional';
+    if (f.repeat) {
+      return `${i + 1}. ${f.name} 1…N — ${kind}, ${need}, one frame per step, ${f.repeat.min}–${f.repeat.max} steps, each named for its step. ${f.instruction} If the flow needs more than ${f.repeat.max} steps, draw the first ${f.repeat.max}.`;
+    }
+    return `${i + 1}. ${f.name} — ${kind}, ${need}. ${f.instruction}`;
+  });
+  const service = frames.filter((f) =>
+    DESIGN_SERVICE_FRAME_KINDS.includes(f.kind),
+  );
+  return [
+    '# Frames to draw',
+    [
+      `Template: "${template.name}" (\`${template.key}\`). Draw these frames and no others, in this order — every required one; an optional one only when you have something to show in it, in its own place. Name each in \`"frames"\` as \`{ "name", "kind" }\` with the kind given here.`,
+      ...lines,
+      service.length > 0
+        ? `Service frames (${service.map((f) => f.name).join(', ')}) use the same kit and custom properties as the screen: the project's fonts, colours, tokens and components, never a neutral or wireframe style. An explanation is its own frame, never text drawn over or around the screen.`
+        : null,
+    ]
+      .filter((l): l is string => l !== null)
+      .join('\n'),
+  ];
+};
+
+/** #833 D7: a repair turn's section — what the previous revision got wrong. */
+const repairSections = (
+  repair: DesignConformance | null | undefined,
+  previous: DesignPromptContext['previous'],
+): string[] => {
+  if (!repair || repair.ok) return [];
+  const list = (items: readonly string[]) =>
+    items.map((i) => `"${i}"`).join(', ');
+  return [
+    '## Repair',
+    [
+      `${previous ? `Revision ${previous.revision}` : 'The latest revision'} does not follow the template. Draw the next revision so its frames are exactly those of "Frames to draw", in order; keep every frame that is right in \`"kept"\`.`,
+      repair.missing.length > 0 ? `Missing: ${list(repair.missing)}.` : null,
+      repair.extra.length > 0
+        ? `Extra, not in the template: ${list(repair.extra)}.`
+        : null,
+      repair.misplaced.length > 0
+        ? `Out of order: ${list(repair.misplaced)}.`
+        : null,
+      repair.reason === 'too_many_steps'
+        ? 'It has more steps than the template allows: draw only the first ones.'
+        : null,
+    ]
+      .filter((l): l is string => l !== null)
+      .join('\n'),
+  ];
+};
+
+/**
  * The turn's own sections: the variant, on a revise the previous revision
  * (#628: only the frames the comments point at in full), and the open
  * comments. `withHtml` false summarizes every previous frame, the last resort
@@ -357,15 +433,16 @@ export const designTurnSections = (
         ? `Your latest revision of this variant is revision ${previous.revision}: "${previous.title}". Its rationale: ${previous.rationale}`
         : null,
       previous
-        ? `Its frames, in order: ${previous.frames.map((f) => `"${f.name}"`).join(', ')}. Change, add or drop frames as the comments ask. A comment names the frame it was left on in \`leftOn.frame\`. Keep every frame the comments leave alone: name it in \`"kept"\` and give it no design block — Nautelle copies it from revision ${previous.revision} as it is.`
+        ? `Its frames, in order: ${previous.frames.map((f) => `"${f.name}"${f.kind ? ` (${f.kind})` : ''}`).join(', ')}. Change them as the comments ask, keeping to the frames of the template below. A comment names the frame it was left on in \`leftOn.frame\`. Keep every frame the comments leave alone: name it in \`"kept"\` and give it no design block — Nautelle copies it from revision ${previous.revision} as it is. A required frame you leave out of \`"frames"\` is copied too.`
         : null,
-      'Use one frame unless the task touches several pages or several standalone components; then draw one frame per page, plus one per component that matters on its own.',
       previous
-        ? `Answer with the \`agentdock-plan\` block — \`"variant": ${ctx.variant}\`, \`"frames"\` naming each frame of the revision in order, kept ones included, and \`"kept"\` naming the kept ones — and one \`agentdock-design\` block per frame you draw, in order, each fenced with four backticks.`
-        : `Answer with the \`agentdock-plan\` block — \`"variant": ${ctx.variant}\`, and \`"frames"\` naming each frame in order — and one \`agentdock-design\` block per frame, each fenced with four backticks.`,
+        ? `Answer with the \`agentdock-plan\` block — \`"variant": ${ctx.variant}\`, \`"frames"\` naming each frame of the revision in order as \`{ "name", "kind" }\`, kept ones included, and \`"kept"\` naming the kept ones — and one \`agentdock-design\` block per frame you draw, in order, each fenced with four backticks.`
+        : `Answer with the \`agentdock-plan\` block — \`"variant": ${ctx.variant}\`, and \`"frames"\` naming each frame in order as \`{ "name", "kind" }\` — and one \`agentdock-design\` block per frame, each fenced with four backticks.`,
     ]
       .filter((l): l is string => l !== null)
       .join('\n'),
+    ...framesToDrawSections(ctx.template),
+    ...repairSections(ctx.repair, previous),
     ...previousSections(ctx, withHtml),
   ];
   if (ctx.comments.length > 0) {

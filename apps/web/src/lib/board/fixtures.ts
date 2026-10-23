@@ -94,6 +94,7 @@ export const boardView = (cards: BoardCardView[]): BoardView => ({
     autoMergeCards: null,
     autoMergeCardsDefault: true,
     backgroundStallMinutes: 30,
+    cardMergePolicy: 'ask',
     isDefault: true,
     updatedAt: null,
   },

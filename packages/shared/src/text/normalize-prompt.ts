@@ -48,13 +48,26 @@ export const needsNormalizeCall = (
 const utf8Bytes = (text: string): number =>
   new TextEncoder().encode(text).length;
 
-const instructions = (classifyKind: boolean): string => {
+const instructions = (
+  classifyKind: boolean,
+  templateKeys: readonly string[],
+): string => {
+  const asksTemplate = classifyKind && templateKeys.length > 0;
+  const keys = templateKeys.map((k) => `"${k}"`).join(', ');
   const kindRule = classifyKind
-    ? `\n\nThe fields describe one task on a project board. Also classify it: "kind" is "bug" when it reports something broken or wrong, and "feature" otherwise.`
+    ? `\n\nThe fields describe one task on a project board. Also classify it: "kind" is "bug" when it reports something broken or wrong, and "feature" otherwise.${
+        asksTemplate
+          ? ` "designTemplate" is the shape of design the task needs, one of ${keys}: "page" for a whole screen, "component" for one reusable interface element, "flow" for a multi-step journey; any other key only when the task clearly matches its name.`
+          : ''
+      }`
     : '';
-  const kindExample = classifyKind ? ', "kind": "bug"' : '';
+  const kindExample = classifyKind
+    ? `, "kind": "bug"${asksTemplate ? ', "designTemplate": "page"' : ''}`
+    : '';
   const kindLine = classifyKind
-    ? '\n- kind: "bug" or "feature" — required.'
+    ? `\n- kind: "bug" or "feature" — required.${
+        asksTemplate ? `\n- designTemplate: one of ${keys} — required.` : ''
+      }`
     : '\n- Do not write "kind".';
   return `You translate short texts that people typed into a software project's tools into clear, natural English.
 
@@ -88,6 +101,7 @@ const neutralize = (json: string): string =>
 export const buildNormalizePrompt = (
   fields: readonly MaskedTextField[],
   classifyKind: boolean,
+  templateKeys: readonly string[] = [],
 ): string => {
   const data = neutralize(
     JSON.stringify(
@@ -97,7 +111,7 @@ export const buildNormalizePrompt = (
     ),
   );
   const prompt = [
-    instructions(classifyKind),
+    instructions(classifyKind, templateKeys),
     `<input>\n${data}\n</input>`,
   ].join('\n\n');
   if (utf8Bytes(prompt) > TEXT_PROMPT_MAX_BYTES) {

@@ -61,6 +61,28 @@ describe('suggestions (D2, D3)', () => {
       suggestionWhy: 'A new screen.',
     });
   });
+
+  it('takes a suggested template of the project, never over a person’s choice (#833 D8)', () => {
+    const keys = ['page', 'component', 'flow', 'landing'];
+    const named = { ...suggestion, template: 'flow' };
+    expect(suggestionOf(named, true, keys).templateKey).toBe('flow');
+    expect(suggestionOf(named, true, ['page']).templateKey).toBeNull();
+    expect(suggestionOf(suggestion, true, keys).templateKey).toBeNull();
+    const s = suggestionOf(named, true, keys);
+    expect(suggestionUpdate(s, { status: 'idle', drawn: false })).toMatchObject(
+      { templateKey: 'flow' },
+    );
+    expect(
+      suggestionUpdate(s, {
+        status: 'idle',
+        drawn: false,
+        templateSource: 'person',
+      }),
+    ).not.toHaveProperty('templateKey');
+    expect(
+      suggestionUpdate(s, { status: 'reviewing', drawn: true }),
+    ).not.toHaveProperty('templateKey');
+  });
 });
 
 describe('batchOf (D4, D10)', () => {

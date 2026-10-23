@@ -1,6 +1,7 @@
 import type {
   DesignCommentKind,
   DesignSuggestion,
+  DesignTemplateChoice,
   DesignTheme,
   PlanTaskStatus,
   TaskDesignStatus,
@@ -41,15 +42,20 @@ export interface SuggestedDesign {
   suggested: boolean;
   suggestionWhy: string;
   variantCount: number;
+  /** #833 D8: the suggested template; null when none, or not one of the project's. */
+  templateKey: string | null;
 }
 
 /**
  * D2, D3: a suggestion read for a project. A profile with `hasUi: false`
  * turns every suggestion off — the planner is told so, this enforces it.
+ * `templateKeys` are the project's template keys (#833 D8): any other key the
+ * planner names is dropped.
  */
 export const suggestionOf = (
   suggestion: DesignSuggestion,
   hasUi: boolean | null,
+  templateKeys: readonly string[] = [],
 ): SuggestedDesign => {
   const needed = suggestion.needed && hasUi !== false;
   return {
@@ -57,26 +63,43 @@ export const suggestionOf = (
     suggested: needed,
     suggestionWhy: suggestion.why,
     variantCount: suggestion.variants,
+    templateKey:
+      suggestion.template !== undefined &&
+      templateKeys.includes(suggestion.template)
+        ? suggestion.template
+        : null,
   };
 };
 
 /**
  * D2: what a later suggestion changes on an existing row. The planner
  * suggests, the person decides: `needed` stays the person's, and the variant
- * count follows the planner only while nothing was drawn.
+ * count follows the planner only while nothing was drawn. #833 D8: so does
+ * the template, and never over a person's choice.
  */
 export const suggestionUpdate = (
   suggestion: SuggestedDesign,
-  row: { status: TaskDesignStatus; drawn: boolean },
+  row: {
+    status: TaskDesignStatus;
+    drawn: boolean;
+    templateSource?: DesignTemplateChoice;
+  },
 ): {
   suggested: boolean;
   suggestionWhy: string;
   variantCount?: number;
+  templateKey?: string;
 } => ({
   suggested: suggestion.suggested,
   suggestionWhy: suggestion.suggestionWhy,
   ...(row.status === 'idle' && !row.drawn
     ? { variantCount: suggestion.variantCount }
+    : {}),
+  ...(row.status === 'idle' &&
+  !row.drawn &&
+  row.templateSource !== 'person' &&
+  suggestion.templateKey !== null
+    ? { templateKey: suggestion.templateKey }
     : {}),
 });
 
@@ -143,6 +166,15 @@ export const designTurnPlanSchema = z.strictObject({
   profileId: z.string().min(1).nullable(),
   /** #275 D1: the build this batch waited for — its turns are step 2 of 2. */
   profileBuildRunId: z.string().min(1).optional(),
+  /**
+   * #833 D7: a repair turn — a revise of the variant's latest revision that
+   * does not follow its template. `next` is what the rest of the batch
+   * draws: the batch's own mode after an automatic repair, `repair` when a
+   * person's Complete repairs every variant. A repair is never repaired again.
+   */
+  repair: z
+    .strictObject({ next: z.enum(['generate', 'revise', 'repair']) })
+    .optional(),
 });
 export type DesignTurnPlan = z.infer<typeof designTurnPlanSchema>;
 
@@ -189,8 +221,43 @@ export const batchOf = (
   };
 };
 
-/** The next turn of a batch, after `plan`'s variant is drawn. */
+/**
+ * The next turn of a batch, after `plan`'s variant is drawn. #833: after an
+ * automatic repair the batch goes on in its own mode.
+ */
 export const nextOfBatch = (plan: DesignTurnPlan): DesignTurnPlan | null => {
   const [variant, ...remaining] = plan.remaining;
-  return variant === undefined ? null : { ...plan, variant, remaining };
+  if (variant === undefined) return null;
+  const { repair, ...rest } = plan;
+  if (!repair || repair.next === 'repair') {
+    return { ...plan, variant, remaining };
+  }
+  return { ...rest, mode: repair.next, variant, remaining };
+};
+
+/**
+ * #833 D7: the one automatic repair of the revision `plan` just drew — a
+ * revise of the same variant that carries the rest of the batch.
+ */
+export const repairOf = (plan: DesignTurnPlan): DesignTurnPlan => ({
+  ...plan,
+  mode: 'revise',
+  repair: { next: plan.mode },
+});
+
+/** #833 D7: a person's Complete — a repair of every listed variant. */
+export const completeBatchOf = (
+  variants: readonly number[],
+  profileId: string | null,
+): DesignTurnPlan | null => {
+  const [variant, ...remaining] = [...variants].sort((a, b) => a - b);
+  if (variant === undefined) return null;
+  return {
+    mode: 'revise',
+    variant,
+    remaining,
+    comments: [],
+    profileId,
+    repair: { next: 'repair' },
+  };
 };

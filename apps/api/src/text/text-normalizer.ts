@@ -3,6 +3,7 @@ import {
   type BoardCardKind,
   buildNormalizePrompt,
   classifyCardKindEnglish,
+  classifyDesignTemplateEnglish,
   type DeepLError,
   isDeepLFinal,
   needsNormalizeCall,
@@ -39,6 +40,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Prisma, RunStatus, TextNormalization } from '@prisma/client';
 import { BudgetGate } from '../budgets/budget-gate';
 import { PrismaService } from '../database/prisma.service';
+import { projectDesignTemplateKeys } from '../design/design-store';
 import { LiveService } from '../live/live.service';
 import { RuntimeProfileResolver } from '../readiness';
 import { TokenSaverService } from '../token-saver/token-saver.service';
@@ -424,7 +426,13 @@ export class TextNormalizer {
     );
     let prompt: string;
     try {
-      prompt = buildNormalizePrompt(toSend, row.classifyKind);
+      prompt = buildNormalizePrompt(
+        toSend,
+        row.classifyKind,
+        row.classifyKind
+          ? await projectDesignTemplateKeys(this.prisma, row.projectId)
+          : [],
+      );
     } catch (error) {
       await this.end(row.id, 'failed', 'run_failed', (error as Error).message);
       return { kind: 'failed', reason: 'run_failed' };
@@ -567,6 +575,7 @@ export class TextNormalizer {
       resolvedById(prepared, parsed.output),
       parsed.output.kind,
       { from: 'running' },
+      parsed.output.designTemplate,
     );
   }
 
@@ -634,13 +643,15 @@ export class TextNormalizer {
   /**
    * D8, D9, D10: the result, field by field, under the owner's row lock.
    * `kind` is the model's answer, or `rule` (#324 D7): the English rule on
-   * the card's text as it now stands. Returns whether it was applied.
+   * the card's text as it now stands. `templateOf` is the model's design
+   * template key (#833 D8). Returns whether it was applied.
    */
   private async apply(
     row: TextNormalization,
     resolved: ReadonlyMap<string, ResolvedTextField>,
     kindOf: BoardCardKind | 'rule' | undefined,
     via: ApplyVia,
+    templateOf?: string,
   ): Promise<boolean> {
     const owner = ownerOfRow(row);
     const now = new Date();
@@ -695,6 +706,24 @@ export class TextNormalizer {
           where: { id: row.cardId, kindSource: 'auto', branch: null },
           data: { kind },
         });
+      }
+      if (row.classifyKind && row.cardId !== null) {
+        // #833 D8: classified with the kind, but never over a person's choice.
+        const template =
+          kindOf === 'rule'
+            ? classifyDesignTemplateEnglish(textOf('title'))
+            : templateOf;
+        if (
+          template !== undefined &&
+          (await projectDesignTemplateKeys(tx, row.projectId)).includes(
+            template,
+          )
+        ) {
+          await tx.boardCard.updateMany({
+            where: { id: row.cardId, designTemplateSource: 'auto' },
+            data: { designTemplate: template },
+          });
+        }
       }
       await tx.textNormalization.update({
         where: { id: row.id },

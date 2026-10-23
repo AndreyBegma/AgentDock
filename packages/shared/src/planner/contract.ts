@@ -23,7 +23,9 @@ import {
   CARD_DRAFT_SECTIONS,
   CARD_DRAFT_TITLE_MAX,
   type CardDraft,
+  type DesignFrameEntry,
   DISCUSS_PROPOSALS_MAX,
+  frameEntryOf,
   INTAKE_SPLIT_MAX,
   INTAKE_SPLIT_MIN,
   INTAKE_STACK_STAGES_MIN,
@@ -184,7 +186,7 @@ export interface PlannerParseContexts {
      * #628: a revise's previous revision of the variant, in order — the
      * frames `kept` may name. Absent on a generate: nothing can be kept.
      */
-    previousFrames?: readonly DesignFrameDraft[];
+    previousFrames?: readonly Pick<DesignFrameDraft, 'name' | 'html'>[];
   };
   /** #337: what decides whether the intake turn may still ask. */
   intake: VersionContext & IntakeTurnState;
@@ -471,15 +473,19 @@ const intakeBranchSchema = (json: unknown) => {
  * most `DESIGN_HTML_MAX_BYTES` apiece — and together at most
  * `DESIGN_TOTAL_MAX_BYTES` (#686). #628: a frame named in `kept`
  * has no block; it is the previous revision's frame of that name, as drawn.
+ * #833 D13: each frame carries the kind its entry names — `legacy` for a
+ * plain name; conformance to the template is the API's check, not this one.
  */
 const parseDesignBlocks = (
   text: string,
-  names: readonly string[] | undefined,
+  entries: readonly DesignFrameEntry[] | undefined,
   kept: readonly string[],
-  previous: readonly DesignFrameDraft[],
+  previous: readonly Pick<DesignFrameDraft, 'name' | 'html'>[],
 ):
   | { ok: true; frames: DesignFrameDraft[] }
   | { ok: false; error: PlannerContractViolation } => {
+  const named = entries?.map(frameEntryOf);
+  const names = named?.map((f) => f.name);
   const blocks = extractFencedBlocks(text, PLANNER_DESIGN_BLOCK_TAG);
   if (blocks.includes(null)) {
     return violation(
@@ -537,7 +543,7 @@ const parseDesignBlocks = (
   const frames: DesignFrameDraft[] = [];
   let total = 0;
   let block = 0;
-  for (const name of frameNames) {
+  for (const [i, name] of frameNames.entries()) {
     const copy = keptKeys.has(name.toLowerCase())
       ? earlier.get(name.toLowerCase())
       : undefined;
@@ -563,7 +569,7 @@ const parseDesignBlocks = (
       }
     }
     total += designBytes(html);
-    frames.push({ name, html });
+    frames.push({ name, kind: named?.[i].kind ?? 'legacy', html });
   }
   if (total > DESIGN_TOTAL_MAX_BYTES) {
     return violation(
@@ -843,8 +849,8 @@ backticks, each holding one self-contained HTML document:
 
 Frames:
 
-- Draw one frame, unless the task touches several pages or standalone components: then one per page, plus one per component that matters on its own (states side by side).
-- \`"frames"\` lists one-line names (max ${DESIGN_FRAME_NAME_MAX} chars, distinct, ≤${DESIGN_FRAMES_MAX} frames), in block order: \`"frames": ["Board page", "Card tile"]\`. With one frame it may be left out (named "${DESIGN_LEGACY_FRAME_NAME}").
+- Draw exactly the frames of the template the turn gives you ("Frames to draw"), in that order — nothing else. An explanation is its own frame, never text over the screen.
+- \`"frames"\` lists them in block order as \`{ "name", "kind" }\`, with the template's kind: \`[{ "name": "Screen", "kind": "screen" }]\`. Names are one line (max ${DESIGN_FRAME_NAME_MAX} chars), distinct, ≤${DESIGN_FRAMES_MAX} frames. A plain string reads as kind \`legacy\` and fails the template; left out, the one frame is "${DESIGN_LEGACY_FRAME_NAME}".
 - On a revision, \`"kept"\` names the frames you leave exactly as the previous revision drew them. A kept frame has no design block — Nautelle copies it; every other frame has one, in order.
 
 The mockup's rules — a frame that breaks one fails the turn:
@@ -931,7 +937,7 @@ write     → { "action": "write", "taskKey": key, "document": markdown, "assump
 revise    → { "action": "revise", "tasks": [ Task | { "key": key } ] }${
     v2
       ? `
-design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ], "frames"?: [ string ], "kept"?: [ string ] }`
+design    → { "action": "design", "taskKey": key, "variant": 1 | 2 | 3, "title": string, "rationale": string, "addressed": [ commentId ], "frames"?: [ { "name": string, "kind": string } ], "kept"?: [ string ] }`
       : ''
   }
 \`\`\`

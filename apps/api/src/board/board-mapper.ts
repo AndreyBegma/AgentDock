@@ -9,6 +9,7 @@ import {
   CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
   CARD_DECIDING_SIGNALS,
   CARD_HOOKS_GRACE_MS,
+  CARD_MERGE_POLICY_DEFAULT,
   type CardDecidingSignal,
   type CardDependencyRef,
   type CardEscalationView,
@@ -22,6 +23,7 @@ import {
   type CardRoundCiState,
   type CardRoundView,
   type CardStackRef,
+  type CardTakenView,
   type CardTrackingView,
   cardAutoMergeDefault,
   cardCiChecksOf,
@@ -230,6 +232,23 @@ const trackingOf = (
       }
     : null;
 
+/**
+ * #845 D2, D10: a card a manual session took (`card.take`) — any bound card
+ * that is not the session's own `terminal` one. "Session ended" once
+ * `alive` is false.
+ */
+export const takenOf = (
+  card: BoardCard,
+  facts: Pick<CardFacts, 'alive'>,
+): CardTakenView | null =>
+  card.source !== 'terminal' && card.trackedSessionId !== null
+    ? {
+        sessionId: card.trackedSessionId,
+        alive: facts.alive.has(card.trackedSessionId),
+        branch: card.takenBranch,
+      }
+    : null;
+
 const isFleetStage = (value: string): value is FleetStage =>
   (FLEET_STAGES as readonly string[]).includes(value);
 
@@ -420,6 +439,8 @@ export const toCardView = (
   title: card.title,
   kind: card.kind,
   kindSource: card.kindSource,
+  designTemplate: card.designTemplate,
+  designTemplateSource: card.designTemplateSource,
   column: card.column,
   position: card.position,
   source: card.source,
@@ -471,6 +492,8 @@ export const toCardView = (
   readiness: cardReadiness(card.column, facts.dependencies.get(card.id) ?? []),
   stack: facts.stacks?.get(card.id) ?? null,
   tracking: trackingOf(card, facts),
+  taken: takenOf(card, facts),
+  queuedForSessionId: card.queuedForSessionId,
   fleet: fleetOf(card),
   autoCollect: card.autoCollect,
   movedAt: card.movedAt.toISOString(),
@@ -741,6 +764,7 @@ export const toSettingsView = (
         autoMergeCards: row.autoMergeCards,
         autoMergeCardsDefault,
         backgroundStallMinutes: row.backgroundStallMinutes,
+        cardMergePolicy: row.cardMergePolicy,
         isDefault: false,
         updatedAt: row.updatedAt.toISOString(),
       }
@@ -755,6 +779,7 @@ export const toSettingsView = (
         autoMergeCards: null,
         autoMergeCardsDefault,
         backgroundStallMinutes: CARD_BACKGROUND_STALL_MINUTES_DEFAULT,
+        cardMergePolicy: CARD_MERGE_POLICY_DEFAULT,
         isDefault: true,
         updatedAt: null,
       };

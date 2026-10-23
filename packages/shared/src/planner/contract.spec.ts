@@ -514,7 +514,7 @@ describe('parsePlannerOutput — design', () => {
     const r = parsePlannerOutput(designMessage(design), 'design', ctx);
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.frames).toEqual([{ name: 'Mockup', html }]);
+      expect(r.frames).toEqual([{ name: 'Mockup', kind: 'legacy', html }]);
       expect(r.output).toEqual(design as never);
       expect('html' in r.output).toBe(false);
     }
@@ -601,7 +601,65 @@ describe('parsePlannerOutput — design', () => {
   it('names a single frame when frames is given', () => {
     const r = parsePlannerOutput(framed(['Board page'], [html]), 'design', ctx);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.frames).toEqual([{ name: 'Board page', html }]);
+    if (r.ok) {
+      expect(r.frames).toEqual([{ name: 'Board page', kind: 'legacy', html }]);
+    }
+  });
+
+  // #833 D13: a frame names its kind; a plain name reads as legacy.
+  it('reads the kind of each frame, a plain name as legacy', () => {
+    const r = parsePlannerOutput(
+      framed(
+        [
+          { name: 'Screen', kind: 'screen' },
+          { name: 'Breakdown', kind: 'breakdown' },
+          'Notes',
+        ] as never,
+        [html, html, html],
+      ),
+      'design',
+      ctx,
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.frames.map((f) => [f.name, f.kind])).toEqual([
+        ['Screen', 'screen'],
+        ['Breakdown', 'breakdown'],
+        ['Notes', 'legacy'],
+      ]);
+    }
+  });
+
+  it('refuses an unknown kind as invalid_shape', () => {
+    expectViolation(
+      parsePlannerOutput(
+        framed([{ name: 'Screen', kind: 'hero' }] as never, [html]),
+        'design',
+        ctx,
+      ),
+      'invalid_shape',
+    );
+  });
+
+  // #833 D12: 2 MiB of HTML across the frames.
+  it('takes 1.5 MiB of frames and refuses 2.1 MiB as design_too_large', () => {
+    const sized = (total: number) => {
+      const n = Math.ceil(total / (150 * 1024));
+      const each = Math.floor(total / n);
+      const body = (i: number) =>
+        html.replace('Facts', `F${i}${'x'.repeat(each - html.length)}`);
+      return framed(
+        Array.from({ length: n }, (_, i) => `Frame ${i + 1}`),
+        Array.from({ length: n }, (_, i) => body(i)),
+      );
+    };
+    expect(parsePlannerOutput(sized(1.5 * 1024 * 1024), 'design', ctx).ok).toBe(
+      true,
+    );
+    expectViolation(
+      parsePlannerOutput(sized(2.1 * 1024 * 1024), 'design', ctx),
+      'design_too_large',
+    );
   });
 
   it.each([
@@ -629,8 +687,12 @@ describe('parsePlannerOutput — design', () => {
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.frames).toEqual([
-        previousFrames[0],
-        { name: 'Tile', html: html.replace('Facts', 'New tile') },
+        { ...previousFrames[0], kind: 'legacy' },
+        {
+          name: 'Tile',
+          kind: 'legacy',
+          html: html.replace('Facts', 'New tile'),
+        },
       ]);
       expect(r.output.kept).toEqual(['Page']);
     }
@@ -643,7 +705,11 @@ describe('parsePlannerOutput — design', () => {
       { ...ctx, previousFrames },
     );
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.frames).toEqual(previousFrames);
+    if (r.ok) {
+      expect(r.frames).toEqual(
+        previousFrames.map((f) => ({ ...f, kind: 'legacy' })),
+      );
+    }
   });
 
   it.each([
@@ -691,7 +757,7 @@ describe('parsePlannerOutput — design', () => {
 
   it('#686: caps the frames together at the total limit', () => {
     const frame = `<p>${'x'.repeat(150 * 1024)}</p>`;
-    const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+    const names = Array.from({ length: 14 }, (_, i) => `F${i + 1}`);
     const r = parsePlannerOutput(
       framed(
         names,
@@ -814,8 +880,13 @@ describe('the fixed contract and the default instructions', () => {
     expect(PLANNER_DESIGN_CONTRACT).toContain('react@18.3.1 ');
     // #686: the per-frame and the total limit.
     expect(PLANNER_DESIGN_CONTRACT).toContain(
-      'At most 160 KiB of HTML per frame, and 1024 KiB for all frames together.',
+      'At most 160 KiB of HTML per frame, and 2048 KiB for all frames together.',
     );
+    // #833 D13: the template's frames, each named with its kind.
+    expect(PLANNER_DESIGN_CONTRACT).toContain(
+      'Draw exactly the frames of the template',
+    );
+    expect(PLANNER_DESIGN_CONTRACT).not.toContain('Draw one frame, unless');
   });
 
   it('a v1 plan keeps the v1 text: no design anywhere', () => {

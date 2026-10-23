@@ -469,6 +469,21 @@ describe('boardMoveRule', () => {
       });
     });
 
+    it('offers no Run for a taken card while its session lives (#845 D10)', () => {
+      const back = move({ from: 'todo', to: 'in_progress' });
+      expect(boardMoveRule({ ...back, trackingAlive: true })).toEqual({
+        allowed: true,
+        effects: [],
+        offerRun: false,
+      });
+      // The taking session ended: Run is offered again.
+      expect(boardMoveRule({ ...back, trackingAlive: false })).toEqual({
+        allowed: true,
+        effects: [],
+        offerRun: true,
+      });
+    });
+
     it('decides a manual card exactly as before, whatever the new fields say', () => {
       for (const from of BOARD_COLUMNS) {
         for (const to of BOARD_COLUMNS) {
@@ -476,13 +491,15 @@ describe('boardMoveRule', () => {
             const input = move({ from, to, roundPhase });
             for (const cardSource of ['manual', 'captured'] as const) {
               expect(
-                boardMoveRule({
-                  ...input,
-                  cardSource,
-                  autoCollect: true,
-                  trackingAlive: true,
-                }),
+                boardMoveRule({ ...input, cardSource, autoCollect: true }),
               ).toEqual(boardMoveRule(input));
+              // #845 D10: a live taking session only withholds the Run offer.
+              const before = boardMoveRule(input);
+              expect(
+                boardMoveRule({ ...input, cardSource, trackingAlive: true }),
+              ).toEqual(
+                before.allowed ? { ...before, offerRun: false } : before,
+              );
             }
           }
         }

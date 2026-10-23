@@ -18,6 +18,7 @@ import {
   UI_PROFILE_STYLE_RULES_MAX,
   UIPROFILE_GLOB_MAX,
 } from './limits';
+import { DESIGN_TEMPLATE_KEY_MAX } from './templates';
 
 /**
  * The design stage's types (docs/specs/223-design-stage.md): UI profile,
@@ -82,6 +83,8 @@ export const designSuggestionSchema = z.strictObject({
   needed: z.boolean(),
   why: z.string().trim().min(1).max(500),
   variants: designVariantSchema,
+  /** #833 D8: the template the planner suggests (a key of the project's); absent keeps `page`. */
+  template: z.string().min(1).max(DESIGN_TEMPLATE_KEY_MAX).optional(),
 });
 export type DesignSuggestion = z.infer<typeof designSuggestionSchema>;
 

@@ -29,6 +29,7 @@ export type DesignBusy =
   | 'comment'
   | 'revise'
   | 'approve'
+  | 'complete'
   | 'stop';
 
 /**
@@ -187,6 +188,9 @@ export function useDesignAt(
       ),
     approve: (body: DesignApproveRequest) =>
       run('approve', () => api(`${base}/approve`, { method: 'POST', body })),
+    /** #833 D7: the repair turn by hand, for a revision off its template. */
+    complete: () =>
+      run('complete', () => api(`${base}/complete`, { method: 'POST' })),
     /** #275 D5: stops the running stage; the design settles at rest. */
     stop: () => run('stop', () => api(`${base}/stop`, { method: 'POST' })),
   };

@@ -1,10 +1,15 @@
 import {
+  ACTION_REQUEST_CARD_TITLE_MAX,
   ACTION_REQUEST_PR_TITLE_MAX,
   ACTION_REQUEST_TTL_MS,
+  type ActionRequestArgs,
   type ActionRequestKind,
   type ActionRequestStatus,
   type ActionRequestSummary,
   actionRequestArgsSchemas,
+  BOARD_ERROR,
+  cardAcceptBoundArgsSchema,
+  cardLabel,
   mayDecideActionRequest,
   prApproveBoundArgsSchema,
   type Role,
@@ -15,6 +20,8 @@ import { z } from 'zod';
 import { type ApprovalsCaller, ApprovalsService } from '../approvals';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
+import { BoardService } from '../board/board.service';
+import { boardError, cardNotFound } from '../board/board-error';
 import { ControlService } from '../control/control.service';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
@@ -129,6 +136,7 @@ export class ActionRequestsService {
     private readonly control: ControlService,
     private readonly approvals: ApprovalsService,
     private readonly queue: QueueService,
+    private readonly board: BoardService,
   ) {}
 
   async create(
@@ -146,7 +154,12 @@ export class ActionRequestsService {
     const args =
       input.kind === 'pr_approve'
         ? await this.bindPr(input, parsed.data as { pr: number }, auditor)
-        : (parsed.data as Record<string, unknown>);
+        : input.kind === 'card_accept'
+          ? await this.bindCard(
+              input,
+              parsed.data as ActionRequestArgs<'card_accept'>,
+            )
+          : (parsed.data as Record<string, unknown>);
     const now = new Date();
     const { row, written } = await this.prisma.$transaction(async (tx) => {
       const row = await tx.actionRequest.create({
@@ -239,6 +252,42 @@ export class ActionRequestsService {
       headSha: inspection.headSha,
       title: inspection.title.slice(0, ACTION_REQUEST_PR_TITLE_MAX),
       url: inspection.url,
+    });
+  }
+
+  /**
+   * #845 D5 (ADR-0083 §10): a `card_accept` binds the card as the API reads
+   * it now — its title and pull request are what the approver is shown,
+   * never the session's words. Only a card in Finished is accepted.
+   */
+  private async bindCard(
+    input: NewActionRequest,
+    { card: number, merge }: ActionRequestArgs<'card_accept'>,
+  ): Promise<Record<string, unknown>> {
+    const card = await this.prisma.boardCard.findUnique({
+      where: { projectId_number: { projectId: input.projectId, number } },
+      select: {
+        number: true,
+        title: true,
+        column: true,
+        prNumber: true,
+        prUrl: true,
+      },
+    });
+    if (!card) throw cardNotFound();
+    if (card.column !== 'finished') {
+      throw boardError(
+        409,
+        BOARD_ERROR.wrongColumn,
+        `Only a card in Finished is accepted; ${cardLabel(number)} is in ${card.column}`,
+      );
+    }
+    return cardAcceptBoundArgsSchema.parse({
+      card: card.number,
+      ...(merge !== undefined ? { merge } : {}),
+      title: card.title.slice(0, ACTION_REQUEST_CARD_TITLE_MAX),
+      prNumber: card.prNumber,
+      prUrl: card.prUrl && /^https?:\/\//.test(card.prUrl) ? card.prUrl : null,
     });
   }
 
@@ -494,6 +543,34 @@ export class ActionRequestsService {
         }
         case 'tool_use':
           return { ok: true, result: {} };
+        case 'card_accept': {
+          // #845 D5: the Board's own Accept, as the approver — merging first
+          // when asked and the pull request is still open.
+          const bound = cardAcceptBoundArgsSchema.parse(row.args);
+          const actor = {
+            userId: decider.user.id,
+            role: decider.role,
+            ctx: decider.ctx,
+          };
+          const pr =
+            bound.merge === true && bound.prNumber !== null
+              ? await this.board.pullRequest(row.projectId, bound.card, actor)
+              : null;
+          const accepted = await this.board.accept(
+            row.projectId,
+            bound.card,
+            pr?.state === 'open' ? { merge: { headSha: pr.headSha } } : {},
+            actor,
+          );
+          return {
+            ok: true,
+            result: {
+              card: bound.card,
+              column: accepted.column,
+              merged: accepted.merge !== null && !accepted.merge.alreadyMerged,
+            },
+          };
+        }
       }
     } catch (error) {
       if (error instanceof HttpException) {

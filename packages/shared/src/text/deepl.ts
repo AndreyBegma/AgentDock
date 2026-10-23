@@ -160,3 +160,46 @@ export const classifyCardKindEnglish = (
   BUG_WORDS.test(title) || BUG_WORDS.test(body.slice(0, CARD_KIND_BODY_CHARS))
     ? 'bug'
     : 'feature';
+
+const wordsOf = (words: readonly string[]): RegExp =>
+  new RegExp(
+    `(?<![\\p{L}\\p{N}_])(?:${words.join('|')})(?![\\p{L}\\p{N}_])`,
+    'iu',
+  );
+
+const FLOW_WORDS = wordsOf([
+  'wizard',
+  'flow',
+  'onboarding',
+  'checkout',
+  'sign-?up',
+  'multi-?step',
+  '(?:\\d+|two|three|four|five|six)-?steps?',
+  'steps',
+]);
+const COMPONENT_WORDS = wordsOf([
+  'components?',
+  'widgets?',
+  'pickers?',
+  'dropdowns?',
+  'modals?',
+  'tooltips?',
+  'buttons?',
+  'toggles?',
+  'badges?',
+  'tabs',
+  'inputs?',
+]);
+
+/**
+ * #833 D8: the design template of an English card when no model answered
+ * (the DeepL path, as `classifyCardKindEnglish`): `flow` for a title that
+ * names a multi-step journey, `component` for one that names a single
+ * interface element, else `page`.
+ */
+export const classifyDesignTemplateEnglish = (title: string): string =>
+  FLOW_WORDS.test(title)
+    ? 'flow'
+    : COMPONENT_WORDS.test(title)
+      ? 'component'
+      : 'page';

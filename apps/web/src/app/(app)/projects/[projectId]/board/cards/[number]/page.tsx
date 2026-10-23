@@ -9,6 +9,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { CardNotFound } from '../../../../../../../components/board/card-not-found';
 import type { TerminalAccess } from '../../../../../../../components/board/card-sheet';
 import { CardDetailBody } from '../../../../../../../components/board/card-sheet';
+import { useCardTab } from '../../../../../../../components/board/card-tabs';
 import { useCardActions } from '../../../../../../../components/board/use-card-actions';
 import { fetchCard } from '../../../../../../../lib/board/actions';
 import {
@@ -22,13 +23,14 @@ import { useProjectDetail } from '../../../use-project-detail';
 
 /**
  * #431: one Board card on its own page. The same `CardDetailBody` as the
- * sheet, laid out in two columns at full width.
+ * sheet, laid out in the compact header and tabs at full width.
  */
 export default function CardPage() {
   const params = useParams<{ projectId: string; number: string }>();
   const { projectId } = params;
   const number = Number(params.number);
   const router = useRouter();
+  const [tab, setTab] = useCardTab(`${projectId}:${number}`);
 
   const project = useProjectDetail(projectId).data;
   const role = project?.role ?? 'viewer';
@@ -91,6 +93,8 @@ export default function CardPage() {
           terminal={terminal}
           runnerName={project?.runnerName}
           onSaved={card.retry}
+          tab={tab}
+          onTabChange={setTab}
         />
       ) : card.error ? (
         <p role="alert" className="text-sm text-danger">

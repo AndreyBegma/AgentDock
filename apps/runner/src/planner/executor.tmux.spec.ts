@@ -76,7 +76,7 @@ case "$FAKE_MODE" in
     sleep 60 ;;
   fail) echo 'Error: No conversation found with session ID' >&2; exit 2 ;;
   big) printf '{"type":"result","subtype":"success","is_error":false,"result":"%s"}\\n' "$(head -c 200000 /dev/zero | tr '\\0' a)"; exit 0 ;;
-  huge) printf '{"type":"result","subtype":"success","is_error":false,"result":"%s"}\\n' "$(head -c 2200000 /dev/zero | tr '\\0' a)"; exit 0 ;;
+  huge) printf '{"type":"result","subtype":"success","is_error":false,"result":"%s"}\\n' "$(head -c 2700000 /dev/zero | tr '\\0' a)"; exit 0 ;;
 esac
 echo '{"type":"result","subtype":"success","is_error":false,"result":"Planned.\\n\`\`\`agentdock-plan\\n{}\\n\`\`\`"}'
 `;

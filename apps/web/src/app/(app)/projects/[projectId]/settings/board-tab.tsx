@@ -3,6 +3,7 @@
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Card } from '@andrewbehma/glass-ui/card';
 import { Field, Input } from '@andrewbehma/glass-ui/field';
+import { Select } from '@andrewbehma/glass-ui/select';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
 import { toast } from '@andrewbehma/glass-ui/toast';
 import {
@@ -12,6 +13,8 @@ import {
   CARD_BACKGROUND_STALL_MINUTES_MAX,
   CARD_BACKGROUND_STALL_MINUTES_MIN,
   type CaptureModel,
+  type CardMergePolicy,
+  isCardMergePolicy,
 } from '@nautelle/shared';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import {
@@ -29,6 +32,11 @@ import {
   parseMaxRunning,
   parseStallMinutes,
 } from '../../../../../lib/board/format';
+import {
+  MERGE_POLICY_HINT,
+  MERGE_POLICY_LABEL,
+  MERGE_POLICY_OPTIONS,
+} from '../../../../../lib/board/merge-policy';
 import {
   AUTO_MERGE_LABEL,
   autoMergeHint,
@@ -56,6 +64,7 @@ export function BoardTab({
   const [specOnRun, setSpecOnRun] = useState(false);
   const [autoCollectTracked, setAutoCollectTracked] = useState(false);
   const [autoMerge, setAutoMerge] = useState(false);
+  const [mergePolicy, setMergePolicy] = useState<CardMergePolicy>('ask');
   const [maxRunning, setMaxRunning] = useState('3');
   const [stallMinutes, setStallMinutes] = useState('30');
   const [captureEnabled, setCaptureEnabled] = useState(false);
@@ -71,6 +80,7 @@ export function BoardTab({
       setSpecOnRun(view.specOnRun);
       setAutoCollectTracked(view.autoCollectTracked);
       setAutoMerge(effectiveAutoMerge(view));
+      setMergePolicy(view.cardMergePolicy);
       setMaxRunning(String(view.maxRunning));
       setStallMinutes(String(view.backgroundStallMinutes));
       setCaptureEnabled(view.captureEnabled);
@@ -93,6 +103,7 @@ export function BoardTab({
     specOnRun !== settings.specOnRun ||
     autoCollectTracked !== settings.autoCollectTracked ||
     autoMerge !== effectiveAutoMerge(settings) ||
+    mergePolicy !== settings.cardMergePolicy ||
     limit !== settings.maxRunning ||
     stall !== settings.backgroundStallMinutes ||
     captureEnabled !== settings.captureEnabled ||
@@ -111,6 +122,7 @@ export function BoardTab({
         ...(autoMerge !== effectiveAutoMerge(settings)
           ? { autoMergeCards: autoMerge }
           : {}),
+        cardMergePolicy: mergePolicy,
         maxRunning: limit,
         backgroundStallMinutes: stall,
         captureEnabled: captureEnabled && contentOn,
@@ -164,6 +176,27 @@ export function BoardTab({
               )}
               onChange={setAutoMerge}
             />
+            <Field
+              label={MERGE_POLICY_LABEL}
+              htmlFor="board-set-merge-policy"
+              hint={MERGE_POLICY_HINT}
+            >
+              <Select
+                id="board-set-merge-policy"
+                value={mergePolicy}
+                disabled={!isAdmin}
+                onChange={(e) => {
+                  if (isCardMergePolicy(e.target.value))
+                    setMergePolicy(e.target.value);
+                }}
+              >
+                {MERGE_POLICY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
             <Field
               label="Workers at once"
               htmlFor="board-set-max"

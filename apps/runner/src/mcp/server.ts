@@ -14,6 +14,7 @@ import {
 } from '../handoff/context';
 import type { LocalResult } from '../local/types';
 import { RUNNER_VERSION } from '../version';
+import { type BoardWaitClock, boardWait } from './board-wait';
 import {
   ESCALATE_CARD_MCP_TOOL,
   MCP_TOOLS,
@@ -95,16 +96,19 @@ const withCardNote = async (
 };
 
 /**
- * The twelve tools of spec 201 D20 and `finish_card` (#242 D6), each a thin
- * call to one local method (D7). `finish_card` meets the artifact guard
- * (#445 D8) in the daemon, never here (DR-10). With `escalate` (#750 D8),
- * `escalate_card` is listed too.
+ * The tools of spec 201 D20, `finish_card` (#242 D6) and the Board tools
+ * (#845), each a thin call to one local method (D7) — `board_wait` loops its
+ * method. `finish_card` meets the artifact guard (#445 D8) in the daemon,
+ * never here (DR-10). With `escalate` (#750 D8), `escalate_card` is listed
+ * too.
  */
 export const buildMcpServer = (
   request: McpRequest,
   options: {
     cardNote?: McpCardNote;
     escalate?: boolean;
+    /** Tests only: the clock `board_wait` measures its timeout with. */
+    waitClock?: BoardWaitClock;
   } = {},
 ): McpServer => {
   const server = new McpServer({
@@ -128,7 +132,19 @@ export const buildMcpServer = (
       tool.name,
       { description: tool.description, inputSchema: tool.input },
       async (input: Record<string, unknown>): Promise<CallToolResult> => {
-        const result = await request(tool.method, input);
+        // #845 D8: the tool's wait is a loop of short server holds.
+        const result: LocalResult<unknown> =
+          tool.method === 'board.wait'
+            ? await boardWait(
+                request,
+                input as {
+                  cursor?: string;
+                  cards?: number[];
+                  timeoutSec?: number;
+                },
+                options.waitClock,
+              )
+            : await request(tool.method, input);
         if (!result.ok)
           return errorResult(result.error.code, result.error.message);
         const data = z.record(z.string(), z.unknown()).safeParse(result.data);

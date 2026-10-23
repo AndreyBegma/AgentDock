@@ -4,8 +4,9 @@ import { Badge } from '@andrewbehma/glass-ui/badge';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Tab, TabList } from '@andrewbehma/glass-ui/tabs';
 import type { DesignFrameView } from '@nautelle/shared';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Columns2 } from 'lucide-react';
 import { framePath } from '../../lib/design/frames';
+import { frameKindLabel } from '../../lib/design/templates';
 
 /** The keys the strip turns into a frame: the tablist's own, which only move focus. */
 const STEP: Record<string, (at: number, last: number) => number> = {
@@ -30,8 +31,14 @@ export function FrameStrip({
   comments,
   pinned,
   onFrame,
+  templateName = null,
+  compare,
 }: {
   frames: readonly DesignFrameView[];
+  /** #833 D11: the template the revision was drawn by, named once above the tabs; null for a legacy one. */
+  templateName?: string | null;
+  /** #833 D11: the Compare toggle; left out while there is one variant to see. */
+  compare?: { on: boolean; onToggle: () => void };
   /** The position of the frame in view. */
   frame: number;
   variant: number;
@@ -45,6 +52,12 @@ export function FrameStrip({
   const current = frames[frame];
   return (
     <div className="flex shrink-0 flex-col gap-1">
+      {templateName ? (
+        <p className="text-xs text-ink-3">
+          Template ·{' '}
+          <span className="font-semibold text-ink">{templateName}</span>
+        </p>
+      ) : null}
       <div className="flex min-w-0 items-center gap-2">
         <span id="design-frames-label" className="shrink-0 text-xs text-ink-3">
           Frames · {frames.length}
@@ -60,6 +73,7 @@ export function FrameStrip({
           <TabList aria-labelledby="design-frames-label" className="w-max">
             {frames.map((f) => {
               const open = comments.get(f.position) ?? 0;
+              const kind = frameKindLabel(f);
               return (
                 <Tab
                   key={f.position}
@@ -71,6 +85,9 @@ export function FrameStrip({
                       {f.position + 1}
                     </span>
                     <span className="max-w-48 truncate">{f.name}</span>
+                    {kind ? (
+                      <span className="text-xs text-ink-3">{kind}</span>
+                    ) : null}
                     {open > 0 ? (
                       <Badge
                         count={open}
@@ -108,6 +125,18 @@ export function FrameStrip({
         >
           <ChevronRight aria-hidden="true" className="size-4" />
         </Button>
+        {compare ? (
+          <Button
+            size="sm"
+            variant="glass"
+            aria-pressed={compare.on}
+            title="Show the same frame of every variant side by side"
+            onClick={compare.onToggle}
+          >
+            <Columns2 aria-hidden="true" className="size-4" />
+            Compare
+          </Button>
+        ) : null}
       </div>
       {current ? (
         <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-ink-3">

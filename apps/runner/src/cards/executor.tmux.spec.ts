@@ -534,6 +534,7 @@ describe.skipIf(!tmuxInstalled)(
       expect(result).toEqual({
         phase: 'running',
         tmuxSession: 'nautelle-card-ab12cd34',
+        branch: 'card/c12-export-csv',
       });
 
       const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
@@ -949,6 +950,73 @@ describe.skipIf(!tmuxInstalled)(
       await t.executor.settled();
       expect(t.events.some((e) => e.type === 'card_run.pushed')).toBe(false);
       expect(t.f.gh.calls).toEqual([]);
+    });
+
+    it('#854 D1: startBranch on origin is the round’s branch — the worktree, the result and the pushes; else the card’s own, with the reason', async () => {
+      const t = await setup();
+      const taken = 'feat/12-export-csv';
+      const session = join(t.f.ws, 'session');
+      await t.f.run(
+        t.f.root,
+        'worktree',
+        'add',
+        '-q',
+        '-b',
+        taken,
+        session,
+        'refs/remotes/origin/main',
+      );
+      t.f.write(session, { 'src/csv.ts': 'export const csv = 1;\n' });
+      const pushed = await t.f.commitAll(session, 'feat: csv');
+      await t.f.run(session, 'push', '-q', 'origin', taken);
+      await t.f.run(t.f.root, 'worktree', 'remove', '--force', session);
+      await t.f.run(t.f.root, 'branch', '-q', '-D', taken);
+
+      const missing = await t.executor.run(
+        t.args({
+          cardId: 'card_m',
+          runId: 'run_m',
+          shortId: 'cd34ef56',
+          profileKey: 'claude-slow',
+          startBranch: 'feat/never-pushed',
+        }),
+      );
+      expect(missing).toMatchObject({
+        branch: 'card/c12-export-csv',
+        startBranchSkipped: 'not_on_origin',
+      });
+      await t.tmux('kill-session', '-t', '=nautelle-card-cd34ef56');
+
+      const draft = cardDraftPullRequest({
+        number: 12,
+        title: 'Export as CSV',
+        issueNumber: null,
+      });
+      const result = await t.executor.run(
+        t.args({
+          profileKey: 'claude-slow',
+          pullRequest: draft,
+          startBranch: taken,
+        }),
+      );
+      expect(result).toEqual({
+        phase: 'running',
+        tmuxSession: 'nautelle-card-ab12cd34',
+        branch: taken,
+      });
+      const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
+      expect(await t.f.run(worktree, 'branch', '--show-current')).toBe(taken);
+      expect(await t.f.run(worktree, 'rev-parse', 'HEAD')).toBe(pushed);
+
+      t.f.write(worktree, { 'src/header.ts': 'export const h = 1;\n' });
+      const next = await t.f.commitAll(worktree, 'feat: header row');
+      t.clock.advance(CARD_PUSH_MIN_INTERVAL_MS);
+      await t.executor.poll();
+      await t.executor.settled();
+      expect(
+        await t.f.run(t.f.origin, 'rev-parse', `refs/heads/${taken}`),
+      ).toBe(next);
+      await t.tmux('kill-session', '-t', '=nautelle-card-ab12cd34');
     });
 
     it('#359 D8: newBranch resumes the session on a fresh branch from the updated base, opening a second draft PR; Completed removes both branches', async () => {

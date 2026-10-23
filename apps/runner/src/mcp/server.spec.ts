@@ -29,7 +29,7 @@ const text = (result: unknown): string =>
   (result as { content: { text: string }[] }).content[0]?.text ?? '';
 
 describe('nautelle MCP server (spec 201 D20)', () => {
-  it('answers tools/list with the fifteen tools, named agentdock', async () => {
+  it('answers tools/list with the twenty-six tools, named agentdock', async () => {
     const { client } = await connect(() => ({ ok: true, data: {} }));
     expect(client.getServerVersion()?.name).toBe(MCP_SERVER_NAME);
     const { tools } = await client.listTools();
@@ -50,6 +50,17 @@ describe('nautelle MCP server (spec 201 D20)', () => {
         'track_card',
         'away',
         'resume_context',
+        'board_list',
+        'board_card',
+        'board_wait',
+        'card_create',
+        'card_run',
+        'card_move',
+        'card_feedback',
+        'card_message',
+        'card_stop',
+        'take_card',
+        'release_card',
       ].sort(),
     );
     expect(tools.every((tool) => tool.description)).toBe(true);
@@ -116,6 +127,93 @@ describe('nautelle MCP server (spec 201 D20)', () => {
         'finish_card',
         { summary: 'Added the export.' },
         { method: 'card.finish', args: { summary: 'Added the export.' } },
+      ],
+      [
+        'finish_card',
+        {
+          summary: 'Done.',
+          pullRequestUrl: 'https://github.com/o/r/pull/9',
+        },
+        {
+          method: 'card.finish',
+          args: {
+            summary: 'Done.',
+            pullRequestUrl: 'https://github.com/o/r/pull/9',
+          },
+        },
+      ],
+      ['board_list', {}, { method: 'board.list', args: {} }],
+      [
+        'board_list',
+        { column: 'todo' },
+        { method: 'board.list', args: { column: 'todo' } },
+      ],
+      [
+        'board_card',
+        { card: 42 },
+        { method: 'board.card', args: { card: 42 } },
+      ],
+      [
+        'card_create',
+        { title: 'Add export', candidate: true },
+        {
+          method: 'card.create',
+          args: { title: 'Add export', candidate: true },
+        },
+      ],
+      [
+        'card_run',
+        { card: 3, model: 'sonnet', effort: 'low' },
+        {
+          method: 'card.run',
+          args: { card: 3, model: 'sonnet', effort: 'low' },
+        },
+      ],
+      [
+        'card_move',
+        { card: 3, column: 'todo', index: 0 },
+        { method: 'card.move', args: { card: 3, column: 'todo', index: 0 } },
+      ],
+      [
+        'card_feedback',
+        { card: 3, text: 'CI is red.' },
+        { method: 'card.feedback', args: { card: 3, text: 'CI is red.' } },
+      ],
+      [
+        'card_message',
+        { card: 3, kind: 'option', questionKey: '0123456789abcdef', index: 1 },
+        {
+          method: 'card.message',
+          args: {
+            card: 3,
+            kind: 'option',
+            questionKey: '0123456789abcdef',
+            index: 1,
+          },
+        },
+      ],
+      ['card_stop', { card: 3 }, { method: 'card.stop', args: { card: 3 } }],
+      ['take_card', { card: 3 }, { method: 'card.take', args: { card: 3 } }],
+      [
+        'release_card',
+        { card: 3 },
+        { method: 'card.release', args: { card: 3 } },
+      ],
+      [
+        'request_action',
+        {
+          kind: 'card_accept',
+          args: { card: 3, merge: true },
+          summary: 'Accept C-3',
+        },
+        {
+          method: 'action.request',
+          args: {
+            kind: 'card_accept',
+            args: { card: 3, merge: true },
+            summary: 'Accept C-3',
+          },
+        },
       ],
     ];
     for (const [name, args, expected] of cases) {

@@ -1,6 +1,11 @@
 import {
+  LOCAL_BOARD_COLUMNS,
   LOCAL_CARD_BODY_MAX,
+  LOCAL_CARD_CI_STATES,
   LOCAL_CARD_KINDS,
+  LOCAL_CARD_MERGE_POLICIES,
+  LOCAL_CARD_PR_STATES,
+  LOCAL_CARD_ROUND_PHASES,
   LOCAL_CARD_SUMMARY_MAX,
   LOCAL_CARD_TITLE_MAX,
 } from '../protocol/local';
@@ -15,13 +20,7 @@ import {
  * D3. `inbox` (#244 D8/D9) holds captured suggestions; it is first, and only
  * operators and above see it.
  */
-export const BOARD_COLUMNS = [
-  'inbox',
-  'todo',
-  'in_progress',
-  'finished',
-  'completed',
-] as const;
+export const BOARD_COLUMNS = LOCAL_BOARD_COLUMNS;
 export type BoardColumn = (typeof BOARD_COLUMNS)[number];
 
 export const isBoardColumn = (value: string): value is BoardColumn =>
@@ -84,17 +83,7 @@ export type CardRoundTrigger = (typeof CARD_ROUND_TRIGGERS)[number];
  * them, not on the person; `finished` is done (worker, session end or the
  * person); `ended` is a session that exited without being finished first.
  */
-export const CARD_ROUND_PHASES = [
-  'queued',
-  'starting',
-  'running',
-  'waiting',
-  'background',
-  'finished',
-  'ended',
-  'failed',
-  'cancelled',
-] as const;
+export const CARD_ROUND_PHASES = LOCAL_CARD_ROUND_PHASES;
 export type CardRoundPhase = (typeof CARD_ROUND_PHASES)[number];
 
 /** D7: a round in one of these phases holds the card in In progress. */
@@ -151,7 +140,7 @@ export const CARD_COLLECT_RETRY_DELAY_MS = 2 * 60 * 1000;
  * #329 D6: the card's PR as last seen — from the PR poll, else from a
  * `card.collect` / `card.merge` / `card.prClose` result.
  */
-export const CARD_PR_STATES = ['open', 'draft', 'merged', 'closed'] as const;
+export const CARD_PR_STATES = LOCAL_CARD_PR_STATES;
 export type CardPrState = (typeof CARD_PR_STATES)[number];
 
 export const isCardPrState = (value: string): value is CardPrState =>
@@ -165,8 +154,22 @@ export const isCardPrState = (value: string): value is CardPrState =>
  * - `red` — a check failed; `ciChecks` names them.
  * Auto-merge asks more than `green` (`cardCiMergeable`, C-182).
  */
-export const CARD_CI_STATES = ['none', 'pending', 'green', 'red'] as const;
+export const CARD_CI_STATES = LOCAL_CARD_CI_STATES;
 export type CardCiState = (typeof CARD_CI_STATES)[number];
+
+/**
+ * #845 D4: who merges a finished card's green pull request when a person's
+ * session conducts a Board Run — `ask` (default): the conductor asks the
+ * person once per run; `agent`: it merges a green, `CLEAN` pull request
+ * itself; `person`: it never merges. A pull request touching `.woodpecker/**`
+ * or carrying a `Gate:` always goes to the person.
+ */
+export const CARD_MERGE_POLICIES = LOCAL_CARD_MERGE_POLICIES;
+export type CardMergePolicy = (typeof CARD_MERGE_POLICIES)[number];
+export const CARD_MERGE_POLICY_DEFAULT: CardMergePolicy = 'ask';
+
+export const isCardMergePolicy = (value: string): value is CardMergePolicy =>
+  (CARD_MERGE_POLICIES as readonly string[]).includes(value);
 
 export const isCardCiState = (value: string): value is CardCiState =>
   (CARD_CI_STATES as readonly string[]).includes(value);

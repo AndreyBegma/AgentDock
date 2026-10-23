@@ -39,6 +39,7 @@ import {
   cardEscalateAvailable,
   cardFreshStartAvailable,
   cardRunArgsSchema,
+  cardStartBranchAvailable,
   ISSUE_TITLE_MAX,
   ORCHESTRATOR_DEFAULTS,
   type OrchestratorPermissionMode,
@@ -103,6 +104,8 @@ import {
   isOpusModel,
   MODEL_BY_TYPE,
   rememberedChoice,
+  startBranchChoice,
+  startBranchOutcome,
 } from './launch-choice';
 
 type Tx = Prisma.TransactionClient;
@@ -314,6 +317,20 @@ export class BoardRoundsService {
         'A suggestion runs once it is accepted',
       );
     }
+    // #845 D10 (ADR-0083 §8): a live taking session is the card's worker.
+    const takenBy = card.source !== 'terminal' ? card.trackedSessionId : null;
+    if (takenBy !== null) {
+      const live = await this.prisma.agentSession.count({
+        where: { id: takenBy, endedAt: null },
+      });
+      if (live > 0) {
+        throw boardError(
+          409,
+          BOARD_ERROR.cardRunning,
+          `${cardLabel(card.number)} is taken by a live session`,
+        );
+      }
+    }
     // #480 (ADR-0044): no card of a stack runs before its design is approved.
     await this.stacks.assertStackApproved(card.id);
     // #638 (ADR-0065): an open dependency refuses the Run; nothing overrides
@@ -330,7 +347,18 @@ export class BoardRoundsService {
       null,
       autoRunAfter,
       stacked,
+      // #854: the gone session's branch, for the Run to continue.
+      takenBy !== null ? card.takenBranch : null,
     );
+    if (takenBy !== null) {
+      // The Run is the card's worker now; `start` moved it onto `takenBranch`
+      // when the runner took it (#854 D2), else `takenBranch` stays recorded.
+      await this.prisma.boardCard.updateMany({
+        where: { id: card.id, trackedSessionId: takenBy },
+        data: { trackedSessionId: null },
+      });
+      this.work.publish(projectId, card.id);
+    }
     return this.board.detail(projectId, number);
   }
 
@@ -678,6 +706,8 @@ export class BoardRoundsService {
     autoRunAfter: number | null = null,
     /** #636: the dependency a Run stacks the card on; `null` is the base. */
     stacked: StackedBase | null = null,
+    /** #854: the branch a session-gone taken card was worked on. */
+    taken: string | null = null,
   ): Promise<void> {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
@@ -855,6 +885,17 @@ export class BoardRoundsService {
           title: card.title,
           issueNumber: issue.number,
         }));
+    // #854 D1: a session-gone taken card's Run starts on the branch the
+    // session worked — when it is a card branch and the runner takes the
+    // field; the runner then uses it only when origin has it.
+    const startChoice = startBranchChoice(
+      taken,
+      branch,
+      followUp,
+      capabilities !== null && cardStartBranchAvailable(capabilities),
+    );
+    const startBranch =
+      startChoice?.kind === 'send' ? startChoice.branch : null;
     // #379: a spec in an external docs repository goes in through its own
     // pull request, before the worker starts; the card's branch never holds it.
     let specPr = cardSpecPrOf(card);
@@ -961,7 +1002,8 @@ export class BoardRoundsService {
             title: card.title,
             body: card.body,
             kind: card.kind,
-            branch,
+            // #854: the branch the round is expected to work on.
+            branch: startBranch ?? branch,
             base,
             specPath,
             specPr: specPr
@@ -1038,6 +1080,7 @@ export class BoardRoundsService {
         : {}),
       ...(followUp ? { newBranch: true } : {}),
       ...(escalate ? { escalate: true as const } : {}),
+      ...(startBranch !== null ? { startBranch } : {}),
       ...withCardPrefix(saver.args, prefix.prefix),
     };
     const valid = cardRunArgsSchema.safeParse({ ...draft, runId: 'pending' });
@@ -1264,7 +1307,31 @@ export class BoardRoundsService {
         where: { id: round.id, tmuxSession: null },
         data: { tmuxSession: output.tmuxSession },
       });
-      await this.record(trigger, actor, project.id, card.id, after, 'ok');
+      // #854 D2: on the taken branch now, the card continues it from here.
+      const onBranch = output.branch ?? branch;
+      if (taken !== null && onBranch === taken) {
+        await this.prisma.boardCard.update({
+          where: { id: card.id },
+          data: { branch: taken, takenBranch: null },
+        });
+      }
+      await this.record(
+        trigger,
+        actor,
+        project.id,
+        card.id,
+        {
+          ...after,
+          ...(taken !== null
+            ? {
+                branch: onBranch,
+                takenBranch: taken,
+                ...startBranchOutcome(startChoice, output.startBranchSkipped),
+              }
+            : {}),
+        },
+        'ok',
+      );
     } catch (error) {
       if (!(error instanceof BoardFailure)) throw error;
       // No answer: the runner may have started it; its events settle it.

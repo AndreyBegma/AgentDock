@@ -33,6 +33,44 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: '0.15.0',
+    date: '2026-10-23',
+    items: [
+      {
+        kind: 'new',
+        text: 'Your own Claude Code session can work the Board: it lists, creates, runs and moves cards, answers their questions, takes one to do itself, and asks you to accept a finished card.',
+      },
+      {
+        kind: 'new',
+        text: 'A design follows a frame template for a page, a component or a flow, which a project can edit and each card, plan task and stack can choose.',
+      },
+      {
+        kind: 'new',
+        text: 'You can turn on two-factor sign-in with an authenticator app and recovery codes.',
+      },
+      {
+        kind: 'new',
+        text: 'Usage shows what each token-saving technique saves per successful card, and cards can try a technique side by side with a control group.',
+      },
+      {
+        kind: 'new',
+        text: 'A card’s model and effort follow the kind of work it is, and a round on Sonnet can hand itself over to Opus once.',
+      },
+      {
+        kind: 'improved',
+        text: 'The card detail opens with a compact header and tabs, and a card on the Board shows only what you act on.',
+      },
+      {
+        kind: 'improved',
+        text: 'The app and the runner tell you when a newer runner is available.',
+      },
+      {
+        kind: 'fixed',
+        text: 'A card that hits a usage limit resumes by itself when the limit resets.',
+      },
+    ],
+  },
+  {
     version: '0.14.0',
     date: '2026-10-20',
     items: [

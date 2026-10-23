@@ -53,6 +53,7 @@ import { LaunchSelects } from '../board/launch-popover';
 import { DisabledReason } from '../prerequisites/disabled-reason';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { DesignSkillsGroup } from './design-skills-group';
+import { TemplateSelect } from './template-select';
 
 const VARIANT_COUNTS = Array.from(
   { length: DESIGN_VARIANTS_MAX - DESIGN_VARIANTS_MIN + 1 },
@@ -220,6 +221,21 @@ export function GeneratePanel({
           <p className="text-xs text-ink-3">{profileNote}</p>
         ) : null}
       </div>
+
+      {/* #833 D8: a card picks its template in its own design section; a plan task and a stack pick it here, by the variant count. */}
+      {design.owner.kind !== 'card' ? (
+        <TemplateSelect
+          projectId={projectId}
+          value={design.template.key}
+          disabled={writeBlock !== null || busy}
+          onChange={(key) => {
+            const body: TaskDesignPatchRequest = {
+              templateKey: key,
+            };
+            void onPatch(body).catch(() => {});
+          }}
+        />
+      ) : null}
 
       <Field label="Variants">
         <SegmentedControl size="sm" role="group" aria-label="Variants">

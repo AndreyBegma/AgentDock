@@ -20,11 +20,15 @@ import {
   CARD_BACKGROUND_STALL_MINUTES_MIN,
   CARD_EFFORTS,
   CARD_FEEDBACK_MAX,
+  CARD_MERGE_POLICIES,
   type CaptureModel,
   type CardEffort,
   type CardFeedbackRequest,
+  type CardMergePolicy,
   type CreateBoardCardRequest,
   type CreateBoardStackRequest,
+  DESIGN_TEMPLATE_KEY_MAX,
+  DESIGN_TEMPLATE_KEY_PATTERN,
   INTAKE_SPLIT_MAX,
   MANUAL_STACK_CARDS_MIN,
   type MoveBoardCardRequest,
@@ -125,6 +129,15 @@ export class UpdateBoardCardDto implements UpdateBoardCardRequest {
   @IsIn(BOARD_CARD_KINDS)
   kind?: BoardCardKind;
 
+  /** #833 D8: checked against the project's templates by the service. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(DESIGN_TEMPLATE_KEY_MAX)
+  @Matches(DESIGN_TEMPLATE_KEY_PATTERN, {
+    message: 'designTemplate is not a template key',
+  })
+  designTemplate?: string;
+
   @IsOptional()
   @IsBoolean()
   issueOnRun?: boolean;
@@ -195,6 +208,11 @@ export class MoveBoardCardDto implements MoveBoardCardRequest {
   @IsOptional()
   @IsBoolean()
   stopWorker?: boolean;
+
+  /** #847: as on Accept — a move to Completed leaves unlanded work out. */
+  @IsOptional()
+  @IsBoolean()
+  confirmUnlanded?: boolean;
 }
 
 /** `POST /board/cards/bulk` (#452): distinct card numbers, one action. */
@@ -354,6 +372,11 @@ export class UpdateBoardSettingsDto implements UpdateBoardSettingsRequest {
   @Min(CARD_BACKGROUND_STALL_MINUTES_MIN)
   @Max(CARD_BACKGROUND_STALL_MINUTES_MAX)
   backgroundStallMinutes?: number;
+
+  /** #845 D4: who merges a finished card's pull request. */
+  @IsOptional()
+  @IsIn(CARD_MERGE_POLICIES)
+  cardMergePolicy?: CardMergePolicy;
 }
 
 /** #273 D13: the head the person saw in the accept dialog. */

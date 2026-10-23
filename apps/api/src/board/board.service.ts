@@ -34,6 +34,7 @@ import { CardAssessor } from '../assess/card-assessor';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { projectDesignTemplateKeys } from '../design/design-store';
 import { usageByRun } from '../history/run-usage';
 import { mergeMethodOf } from '../planner/planner-instructions.service';
 import { RuntimeProfileResolver } from '../readiness';
@@ -178,6 +179,7 @@ export class BoardService implements OnModuleInit {
         text === undefined ? [] : [{ field, text }],
       ),
       {
+        // #833 D8: the template is classified in the same step as the kind.
         classifyKind:
           card.kindSource === 'auto' &&
           card.branch === null &&
@@ -660,6 +662,19 @@ export class BoardService implements OnModuleInit {
           boardError(422, BOARD_ERROR.noProfile, message, details),
       );
     }
+    // #833 D8: one of the project's templates, else 422 before anything is written.
+    if (
+      fields.designTemplate !== undefined &&
+      !(await projectDesignTemplateKeys(this.prisma, projectId)).includes(
+        fields.designTemplate,
+      )
+    ) {
+      throw boardError(
+        400,
+        BOARD_ERROR.invalidDesignTemplate,
+        'designTemplate is not a design template of this project',
+      );
+    }
     // #447 D8: only an open issue of the project's repository; null unlinks.
     const issueLink =
       fields.issueNumber === undefined
@@ -699,6 +714,13 @@ export class BoardService implements OnModuleInit {
       ...(fields.kind !== undefined ? { kind: fields.kind } : {}),
       // #271 D9: a kind the person sets is theirs from now on.
       ...(fields.kind !== undefined ? { kindSource: 'person' as const } : {}),
+      // #833 D8: a template the person sets is theirs from now on.
+      ...(fields.designTemplate !== undefined
+        ? {
+            designTemplate: fields.designTemplate,
+            designTemplateSource: 'person' as const,
+          }
+        : {}),
       // #359 D4: the issue follows the kind, unless the person sets it too.
       ...(fields.issueOnRun !== undefined
         ? { issueOnRun: fields.issueOnRun }
@@ -975,6 +997,19 @@ export class BoardService implements OnModuleInit {
   ): Promise<BoardCardDetail> {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
+    // #847 (ADR-0064): Completed means landed, whichever route gets there.
+    // A fleet card keeps its own rule (#282 D4).
+    if (
+      dto.column === 'completed' &&
+      card.column !== 'completed' &&
+      card.source !== 'fleet' &&
+      dto.confirmUnlanded !== true
+    ) {
+      const missing = await this.work.missingLanding(project, card.id);
+      if (missing !== null) {
+        throw boardError(409, BOARD_ERROR.notLanded, missing);
+      }
+    }
     await this.work.move(
       project,
       card,
@@ -1403,6 +1438,9 @@ export class BoardService implements OnModuleInit {
       ...(dto.backgroundStallMinutes !== undefined
         ? { backgroundStallMinutes: dto.backgroundStallMinutes }
         : {}),
+      ...(dto.cardMergePolicy !== undefined
+        ? { cardMergePolicy: dto.cardMergePolicy }
+        : {}),
       updatedById: actor.userId,
     };
     const row = await this.prisma.boardSettings.upsert({
@@ -1424,6 +1462,7 @@ export class BoardService implements OnModuleInit {
         autoCollectTracked: before.autoCollectTracked,
         autoMergeCards: before.autoMergeCards,
         backgroundStallMinutes: before.backgroundStallMinutes,
+        cardMergePolicy: before.cardMergePolicy,
       },
       after: {
         issueOnRun: row.issueOnRun,
@@ -1434,6 +1473,7 @@ export class BoardService implements OnModuleInit {
         autoCollectTracked: row.autoCollectTracked,
         autoMergeCards: row.autoMergeCards,
         backgroundStallMinutes: row.backgroundStallMinutes,
+        cardMergePolicy: row.cardMergePolicy,
       },
       result: 'ok',
     });

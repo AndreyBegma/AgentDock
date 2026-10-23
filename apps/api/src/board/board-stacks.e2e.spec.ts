@@ -508,11 +508,12 @@ describe('card stacks (e2e, #480)', () => {
       const started = await run(1);
       expect(started.status).toBe(200);
       const [args] = h.cardSentOf('card.run');
+      // #833: the page template's first frame.
       const path = stackDesignPath(
         null,
         { number: stack.number, title: stack.title },
         1,
-        'mockup',
+        'screen',
       );
       const files = args.files as CardRunFile[];
       expect(files).toContainEqual({
@@ -736,10 +737,10 @@ describe('card stacks (e2e, #480)', () => {
         'docs/specs',
         { number: stack.number, title: stack.title },
         1,
-        'mockup',
+        'screen',
       );
       expect(path).toBe(
-        'docs/specs/stacks/S-1-redesign-the-settings-page/design/1/mockup.html',
+        'docs/specs/stacks/S-1-redesign-the-settings-page/design/1/screen.html',
       );
       const stages = new Map([
         [1, 'stage 1 of 2'],
