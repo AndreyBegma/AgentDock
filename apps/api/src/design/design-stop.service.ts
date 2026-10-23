@@ -38,7 +38,8 @@ const notRunning = () =>
   );
 
 /**
- * #275 D5: Stop a busy design, for both owners. On the draw or revise stage
+ * #275 D5: Stop a busy design, for both owners — or, #840, one whose design
+ * turn is still queued or running. On the draw or revise stage
  * the design turn is cancelled (`plan.cancel`) and the projector settles the
  * design when the runner reports it. On the profile stage the design leaves
  * the build's `args.waiting` and rests at once; the build itself is cancelled
@@ -132,12 +133,6 @@ export class DesignStopService {
     if (!design) {
       throw designError(404, DESIGN_ERROR.notFound, 'Design not found');
     }
-    if (design.status !== 'generating' && design.status !== 'revising') {
-      throw notRunning();
-    }
-    const project = await this.store.project(owner.projectId);
-    const caller = { role: actor.role, ctx: actor.ctx };
-
     const turn = await this.prisma.planTurn.findFirst({
       where: {
         ...designTurnWhere(owner.key),
@@ -145,6 +140,18 @@ export class DesignStopService {
       },
       select: { id: true, runId: true, run: { select: { args: true } } },
     });
+    // #840: a turn still queued or running is stoppable whatever the status
+    // says; the design is busy until the turn's end settles it.
+    if (
+      !turn &&
+      design.status !== 'generating' &&
+      design.status !== 'revising'
+    ) {
+      throw notRunning();
+    }
+    const project = await this.store.project(owner.projectId);
+    const caller = { role: actor.role, ctx: actor.ctx };
+
     if (turn) {
       plannerOutput(
         'plan.cancel',

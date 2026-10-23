@@ -78,6 +78,7 @@ import {
   stackDesignHref,
 } from '../../../../../../../lib/design/href';
 import { mobilePreset } from '../../../../../../../lib/design/mobile-preview';
+import { isDesignBusy } from '../../../../../../../lib/design/progress';
 import { formatCost } from '../../../../../../../lib/format';
 import { useLive } from '../../../../../../../lib/live/use-live';
 import { useErrorToast } from '../../../../../../../lib/section/use-error-toast';
@@ -219,6 +220,10 @@ function StackDetail({
   const cost = formatCost(stack.costUsd);
 
   const reviewing = stack.design?.status === 'reviewing';
+  // #840: a design turn still queued or running keeps the design busy, so
+  // there is nothing to generate yet.
+  const idle =
+    stack.design?.status === 'idle' && !(design && isDesignBusy(design));
   const approve = approvable ? (
     <Button
       variant="solid"
@@ -244,7 +249,7 @@ function StackDetail({
   const generate = <GenerateDesignLink href={viewer} />;
 
   const actions = canOperate ? (
-    stack.design === null ? null : stack.design.status === 'idle' ? (
+    stack.design === null ? null : idle ? (
       generate
     ) : reviewing ? (
       <>
@@ -258,7 +263,7 @@ function StackDetail({
   // #526: below `lg` the same actions sit in a dock; Revise design opens the
   // viewer just as Open viewer does, so the dock keeps the one.
   const dock = canOperate ? (
-    stack.design?.status === 'idle' ? (
+    idle ? (
       generate
     ) : reviewing ? (
       <>
