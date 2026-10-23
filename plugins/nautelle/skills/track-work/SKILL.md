@@ -35,7 +35,9 @@ When in doubt, do not track: a card for every message fills the Board with noise
 - If the scope of the same work changes, call the tool again from this
   session: it updates the same card (title, body, kind) and never creates a
   second one. Do not call it again for unrelated work in the same session.
-- Do not start, stop or move anything else on the Board; the card follows the
+- If the work is a card that **already exists** ("do C-42"), do not create a
+  second one: use `take_card` (see the `board` skill).
+- Do not start, stop or move anything else on the Board from here; the card follows the
   session. When the session ends the card moves to Finished, and only the
   person moves it to Completed.
 
