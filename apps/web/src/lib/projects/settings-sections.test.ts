@@ -34,7 +34,8 @@ describe('project settings sections (#704)', () => {
     const items: string[] = SETTINGS_SECTIONS.flatMap(({ items }) =>
       items.map(({ id }) => id),
     );
-    expect([...items].sort()).toEqual([...FORMER_TABS].sort());
+    // Review (#890) is the one block that was never a tab.
+    expect([...items].sort()).toEqual([...FORMER_TABS, 'review'].sort());
   });
 
   test('an old tab link maps to the section that holds it', () => {

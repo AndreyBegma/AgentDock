@@ -33,6 +33,7 @@ import { GitHubAppRow } from './github-app-row';
 import { MembersTab } from './members-tab';
 import { OrchestratorTab } from './orchestrator-tab';
 import { PlannerTab } from './planner-tab';
+import { ReviewTab } from './review-tab';
 import { RulesTab } from './rules/rules-tab';
 import { SessionsTab } from './sessions-tab';
 import { SettingsIndex } from './settings-index';
@@ -98,6 +99,9 @@ const BLOCKS: Readonly<
       canOperate={canOperate}
       contentOn={project.shipSessionContent ?? false}
     />
+  ),
+  review: ({ project, isAdmin }) => (
+    <ReviewTab projectId={project.id} isAdmin={isAdmin} />
   ),
   'token-saver': ({ project, isAdmin, canOperate }) => (
     <TokenSaverTab
