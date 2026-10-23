@@ -3695,6 +3695,21 @@ model BoardCardRound {
   /// from `round.warmup`.
   warmupTokens        Int?
   warmupMs            Int?
+  /// #837: the PR the round pushed to, from `card_run.pushed` or the collect
+  /// that followed it; `null` for a round that pushed nothing.
+  prNumber            Int?
+  prUrl               String?
+  /// #837: the last commit the round pushed — the head it left. Set only for
+  /// a head no earlier round left and other than `startHeadSha`.
+  headSha             String?
+  /// #837: commits on the branch ahead of its base at `headSha`; `null` from
+  /// a runner older than #837.
+  headAhead           Int?
+  /// #837: the checks on `headSha`, from every `card.checks` that answers for
+  /// it; `null` until one does. Counted without cancelled and skipped checks.
+  ciState             CardCiState?
+  ciPassed            Int?
+  ciTotal             Int?
 
   card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)

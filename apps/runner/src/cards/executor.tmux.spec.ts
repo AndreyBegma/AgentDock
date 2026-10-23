@@ -889,6 +889,7 @@ describe.skipIf(!tmuxInstalled)(
           prUrl: 'https://github.com/acme/widget/pull/7',
           prState: 'draft',
           protectedPaths: [],
+          ahead: 1,
         },
       ]);
       expect(

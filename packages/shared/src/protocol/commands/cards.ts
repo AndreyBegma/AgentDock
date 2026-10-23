@@ -407,6 +407,12 @@ export const cardCollectResultSchema = z
      * nothing was pushed, or from a runner older than the field.
      */
     protectedPaths: protectedPathsSchema.optional(),
+    /**
+     * #837: the commit this collect pushed, now the PR's head — the round it
+     * follows records it. Absent when nothing was pushed, or from a runner
+     * older than the field.
+     */
+    headSha: headShaSchema.optional(),
   })
   .refine((r) => (r.prNumber === undefined) === (r.prUrl === undefined), {
     message: 'prNumber and prUrl go together',
