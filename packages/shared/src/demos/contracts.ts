@@ -154,6 +154,8 @@ export const DEMO_ERROR = {
   inFlight: 'demo_in_flight',
   /** 409: the demo is no longer queued or recording. */
   notActive: 'demo_not_active',
+  /** 409: the card has never run, so there is nothing to record. */
+  noRound: 'no_round',
   /** 409: `APP_ENCRYPTION_KEY` is not set, so a secret cannot be stored. */
   encryptionUnavailable: 'encryption_unavailable',
   /** 422: over `DEMO_SECRETS_MAX`. */
@@ -163,7 +165,17 @@ export const DEMO_ERROR = {
 } as const;
 export type DemoErrorCode = (typeof DEMO_ERROR)[keyof typeof DEMO_ERROR];
 
-/** Headers of the runner's video upload; the body is the raw video bytes. */
+export interface DemoErrorBody {
+  statusCode: number;
+  error: DemoErrorCode;
+  message: string;
+}
+
+/**
+ * Headers of the runner's video upload. The body is the raw video bytes, sent
+ * with `Content-Type: video/mp4` or `video/webm`; the type is still taken from
+ * the bytes, never from the header.
+ */
 export const DEMO_UPLOAD_HEADERS = {
   /** Lower-case hex SHA-256 of the body. */
   sha256: 'x-demo-sha256',

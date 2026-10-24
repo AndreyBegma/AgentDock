@@ -19,6 +19,7 @@ import {
   type CardAttachmentBrief,
   detectScannedAttachmentMime,
   isAttachmentMime,
+  isAttachmentVideo,
   type Role,
 } from '@nautelle/shared';
 import {
@@ -196,18 +197,7 @@ export class AttachmentsService {
         if (actor.userId !== null) {
           await this.assertPendingRoom(tx, actor.userId, file.size, now);
         }
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attachments-quota:${projectId}`}))`;
-        const used = await tx.attachment.aggregate({
-          where: { projectId },
-          _sum: { size: true },
-        });
-        const total = (used._sum.size ?? 0) + file.size;
-        if (total > this.options.projectQuotaBytes) {
-          throw attachmentRefused(
-            ATTACHMENT_REFUSAL.quotaExceeded,
-            'The project has no room left for attachments',
-          );
-        }
+        await this.assertQuota(tx, projectId, file.size);
         const created = await tx.attachment.create({
           data: {
             projectId,
@@ -309,6 +299,62 @@ export class AttachmentsService {
       { originalname: name, path, ...scanBytes(bytes) },
       actor,
     );
+  }
+
+  /** D4: under the project's lock, the quota has room for `adding` bytes. */
+  private async assertQuota(
+    tx: Prisma.TransactionClient,
+    projectId: string,
+    adding: number,
+  ): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attachments-quota:${projectId}`}))`;
+    const used = await tx.attachment.aggregate({
+      where: { projectId },
+      _sum: { size: true },
+    });
+    if ((used._sum.size ?? 0) + adding > this.options.projectQuotaBytes) {
+      throw attachmentRefused(
+        ATTACHMENT_REFUSAL.quotaExceeded,
+        'The project has no room left for attachments',
+      );
+    }
+  }
+
+  /**
+   * ADR-0089: a demo video the runner uploaded, stored straight onto its card
+   * inside the caller's transaction — no uploader, never pending. Only a video
+   * by its content, within the video limit and the project's quota. The
+   * caller removes `file.path` whatever happens.
+   */
+  async addVideo(
+    tx: Prisma.TransactionClient,
+    target: { projectId: string; cardId: string },
+    name: string,
+    file: UploadedAttachment,
+  ): Promise<Attachment> {
+    const mime = this.mimeOfUpload(file);
+    if (!isAttachmentVideo(mime)) {
+      throw attachmentRefused(
+        ATTACHMENT_REFUSAL.unsupportedType,
+        'A demo video must be an MP4 or WebM file',
+      );
+    }
+    await this.assertQuota(tx, target.projectId, file.size);
+    const created = await tx.attachment.create({
+      data: {
+        projectId: target.projectId,
+        cardId: target.cardId,
+        uploaderId: null,
+        name: attachmentDisplayName(name),
+        mime,
+        size: file.size,
+        sha256: file.sha256,
+        expiresAt: null,
+      },
+    });
+    // Before commit, as in `upload`: a failed move leaves no row.
+    await this.store.put(target.projectId, created.id, file.path);
+    return created;
   }
 
   /** D4, ADR-0089: over the type's limit — or, unknown, the largest of any. */

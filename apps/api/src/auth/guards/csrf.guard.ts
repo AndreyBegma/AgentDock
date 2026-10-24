@@ -3,7 +3,7 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { authError } from '../auth-error';
-import { IS_PUBLIC_KEY } from '../decorators';
+import { BEARER_BODY_KEY, IS_PUBLIC_KEY } from '../decorators';
 import { csrfTokenFor } from '../session.service';
 import { safeEqual } from '../tokens';
 
@@ -30,6 +30,7 @@ export class CsrfGuard implements CanActivate {
       context.getClass(),
     ]);
     if (isPublic) {
+      if (this.bearerBody(context, request)) return true;
       if (!request.is('application/json')) {
         throw authError(
           415,
@@ -55,5 +56,16 @@ export class CsrfGuard implements CanActivate {
       );
     }
     return true;
+  }
+
+  /** ADR-0089: a `@BearerBody()` route called with a bearer token. */
+  private bearerBody(context: ExecutionContext, request: Request): boolean {
+    const allowed = this.reflector.getAllAndOverride<boolean>(BEARER_BODY_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    return (
+      allowed === true && /^Bearer \S/i.test(request.get('authorization') ?? '')
+    );
   }
 }

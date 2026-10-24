@@ -165,3 +165,51 @@ export const uploadOptions = (store: AttachmentStore): MulterOptions => ({
     fieldSize: 1024,
   },
 });
+
+/** A raw request body over its limit: nothing of it is kept. */
+export class UploadOverLimit extends Error {
+  constructor(readonly maxBytes: number) {
+    super(`the body exceeds ${maxBytes} bytes`);
+    this.name = 'UploadOverLimit';
+  }
+}
+
+/**
+ * ADR-0089: `TempFileStorage` for a raw request body — the runner's demo
+ * video. Streams it to a temporary file, scanning it on the way. Past
+ * `maxBytes` the rest is read and dropped — destroying the request would
+ * reset the socket before the 422 is sent — and `UploadOverLimit` is thrown
+ * once it ends; a partial file is removed here. The caller moves or removes
+ * the file it gets.
+ */
+export const receiveUpload = async (
+  stream: Readable,
+  store: AttachmentStore,
+  maxBytes: number,
+): Promise<{ path: string } & ScannedUpload> => {
+  const path = join(await store.tempDir(), randomBytes(16).toString('hex'));
+  const scanner = new UploadScanner();
+  let size = 0;
+  const scan = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      size += chunk.byteLength;
+      if (size > maxBytes) {
+        callback();
+        return;
+      }
+      scanner.update(chunk);
+      callback(null, chunk);
+    },
+  });
+  try {
+    await pipeline(stream, scan, createWriteStream(path, { flags: 'wx' }));
+  } catch (error) {
+    await rm(path, { force: true });
+    throw error;
+  }
+  if (size > maxBytes) {
+    await rm(path, { force: true });
+    throw new UploadOverLimit(maxBytes);
+  }
+  return { path, ...scanner.result() };
+};
