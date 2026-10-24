@@ -1,0 +1,33 @@
+# CI: a managed database and Redis from existing Secrets, an Ingress with
+# cert-manager TLS, keys and extras from an existing Secret.
+nautelleUrl: https://dock.example.com
+existingSecret: nautelle-api-extra
+api:
+  env:
+    TELEGRAM_BOT_NAME: nautelle_bot
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 10m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+  tls:
+    enabled: true
+    certManager:
+      clusterIssuer: letsencrypt
+postgresql:
+  enabled: false
+externalDatabase:
+  existingSecret: nautelle-database
+redis:
+  enabled: false
+externalRedis:
+  existingSecret: nautelle-redis
+  existingSecretKey: url
+nodeSelector:
+  kubernetes.io/os: linux
+tolerations:
+  - key: dedicated
+    operator: Equal
+    value: nautelle
+    effect: NoSchedule

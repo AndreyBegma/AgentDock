@@ -1,12 +1,14 @@
-# Publishes the Nautelle images (ADR-0088).
+# Publishes the Nautelle images (ADR-0088) and the Helm chart (ADR-0091).
 #
 # Pushing the tag vX.Y.Z on main (ADR-0071) builds ghcr.io/andreybegma/
 # nautelle-api and nautelle-web and pushes them as :X.Y.Z and :latest. The
-# public install (deploy/compose/) pulls them. The tag must equal APP_VERSION;
-# deploy/images/release-images.sh refuses anything else.
+# public install (deploy/compose/) pulls them. Then it pushes the chart
+# deploy/helm/nautelle as oci://ghcr.io/andreybegma/charts/nautelle:X.Y.Z. The
+# tag must equal APP_VERSION; deploy/images/release-images.sh and
+# deploy/helm/release-chart.sh refuse anything else.
 #
-# A manual run is a dry run: it builds both images on the host and pushes
-# nothing. It starts only when the message given to the manual run contains
+# A manual run is a dry run: it builds both images on the host, packages the
+# chart and pushes nothing. It starts only when the message given to the manual run contains
 # [image-release] (the gate reads the message, as release-runner.yml explains).
 # Rehearse on a branch other than develop: a manual run on develop also
 # deploys staging through pipeline.yml.
@@ -26,6 +28,7 @@ when:
 
 variables:
   - &docker_image docker:28-cli
+  - &helm_image alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd12edf68f8a719716d9d29c9
   - &socket
     - /var/run/docker.sock:/var/run/docker.sock
 
@@ -51,3 +54,27 @@ steps:
     volumes: *socket
     commands:
       - sh deploy/images/release-images.sh
+
+  # The Helm chart at the same version, once its images are pushed
+  # (ADR-0091). No socket: helm talks to the registry itself.
+  - name: chart
+    image: *helm_image
+    depends_on: [images]
+    when:
+      - event: tag
+        ref: refs/tags/v*
+    environment:
+      GHCR_USER: andreybegma
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+    commands:
+      - sh deploy/helm/release-chart.sh
+
+  # Packages <APP_VERSION>-dev and pushes nothing.
+  - name: chart-dry-run
+    image: *helm_image
+    depends_on: []
+    when:
+      - event: manual
+    commands:
+      - sh deploy/helm/release-chart.sh

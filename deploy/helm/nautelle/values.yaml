@@ -1,0 +1,219 @@
+# Nautelle on Kubernetes (ADR-0091, docs/guides/kubernetes.md).
+#
+# The chart is the control plane only: the API, the web app and a Caddy proxy
+# that gives both one origin, as in deploy/compose/. Runners stay on the
+# machines that hold the repositories and pair against `<nautelleUrl>/api`.
+
+# The address people open, without a trailing slash (NAUTELLE_URL). The API's
+# API_URL, WEB_URL, APP_URL and PUBLIC_URL derive from it, and so does the
+# Ingress host when `ingress.host` is empty.
+nautelleUrl: http://localhost:8000
+
+# `production` marks cookies Secure; `development` keeps them working over
+# plain HTTP. Empty: `production` for an https:// nautelleUrl, otherwise
+# `development`.
+appEnv: ''
+
+# A Secret whose every key becomes an environment variable of the API: the
+# place for anything of apps/api/.env.example that is a secret (DEEPL_API_KEY,
+# the GitHub App, the Telegram bot…), for APP_ENCRYPTION_KEY, AUDIT_HMAC_KEY
+# and LLM_SECRETS_KEY when you keep them yourself instead of the generated
+# secrets.json, and for ADMIN_EMAIL / ADMIN_PASSWORD to create the first
+# administrator without the setup page (ADR-0087).
+existingSecret: ''
+
+nameOverride: ''
+fullnameOverride: ''
+imagePullSecrets: []
+
+# Applied to every pod unless a component sets its own.
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+api:
+  image:
+    repository: ghcr.io/andreybegma/nautelle-api
+    # Empty: the chart's appVersion.
+    tag: ''
+    pullPolicy: IfNotPresent
+  # Plain (non-secret) extra environment, as a map: { TELEGRAM_BOT_NAME: … }.
+  env: {}
+  # Express `trust proxy` (deploy/README.md, TRUST_PROXY per topology). The
+  # API's peer is always the chart's proxy pod, on the cluster's private
+  # network.
+  trustProxy: uniquelocal
+  # The API migrates the database before it listens; the startup probe gives
+  # it failureThreshold × periodSeconds to do so.
+  startupProbe:
+    periodSeconds: 5
+    failureThreshold: 60
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+web:
+  image:
+    repository: ghcr.io/andreybegma/nautelle-web
+    tag: ''
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  env: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Caddy: /api/* to the API with the prefix stripped (WebSockets included),
+# everything else to the web app. The Service and the Ingress point at it.
+proxy:
+  image:
+    repository: caddy
+    tag: 2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  # Which peers' X-Forwarded-For Caddy believes: the Ingress controller's pods.
+  trustedProxies: private_ranges
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ''
+  # Empty: the host of nautelleUrl.
+  host: ''
+  # Uploads reach 10 MB and the runner keeps a WebSocket open. With
+  # ingress-nginx, for example:
+  #   nginx.ingress.kubernetes.io/proxy-body-size: 10m
+  #   nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+  #   nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+  annotations: {}
+  tls:
+    enabled: false
+    # Empty: <fullname>-tls. cert-manager writes it when an issuer is set.
+    secretName: ''
+    certManager:
+      # One of them, or neither when the Secret already exists.
+      clusterIssuer: ''
+      issuer: ''
+
+# A Cloudflare tunnel as a sidecar of the proxy pod: no Ingress needed. It runs
+# when a token or an existing Secret is set. Point the tunnel's public hostname
+# at http://localhost:8080 and set nautelleUrl to its https:// address.
+tunnel:
+  token: ''
+  existingSecret: ''
+  existingSecretKey: TUNNEL_TOKEN
+  image:
+    repository: cloudflare/cloudflared
+    tag: 2025.9.1@sha256:4604b477520dc8322af5427da68b44f0bf814938e9d2e4814f2249ee4b03ffdf
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+# The API's /data: secrets.json with the keys it generates on its first boot
+# (C-366) and the board card attachments (ADR-0031). Back it up with the
+# database: without secrets.json the sealed data cannot be read.
+persistence:
+  enabled: true
+  existingClaim: ''
+  storageClass: ''
+  accessModes: [ReadWriteOnce]
+  size: 5Gi
+  annotations: {}
+
+# The bundled PostgreSQL: one StatefulSet. Turn it off and set
+# externalDatabase for a managed database.
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 16.5-alpine@sha256:0366402213df5db03c47ff80bcc697e92c8be0c213d03c941df1fc42d1ba9560
+    pullPolicy: IfNotPresent
+  auth:
+    # Empty: generated once and kept in <fullname>-bundled across upgrades.
+    # URL-safe characters only: it goes into DATABASE_URL as is.
+    password: ''
+    existingSecret: ''
+    existingSecretKey: postgres-password
+  persistence:
+    storageClass: ''
+    size: 8Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# A database of your own (postgresql.enabled: false). Either the URL, or a
+# Secret that holds it.
+externalDatabase:
+  url: ''
+  existingSecret: ''
+  existingSecretKey: DATABASE_URL
+
+# The bundled Redis (BullMQ, ADR-0015), with AOF so pending timers survive a
+# restart.
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    pullPolicy: IfNotPresent
+  auth:
+    password: ''
+    existingSecret: ''
+    existingSecretKey: redis-password
+  persistence:
+    storageClass: ''
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# A Redis of your own (redis.enabled: false). It must not evict keys
+# (maxmemory-policy noeviction).
+externalRedis:
+  url: ''
+  existingSecret: ''
+  existingSecretKey: REDIS_URL

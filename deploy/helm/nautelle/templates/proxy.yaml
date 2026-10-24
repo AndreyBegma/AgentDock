@@ -1,0 +1,163 @@
+{{- $fullname := include "nautelle.fullname" . -}}
+{{- $tunnel := include "nautelle.tunnel" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-proxy
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "proxy") | nindent 4 }}
+data:
+  # The Caddyfile of deploy/compose/docker-compose.yml, on port 8080 so that
+  # Caddy runs without root. TLS, when there is any, ends at the Ingress or at
+  # Cloudflare.
+  Caddyfile: |
+    {
+      admin off
+      servers {
+        trusted_proxies static {{ .Values.proxy.trustedProxies }}
+      }
+    }
+
+    :8080 {
+      # Nothing above 10 MB reaches the API or web (C-134).
+      request_body {
+        max_size 10MB
+      }
+      header X-Content-Type-Options "nosniff"
+
+      # Pairing and hook responses carry a token or a decision.
+      @uncached path /api/runners/pair /api/hooks/*
+      header @uncached Cache-Control "no-store"
+
+      # The API has no /api prefix of its own. While a pod restarts a request
+      # is held and retried instead of answered 502 (#368).
+      handle_path /api/* {
+        reverse_proxy {{ $fullname }}-api:8180 {
+          lb_try_duration 60s
+          lb_try_interval 250ms
+          health_uri /health
+          health_interval 2s
+        }
+      }
+
+      handle {
+        reverse_proxy {{ $fullname }}-web:3517 {
+          lb_try_duration 60s
+          lb_try_interval 250ms
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "proxy") | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "nautelle.selectorLabels" (dict "root" . "component" "proxy") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-proxy
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "proxy") | nindent 4 }}
+spec:
+  replicas: {{ .Values.proxy.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "nautelle.selectorLabels" (dict "root" . "component" "proxy") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nautelle.selectorLabels" (dict "root" . "component" "proxy") | nindent 8 }}
+      annotations:
+        checksum/config: {{ dict "fullname" $fullname "proxy" .Values.proxy "tunnel" .Values.tunnel | toJson | sha256sum }}
+        {{- with .Values.proxy.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with include "nautelle.imagePullSecrets" . | trim }}{{ . | nindent 6 }}{{ end }}
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: caddy
+          image: {{ include "nautelle.image" (dict "root" . "image" .Values.proxy.image) | quote }}
+          imagePullPolicy: {{ .Values.proxy.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            # The image's binary carries the file capability
+            # cap_net_bind_service; without it in the bounding set the kernel
+            # refuses to start it. Port 8080 does not use it.
+            capabilities:
+              drop: [ALL]
+              add: [NET_BIND_SERVICE]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.proxy.resources | nindent 12 }}
+          volumeMounts:
+            - name: caddyfile
+              mountPath: /etc/caddy
+              readOnly: true
+            # Caddy's XDG data and config directories.
+            - name: caddy-data
+              mountPath: /data
+            - name: caddy-config
+              mountPath: /config
+        {{- if $tunnel }}
+        # A remote-managed tunnel: its public hostname and the target
+        # (http://localhost:8080) are set in the Cloudflare dashboard.
+        - name: cloudflared
+          image: {{ include "nautelle.image" (dict "root" . "image" .Values.tunnel.image) | quote }}
+          imagePullPolicy: {{ .Values.tunnel.image.pullPolicy }}
+          args: [tunnel, --no-autoupdate, run]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nautelle.tunnelSecret" . }}
+                  key: {{ .Values.tunnel.existingSecretKey }}
+          resources:
+            {{- toYaml .Values.tunnel.resources | nindent 12 }}
+        {{- end }}
+      volumes:
+        - name: caddyfile
+          configMap:
+            name: {{ $fullname }}-proxy
+        - name: caddy-data
+          emptyDir: {}
+        - name: caddy-config
+          emptyDir: {}
+      {{- with include "nautelle.scheduling" (dict "root" . "values" .Values.proxy) | trim }}{{ . | nindent 6 }}{{ end }}
