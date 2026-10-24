@@ -46,7 +46,7 @@ taken, with its source.
 | # | Decision | Source |
 |---|---|---|
 | D1 | Roles are global: `admin`, `operator`, `viewer`. Statuses: `pending`, `active`, `rejected`, `disabled`. Only `active` users can hold a session | ADR-0008 |
-| D2 | First admin via `bun run admin:create` (interactive prompt, or `ADMIN_EMAIL` / `ADMIN_PASSWORD` env for non-interactive use). It creates an `active` admin; it refuses an email that already exists. The seed creates **no** users | ADR-0008, security.md |
+| D2 | First admin via `bun run admin:create` (interactive prompt, or `ADMIN_EMAIL` / `ADMIN_PASSWORD` env for non-interactive use). It creates an `active` admin; it refuses an email that already exists. The seed creates **no** users. Amended by ADR-0087 (C-367): while no user exists, the browser's `/setup` page creates the first admin with the one-time token the API logs on boot, and `ADMIN_EMAIL` / `ADMIN_PASSWORD` create it on boot; the CLI stays for recovery | ADR-0008, ADR-0087, security.md |
 | D3 | Registration is closed by default. Setting `registration.open` (boolean) in a `settings` key/value table, changed only by admins. Closed → `POST /auth/register` answers 403 `registration_closed` | ADR-0008 |
 | D4 | Approval is one action that sets status `active` **and** the role. Rejection sets `rejected`; a rejected email cannot register again until an admin deletes the account | ADR-0008; Mission Control access-request flow (inspiration) |
 | D5 | Sessions are server-side: a random 32-byte token in an httpOnly, `Secure` (unless `APP_ENV` is `development` or `test`), `SameSite=Lax` cookie `ad_session`; the database stores only its SHA-256. Idle expiry 7 days, absolute 30 days, refreshed `lastSeenAt` at most once a minute | security.md |
@@ -141,7 +141,7 @@ Pages, plain layout (no app shell yet):
 | Variable | Where | Meaning |
 |---|---|---|
 | `API_URL` | `apps/web` | target of the `/api` rewrite (default `http://localhost:8180`) |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | `admin:create` only | non-interactive admin creation |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` (`ADMIN_NAME`) | `admin:create`, and the API on boot while no user exists (ADR-0087) | non-interactive admin creation |
 | `APP_ENV` | `apps/api` (exists) | `development` and `test` → plain-http cookies; anything else → `Secure` |
 | `TRUST_PROXY` | `apps/api` | Express `trust proxy` (default `loopback`). The per-IP login limit must see the client's address, not the address of the Next `/api` rewrite or the reverse proxy |
 | `TEST_DATABASE_URL` | `apps/api` tests | the database the e2e suite resets; its name must end in `_test` |

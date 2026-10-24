@@ -18,6 +18,8 @@ const PUBLIC_PATHS = [
   '/login',
   '/register',
   '/pending',
+  // C-367: the first-run setup, before any account exists.
+  '/setup',
   INSTALL_PATH,
   MINI_APP_PATH,
 ];
