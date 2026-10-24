@@ -1,0 +1,53 @@
+# Publishes the Nautelle images (ADR-0087).
+#
+# Pushing the tag vX.Y.Z on main (ADR-0071) builds ghcr.io/andreybegma/
+# nautelle-api and nautelle-web and pushes them as :X.Y.Z and :latest. The
+# public install (deploy/compose/) pulls them. The tag must equal APP_VERSION;
+# deploy/images/release-images.sh refuses anything else.
+#
+# A manual run is a dry run: it builds both images on the host and pushes
+# nothing. It starts only when the message given to the manual run contains
+# [image-release] (the gate reads the message, as release-runner.yml explains).
+# Rehearse on a branch other than develop: a manual run on develop also
+# deploys staging through pipeline.yml.
+#
+# Pull requests never run this workflow (ADR-0053). The gating in this file is
+# not the security boundary: whoever pushes a commit can edit it. The boundary
+# is in settings a pusher cannot change (deploy/README.md): the secret
+# ghcr_token is restricted to the tag event only, never manual, and v* tags are
+# protected by a GitHub ruleset and cut from main. Each build runs with
+# --pull, and the Dockerfiles pin their bases by digest.
+
+when:
+  - event: tag
+    ref: refs/tags/v*
+  - event: manual
+    evaluate: 'CI_COMMIT_MESSAGE contains "[image-release]"'
+
+variables:
+  - &docker_image docker:28-cli
+  - &socket
+    - /var/run/docker.sock:/var/run/docker.sock
+
+steps:
+  - name: images
+    image: *docker_image
+    when:
+      - event: tag
+        ref: refs/tags/v*
+    volumes: *socket
+    environment:
+      GHCR_USER: andreybegma
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+    commands:
+      - sh deploy/images/release-images.sh
+
+  # No tag and no secret: builds both images and stops before the push.
+  - name: images-dry-run
+    image: *docker_image
+    when:
+      - event: manual
+    volumes: *socket
+    commands:
+      - sh deploy/images/release-images.sh

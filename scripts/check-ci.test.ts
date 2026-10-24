@@ -113,7 +113,11 @@ describe('checkWorkflow', () => {
   });
 
   test('the workflows in .woodpecker/ pass', () => {
-    for (const file of ['pipeline.yml', 'release-runner.yml']) {
+    for (const file of [
+      'pipeline.yml',
+      'release-runner.yml',
+      'release-images.yml',
+    ]) {
       expect(checkWorkflow(file, load(`.woodpecker/${file}`))).toEqual([]);
     }
   });

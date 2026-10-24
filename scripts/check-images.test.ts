@@ -61,4 +61,15 @@ describe('checkCompose', () => {
     ].join('\n');
     expect(checkCompose(source)).toHaveLength(1);
   });
+
+  test('allows the published Nautelle images by tag, nothing else of ghcr', () => {
+    const source = [
+      '    image: ghcr.io/andreybegma/nautelle-api:${NAUTELLE_VERSION:-latest}',
+      '    image: ghcr.io/andreybegma/nautelle-web:0.15.0',
+      '    image: ghcr.io/andreybegma/other:1',
+    ].join('\n');
+    expect(checkCompose(source)).toEqual([
+      '3: image `ghcr.io/andreybegma/other:1` is not pinned by @sha256:',
+    ]);
+  });
 });

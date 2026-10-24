@@ -4,7 +4,9 @@
  *   - every `FROM` and `COPY --from=<image>` in a Dockerfile names its image
  *     with `@sha256:` (a build argument is resolved to its default first);
  *   - no Dockerfile pipes a download into a shell (`curl … | bash`, `| sh`);
- *   - every third-party `image:` in a compose file carries a digest.
+ *   - every third-party `image:` in a compose file carries a digest. Nautelle's
+ *     own images are exempt: the staging ones are built locally, and the
+ *     public install picks a published release by tag (ADR-0087).
  *
  *   bun scripts/check-images.ts [file ...]
  *
@@ -18,8 +20,11 @@ import { basename, join, relative, resolve } from 'node:path';
 const root = resolve(import.meta.dir, '..');
 
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.next', 'dist']);
-/** Images the compose file builds locally (`bun run build` / docker build). */
-const LOCAL_IMAGE = /^agentdock-/;
+/**
+ * Nautelle's own images: built locally for staging (`agentdock-*`), or the
+ * published ones the public install selects by release tag (ADR-0087).
+ */
+const OWN_IMAGE = /^(agentdock-|ghcr\.io\/andreybegma\/nautelle-(api|web):)/;
 
 const isDockerfile = (name: string) => /^Dockerfile(\..+)?$/.test(name);
 const isCompose = (name: string) => /^docker-compose(\..+)?\.ya?ml$/.test(name);
@@ -104,7 +109,7 @@ export const checkCompose = (source: string): string[] =>
   source.split('\n').flatMap((raw, index) => {
     const match = /^\s*image:\s*(\S+)/.exec(raw);
     const image = match?.[1];
-    if (image === undefined || LOCAL_IMAGE.test(image) || DIGEST.test(image)) {
+    if (image === undefined || OWN_IMAGE.test(image) || DIGEST.test(image)) {
       return [];
     }
     return [`${index + 1}: image \`${image}\` is not pinned by @sha256:`];
