@@ -61,7 +61,7 @@ secret, and `--redact` keeps a value it finds out of the public log.
 narrow allowlist entry in `.gitleaks.toml`, with a comment: name the file and,
 where possible, the rule.
 
-The `helm` step checks the Helm chart in `helm/nautelle` (ADR-0091) on every
+The `helm` step checks the Helm chart in `helm/nautelle` (ADR-0092) on every
 event: `helm/check-chart.sh` lints it with each value set in
 `helm/nautelle/ci`, renders them into `.helm-out`, checks that contradictory
 settings (a database bundled and external, two tunnel tokens…) are refused
@@ -354,7 +354,8 @@ publishes; it is the way to rehearse the signature with the real key.
 ## Releasing the images
 
 Decisions: [ADR-0088](../docs/adr/0088-nautelle-installs-from-published-images-with-one-compose-file.md),
-[ADR-0091](../docs/adr/0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md).
+[ADR-0091](../docs/adr/0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md),
+[ADR-0092](../docs/adr/0092-nautelle-runs-on-kubernetes-from-a-helm-chart-published-with-each-release.md).
 A product tag `vX.Y.Z` (ADR-0071) runs `.woodpecker/release-images.yml`. It
 calls `deploy/images/release-images.sh`, which:
 
@@ -372,7 +373,15 @@ calls `deploy/images/release-images.sh`, which:
 5. signs each image by digest with cosign and writes the digests to
    `.release/images.json`.
 
-The `github-release` step then creates the `vX.Y.Z` GitHub Release, marked
+Once both images are pushed, the `chart` step runs
+`deploy/helm/release-chart.sh` (ADR-0092). It checks the tag the same way,
+stamps the chart's `version` and `appVersion` with `X.Y.Z` (`Chart.yaml` holds
+only the placeholders `0.0.0` and `latest`), lints and packages it and pushes
+it as `oci://ghcr.io/andreybegma/charts/nautelle:X.Y.Z` with the same
+`ghcr_token`. [docs/guides/kubernetes.md](../docs/guides/kubernetes.md)
+installs from it.
+
+The `github-release` step then waits for the chart and creates the `vX.Y.Z` GitHub Release, marked
 latest, with a body from `scripts/release-notes.ts`: the "Summary" and "What
 changed" sections of `docs/releases/vX.Y.Z.md`, the install command, the image
 digests with the verify command, and the runner version of the tree. A re-run
@@ -385,14 +394,6 @@ web image is built with `NEXT_PUBLIC_LIVE_URL=/api/live`, a path the browser
 resolves against the page's own origin, and `API_URL=http://api:8180`, the API
 service in the compose file. One image therefore serves any host. Staging
 keeps building its own images (`build-staging.sh`).
-
-Once both images are pushed, the `chart` step runs
-`deploy/helm/release-chart.sh` (ADR-0091). It checks the tag the same way,
-stamps the chart's `version` and `appVersion` with `X.Y.Z` (`Chart.yaml` holds
-only the placeholders `0.0.0` and `latest`), lints and packages it and pushes
-it as `oci://ghcr.io/andreybegma/charts/nautelle:X.Y.Z` with the same
-`ghcr_token`. [docs/guides/kubernetes.md](../docs/guides/kubernetes.md)
-installs from it.
 
 ### One-time setup
 
@@ -418,17 +419,10 @@ installs from it.
    `cosign.pub`, stops before it builds anything.
 3. **GitHub tag ruleset.** Add the pattern `v*` to the tag ruleset of P-03, so
    only administrators can create, move or delete a product tag.
-<<<<<<< HEAD
-3. **Package visibility.** After the first push, set the three packages,
+4. **Package visibility.** After the first push, set the three packages,
    `nautelle-api`, `nautelle-web` and the chart `charts/nautelle`, to *Public*
    in the account's package settings, and link them to the repository. An
    install pulls them without a login only once they are public.
-=======
-4. **Package visibility.** After the first push, set both packages,
-   `nautelle-api` and `nautelle-web`, to *Public* in the account's package
-   settings, and link them to the repository. An install pulls them without a
-   login only once they are public.
->>>>>>> origin/develop
 
 ### Each release
 
@@ -436,19 +430,12 @@ The `release` skill tags `vX.Y.Z` on `main` after the release pull request
 merges; the tag starts the workflow, and the release note must already have its
 "Summary" and "What changed" sections. To rehearse, run the pipeline by hand
 with a message that contains `[image-release]` on a branch other than
-<<<<<<< HEAD
-`develop`: it builds both images on the host as `<APP_VERSION>-dev`, packages
-the chart as `<APP_VERSION>-dev` and pushes nothing. Locally,
-`sh deploy/images/release-images.sh` and `sh deploy/helm/release-chart.sh` do
-the same. `NAUTELLE_IMAGES_DRY_RUN=1` and `NAUTELLE_CHART_DRY_RUN=1` stop a tag
-run before it pushes.
-=======
-`develop`: it builds both images for both platforms as `<APP_VERSION>-dev` and
-pushes, signs and releases nothing. Locally, `sh deploy/images/release-images.sh`
-does the same. `NAUTELLE_IMAGES_DRY_RUN=1` stops a tag run before it pushes.
-The arm64 half builds under emulation and takes several times as long as the
-amd64 half.
->>>>>>> origin/develop
+`develop`: it builds both images for both platforms as `<APP_VERSION>-dev`,
+packages the chart as `<APP_VERSION>-dev` and pushes, signs and releases
+nothing. Locally, `sh deploy/images/release-images.sh` and
+`sh deploy/helm/release-chart.sh` do the same. `NAUTELLE_IMAGES_DRY_RUN=1` and
+`NAUTELLE_CHART_DRY_RUN=1` stop a tag run before it pushes. The arm64 half
+builds under emulation and takes several times as long as the amd64 half.
 
 To check a release, verify an image and install it on a clean machine:
 

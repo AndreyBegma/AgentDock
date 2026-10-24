@@ -112,7 +112,7 @@ steps:
     commands:
       - gitleaks git --no-banner --redact --config .gitleaks.toml .
 
-  # The Helm chart (ADR-0091): lint every value set in deploy/helm/nautelle/ci,
+  # The Helm chart (ADR-0092): lint every value set in deploy/helm/nautelle/ci,
   # render it into .helm-out and check that contradictory settings are refused.
   # Then the rendered manifests against the Kubernetes API schemas. Both read
   # only the clone; kubeconform fetches the schemas over the network.

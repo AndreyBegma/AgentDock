@@ -1,35 +1,25 @@
-<<<<<<< HEAD
-# Publishes the Nautelle images (ADR-0088) and the Helm chart (ADR-0091).
-#
-# Pushing the tag vX.Y.Z on main (ADR-0071) builds ghcr.io/andreybegma/
-# nautelle-api and nautelle-web and pushes them as :X.Y.Z and :latest. The
-# public install (deploy/compose/) pulls them. Then it pushes the chart
-# deploy/helm/nautelle as oci://ghcr.io/andreybegma/charts/nautelle:X.Y.Z. The
-# tag must equal APP_VERSION; deploy/images/release-images.sh and
-# deploy/helm/release-chart.sh refuse anything else.
-#
-# A manual run is a dry run: it builds both images on the host, packages the
-# chart and pushes nothing. It starts only when the message given to the manual run contains
-# [image-release] (the gate reads the message, as release-runner.yml explains).
-# Rehearse on a branch other than develop: a manual run on develop also
-# deploys staging through pipeline.yml.
-=======
-# Publishes the Nautelle images and the GitHub Release (ADR-0088, ADR-0091).
+# Publishes the Nautelle images, the Helm chart and the GitHub Release
+# (ADR-0088, ADR-0091, ADR-0092).
 #
 # Pushing the tag vX.Y.Z on main (ADR-0071) builds ghcr.io/andreybegma/
 # nautelle-api and nautelle-web for linux/amd64 and linux/arm64, pushes them as
-# :X.Y.Z, :X.Y, :X and :latest with an SBOM and provenance, signs them with
-# cosign, and creates the vX.Y.Z GitHub Release from docs/releases/vX.Y.Z.md
-# with the install command, the image digests and the runner version. The
-# public install (deploy/compose/) pulls the images. The tag must equal
-# APP_VERSION; deploy/images/release-images.sh refuses anything else.
+# :X.Y.Z, :X.Y, :X and :latest with an SBOM and provenance, and signs them with
+# cosign. Then it pushes the chart deploy/helm/nautelle as
+# oci://ghcr.io/andreybegma/charts/nautelle:X.Y.Z and creates the vX.Y.Z GitHub
+# Release from docs/releases/vX.Y.Z.md with the install command, the image
+# digests and the runner version. The public install (deploy/compose/) pulls
+# the images. The tag must equal APP_VERSION; deploy/images/release-images.sh
+# and deploy/helm/release-chart.sh refuse anything else.
 #
-# A manual run is a dry run: it builds both images for both platforms and
-# pushes, signs and releases nothing. It starts only when the message given to
-# the manual run contains [image-release] (the gate reads the message, as
-# release-runner.yml explains). Rehearse on a branch other than develop: a
-# manual run on develop also deploys staging through pipeline.yml.
->>>>>>> origin/develop
+# A manual run is a dry run: it builds both images for both platforms,
+# packages the chart and pushes, signs and releases nothing. It starts only
+# when the message given to the manual run contains [image-release] (the gate
+# reads the message, as release-runner.yml explains). Rehearse on a branch
+# other than develop: a manual run on develop also deploys staging through
+# pipeline.yml.
+#
+# Every step names its depends_on: one that does switches Woodpecker to a
+# graph, and a step without it would start at once.
 #
 # Pull requests never run this workflow (ADR-0053). The gating in this file is
 # not the security boundary: whoever pushes a commit can edit it. The boundary
@@ -61,6 +51,7 @@ steps:
   # not depend on another one (pipeline.yml does not run on tags).
   - name: ci-image
     image: *docker_image
+    depends_on: []
     when: *publish_when
     volumes: *socket
     commands:
@@ -68,6 +59,7 @@ steps:
 
   - name: images
     image: *docker_image
+    depends_on: [ci-image]
     when: *publish_when
     volumes: *socket
     environment:
@@ -82,9 +74,11 @@ steps:
       - sh deploy/images/release-images.sh
 
   # The body comes from the release note and the digests images wrote to
-  # .release/images.json. A re-run edits the release instead of failing.
+  # .release/images.json. A re-run edits the release instead of failing. It
+  # waits for the chart, so a release is announced only once all of it is out.
   - name: github-release
     image: *ci_image
+    depends_on: [ci-image, images, chart]
     when: *publish_when
     environment:
       GH_TOKEN:
@@ -108,6 +102,7 @@ steps:
   # before the push.
   - name: images-dry-run
     image: *docker_image
+    depends_on: []
     when:
       - event: manual
     volumes: *socket
@@ -115,13 +110,11 @@ steps:
       - sh deploy/images/release-images.sh
 
   # The Helm chart at the same version, once its images are pushed
-  # (ADR-0091). No socket: helm talks to the registry itself.
+  # (ADR-0092). No socket: helm talks to the registry itself.
   - name: chart
     image: *helm_image
     depends_on: [images]
-    when:
-      - event: tag
-        ref: refs/tags/v*
+    when: *publish_when
     environment:
       GHCR_USER: andreybegma
       GHCR_TOKEN:

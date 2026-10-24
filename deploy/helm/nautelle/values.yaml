@@ -1,4 +1,4 @@
-# Nautelle on Kubernetes (ADR-0091, docs/guides/kubernetes.md).
+# Nautelle on Kubernetes (ADR-0092, docs/guides/kubernetes.md).
 #
 # The chart is the control plane only: the API, the web app and a Caddy proxy
 # that gives both one origin, as in deploy/compose/. Runners stay on the

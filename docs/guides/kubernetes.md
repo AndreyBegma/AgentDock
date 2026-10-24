@@ -3,7 +3,7 @@
 The Helm chart runs the Nautelle control plane on a Kubernetes cluster: the
 published `ghcr.io/andreybegma/nautelle-api` and `nautelle-web` images, a Caddy
 proxy that gives both one address, and optionally its own PostgreSQL and Redis
-([ADR-0091](../adr/0091-nautelle-runs-on-kubernetes-from-a-helm-chart-published-with-each-release.md)).
+([ADR-0092](../adr/0092-nautelle-runs-on-kubernetes-from-a-helm-chart-published-with-each-release.md)).
 It is the same install as the compose file of [Installing Nautelle](install.md),
 in Kubernetes objects.
 
@@ -13,7 +13,7 @@ chart's address ([Pairing a runner](#pairing-a-runner)).
 
 You need:
 
-- Kubernetes 1.25 or newer, with amd64 nodes (the images are amd64 only);
+- Kubernetes 1.25 or newer, with amd64 or arm64 nodes;
 - Helm 3.8 or newer, for OCI charts;
 - a default StorageClass that provides `ReadWriteOnce` volumes, unless you
   bring your own claims;

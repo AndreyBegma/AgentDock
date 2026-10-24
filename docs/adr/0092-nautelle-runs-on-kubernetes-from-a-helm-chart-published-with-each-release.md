@@ -1,9 +1,9 @@
-# ADR-0091: Nautelle runs on Kubernetes from a Helm chart published with each release
+# ADR-0092: Nautelle runs on Kubernetes from a Helm chart published with each release
 
 Status: accepted · Date: 2026-10-24 ·
 Card: C-376 ·
 Spec: [`docs/specs/card-376-open-source-polish-helm-chart-for-kubern.md`](../specs/card-376-open-source-polish-helm-chart-for-kubern.md) ·
-Keeps: [ADR-0001](0001-control-plane-and-per-machine-runner.md), [ADR-0053](0053-pull-request-pipelines-are-untrusted.md), [ADR-0071](0071-the-product-is-released-by-version-with-a-changelog-and-release-notes.md), [ADR-0087](0087-the-first-admin-is-created-in-the-browser-with-a-one-time-setup-token.md), [ADR-0088](0088-nautelle-installs-from-published-images-with-one-compose-file.md)
+Keeps: [ADR-0001](0001-control-plane-and-per-machine-runner.md), [ADR-0053](0053-pull-request-pipelines-are-untrusted.md), [ADR-0071](0071-the-product-is-released-by-version-with-a-changelog-and-release-notes.md), [ADR-0087](0087-the-first-admin-is-created-in-the-browser-with-a-one-time-setup-token.md), [ADR-0088](0088-nautelle-installs-from-published-images-with-one-compose-file.md), [ADR-0091](0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md)
 
 ## Context
 
@@ -53,9 +53,10 @@ that Caddy does in the compose file has no portable Ingress equivalent.
    (ADR-0071). `deploy/helm/release-chart.sh` stamps both versions with
    `X.Y.Z` and, on the tag `vX.Y.Z`, pushes the package to
    `oci://ghcr.io/andreybegma/charts/nautelle` from
-   `.woodpecker/release-images.yml`, once the images are pushed. It uses the
-   same tag-only `ghcr_token` secret as the images; the manual dry run
-   packages the chart and pushes nothing.
+   `.woodpecker/release-images.yml`, once the images are pushed and signed.
+   It uses the same tag-only `ghcr_token` secret as the images; the GitHub
+   Release (ADR-0091) waits for the chart, so a release is announced only once
+   its chart is out. The manual dry run packages the chart and pushes nothing.
 8. **Pull requests check the chart without secrets.** The `helm` step of
    `.woodpecker/pipeline.yml` lints every value set in
    `deploy/helm/nautelle/ci`, renders them and checks that contradictory
@@ -69,10 +70,13 @@ that Caddy does in the compose file has no portable Ingress equivalent.
 - The chart package must be made public on GHCR, like the images, before an
   install can pull it without a login (deploy/README.md, one-time setup).
 - A release now publishes a chart too; a failed chart push leaves the images
-  of that release published without a chart, and the step can be re-run.
+  of that release published without a chart or a GitHub Release, and the
+  step can be re-run.
 - An upgrade stops the API before the new one starts, so the board is
   unavailable for the migration and the start (single replica, `Recreate`).
 - A backup is the database and the API's claim together, as in ADR-0088.
-- The images are amd64 only (ADR-0088), so the chart runs on amd64 nodes only.
+- The Nautelle images are built for amd64 and arm64 (ADR-0091), and the
+  third-party images are pinned by their multi-platform index digests, so the
+  chart runs on either kind of node.
 - The API process does not handle `SIGTERM`, so a pod waits the whole grace
   period before it stops; the compose install has the same delay.

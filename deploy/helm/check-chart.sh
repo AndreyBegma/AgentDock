@@ -1,5 +1,5 @@
 #!/bin/sh
-# Lints and renders the Nautelle chart (ADR-0091). Run from the repository
+# Lints and renders the Nautelle chart (ADR-0092). Run from the repository
 # root with helm on the PATH; the `helm` step of .woodpecker/pipeline.yml does,
 # and `kubeconform` then validates what it wrote.
 #

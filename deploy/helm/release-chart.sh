@@ -1,6 +1,6 @@
 #!/bin/sh
 # Packages the Helm chart and, on a release tag, pushes it to ghcr as an OCI
-# artifact (ADR-0091). Run from the repository root;
+# artifact (ADR-0092). Run from the repository root;
 # .woodpecker/release-images.yml calls it.
 #
 #   oci://ghcr.io/andreybegma/charts/nautelle:<version>
