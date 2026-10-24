@@ -13,3 +13,6 @@ New local methods + MCP tools, same rules as the existing `card.*` (manual sessi
 - `card_depend` / `card_undepend` → `{ card, dependsOn }` (`POST /board/cards/:n/dependencies`).
 - `board_list` returns stacks (number, title, stages with card numbers, design status).
 Update the nautelle plugin skill `nautelle:board` to mention the tools. Tests: tools.spec (schemas), local handler e2e for each method incl. refusals and the manual-only rule.
+
+## Decisions
+Recorded in [ADR-0089](../adr/0089-a-persons-session-may-work-stacks-designs-and-dependencies.md). `status` is a read method of its own (`stack.designView`, `card.designView`), so the MCP design tools route it there; Approve from any session but a manual one is `needs_person`; `stack_remove_card` takes `{ stack, card }`, since the card's stage is known.
