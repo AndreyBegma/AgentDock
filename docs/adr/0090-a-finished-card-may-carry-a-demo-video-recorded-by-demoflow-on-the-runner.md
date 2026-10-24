@@ -77,8 +77,9 @@ The decisions below were settled with the person on 2026-10-24.
 11. **Proxies.** A raw upload carries a bearer token, which a cross-site form
     cannot set, so a `@BearerBody()` route called with `Authorization: Bearer …`
     is exempt from the JSON-only rule for public non-GET routes; without the
-    header the rule still answers 415. Staging's Caddy keeps its 10 MB request
-    cap for everything but the video upload path, which gets 100 MiB.
+    header the rule still answers 415. Caddy, in staging and in the public
+    install's compose file (ADR-0088), keeps its 10 MB request cap for
+    everything but the video upload path, which gets 100 MiB.
     Cloudflare's free plan caps a request at 100 MB, so a self-hosted instance
     behind it uploads a video of at most that size.
 

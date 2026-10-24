@@ -24,3 +24,53 @@ Stack "Demo videos of finished cards", stage 1 (Foundations). DemoFlow (https://
 5. Shared types for the demo status so web/runner use one source.
 
 e2e tests for: settings, secrets never echoed, Range responses, video signature check, upload auth (foreign runner → 403), manual demo creation.
+
+## Design (as built)
+
+The decision record is [ADR-0090](../adr/0090-a-finished-card-may-carry-a-demo-video-recorded-by-demoflow-on-the-runner.md). The card asked for ADR-0089, but that number was taken on `develop` while the card was worked, so the ADR is 0090.
+
+### Data model
+
+Migration `20261231000023_card_demo_videos`:
+
+- `board_settings`: `demoVideosEnabled` (false), `demoUiPaths` (the three default globs), `demoTelegram` (true).
+- `project_demo_secrets`: `(projectId, name)` unique, `valueCiphertext` sealed by `SecretCipher` (`v1:<iv>:<tag>:<ct>`), `updatedById` (set null when the user is deleted). At most 32 per project, enforced under an advisory lock.
+- `card_demos`: `cardId`, `round`, `status`, `trigger`, `reason`, `scenarioPath`, `attachmentId` (set null when the attachment is deleted), `durationMs`, `size`, `requestedById`, `startedAt`, `finishedAt`, `createdAt`.
+
+### Shared contracts (`packages/shared`)
+
+- `src/demos/contracts.ts`: `DEMO_STATUSES`, `DEMO_ACTIVE_STATUSES`, `DEMO_TRIGGERS`, the name/scenario/id schemas, the views (`DemoSettingsView`, `DemoSecretView`, `CardDemoView`, `RunnerDemoEnvView`), `DEMO_ERROR`, `DEMO_UPLOAD_HEADERS`, `runnerDemoVideoPath`, `runnerDemoEnvPath`.
+- `src/protocol/commands/demos.ts`: the typed command `card.demo` `{ cardId, projectId, card, round, demoId, worktree: { root, shortId }, scenario, env: names }`, minimum role operator, 15 s timeout. The runner's handler answers `unsupported` until stage 2; the API dispatches it only to a runner advertising the `cardDemo` capability.
+- `src/protocol/events/demos.ts`: the runner's `demo.status` event (`recording`, `failed` with a reason, `skipped` with a reason). The video upload, not an event, makes a demo `ready`.
+
+### Routes
+
+| Route | Who | Answer |
+| --- | --- | --- |
+| `GET /projects/:p/demos/settings` | member | `DemoSettingsView` |
+| `PATCH /projects/:p/demos/settings` | project admin | `DemoSettingsView`, audited |
+| `GET /projects/:p/demos/secrets` | member | `DemoSecretView[]`, names only |
+| `PUT /projects/:p/demos/secrets/:name` | project admin | `DemoSecretView`, audited without the value (`replaced` on an overwrite) |
+| `DELETE /projects/:p/demos/secrets/:name` | project admin | 204, audited |
+| `GET /projects/:p/board/cards/:n/demos` | member | `CardDemoView[]`, newest first |
+| `POST /projects/:p/board/cards/:n/demos` | operator | 201 `CardDemoView` (`queued`, `manual`), audited |
+| `GET /runner/cards/:n/demos/:demoId/env` | the project's runner token | `RunnerDemoEnvView` while the demo is queued or recording |
+| `POST /runner/cards/:n/demos/:demoId/video` | the project's runner token | 201 `CardDemoView` (`ready`) |
+
+Error codes are `DEMO_ERROR`: `demos_disabled`, `demo_in_flight`, `no_round` and `demo_not_active` (409), `encryption_unavailable` (409), `too_many_secrets` and `integrity_mismatch` (422). An unknown card, demo or secret is 404; a runner that does not own the card's project is 403.
+
+### The runner's upload
+
+The body is the raw video, with `Authorization: Bearer <runner token>`, `x-demo-sha256` (hex) and `x-demo-duration-ms`. Because the public route takes a non-JSON body, it is marked `@BearerBody()`: the CSRF guard exempts it only when the request carries a bearer token, which a cross-site form cannot set. The API checks the token, the project's runner and the demo's status before it reads the body, streams it to disk with a 100 MiB cap, checks the SHA-256 and the content signature, stores the attachment with no uploader and marks the demo `ready` under the demo's row lock.
+
+### Attachments (amends ADR-0031)
+
+MP4 (`ftyp` with a browser-playable major brand) and WebM (EBML with the `webm` DocType) are accepted by signature. A video may be up to 100 MiB, any other type 25 MiB. Videos do not count toward the 20 per card and are not handed to the card worker. The member content route answers a single `Range` with 206 and `Content-Range`, and 416 past the end.
+
+### Proxies
+
+Both Caddy configurations (`deploy/staging/Caddyfile` and the inline one in `deploy/compose/docker-compose.yml`) keep the 10 MB request cap everywhere except the video upload path, which gets 100 MiB.
+
+### Out of scope (later stages of S-12)
+
+Dispatching `card.demo`, the auto trigger, recording on the runner, Telegram delivery, the Demo section on Overview, the board tile chip and the Settings → Demo videos tab.
