@@ -9,8 +9,8 @@ setup in [deploy/README.md](../../deploy/README.md). To run it on a
 Kubernetes cluster instead, use the Helm chart:
 [Kubernetes (Helm)](kubernetes.md).
 
-You need a Linux host (amd64) with Docker and Docker Compose 2.24 or newer,
-and `curl` or `wget`.
+You need a Linux host (amd64 or arm64) with Docker and Docker Compose 2.24 or
+newer, and `curl` or `wget`.
 
 ## Quick start
 
@@ -123,6 +123,11 @@ on its first start and keeps them in `secrets.json` in the `data` volume. They
 seal stored secrets, and the database cannot be read without them. A key set
 in `api.env` wins over the generated one; never change one once set.
 
+Once a day the API asks GitHub for the latest Nautelle release and tells
+administrators when a newer one is out (**Account › About** shows the version
+you run). It sends no data about the install. To turn the check off, add
+`NAUTELLE_UPDATE_CHECK=false` to `api.env`.
+
 ## Upgrading
 
 ```sh
@@ -134,6 +139,12 @@ docker compose up -d
 The API applies new migrations when it starts. To stay on a release, set
 `NAUTELLE_VERSION=X.Y.Z` in `.env`. Running `install.sh` again also upgrades:
 it fetches the current compose file, keeps `.env` and pulls the images.
+[Versioning](versioning.md) says what a release may break and which upgrades
+are supported; read a release's notes before you skip a minor version.
+
+Every release lists its image digests and how to check them: the images are
+signed with cosign and carry an SBOM and build provenance
+([ADR-0091](../adr/0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md)).
 
 ## Backup
 

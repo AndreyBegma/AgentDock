@@ -166,8 +166,9 @@ and **[Self-hosting](https://github.com/AndreyBegma/Nautelle/wiki/Self-Hosting)*
 
 ## Contributing
 
-Pull requests target `develop`. Read **[Contributing](https://github.com/AndreyBegma/Nautelle/wiki/Contributing)**
-and [CLAUDE.md](CLAUDE.md) for the conventions. An architectural change records
+Pull requests target `develop`. Read **[CONTRIBUTING.md](CONTRIBUTING.md)**
+and [CLAUDE.md](CLAUDE.md) for the conventions; help is in [SUPPORT.md](SUPPORT.md),
+vulnerabilities go through [SECURITY.md](SECURITY.md). An architectural change records
 a new ADR in the same pull request.
 
 ## License

@@ -2,6 +2,7 @@
   "name": "@nautelle/web",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "next build",
     "start": "next start -p 3517",

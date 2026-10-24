@@ -28,6 +28,8 @@ import { Assistant } from '../assistant/assistant';
 import { AskBoardDialog } from '../board-ai/ask-board-dialog';
 import { RunnerUpdateNotice } from '../runners/runner-update-notice';
 import { useRunnerUpdate } from '../runners/use-runner-update';
+import { ProductUpdateNotice } from '../updates/product-update-notice';
+import { useProductUpdate } from '../updates/use-product-update';
 import { AccountMenu } from './account-menu';
 import { Capsule } from './capsule';
 import { crumbsFor, pageTitleOf } from './crumbs';
@@ -144,6 +146,8 @@ export function AppShell({
   const restarting = useServerRestarting();
   // C-328: the caller's own runner is behind the latest release.
   const runnerUpdate = useRunnerUpdate();
+  // C-374: a newer Nautelle release is out; admins only.
+  const productUpdate = useProductUpdate(user.role === 'admin');
   useEffect(() => {
     if (status === 'offline' && closeCode === LIVE_CLOSE_CODES.unauthorized) {
       router.replace('/login');
@@ -341,6 +345,13 @@ export function AppShell({
                 >
                   This page may be out of date.
                 </Banner>
+              ) : null}
+
+              {productUpdate.release ? (
+                <ProductUpdateNotice
+                  release={productUpdate.release}
+                  onDismiss={productUpdate.dismiss}
+                />
               ) : null}
 
               {runnerUpdate.notice ? (

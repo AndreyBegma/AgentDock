@@ -6,7 +6,7 @@ export type {
   AuthUser,
 } from './auth-request';
 export { setSessionCookies } from './cookies';
-export { CurrentUser, Public, Roles } from './decorators';
+export { BearerBody, CurrentUser, Public, Roles } from './decorators';
 export { CsrfGuard } from './guards/csrf.guard';
 export { RolesGuard } from './guards/roles.guard';
 export { SessionGuard } from './guards/session.guard';

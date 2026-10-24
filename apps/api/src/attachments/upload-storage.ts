@@ -6,8 +6,8 @@ import { type Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { TextDecoder } from 'node:util';
 import {
-  ATTACHMENT_MAX_BYTES,
   ATTACHMENT_SIGNATURE_BYTES,
+  ATTACHMENT_UPLOAD_MAX_BYTES,
   type AttachmentScan,
 } from '@nautelle/shared';
 import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
@@ -158,10 +158,58 @@ export const uploadOptions = (store: AttachmentStore): MulterOptions => ({
   // Names arrive as UTF-8 from browsers; busboy's default is latin1.
   defParamCharset: 'utf8',
   limits: {
-    fileSize: ATTACHMENT_MAX_BYTES,
+    fileSize: ATTACHMENT_UPLOAD_MAX_BYTES,
     files: 1,
     // A client may send a few plain fields beside the file; they are ignored.
     fields: 10,
     fieldSize: 1024,
   },
 });
+
+/** A raw request body over its limit: nothing of it is kept. */
+export class UploadOverLimit extends Error {
+  constructor(readonly maxBytes: number) {
+    super(`the body exceeds ${maxBytes} bytes`);
+    this.name = 'UploadOverLimit';
+  }
+}
+
+/**
+ * ADR-0090: `TempFileStorage` for a raw request body — the runner's demo
+ * video. Streams it to a temporary file, scanning it on the way. Past
+ * `maxBytes` the rest is read and dropped — destroying the request would
+ * reset the socket before the 422 is sent — and `UploadOverLimit` is thrown
+ * once it ends; a partial file is removed here. The caller moves or removes
+ * the file it gets.
+ */
+export const receiveUpload = async (
+  stream: Readable,
+  store: AttachmentStore,
+  maxBytes: number,
+): Promise<{ path: string } & ScannedUpload> => {
+  const path = join(await store.tempDir(), randomBytes(16).toString('hex'));
+  const scanner = new UploadScanner();
+  let size = 0;
+  const scan = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      size += chunk.byteLength;
+      if (size > maxBytes) {
+        callback();
+        return;
+      }
+      scanner.update(chunk);
+      callback(null, chunk);
+    },
+  });
+  try {
+    await pipeline(stream, scan, createWriteStream(path, { flags: 'wx' }));
+  } catch (error) {
+    await rm(path, { force: true });
+    throw error;
+  }
+  if (size > maxBytes) {
+    await rm(path, { force: true });
+    throw new UploadOverLimit(maxBytes);
+  }
+  return { path, ...scanner.result() };
+};
