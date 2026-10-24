@@ -110,6 +110,7 @@ import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
 import { CardAttachmentsSection } from '../attachments/card-attachments-section';
 import { useRemoveAttachment } from '../attachments/use-remove-attachment';
+import { DemoSection } from '../demos/demo-section';
 import { PageHeader } from '../page-header/page-header';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { SessionMessageLine } from '../session/session-message-line';
@@ -1415,6 +1416,19 @@ export function CardDetailBody({
   // A section with nothing to show is `null`, and its tab is not drawn.
   const overview = (
     <div className="flex min-w-0 flex-col gap-6">
+      {card.demo ? (
+        // C-371: first, so watching the demo and accepting is one place.
+        <DemoSection
+          projectId={projectId}
+          card={card}
+          canOperate={canOperate}
+          accept={
+            canOperate && canAccept(card)
+              ? { busy: actions.busy, run: () => actions.accept(card) }
+              : null
+          }
+        />
+      ) : null}
       {triageSection}
       {runSection}
       {summarySection}
