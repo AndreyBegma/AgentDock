@@ -1257,14 +1257,11 @@ export class CardExecutor {
    * #489 M4: what the round's question selector shows — reported as
    * `card_run.pending_question` whenever the screen changes, and with
    * `question: null` once it is gone, so the Board can offer its options.
-   * Content (ADR-0021): only for a project that ships it.
+   * ADR-0094: on every project, content shipped or not — the selector is
+   * the worker addressing the person; `readQuestion` redacts and caps it.
    */
   private noticePendingQuestion(record: CardRecord, pane: string | null): void {
     if (pane === null) return;
-    const project = this.options.deps
-      .watchedProjects()
-      .find((p) => p.id === record.projectId);
-    if (project?.shipContent !== true) return;
     const screen = readQuestion(pane);
     const shown = this.pendingShown.get(record.cardId);
     const key = screen ? `${record.runId}:${screen.question.key}` : null;
