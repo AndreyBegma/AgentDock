@@ -458,10 +458,9 @@ publishes nothing.
 
 ### One-time setup
 
-1. **Woodpecker secret.** Add `pages_token` to `AndreyBegma/Nautelle`,
-   restricted to the **tag** event only, like the secrets above. It is a
-   fine-grained GitHub token for this repository with *Contents: read and
-   write*.
+1. **Woodpecker secret.** None of its own: the docs step pushes `gh-pages`
+   with `github_release_token`, the runner's token (*contents: write* on this
+   repository), restricted to the **tag** event like the secrets above.
 2. **GitHub Pages.** In the repository's *Settings › Pages*, choose *Deploy
    from a branch* and the branch `gh-pages`, folder `/ (root)`, after the
    first release has pushed it.
