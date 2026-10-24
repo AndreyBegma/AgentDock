@@ -6,7 +6,7 @@
  *   - no Dockerfile pipes a download into a shell (`curl … | bash`, `| sh`);
  *   - every third-party `image:` in a compose file carries a digest. Nautelle's
  *     own images are exempt: the staging ones are built locally, and the
- *     public install picks a published release by tag (ADR-0087).
+ *     public install picks a published release by tag (ADR-0088).
  *
  *   bun scripts/check-images.ts [file ...]
  *
@@ -22,7 +22,7 @@ const root = resolve(import.meta.dir, '..');
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.next', 'dist']);
 /**
  * Nautelle's own images: built locally for staging (`agentdock-*`), or the
- * published ones the public install selects by release tag (ADR-0087).
+ * published ones the public install selects by release tag (ADR-0088).
  */
 const OWN_IMAGE = /^(agentdock-|ghcr\.io\/andreybegma\/nautelle-(api|web):)/;
 

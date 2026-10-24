@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the published Nautelle images and, on a release tag, pushes them
-# (ADR-0087). Run from the repository root; .woodpecker/release-images.yml
+# (ADR-0088). Run from the repository root; .woodpecker/release-images.yml
 # calls it.
 #
 #   ghcr.io/andreybegma/nautelle-api:<version> and :latest

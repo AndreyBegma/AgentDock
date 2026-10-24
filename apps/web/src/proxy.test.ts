@@ -24,7 +24,7 @@ describe('proxy', () => {
   });
 
   test('the sign-in pages are public', () => {
-    for (const path of ['/login', '/register', '/pending']) {
+    for (const path of ['/login', '/register', '/pending', '/setup']) {
       expect(redirectOf(visit(path))).toBeNull();
     }
   });
@@ -183,7 +183,7 @@ describe('security headers (F-27)', () => {
     expect(directives(csp).get('script-src')).toBe("'self' 'nonce-n'");
   });
 
-  test('a same-origin live path needs nothing beyond self (ADR-0087)', () => {
+  test('a same-origin live path needs nothing beyond self (ADR-0088)', () => {
     const csp = contentSecurityPolicy({
       nonce: 'n',
       liveUrl: '/api/live',

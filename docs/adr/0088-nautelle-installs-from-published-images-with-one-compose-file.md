@@ -1,4 +1,4 @@
-# ADR-0087: Nautelle installs from published images with one compose file
+# ADR-0088: Nautelle installs from published images with one compose file
 
 Status: accepted · Date: 2026-10-24 ·
 Card: C-365 ·

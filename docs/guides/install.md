@@ -2,7 +2,7 @@
 
 Nautelle runs from two published images, `ghcr.io/andreybegma/nautelle-api`
 and `nautelle-web`, with PostgreSQL, Redis and a Caddy proxy, all from one
-compose file ([ADR-0087](../adr/0087-nautelle-installs-from-published-images-with-one-compose-file.md)).
+compose file ([ADR-0088](../adr/0088-nautelle-installs-from-published-images-with-one-compose-file.md)).
 This guide is for running Nautelle. To work on its code, follow the quick
 start in the [README](../../README.md); the staging deployment has its own
 setup in [deploy/README.md](../../deploy/README.md).

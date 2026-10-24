@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs Nautelle from its published images (ADR-0087, docs/guides/install.md).
+# Installs Nautelle from its published images (ADR-0088, docs/guides/install.md).
 #
 #   curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh
 #   curl -fsSL …/install.sh | sh -s -- --domain dock.example.com

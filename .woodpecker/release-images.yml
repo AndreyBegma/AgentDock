@@ -1,4 +1,4 @@
-# Publishes the Nautelle images (ADR-0087).
+# Publishes the Nautelle images (ADR-0088).
 #
 # Pushing the tag vX.Y.Z on main (ADR-0071) builds ghcr.io/andreybegma/
 # nautelle-api and nautelle-web and pushes them as :X.Y.Z and :latest. The

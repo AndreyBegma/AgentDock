@@ -6,7 +6,7 @@ type PageLocation = Pick<Location, 'protocol' | 'host' | 'hostname'>;
  * The live WebSocket URL. `NEXT_PUBLIC_LIVE_URL` wins, but a page served over
  * https never gets a `ws:` socket (it would be blocked, or travel in the
  * clear). A configured path (`/api/live`, the published image's value) is on
- * the page's own origin, so one image serves any host (ADR-0087). Without it
+ * the page's own origin, so one image serves any host (ADR-0088). Without it
  * the URL follows the page: `wss:` behind the `/api` proxy on https, the API's
  * own development port on http.
  */
