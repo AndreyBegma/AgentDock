@@ -74,7 +74,9 @@ const readForm = async (
     } else if (key === 'reply_markup') {
       body[key] = JSON.parse(value) as unknown;
     } else {
-      body[key] = value;
+      // `FormData` sends a field's line breaks as CRLF; Telegram shows them
+      // as the plain line breaks a JSON call sends.
+      body[key] = value.replace(/\r\n/g, '\n');
     }
   }
   return body;

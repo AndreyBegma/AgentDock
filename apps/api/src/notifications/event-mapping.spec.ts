@@ -385,8 +385,45 @@ describe('draftFor (spec 22 D1)', () => {
       expect(draftFor(card('cards.suggested', { count: 0 }))).toBeNull();
     });
 
+    it('maps card.demo, ready or failed with its reason (C-372)', () => {
+      expect(
+        draftFor(
+          card('card.demo', {
+            number: 12,
+            title: 'Add login',
+            demoId: 'd1',
+            status: 'ready',
+          }),
+        ),
+      ).toEqual({
+        kind: 'card.demo',
+        slot: null,
+        issue: null,
+        title: 'The demo of C-12 "Add login" is ready',
+        body: 'Watch it, then merge it or send feedback.',
+        page: 'board',
+        card: 12,
+      });
+      expect(
+        draftFor(
+          card('card.demo', {
+            number: 12,
+            title: 'Add login',
+            status: 'failed',
+            reason: 'Step 3 timed out',
+          }),
+        ),
+      ).toMatchObject({
+        title: 'The demo of C-12 "Add login" failed',
+        body: 'Step 3 timed out',
+      });
+      expect(
+        draftFor(card('card.demo', { number: 12, status: 'recording' })),
+      ).toBeNull();
+    });
+
     it('does not let a runner forge a card event, and needs a number', () => {
-      for (const type of ['card.finished', 'card.waiting']) {
+      for (const type of ['card.finished', 'card.waiting', 'card.demo']) {
         expect(draftFor(card(type, { number: 1 }, 'runner'))).toBeNull();
         expect(draftFor(card(type, { title: 'x' }))).toBeNull();
       }

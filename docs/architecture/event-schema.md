@@ -67,6 +67,11 @@ Board server events (source `api`, ADR-0014, issue #242 D15): `card.finished`
 `{ cardId, number, title, round, finishedBy, prNumber, prUrl }` and
 `card.waiting` `{ cardId, number, title, round, reason?: stopped|question }` — never prompt or summary
 text. They drive the `card.finished` and `card.waiting` notifications.
+`card.demo` `{ cardId, number, title, round, demoId, status: ready|failed,
+reason, size }` (C-372, ADR-0095) is recorded when a card's demo video becomes
+ready or fails and the project's `demoTelegram` switch is on; `reason` is the
+recording's failure reason, `size` the video's bytes. It drives the
+Telegram-only `card.demo` notification.
 
 ### Usage (source `otel` / `transcript`)
 
