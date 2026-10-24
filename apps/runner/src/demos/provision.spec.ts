@@ -23,7 +23,7 @@ const provisioner = (exec: Exec) =>
 describe('DemoflowProvisioner', () => {
   it('is not ready before the first demo, and says so', () => {
     expect(provisioner(machine({})).status()).toEqual({
-      version: '0.4.0',
+      version: '0.6.0',
       ready: false,
       reason: 'DemoFlow is set up on the first demo',
     });
@@ -35,14 +35,14 @@ describe('DemoflowProvisioner', () => {
       machine(
         {
           'node --version': ok('v22.11.0\n'),
-          [VERSION]: ok('0.4.0\n'),
+          [VERSION]: ok('0.6.0\n'),
           [SETUP]: ok('Chromium is installed: /x/chrome\n'),
         },
         calls,
       ),
     );
     const [a, b] = await Promise.all([p.ensure(), p.ensure()]);
-    expect(a).toEqual({ version: '0.4.0', ready: true });
+    expect(a).toEqual({ version: '0.6.0', ready: true });
     expect(b).toBe(a);
     expect(await p.ensure()).toEqual(a);
     expect(p.status()).toEqual(a);
@@ -65,13 +65,13 @@ describe('DemoflowProvisioner', () => {
     );
     const status = await p.ensure();
     expect(status.ready).toBe(false);
-    expect(status.reason).toBe('npx ran DemoFlow 0.5.1, not 0.4.0');
+    expect(status.reason).toBe('npx ran DemoFlow 0.5.1, not 0.6.0');
   });
 
   it('reports a failed setup and tries again on the next demo', async () => {
     const table: Record<string, ExecResult | null> = {
       'node --version': ok('v22.1.0'),
-      [VERSION]: ok('0.4.0'),
+      [VERSION]: ok('0.6.0'),
       [SETUP]: { code: 3, stdout: '', stderr: 'download failed: ENOSPC\n' },
     };
     const p = provisioner(machine(table));

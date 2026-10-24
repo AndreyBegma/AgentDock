@@ -62,18 +62,23 @@ To turn them on for a project:
    the runner skips every demo and says so on the card.
 
 The config tells DemoFlow where the app is and how to start it in the card's
-worktree. The runner sets `PORT` to the port of `readyUrl`; DemoFlow waits
-until `readyUrl` answers, records, and then stops everything `devCommand`
-started:
+worktree. The runner gives every recording a free local port of its own
+(`demoflow run --port <n> --fresh-app`), so several cards can record at once:
+write `${PORT}` where the port goes — `baseUrl`, `readyUrl` and `devCommand`
+take it, and `${BASE_URL}` too — and `${PORT:-3517}` keeps a default for a run
+by hand. DemoFlow also exports `PORT` to the app. It waits until `readyUrl`
+answers, records, and then stops everything `devCommand` started. A config with
+a fixed port still works, but a second demo fails while the app answers on that
+port.
 
 ```json
 {
-  "baseUrl": "http://127.0.0.1:3517",
-  "allowedOrigins": ["http://127.0.0.1:3517", "http://127.0.0.1:4517"],
+  "baseUrl": "http://127.0.0.1:${PORT:-3517}",
+  "allowedOrigins": ["http://127.0.0.1:4517"],
   "devCommand": {
     "command": "sh",
     "args": ["scripts/demo-dev.sh"],
-    "readyUrl": "http://127.0.0.1:3517/login",
+    "readyUrl": "${BASE_URL}/login",
     "timeoutMs": 300000
   }
 }
@@ -112,9 +117,10 @@ steps; `valueFrom.env` reads a Demo env secret:
 }
 ```
 
-Run one by hand with `npx demoflow@0.4.0 run <scenario>`. A demo that fails or
+Run one by hand with `npx demoflow@0.6.0 run <scenario>`. A demo that fails or
 is skipped shows its reason on the card; it never holds up Finished or a merge.
-The runner records one demo at a time.
+The runner records two demos at a time and queues the rest; set
+`demos.maxConcurrent` in `runner.json` (1 to 8) to change that.
 
 ## Where the reasoning lives
 

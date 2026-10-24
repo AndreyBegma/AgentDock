@@ -282,6 +282,11 @@ copying (never `npx`, never a symlink), and run them headless.
 | `maxTimeoutSec` | `21600` | a run's `timeoutSec` above it is cut to it |
 | `keepPatchesLocal` | `false` | the patch stays in the run's directory; `skill_run.finished` carries only the changed-file list and the patch's SHA-256. Set by hand — the daemon and the server never change it |
 
+`runner.json` key `demos` (C-387, demo videos): `maxConcurrent`, default `2`,
+1 to 8 — recordings at the same time, each on a free port of its own
+(`demoflow run --port <n> --fresh-app`); the rest wait in order. Each one runs
+a Chromium and an FFmpeg, so raise it with care.
+
 Every text the runner sends the server — pane frames, run logs, reports,
 checkpoints, messages, PR bodies, skill-run patches, hook content — passes
 one redactor (`src/pane/redact.ts`): token shapes, private-key blocks,

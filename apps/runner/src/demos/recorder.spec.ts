@@ -15,6 +15,7 @@ import { fakeExec, memoryLogger, TOKEN, tempDir } from '../testing/fixtures';
 import { DEMOFLOW_PACKAGE } from './pin';
 import type { DemoflowExit, DemoflowSpawn } from './process';
 import {
+  DEMO_DEFAULT_MAX_CONCURRENT,
   DEMO_QUEUE_MAX,
   DemoRecorder,
   type DemoRecorderDeps,
@@ -122,13 +123,14 @@ const api = (
     return answer ? answer(req) : new Response(null, { status: 201 });
   }) as typeof fetch;
 
-const ready: DemoflowStatus = { version: '0.4.0', ready: true };
+const ready: DemoflowStatus = { version: '0.6.0', ready: true };
 
 const setup = (
   options: {
     spawn?: DemoflowSpawn;
     probes?: Partial<PortProbes>;
-    features?: { portTemplating: boolean };
+    maxConcurrent?: number;
+    freePorts?: number[];
     answers?: ((req: Request) => Response)[];
     provisioned?: DemoflowStatus;
     scenario?: boolean;
@@ -178,11 +180,10 @@ const setup = (
     workDir: join(dir, 'demos'),
     spawn: options.spawn ?? rendering(calls),
     probes: {
-      portInUse: async () => false,
-      freePort: async () => 41234,
+      freePort: async () => options.freePorts?.shift() ?? 41234,
       ...options.probes,
     },
-    features: options.features ?? { portTemplating: false },
+    ...(options.maxConcurrent ? { maxConcurrent: options.maxConcurrent } : {}),
     upload: {
       sleep: async (ms) => {
         sleeps.push(ms);
@@ -275,7 +276,7 @@ describe('DemoRecorder', () => {
     expect(call.env.LOGIN_PASSWORD).toBe(SECRET);
     // Only the names the command lists, not every project secret.
     expect(call.env.OTHER).toBeUndefined();
-    expect(call.env.PORT).toBe('3000');
+    expect(call.env.PORT).toBe('41234');
     expect(call.env.PATH).toBe('/usr/bin');
     expect('UNSET' in call.env).toBe(false);
     expect(call.args.join(' ')).not.toContain(SECRET);
@@ -283,31 +284,25 @@ describe('DemoRecorder', () => {
     expect(lines.join('\n')).not.toContain(SECRET);
   });
 
-  it('refuses when the app port is already taken (DemoFlow 0.4.0)', async () => {
-    const { recorder, args, events, calls } = setup({
-      probes: { portInUse: async (port) => port === 3000 },
-    });
+  it('runs DemoFlow on a free port of its own, fresh', async () => {
+    const { recorder, args, calls } = setup();
     recorder.command(args());
     await recorder.idle();
-    expect(calls).toHaveLength(0);
-    expect(statuses(events)).toEqual([
-      expect.stringMatching(/^failed: port 3000 .* already in use/),
+    const argv = calls[0].args;
+    expect(argv.slice(2)).toEqual([
+      'run',
+      SCENARIO,
+      '--json',
+      '--format',
+      'mp4',
+      '--out',
+      argv[argv.indexOf('--out') + 1],
+      '--port',
+      '41234',
+      '--fresh-app',
     ]);
-  });
-
-  it('assigns a free port and passes it as the base URL with port templating', async () => {
-    const calls: Call[] = [];
-    const { recorder, args } = setup({
-      spawn: rendering(calls),
-      features: { portTemplating: true },
-      probes: { portInUse: async () => true },
-    });
-    recorder.command(args());
-    await recorder.idle();
+    expect(argv).not.toContain('--base-url');
     expect(calls[0].env.PORT).toBe('41234');
-    expect(calls[0].args.join(' ')).toContain(
-      '--base-url http://127.0.0.1:41234 --fresh-app',
-    );
   });
 
   it('skips a card with no scenario, without starting DemoFlow', async () => {
@@ -363,7 +358,7 @@ describe('DemoRecorder', () => {
 
   it('skips when DemoFlow is not ready (C-370)', async () => {
     const { recorder, args, events, calls } = setup({
-      provisioned: { version: '0.4.0', ready: false, reason: 'no Chromium' },
+      provisioned: { version: '0.6.0', ready: false, reason: 'no Chromium' },
     });
     recorder.command(args());
     await recorder.idle();
@@ -436,6 +431,7 @@ describe('DemoRecorder', () => {
     const render = rendering(calls);
     const order: string[] = [];
     const { recorder, args } = setup({
+      maxConcurrent: 1,
       spawn: async (binary, argv, options) => {
         order.push(`start ${calls.length}`);
         if (calls.length === 0) await gate;
@@ -455,49 +451,128 @@ describe('DemoRecorder', () => {
     expect(order).toEqual(['start 0', 'end 1', 'start 1', 'end 2']);
   });
 
+  it('records up to maxConcurrent demos at once, each on its own port', async () => {
+    let release = () => {};
+    const gate = new Promise<void>((done) => {
+      release = done;
+    });
+    const calls: Call[] = [];
+    const render = rendering(calls);
+    const { recorder, args } = setup({
+      maxConcurrent: 2,
+      freePorts: [41001, 41002, 41003],
+      spawn: async (binary, argv, options) => {
+        await gate;
+        return render(binary, argv, options);
+      },
+    });
+    const started: Call[] = [];
+    const wait = async () => new Promise((done) => setTimeout(done, 30));
+    expect(recorder.command(args('a'))).toEqual({ status: 'recording' });
+    expect(recorder.command(args('b'))).toEqual({ status: 'recording' });
+    expect(recorder.command(args('c'))).toEqual({ status: 'queued' });
+    expect(recorder.command(args('a'))).toEqual({ status: 'recording' });
+    await wait();
+    release();
+    await recorder.idle();
+    started.push(...calls);
+    expect(started.map((c) => c.env.PORT).sort()).toEqual([
+      '41001',
+      '41002',
+      '41003',
+    ]);
+  });
+
+  it('holds the third demo until one of two finishes', async () => {
+    const gates: (() => void)[] = [];
+    const running: string[] = [];
+    let peak = 0;
+    const calls: Call[] = [];
+    const render = rendering(calls);
+    const { recorder, args } = setup({
+      maxConcurrent: 2,
+      freePorts: [41001, 41002, 41003],
+      spawn: async (binary, argv, options) => {
+        running.push(options.env.PORT ?? '');
+        peak = Math.max(peak, running.length);
+        await new Promise<void>((done) => gates.push(done));
+        running.pop();
+        return render(binary, argv, options);
+      },
+    });
+    for (const id of ['a', 'b', 'c']) recorder.command(args(id));
+    await new Promise((done) => setTimeout(done, 30));
+    expect(gates).toHaveLength(2);
+    gates[0]();
+    await new Promise((done) => setTimeout(done, 30));
+    expect(gates).toHaveLength(3);
+    gates[1]();
+    gates[2]();
+    await recorder.idle();
+    expect(peak).toBe(2);
+  });
+
+  it('never hands two running demos the same port', async () => {
+    const calls: Call[] = [];
+    const render = rendering(calls);
+    let release = () => {};
+    const gate = new Promise<void>((done) => {
+      release = done;
+    });
+    const { recorder, args } = setup({
+      maxConcurrent: 2,
+      freePorts: [41001, 41001, 41002],
+      spawn: async (binary, argv, options) => {
+        await gate;
+        return render(binary, argv, options);
+      },
+    });
+    recorder.command(args('a'));
+    recorder.command(args('b'));
+    await new Promise((done) => setTimeout(done, 30));
+    release();
+    await recorder.idle();
+    expect(calls.map((c) => c.env.PORT).sort()).toEqual(['41001', '41002']);
+  });
+
   it(`answers busy past ${DEMO_QUEUE_MAX} waiting demos`, () => {
     const never: DemoflowSpawn = () => new Promise(() => {});
     const { recorder, args } = setup({ spawn: never });
-    for (let i = 0; i <= DEMO_QUEUE_MAX; i += 1)
+    for (let i = 0; i < DEMO_QUEUE_MAX + DEMO_DEFAULT_MAX_CONCURRENT; i += 1)
       recorder.command(args(`d${i}`));
     expect(() => recorder.command(args('one-more'))).toThrow(/already waiting/);
   });
 });
 
 describe('planPort', () => {
-  const probes: PortProbes = {
-    portInUse: async () => false,
-    freePort: async () => 40000,
-  };
-  const config = (readyUrl: string) => ({
-    baseUrl: readyUrl,
+  const probes: PortProbes = { freePort: async () => 40000 };
+  const config = (baseUrl: string, readyUrl: string) => ({
+    baseUrl,
     devCommand: { command: 'bun', readyUrl },
   });
 
-  it("uses the readyUrl's port, or the scheme's default", async () => {
+  it('picks a free port and passes it with --port and --fresh-app', async () => {
     expect(
       await planPort(
-        config('http://127.0.0.1:5173/health'),
-        {
-          portTemplating: false,
-        },
+        config('http://127.0.0.1:${PORT}', '${BASE_URL}/login'),
         probes,
       ),
-    ).toEqual({ port: 5173, args: [] });
+    ).toEqual({ port: 40000, args: ['--port', '40000', '--fresh-app'] });
+  });
+
+  it('does not refuse a port the config names that is taken', async () => {
     expect(
       await planPort(
-        config('http://localhost/'),
-        { portTemplating: false },
+        config('http://127.0.0.1:3517', 'http://127.0.0.1:3517/login'),
         probes,
       ),
-    ).toEqual({ port: 80, args: [] });
+    ).toMatchObject({ port: 40000 });
   });
 
   it('refuses an app that is not on this machine', async () => {
     expect(
       await planPort(
-        config('https://staging.example.com'),
-        { portTemplating: false },
+        config('https://staging.example.com', 'https://staging.example.com'),
         probes,
       ),
     ).toMatch(/not on this machine/);

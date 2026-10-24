@@ -5,7 +5,7 @@ import { boundedReason } from './provision';
 
 /**
  * C-369: the summary `demoflow run --json` prints on stdout — one JSON line,
- * schema version 1 (DemoFlow 0.4.0). Only what the runner reads is checked;
+ * schema version 1 (DemoFlow 0.4 to 0.6). Only what the runner reads is checked;
  * DemoFlow may add fields.
  */
 const stageSchema = z.object({

@@ -558,8 +558,9 @@ export const runDaemon = async (
       log,
     });
 
-    // C-369: `card.demo` records in the card's worktree, one demo at a time.
+    // C-369: `card.demo` records in the card's worktree, up to `demos.maxConcurrent` at a time.
     const demos = new DemoRecorder({
+      maxConcurrent: config.demos.maxConcurrent,
       exec,
       log,
       clock,

@@ -3,20 +3,11 @@
  * installed globally: every call goes through `npx --yes demoflow@<pin>`, so
  * a bump is a deliberate change here and a runner release.
  */
-export const DEMOFLOW_VERSION = '0.4.0';
+export const DEMOFLOW_VERSION = '0.6.0';
 export const DEMOFLOW_PACKAGE = `demoflow@${DEMOFLOW_VERSION}`;
 
-/** DemoFlow 0.4 needs Node 22 or later for `npx` to run it. */
+/** DemoFlow needs Node 22 or later for `npx` to run it. */
 export const DEMOFLOW_NODE_MAJOR = 22;
-
-/**
- * What the pinned DemoFlow can do. `portTemplating`: `demoflow.config.json`
- * takes `${PORT}` and DemoFlow always starts a fresh app (`--fresh-app`), so
- * the runner can move the app to a free port. 0.4.0 has neither: the app runs
- * on the port its `readyUrl` names, and the runner refuses to record when
- * that port is already taken — DemoFlow would record whatever answers there.
- */
-export const DEMOFLOW_FEATURES = { portTemplating: false } as const;
 
 export interface DemoflowCommand {
   binary: 'npx';

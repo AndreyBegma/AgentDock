@@ -12,11 +12,11 @@
 # `admin:create`, and seeds a demo project with a few cards; the database and
 # the API's data directory are dropped when DemoFlow stops the script.
 #
-# The web app listens on PORT (the runner sets it; default 3517) and starts only
+# The web app listens on PORT (DemoFlow's --port, set by the runner; default 3517) and starts only
 # once the API answers its health check, so DemoFlow's readyUrl answers only
 # when the whole app is up. The API listens on DEMO_API_PORT (default PORT +
-# 1000), so it does not clash with the dev API on 8180. DemoFlow 0.4.0 cannot
-# give each card its own port, so one card records at a time (DemoFlow#337).
+# 1000), so it does not clash with the dev API on 8180. Each recording gets a
+# port of its own (DemoFlow 0.6 --port), so cards record in parallel.
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

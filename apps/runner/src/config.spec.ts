@@ -38,6 +38,7 @@ describe('config', () => {
       fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
       queue: { pollSeconds: 60 },
       sessions: { enabled: true },
+      demos: { maxConcurrent: 2 },
       skills: {
         maxConcurrentRuns: 2,
         maxTimeoutSec: 21_600,
@@ -132,6 +133,14 @@ describe('config', () => {
     expect(() =>
       saveConfig(path, { skills: { maxConcurrentRuns: 0 } }),
     ).toThrow();
+  });
+
+  it('bounds concurrent demos, default 2, and refuses zero (C-387)', () => {
+    saveConfig(path, {});
+    expect(loadConfig(path).demos).toEqual({ maxConcurrent: 2 });
+    saveConfig(path, { demos: { maxConcurrent: 3 } });
+    expect(loadConfig(path).demos.maxConcurrent).toBe(3);
+    expect(() => saveConfig(path, { demos: { maxConcurrent: 0 } })).toThrow();
   });
 
   it('defaults queue.pollSeconds to 60 and refuses one below 15', () => {
