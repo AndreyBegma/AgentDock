@@ -20,6 +20,8 @@
 #   --port <port>          local mode: the host port (default 8000, or the --url port)
 #   --dir <dir>            where to install (default ./nautelle)
 #   --version <tag>        image tag (default latest)
+#   --registry <registry>  where the images come from (default ghcr.io/andreybegma;
+#                          docker.io/abegma for the same images on Docker Hub)
 #   --source <url|dir>     where the compose files come from (default: main on GitHub)
 #   --no-start             write the files and .env, start nothing
 #   -y, --yes              ask nothing
@@ -34,6 +36,7 @@ ADMIN_EMAIL=
 ADMIN_PASSWORD=
 PORT=
 VERSION=
+REGISTRY="${NAUTELLE_REGISTRY:-}"
 START=1
 ASK=1
 HEALTH_TIMEOUT="${NAUTELLE_HEALTH_TIMEOUT:-300}"
@@ -59,6 +62,7 @@ while [ $# -gt 0 ]; do
     --port) PORT=$(value "$@"); shift 2 ;;
     --dir) DIR=$(value "$@"); shift 2 ;;
     --version) VERSION=$(value "$@"); shift 2 ;;
+    --registry) REGISTRY=$(value "$@"); shift 2 ;;
     --source) SOURCE=$(value "$@"); shift 2 ;;
     --no-start) START=0; shift ;;
     -y | --yes) ASK=0; shift ;;
@@ -216,6 +220,7 @@ if [ "$MODE" = local ]; then
 fi
 [ -z "$PORT" ] || set_env NAUTELLE_PORT "$PORT"
 [ -z "$VERSION" ] || set_env NAUTELLE_VERSION "$VERSION"
+[ -z "$REGISTRY" ] || set_env NAUTELLE_REGISTRY "${REGISTRY%/}"
 
 # A browser drops Secure cookies on plain HTTP, and GitHub cannot deliver to it.
 case "$URL" in

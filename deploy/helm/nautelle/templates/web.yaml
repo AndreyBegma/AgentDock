@@ -46,7 +46,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: {{ include "nautelle.image" (dict "root" . "image" .Values.web.image) | quote }}
+          image: {{ include "nautelle.ownImage" (dict "root" . "image" .Values.web.image) | quote }}
           imagePullPolicy: {{ .Values.web.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false

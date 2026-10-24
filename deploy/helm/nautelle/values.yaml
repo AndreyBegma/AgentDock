@@ -26,6 +26,12 @@ nameOverride: ''
 fullnameOverride: ''
 imagePullSecrets: []
 
+# Where Nautelle's own images come from (ADR-0097): ghcr.io/andreybegma, or
+# docker.io/abegma for the same images on Docker Hub (the same digests and
+# signatures). An api/web `image.repository` with a slash ignores it.
+image:
+  registry: ghcr.io/andreybegma
+
 # Applied to every pod unless a component sets its own.
 nodeSelector: {}
 tolerations: []
@@ -33,7 +39,7 @@ affinity: {}
 
 api:
   image:
-    repository: ghcr.io/andreybegma/nautelle-api
+    repository: nautelle-api
     # Empty: the chart's appVersion.
     tag: ''
     pullPolicy: IfNotPresent
@@ -61,7 +67,7 @@ api:
 
 web:
   image:
-    repository: ghcr.io/andreybegma/nautelle-web
+    repository: nautelle-web
     tag: ''
     pullPolicy: IfNotPresent
   replicaCount: 1

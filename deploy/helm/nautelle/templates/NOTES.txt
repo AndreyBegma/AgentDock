@@ -1,6 +1,6 @@
 {{- $fullname := include "nautelle.fullname" . -}}
 {{- $url := include "nautelle.url" . -}}
-Nautelle is starting ({{ include "nautelle.image" (dict "root" . "image" .Values.api.image) }}).
+Nautelle is starting ({{ include "nautelle.ownImage" (dict "root" . "image" .Values.api.image) }}).
 The API migrates the database before it answers; that can take a minute on
 the first install.
 

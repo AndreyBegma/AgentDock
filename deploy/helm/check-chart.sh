@@ -30,7 +30,7 @@ render() {
   helm template nautelle "$CHART" --namespace nautelle "$@" >"$OUT/$name.yaml"
   unpinned=$(grep -E '^ *image: ' "$OUT/$name.yaml" |
     grep -vE '@sha256:[0-9a-f]{64}"?$' |
-    grep -vE 'image: "?ghcr\.io/andreybegma/nautelle-(api|web):' || true)
+    grep -vE 'image: "?(ghcr\.io/andreybegma|docker\.io/abegma)/nautelle-(api|web):' || true)
   [ -z "$unpinned" ] || fail "$name: images not pinned by @sha256: $unpinned"
 }
 

@@ -35,6 +35,18 @@ app.kubernetes.io/component: {{ .component }}
 {{- printf "%s:%s" .image.repository (default .root.Chart.AppVersion .image.tag) -}}
 {{- end -}}
 
+{{/*
+Nautelle's own image (ADR-0097): a repository without a slash lives in
+`image.registry`, ghcr.io or Docker Hub; a full one is used as it is.
+*/}}
+{{- define "nautelle.ownImage" -}}
+{{- $repository := .image.repository -}}
+{{- if not (contains "/" $repository) -}}
+{{- $repository = printf "%s/%s" (trimSuffix "/" .root.Values.image.registry) $repository -}}
+{{- end -}}
+{{- include "nautelle.image" (dict "root" .root "image" (dict "repository" $repository "tag" .image.tag)) -}}
+{{- end -}}
+
 {{/* NAUTELLE_URL without a trailing slash. */}}
 {{- define "nautelle.url" -}}
 {{- required "nautelleUrl is required" .Values.nautelleUrl | trimSuffix "/" -}}
