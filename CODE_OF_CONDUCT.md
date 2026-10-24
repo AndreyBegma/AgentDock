@@ -60,8 +60,8 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-**TODO: the maintainer must replace this line with a monitored contact address
-before this file is merged.** Until then, report privately through
+[abegma137@gmail.com](mailto:abegma137@gmail.com). If you prefer not to use
+email, report privately through
 [GitHub Security Advisories](https://github.com/AndreyBegma/Nautelle/security/advisories/new)
 or by contacting the maintainer, [@AndreyBegma](https://github.com/AndreyBegma),
 on GitHub.
