@@ -69,6 +69,28 @@ export const demoSecretNameSchema = z
 /** `card_demos.reason`: why a demo failed or was skipped, without a stack trace. */
 export const DEMO_REASON_MAX = 500;
 
+/**
+ * C-370, ADR-0095: how long auto-merge waits for a demo of the card to end
+ * (`ready`, `failed` or `skipped`). A demo older than this no longer holds the
+ * merge, whatever its status.
+ */
+export const DEMO_MERGE_WAIT_MS = 15 * 60_000;
+
+/**
+ * A demo queued or recording for longer than this is one the runner never
+ * finished: "Record again" fails it instead of answering `demo_in_flight`.
+ */
+export const DEMO_STALE_MS = 30 * 60_000;
+
+/**
+ * Activity events the API records itself (ADR-0014) when a card's demo ends.
+ * A failed demo is a warning only: it never makes the card need a person.
+ */
+export const CARD_DEMO_EVENTS = {
+  ready: 'card.demo_ready',
+  failed: 'card.demo_failed',
+} as const;
+
 /** Where card workers commit their DemoFlow scenarios, repository-relative. */
 export const DEMO_SCENARIO_DIR = 'demoflow/cards';
 
@@ -156,6 +178,10 @@ export const DEMO_ERROR = {
   notActive: 'demo_not_active',
   /** 409: the card has never run, so there is nothing to record. */
   noRound: 'no_round',
+  /** 409 (C-370): the card has no pull request to record. */
+  noPullRequest: 'no_pull_request',
+  /** 409 (C-370): the card is Completed; its demos are history. */
+  completed: 'card_completed',
   /** 409: `APP_ENCRYPTION_KEY` is not set, so a secret cannot be stored. */
   encryptionUnavailable: 'encryption_unavailable',
   /** 422: over `DEMO_SECRETS_MAX`. */
