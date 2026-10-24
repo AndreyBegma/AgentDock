@@ -5,7 +5,9 @@
 #
 # NEXT_PUBLIC_LIVE_URL is baked into the client bundle and API_URL into the
 # routes manifest (next.config.ts rewrites run at build time): both are build
-# arguments, and changing either means rebuilding the image.
+# arguments, and changing either means rebuilding the image. The published
+# image (deploy/images/release-images.sh, ADR-0088) is built with the path
+# `/api/live`: the socket is then on whatever origin serves the page.
 
 # The base is pinned by digest (ADR-0053): a moved tag cannot change what is
 # built. Bump it together with deploy/ci-image/Dockerfile and the app

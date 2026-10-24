@@ -40,6 +40,7 @@ import { ReviewModule } from './review';
 import { RunnersModule } from './runners/runners.module';
 import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
+import { SetupModule } from './setup/setup.module';
 import { SkillsModule } from './skills';
 import { StewardModule } from './steward';
 import { StewardDigestModule } from './steward-digest';
@@ -65,6 +66,8 @@ import { WorkflowsModule } from './workflows';
     BullmqModule,
     AuditModule,
     AuthModule,
+    // C-367: the first-run setup — the first admin, created in the browser.
+    SetupModule,
     AdminModule,
     RunnersModule,
     LiveModule,

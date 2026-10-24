@@ -1,0 +1,237 @@
+# Nautelle — the public install (ADR-0088, docs/guides/install.md).
+#
+# Published images, PostgreSQL, Redis and a Caddy proxy that splits one origin:
+# /api/* → api (prefix stripped, WebSockets included), everything else → web.
+# Settings come from .env beside this file; install.sh writes it. The one that
+# matters is NAUTELLE_URL, the address people open.
+#
+# The exposure mode is a compose profile, set as COMPOSE_PROFILES in .env (or
+# --profile on the command line). Run exactly one:
+#   local   Caddy on ${NAUTELLE_BIND:-127.0.0.1}:${NAUTELLE_PORT:-8000}, plain HTTP.
+#   tunnel  cloudflared with TUNNEL_TOKEN; nothing is published on the host.
+#           Point the tunnel's public hostname at http://proxy:80.
+#   tls     Caddy on ports 80 and 443 with automatic HTTPS for NAUTELLE_DOMAIN.
+#
+#   docker compose up -d                          # start, or apply a change
+#   docker compose pull && docker compose up -d   # upgrade
+
+name: nautelle
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 20m
+    max-file: '5'
+
+x-proxy: &proxy
+  image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+  restart: unless-stopped
+  configs:
+    - source: caddyfile
+      target: /etc/caddy/Caddyfile
+  depends_on:
+    api: { condition: service_healthy }
+    web: { condition: service_started }
+  mem_limit: 128m
+  logging: *logging
+  # cloudflared and people's notes name it `proxy`, whichever mode runs.
+  networks:
+    nautelle:
+      aliases: [proxy]
+
+services:
+  postgres:
+    image: postgres:16.5-alpine@sha256:0366402213df5db03c47ff80bcc697e92c8be0c213d03c941df1fc42d1ba9560
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nautelle
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env (install.sh generates it)}
+      POSTGRES_DB: nautelle
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nautelle']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    mem_limit: 1g
+    logging: *logging
+    networks: [nautelle]
+
+  # BullMQ backend (ADR-0015). AOF keeps pending timers over a restart.
+  redis:
+    image: redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    restart: unless-stopped
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set it in .env (install.sh generates it)}
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?set it in .env (install.sh generates it)}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory-policy noeviction
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    mem_limit: 256m
+    logging: *logging
+    networks: [nautelle]
+
+  # Migrates and seeds in its entrypoint before it listens.
+  api:
+    image: ghcr.io/andreybegma/nautelle-api:${NAUTELLE_VERSION:-latest}
+    restart: unless-stopped
+    # Anything else of apps/api/.env.example (DeepL, Telegram, speech to text…)
+    # goes into api.env beside this file. The keys below win over it.
+    env_file:
+      - path: ./api.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://nautelle:${POSTGRES_PASSWORD}@postgres:5432/nautelle?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      # Secure cookies. install.sh writes `development` for an http:// URL:
+      # a browser drops a Secure cookie on plain HTTP anywhere but localhost.
+      APP_ENV: ${APP_ENV:-production}
+      # Each derives from NAUTELLE_URL and can be set on its own in .env.
+      # The runner pairs with API_URL; Caddy strips /api before the API sees it.
+      API_URL: ${API_URL:-${NAUTELLE_URL:-http://localhost:8000}/api}
+      # CORS and the WebSocket Origin check.
+      WEB_URL: ${WEB_URL:-${NAUTELLE_URL:-http://localhost:8000}}
+      APP_URL: ${APP_URL:-${NAUTELLE_URL:-http://localhost:8000}}
+      # GitHub App webhook base. Set but empty in .env (install.sh does that
+      # for an http:// URL) turns the App's hook off: GitHub cannot reach it.
+      PUBLIC_URL: ${PUBLIC_URL-${NAUTELLE_URL:-http://localhost:8000}/api}
+      # Caddy → API on the private compose bridge; cloudflared too in `tunnel`.
+      TRUST_PROXY: uniquelocal
+      # The data volume: secrets.json, with the keys the API generates on its
+      # first boot (C-366), and the board card attachments (ADR-0031). Back it
+      # up with the database: without secrets.json the sealed data is lost.
+      NAUTELLE_DATA_DIR: /data
+      ATTACHMENTS_DIR: /data/attachments
+      # A headless first admin (ADR-0087), used only while there is no user.
+      # install.sh passes them for one start and writes neither into .env.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - data:/data
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    mem_limit: 1g
+    logging: *logging
+    networks: [nautelle]
+
+  web:
+    image: ghcr.io/andreybegma/nautelle-web:${NAUTELLE_VERSION:-latest}
+    restart: unless-stopped
+    # Server components call the API directly, not through Caddy.
+    environment:
+      API_URL: http://api:8180
+    depends_on:
+      api: { condition: service_healthy }
+    mem_limit: 512m
+    logging: *logging
+    networks: [nautelle]
+
+  proxy:
+    <<: *proxy
+    profiles: [local]
+    environment:
+      NAUTELLE_SITE: ':80'
+      NAUTELLE_TRUSTED_PROXIES: private_ranges
+    ports:
+      - ${NAUTELLE_BIND:-127.0.0.1}:${NAUTELLE_PORT:-8000}:80
+
+  proxy-tunnel:
+    <<: *proxy
+    profiles: [tunnel]
+    environment:
+      NAUTELLE_SITE: ':80'
+      NAUTELLE_TRUSTED_PROXIES: private_ranges
+
+  # Caddy is the edge here: it trusts no X-Forwarded-For but its own host's.
+  proxy-tls:
+    <<: *proxy
+    profiles: [tls]
+    environment:
+      NAUTELLE_SITE: ${NAUTELLE_DOMAIN:-}
+      NAUTELLE_TRUSTED_PROXIES: 127.0.0.1/32
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+
+  # Token-based, remote-managed tunnel: its public hostname and the target
+  # (http://proxy:80) are set in the Cloudflare Zero Trust dashboard.
+  cloudflared:
+    image: cloudflare/cloudflared:2025.9.1@sha256:4604b477520dc8322af5427da68b44f0bf814938e9d2e4814f2249ee4b03ffdf
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      proxy-tunnel: { condition: service_started }
+    mem_limit: 128m
+    logging: *logging
+    networks: [nautelle]
+
+configs:
+  # One origin for the browser and the runner. TLS, when there is any, ends
+  # here (`tls`) or at Cloudflare (`tunnel`). `$$` is a literal `$` for Caddy.
+  caddyfile:
+    content: |
+      {
+        admin off
+        servers {
+          trusted_proxies static {$$NAUTELLE_TRUSTED_PROXIES}
+        }
+      }
+
+      {$$NAUTELLE_SITE} {
+        # Nothing above 10 MB reaches the API or web (C-134).
+        request_body {
+          max_size 10MB
+        }
+        header X-Content-Type-Options "nosniff"
+
+        # Pairing and hook responses carry a token or a decision.
+        @uncached path /api/runners/pair /api/hooks/*
+        header @uncached Cache-Control "no-store"
+
+        # The API has no /api prefix of its own. While a container restarts a
+        # request is held and retried instead of answered 502 (#368).
+        handle_path /api/* {
+          reverse_proxy api:8180 {
+            lb_try_duration 60s
+            lb_try_interval 250ms
+            health_uri /health
+            health_interval 2s
+          }
+        }
+
+        handle {
+          reverse_proxy web:3517 {
+            lb_try_duration 60s
+            lb_try_interval 250ms
+          }
+        }
+      }
+
+volumes:
+  pgdata:
+  redis:
+  data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  nautelle:
+    driver: bridge

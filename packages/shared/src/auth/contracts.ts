@@ -131,6 +131,22 @@ export interface RegistrationState {
   open: boolean;
 }
 
+/** C-367: `GET /setup/status` — true while the instance has no user at all. */
+export interface SetupStatus {
+  needsSetup: boolean;
+}
+
+/**
+ * C-367: `POST /setup/admin` — the first admin. `token` is the one-time setup
+ * token the API logs on boot (`Open <WEB_URL>/setup?token=…`).
+ */
+export interface SetupAdminRequest {
+  token: string;
+  email: string;
+  password: string;
+  name?: string;
+}
+
 export interface ApproveUserRequest {
   role: Role;
 }

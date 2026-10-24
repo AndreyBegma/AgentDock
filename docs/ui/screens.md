@@ -130,7 +130,8 @@ once, shows nothing.
 | **Users** (admin) | the tabs are ARIA `TabList`/`Tab`/`TabPanel` with `?tab=` in the URL (#213); it opens on Active (or the first tab with accounts), a count on every tab, the registration switch above them; pending approvals (Approve is glass: the page has no solid), roles with a one-line hint each, disable, delete (says what goes with the account); reject, disable, delete and a change to or from admin are `ConfirmDialog`s; errors are `useErrorToast`; your own row cannot be disabled or deleted; an empty Pending tab says when registration is closed and points to the switch above | M1 |
 | **Settings** (admin) | no page of its own: the registration toggle is the "Open registration" card on Users, above the tabs it governs; `/admin/settings` redirects to Users | M1 |
 | **Integrations** (admin) | overview of the four integrations, each with an icon, its status (a failed one reads "Status unavailable") and one action ("Set up …" or "Manage …"), a glass button — the overview has no solid (#213); the pages open under their own titles; webhooks loads the project list only when its dialog opens; GitHub App, Telegram bot, webhooks + delivery log, inbound triggers | M2 / M3 |
-| **Login / Register / Pending** (public) | a branded, centred hero (logomark, wordmark, one line on what Nautelle is) over the form card (`components/auth-card.tsx`). A signed-in user on `/login` is sent to a safe `next` or `/`, decided on the server from `/auth/me`. A stale cookie or an API that is down still shows the form | M1 |
+| **Login / Register / Pending** (public) | a branded, centred hero (logomark, wordmark, one line on what Nautelle is) over the form card (`components/auth-card.tsx`). A signed-in user on `/login` is sent to a safe `next` or `/`, decided on the server from `/auth/me`. A stale cookie or an API that is down still shows the form. While the server has no account, `/login` redirects to `/setup` | M1 |
+| **Setup** (`/setup`, public, C-367) | the first-run page, in the same `AuthCard` as Login. While the server has no account (`GET /setup/status`), `/login` redirects here; once one exists, `/setup` redirects to `/login`; an API that is down redirects neither way. Opened from the link the API logs on boot (`Open <WEB_URL>/setup?token=…`): Email, Name (optional), Password and Repeat password, and the one solid, Create administrator, which creates the first admin, signs them in and goes to `/`. Without `?token=` it shows "Open the setup link" with the command that finds the link in the API log. A wrong token is a field error; if someone else finished first, it goes to `/login` | #367 |
 | **Not found** | branded 404 with Back to Overview and Projects | M1 |
 | **Install** (`/install`, public) | no shell, works signed out, and reads like a product page: the value proposition, the system choice (macOS / Linux), then a numbered stepper Install → Pair → Keep running, with 15 px body text. What the runner is and what it needs (tmux, git, signed-in `gh`, Claude Code and/or Codex); install (Homebrew, npm or Bun, from source; macOS and Linux, arm64 and x64) and `nautelle-runner version`; pair with this server (the command built from the page's origin + `/api`, the code's 10-minute TTL; an admin gets Add runner → `/admin/runners?add=1`); keep it running; profiles; troubleshooting. Every command comes from `lib/runners/install.ts`. Linked from Login, Getting started, the pairing dialog, the Connect dialog's runner banner, the Runners empty state and the runner-offline banner | M1 |
 | **GitHub App** (admin) | without `APP_ENCRYPTION_KEY` a banner, and both register paths off with a reason; the manual card lists permissions, events, the absolute webhook URL and where GitHub shows the App ID and key; an inactive or failing webhook links to the App's Recent deliveries. One solid per state (#213): Register on GitHub before the App exists (Save credentials is glass), Install on GitHub after; Remove is a `ConfirmDialog` | M2 |
@@ -192,8 +193,11 @@ reads "Could not connect" with **Retry**.
 
 ## First run
 
-A fresh install has an admin and nothing else. The path to a first project
-(issue #132):
+A fresh install has no account. The API logs a one-time link,
+`Open <WEB_URL>/setup?token=…`, and the **Setup** page creates the first admin
+from it (C-367); `ADMIN_EMAIL` / `ADMIN_PASSWORD` create that admin on boot
+instead, and `bun run admin:create` stays for recovery. From there, the path to
+a first project (issue #132):
 
 - **Login** goes to `?next=` when it is a same-origin path (one leading `/`),
   else to Overview. The route guard adds `next` when it sends a signed-out

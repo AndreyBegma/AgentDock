@@ -36,6 +36,12 @@ export const AUTH_ERROR = {
   telegramNotLinked: 'telegram_not_linked',
   /** #580: no usable bot token, so no `initData` can be checked. */
   telegramNotConfigured: 'telegram_not_configured',
+  /** C-367: the first-run setup token is missing, wrong or already used. */
+  setupTokenInvalid: 'setup_token_invalid',
+  /** C-367: a user exists, so the first-run setup is over. */
+  setupDone: 'setup_done',
+  /** C-367: the first admin's email or password breaks the account rules. */
+  setupInvalid: 'setup_invalid',
 } as const;
 export type AuthErrorCode = (typeof AUTH_ERROR)[keyof typeof AUTH_ERROR];
 
