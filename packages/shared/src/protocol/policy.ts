@@ -126,3 +126,15 @@ export const policyFixHint = (rule: PolicyRule, detail?: string): string => {
       return `nautelle-runner policy allow-path ${detail ?? '<pattern>'}`;
   }
 };
+
+/**
+ * The words of every `policy_refused`: the rule, why, then the CLI line
+ * that lifts it. The runner refuses with it; the API says it too when the
+ * runner's reported policy already refuses a command (#913).
+ */
+export const policyRefusalMessage = (
+  rule: PolicyRule,
+  why: string,
+  detail?: string,
+): string =>
+  `refused by this runner's policy (${rule}): ${why}. On the runner's machine: \`${policyFixHint(rule, detail)}\``;

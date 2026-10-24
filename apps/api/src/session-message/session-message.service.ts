@@ -9,6 +9,8 @@ import {
 } from '@nautelle/shared';
 import {
   capabilitiesSchema,
+  commandPolicyRefusalOf,
+  policyRefusalMessage,
   type Role,
   type SessionMessageArgs,
   type SessionMessageTarget,
@@ -54,6 +56,16 @@ const auditedInput = (input: SessionMessageInput) =>
         textChars: input.text.length,
       };
 
+/**
+ * #913: why the runner's local policy (ADR-0047) refuses every message, in
+ * the runner's own words — the rule and the CLI line that lifts it.
+ */
+export const SESSION_MESSAGE_POLICY_REFUSAL = policyRefusalMessage(
+  'commands',
+  'session.message is off on this runner',
+  'session.message',
+);
+
 const auditedTarget = (target: SessionMessageTarget) =>
   target.kind === 'card_round'
     ? { kind: target.kind, cardId: target.cardId, runId: target.runId }
@@ -63,7 +75,8 @@ const auditedTarget = (target: SessionMessageTarget) =>
  * #489: the one place a person's message to a running session is sent —
  * from the Board, the terminal view, the Fleet page and Telegram. The text
  * is cleaned (M1), the runner must serve `session.message` (capability
- * `sessionMessage`), and every message — sent, refused or failed — is one
+ * `sessionMessage`) and its local policy must allow it (ADR-0047, #913),
+ * and every message — sent, refused or failed — is one
  * `card.message` / `slot.session_message` audit row holding the text's hash
  * and length, never the text.
  */
@@ -89,6 +102,20 @@ export class SessionMessageService {
     if (!runner || runner.revokedAt !== null) return false;
     const capabilities = capabilitiesSchema.safeParse(runner.capabilities);
     return capabilities.success && sessionMessageAvailable(capabilities.data);
+  }
+
+  /**
+   * #913: why the policy `runnerId` last reported refuses `session.message`,
+   * or null. A runner older than the policy reports none and refuses nothing.
+   */
+  async policyRefusal(runnerId: string): Promise<string | null> {
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { capabilities: true },
+    });
+    return runner
+      ? commandPolicyRefusalOf(runner.capabilities, 'session.message')
+      : null;
   }
 
   async send(
@@ -144,6 +171,15 @@ export class SessionMessageService {
         'The runner is offline or does not take session messages; update it',
       );
     }
+    const refusal = await this.policyRefusal(message.runnerId);
+    if (refusal !== null) {
+      await record('error', { error: SESSION_MESSAGE_ERROR.policyRefused });
+      throw sessionMessageError(
+        403,
+        SESSION_MESSAGE_ERROR.policyRefused,
+        refusal,
+      );
+    }
     const sent = await this.commands.send(
       message.runnerId,
       'session.message',
@@ -168,6 +204,14 @@ export class SessionMessageService {
     }
     if (sent.status === 'error') {
       await record('error', { error: sent.error.code });
+      // The policy may have changed since the runner's last hello.
+      if (sent.error.code === 'policy_refused') {
+        throw sessionMessageError(
+          403,
+          SESSION_MESSAGE_ERROR.policyRefused,
+          sent.error.message ?? SESSION_MESSAGE_POLICY_REFUSAL,
+        );
+      }
       throw sessionMessageError(
         sent.error.code === 'not_found' ? 409 : 502,
         sent.error.code === 'not_found'

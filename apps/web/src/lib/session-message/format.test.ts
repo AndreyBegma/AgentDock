@@ -33,4 +33,19 @@ describe('sessionMessageError', () => {
     ).toContain('runner is offline');
     expect(sessionMessageError(new Error('boom'))).toBe('boom');
   });
+
+  it("#913: names the runner's policy and the line that lifts it", () => {
+    const message =
+      "refused by this runner's policy (commands): session.message is off on this runner. On the runner's machine: `nautelle-runner policy set commands.session.message true`";
+    expect(
+      sessionMessageError(
+        new ApiError(403, undefined, message, undefined, {
+          error: 'policy_refused',
+          message,
+        }),
+      ),
+    ).toBe(
+      'The runner’s local security policy refused this (Messages into running sessions): session.message is off on this runner. To allow it, run `nautelle-runner policy set commands.session.message true` on that machine.',
+    );
+  });
 });

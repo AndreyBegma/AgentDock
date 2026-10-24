@@ -1113,6 +1113,12 @@ export function CardDetailBody({
             label="Message the agent"
             inputId="board-session-message"
           />
+          {/* #913: say before the person tries that the runner refuses it. */}
+          {card.sessionMessageRefusal ? (
+            <p id="board-session-message-policy" className="mt-2 text-xs">
+              <PolicyRefusalText text={card.sessionMessageRefusal} />
+            </p>
+          ) : null}
         </Field>
       ) : null}
 

@@ -3,6 +3,7 @@ import {
   capabilitiesSchema,
   commandErrorCodeSchema,
   commandNames,
+  commandPolicyRefusalOf,
   POLICY_GATED_COMMANDS,
   permissionModeAllowed,
   policyAllowsCommand,
@@ -49,6 +50,18 @@ describe('runner policy (ADR-0047)', () => {
       expect(policyAllowsCommand(policy, name)).toBe(false);
     }
     expect(policyAllowsCommand(policy, 'card.run')).toBe(true);
+  });
+
+  it('#913: words a gated command that is off as the runner refuses it', () => {
+    expect(commandPolicyRefusalOf({ ...base, policy }, 'session.message')).toBe(
+      "refused by this runner's policy (commands): session.message is off on this runner. On the runner's machine: `nautelle-runner policy set commands.session.message true`",
+    );
+    const on = { ...policy, commands: { 'session.message': true } };
+    expect(
+      commandPolicyRefusalOf({ ...base, policy: on }, 'session.message'),
+    ).toBeNull();
+    // A runner older than the policy refuses nothing it did not report.
+    expect(commandPolicyRefusalOf(base, 'session.message')).toBeNull();
   });
 
   it('has a policy_refused error code', () => {

@@ -650,6 +650,13 @@ export interface BoardCardDetail extends BoardCardView {
   /** The card's Claude session (D6); `null` before the first Run. */
   sessionId: string | null;
   /**
+   * #913: while a round is active, why its runner's local policy refuses a
+   * message into the session — the rule and the CLI line that lifts it, in
+   * the runner's words. Null when it takes messages or is not known; absent
+   * reads as null.
+   */
+  sessionMessageRefusal?: string | null;
+  /**
    * #750 D7: the model and effort `sessionId` was started with — a Run on
    * another pair starts a fresh session. Null for a card with no session or
    * one started before #750. Absent reads as null.
