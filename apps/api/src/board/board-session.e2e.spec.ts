@@ -606,7 +606,7 @@ describe('the Board from a session (#845, e2e)', () => {
 
     /** C-369's selector as the runner reads it from an 80x24 pane. */
     const C369: PendingQuestion = {
-      key: 'a1b2c3d4e5f60718',
+      key: '0123456789abcdef',
       header: 'C-369 order',
       text: 'C-369 depends on C-367 and C-368. Run it now on top of develop, or wait until both are accepted?',
       options: [
