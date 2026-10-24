@@ -79,6 +79,19 @@ started:
 }
 ```
 
+Give every recording the same data: let `devCommand` start the app on a
+database of its own, seeded with a demo account and a little content, rather
+than on whatever the shared dev database holds. Nautelle's own
+`scripts/demo-dev.sh` creates `agentdock_demo_<card>`, applies the card's
+migrations, creates the admin from `DEMO_LOGIN_EMAIL` and `DEMO_LOGIN_PASSWORD`
+and a demo project with a few cards, and drops the database when DemoFlow stops
+it.
+
+A Next.js app in dev mode serves its scripts only to `localhost` unless told
+otherwise, so a page opened on `127.0.0.1` never hydrates and a form submits as
+plain HTML. Add `allowedDevOrigins: ['127.0.0.1']` to `next.config`; it has no
+effect on a production build.
+
 The card's worker writes the scenario and commits it with its pull request as
 `demoflow/cards/C-<n>-<slug>.demo.json`. A scenario is a list of browser
 steps; `valueFrom.env` reads a Demo env secret:
@@ -88,11 +101,13 @@ steps; `valueFrom.env` reads a Demo env secret:
   "schemaVersion": 1,
   "name": "Sign in and open the Board",
   "steps": [
-    { "action": "navigate", "path": "/login" },
+    { "action": "navigate", "path": "/login?next=/projects/demo-project" },
+    { "action": "wait", "ms": 3000 },
     { "action": "fill", "target": { "label": "Email" }, "valueFrom": { "env": "DEMO_LOGIN_EMAIL" } },
     { "action": "fill", "target": { "label": "Password" }, "valueFrom": { "env": "DEMO_LOGIN_PASSWORD" } },
     { "action": "click", "target": { "role": "button", "name": "Sign in" } },
-    { "action": "assertText", "target": { "role": "heading", "level": 1 }, "text": "Board" }
+    { "action": "click", "target": { "role": "link", "name": "Board", "exact": true } },
+    { "action": "assertText", "target": { "role": "heading", "name": "Board", "exact": true }, "text": "Board" }
   ]
 }
 ```

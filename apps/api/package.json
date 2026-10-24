@@ -14,6 +14,7 @@
     "test:watch": "jest --watch --selectProjects unit",
     "test:cov": "jest --runInBand --coverage",
     "admin:create": "ts-node src/cli/admin-create.ts",
+    "demo:db": "ts-node --transpile-only src/cli/demo-database.ts",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
