@@ -244,6 +244,90 @@ describe('attachments (e2e, #309)', () => {
         expect(response.headers['content-security-policy']).toBe('sandbox');
       }
     });
+
+    it('answers one Range with 206 and Content-Range, past the end with 416 (ADR-0089)', async () => {
+      const text = await uploaded(w, 'trace.log', FILES.text);
+      const whole = await content(text.id);
+      expect(whole.status).toBe(200);
+      expect(whole.headers['accept-ranges']).toBe('bytes');
+
+      const part = await content(text.id).set('Range', 'bytes=2-5');
+      expect(part.status).toBe(206);
+      expect(part.headers['content-range']).toBe(
+        `bytes 2-5/${FILES.text.length}`,
+      );
+      expect(part.headers['content-length']).toBe('4');
+      expect(part.headers['x-content-type-options']).toBe('nosniff');
+      expect(Buffer.from(part.body as Buffer).toString()).toBe(
+        FILES.text.subarray(2, 6).toString(),
+      );
+
+      const tail = await content(text.id).set('Range', 'bytes=-3');
+      expect(tail.status).toBe(206);
+      expect(tail.headers['content-range']).toBe(
+        `bytes ${FILES.text.length - 3}-${FILES.text.length - 1}/${FILES.text.length}`,
+      );
+
+      const past = await content(text.id).set('Range', 'bytes=1000-');
+      expect(past.status).toBe(416);
+      expect(past.headers['content-range']).toBe(
+        `bytes */${FILES.text.length}`,
+      );
+      // Still the member check first: a non-member gets no range of it.
+      expect(
+        (await content(text.id, w.outsider).set('Range', 'bytes=0-1')).status,
+      ).toBe(404);
+    });
+  });
+
+  describe('videos (ADR-0089)', () => {
+    it('stores an MP4 and a WebM by their content, whatever the name', async () => {
+      const mp4 = await uploaded(w, 'clip.bin', FILES.mp4);
+      expect(mp4.mime).toBe('video/mp4');
+      const webm = await uploaded(w, 'clip.txt', FILES.webm);
+      expect(webm.mime).toBe('video/webm');
+
+      const served = await content(mp4.id).set('Range', 'bytes=0-7');
+      expect(served.status).toBe(206);
+      expect(served.headers['content-type']).toBe('video/mp4');
+      expect(
+        Buffer.from(served.body as Buffer).equals(FILES.mp4.subarray(0, 8)),
+      ).toBe(true);
+    });
+
+    it('refuses a QuickTime file, which is ftyp too, with unsupported_type', async () => {
+      const response = await upload(w, 'clip.mov', FILES.mov);
+      expect(response.status).toBe(422);
+      expect(response.body.code).toBe('unsupported_type');
+    });
+
+    it('takes a video over 25 MiB, which another file may not be', async () => {
+      const big = Buffer.concat([
+        FILES.mp4,
+        Buffer.alloc(26 * 1024 * 1024, 0x00),
+      ]);
+      const view = await uploaded(w, 'demo.mp4', big);
+      expect(view).toMatchObject({ mime: 'video/mp4', size: big.length });
+    });
+
+    it('does not count a video toward the 20 attachments of a card', async () => {
+      await w.createCard();
+      const twenty: AttachmentView[] = [];
+      for (let i = 0; i < 20; i += 1)
+        twenty.push(await uploaded(w, `${i}.png`));
+      expect(
+        (
+          await claim(
+            1,
+            twenty.map((a) => a.id),
+          )
+        ).status,
+      ).toBe(200);
+      const video = await uploaded(w, 'demo.mp4', FILES.mp4);
+      const claimed = await claim(1, [video.id]);
+      expect(claimed.status).toBe(200);
+      expect((claimed.body as BoardCardDetail).attachments).toHaveLength(21);
+    });
   });
 
   describe('the runner', () => {
