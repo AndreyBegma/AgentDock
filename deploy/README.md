@@ -340,28 +340,64 @@ publishes; it is the way to rehearse the signature with the real key.
 
 ## Releasing the images
 
-Decision: [ADR-0088](../docs/adr/0088-nautelle-installs-from-published-images-with-one-compose-file.md).
+Decisions: [ADR-0088](../docs/adr/0088-nautelle-installs-from-published-images-with-one-compose-file.md),
+[ADR-0090](../docs/adr/0090-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md).
 A product tag `vX.Y.Z` (ADR-0071) runs `.woodpecker/release-images.yml`. It
-calls `deploy/images/release-images.sh`, which checks that `X.Y.Z` is
-`APP_VERSION`, builds `ghcr.io/andreybegma/nautelle-api` and `nautelle-web`
-for amd64, runs `check-api-image.sh` on the API image and pushes both as
-`:X.Y.Z` and `:latest`. A pre-release tag (`vX.Y.Z-rc.1`) is pushed without
-`:latest`. The public install, `deploy/compose/` and
-[docs/guides/install.md](../docs/guides/install.md), pulls these images.
+calls `deploy/images/release-images.sh`, which:
 
-The web image is built with `NEXT_PUBLIC_LIVE_URL=/api/live`, a path the
-browser resolves against the page's own origin, and `API_URL=http://api:8180`,
-the API service in the compose file. One image therefore serves any host.
-Staging keeps building its own images (`build-staging.sh`).
+1. checks that `X.Y.Z` is `APP_VERSION` and that the signing key in the
+   `cosign_private_key` secret belongs to `deploy/images/cosign.pub`;
+2. registers QEMU for arm64 on the CI host (`tonistiigi/binfmt`, a privileged
+   container; the registration stays in the host kernel) and starts a
+   throwaway buildx builder (`moby/buildkit`);
+3. builds the API image for the host and runs `check-api-image.sh` on it;
+4. builds `ghcr.io/andreybegma/nautelle-api` and `nautelle-web` for
+   `linux/amd64` and `linux/arm64` with the OCI labels (`source`, `version`,
+   `revision`, `created`, `title`, `licenses`), an SBOM and `mode=max`
+   provenance, and pushes them as `:X.Y.Z`, `:X.Y`, `:X` and `:latest`. A
+   pre-release tag (`vX.Y.Z-rc.1`) is pushed as its own version only;
+5. signs each image by digest with cosign and writes the digests to
+   `.release/images.json`.
+
+The `github-release` step then creates the `vX.Y.Z` GitHub Release, marked
+latest, with a body from `scripts/release-notes.ts`: the "Summary" and "What
+changed" sections of `docs/releases/vX.Y.Z.md`, the install command, the image
+digests with the verify command, and the runner version of the tree. A re-run
+edits the release. Runner releases are created with `--latest=false`, so the
+repository's latest release stays the product's.
+
+The public install, `deploy/compose/` and
+[docs/guides/install.md](../docs/guides/install.md), pulls these images. The
+web image is built with `NEXT_PUBLIC_LIVE_URL=/api/live`, a path the browser
+resolves against the page's own origin, and `API_URL=http://api:8180`, the API
+service in the compose file. One image therefore serves any host. Staging
+keeps building its own images (`build-staging.sh`).
 
 ### One-time setup
 
-1. **Woodpecker secret.** Add `ghcr_token` to `AndreyBegma/Nautelle`,
-   restricted to the **tag** event only, like the runner secrets above. It is
-   a GitHub token with *write:packages* for the `andreybegma` account.
-2. **GitHub tag ruleset.** Add the pattern `v*` to the tag ruleset of P-03, so
+1. **Signing key.** Generate the cosign key pair offline, with a strong
+   password, outside the repository:
+   ```sh
+   cosign generate-key-pair
+   ```
+   Commit `cosign.pub` as `deploy/images/cosign.pub` in a pull request before
+   the next tag, and keep `cosign.key` offline with mode 600. To rotate,
+   generate a new pair, commit the new public key and replace both secrets;
+   images signed before verify with the old public key from git history.
+2. **Woodpecker secrets.** Add these to `AndreyBegma/Nautelle`, each restricted
+   to the **tag** event only, like the runner secrets above:
+   - `ghcr_token`: a GitHub token with *write:packages* for the `andreybegma`
+     account;
+   - `cosign_private_key`: the content of `cosign.key`;
+   - `cosign_password`: its password;
+   - `github_release_token`: the runner's token (*contents: write* on the
+     repository) also creates the product release.
+
+   A tag run without the cosign secrets, or with a key that does not match
+   `cosign.pub`, stops before it builds anything.
+3. **GitHub tag ruleset.** Add the pattern `v*` to the tag ruleset of P-03, so
    only administrators can create, move or delete a product tag.
-3. **Package visibility.** After the first push, set both packages,
+4. **Package visibility.** After the first push, set both packages,
    `nautelle-api` and `nautelle-web`, to *Public* in the account's package
    settings, and link them to the repository. An install pulls them without a
    login only once they are public.
@@ -369,14 +405,19 @@ Staging keeps building its own images (`build-staging.sh`).
 ### Each release
 
 The `release` skill tags `vX.Y.Z` on `main` after the release pull request
-merges; the tag starts the workflow. To rehearse, run the pipeline by hand
+merges; the tag starts the workflow, and the release note must already have its
+"Summary" and "What changed" sections. To rehearse, run the pipeline by hand
 with a message that contains `[image-release]` on a branch other than
-`develop`: it builds both images on the host as `<APP_VERSION>-dev` and pushes
-nothing. Locally, `sh deploy/images/release-images.sh` does the same.
-`NAUTELLE_IMAGES_DRY_RUN=1` stops a tag run before it pushes.
+`develop`: it builds both images for both platforms as `<APP_VERSION>-dev` and
+pushes, signs and releases nothing. Locally, `sh deploy/images/release-images.sh`
+does the same. `NAUTELLE_IMAGES_DRY_RUN=1` stops a tag run before it pushes.
+The arm64 half builds under emulation and takes several times as long as the
+amd64 half.
 
-To check a release, install it on a clean machine:
+To check a release, verify an image and install it on a clean machine:
 
 ```sh
+cosign verify --key deploy/images/cosign.pub ghcr.io/andreybegma/nautelle-api:X.Y.Z
+docker buildx imagetools inspect ghcr.io/andreybegma/nautelle-api:X.Y.Z --format '{{ json .SBOM }}'
 curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh -s -- --version X.Y.Z
 ```
