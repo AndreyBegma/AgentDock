@@ -23,6 +23,7 @@ import {
   profileAgentdockOf,
   type Role,
 } from '@nautelle/shared';
+import { commandPolicyRefusalOf } from '@nautelle/shared/protocol';
 import {
   BadRequestException,
   Injectable,
@@ -423,6 +424,14 @@ export class BoardService implements OnModuleInit {
     const profileAgentdock = new Map(
       projects.map((p) => [p.id, profileAgentdockOf(p.runner.capabilities)]),
     );
+    const messagesRefused = new Map<string, string>();
+    for (const p of projects) {
+      const refusal = commandPolicyRefusalOf(
+        p.runner.capabilities,
+        'session.message',
+      );
+      if (refusal !== null) messagesRefused.set(p.id, refusal);
+    }
     const costs = new Map<string, string>();
     for (const [runId, u] of usage) {
       if (u.costUsd !== null) costs.set(runId, u.costUsd);
@@ -433,6 +442,7 @@ export class BoardService implements OnModuleInit {
       alive: new Set(alive.map((s) => s.id)),
       runProfileKeys,
       profileAgentdock,
+      messagesRefused,
       attachmentCounts,
       dependencies: deps,
       stacks,

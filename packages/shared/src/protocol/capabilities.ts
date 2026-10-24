@@ -3,7 +3,13 @@ import { mcpServerNameSchema } from '../token-saver/contracts';
 import { boundedName, LIST_MAX, TEXT_NAME_MAX, TEXT_PATH_MAX } from './bounded';
 // Type-only: `./commands` imports this module's schemas.
 import type { CommandName } from './commands';
-import { type RunnerPolicy, runnerPolicySchema } from './policy';
+import {
+  type PolicyGatedCommand,
+  policyAllowsCommand,
+  policyRefusalMessage,
+  type RunnerPolicy,
+  runnerPolicySchema,
+} from './policy';
 
 /** At most this many MCP server names on one runtime profile (#445). */
 export const PROFILE_MCP_SERVERS_MAX = 64;
@@ -352,6 +358,21 @@ export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {
     .object({ policy: runnerPolicySchema })
     .safeParse(capabilities);
   return parsed.success ? parsed.data.policy : null;
+};
+
+/**
+ * #913: the `policy_refused` message the runner gives `name` while its
+ * reported policy has it off — the rule and the CLI line that lifts it — or
+ * null when it allows it or reports no policy.
+ */
+export const commandPolicyRefusalOf = (
+  capabilities: unknown,
+  name: PolicyGatedCommand,
+): string | null => {
+  const policy = runnerPolicyOf(capabilities);
+  return policy === null || policyAllowsCommand(policy, name)
+    ? null
+    : policyRefusalMessage('commands', `${name} is off on this runner`, name);
 };
 
 /** What a runner said it serves (#233, ADR-0023): names only, never paths or versions. */

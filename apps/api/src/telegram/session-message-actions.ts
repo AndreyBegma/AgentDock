@@ -145,6 +145,8 @@ const ERRORS: Partial<Record<SessionMessageErrorCode, string>> = {
   not_running: 'The card has no running round any more; nothing was sent.',
   command_unavailable:
     'The runner is offline or cannot take messages; nothing was sent.',
+  policy_refused:
+    "The runner's local policy has messages into sessions off; nothing was sent. On the runner's machine: nautelle-runner policy set commands.session.message true",
   runner_timeout: 'The runner did not answer in time; it may have arrived.',
 };
 

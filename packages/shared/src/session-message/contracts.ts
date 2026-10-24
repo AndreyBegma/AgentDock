@@ -149,6 +149,11 @@ export const SESSION_MESSAGE_ERROR = {
   notRunning: 'not_running',
   /** The runner is offline, or does not serve `session.message`; nothing was sent. */
   commandUnavailable: 'command_unavailable',
+  /**
+   * #913: the runner's local policy (ADR-0047) has `session.message` off;
+   * the message names the rule and the CLI line that turns it on.
+   */
+  policyRefused: 'policy_refused',
   /** The runner refused the command. */
   runnerError: 'runner_error',
   /** No result came back in time; the message may or may not have arrived. */

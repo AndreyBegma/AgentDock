@@ -211,6 +211,11 @@ export interface CardFacts {
   reviewSteps?: ReadonlyMap<string, readonly CardReviewStepFact[]>;
   /** #884: each card's review runs, by card id; absent is none. */
   reviewRuns?: ReadonlyMap<string, readonly CardReviewRunFact[]>;
+  /**
+   * #913: why each project's runner policy refuses `session.message`
+   * (`commandPolicyRefusalOf`), by project id; absent is not refused.
+   */
+  messagesRefused?: ReadonlyMap<string, string>;
   now: Date;
 }
 
@@ -836,6 +841,7 @@ export const toCardDetail = (
         }
       : null,
   sessionId: card.sessionId,
+  sessionMessageRefusal: facts.messagesRefused?.get(card.projectId) ?? null,
   sessionModel: card.sessionModel,
   sessionEffort: card.sessionEffort,
   createdBy: card.createdBy,
