@@ -196,9 +196,16 @@ configs:
       }
 
       {$$NAUTELLE_SITE} {
-        # Nothing above 10 MB reaches the API or web (C-134).
-        request_body {
+        # Nothing above 10 MB reaches the API or web (C-134), but the runner's
+        # demo video upload: up to 100 MiB, checked by the API before it reads
+        # the body (ADR-0090).
+        @demoVideo path_regexp ^/api/runner/cards/[0-9]+/demos/[A-Za-z0-9_-]+/video$$
+        @bounded not path_regexp ^/api/runner/cards/[0-9]+/demos/[A-Za-z0-9_-]+/video$$
+        request_body @bounded {
           max_size 10MB
+        }
+        request_body @demoVideo {
+          max_size 100MiB
         }
         header X-Content-Type-Options "nosniff"
 

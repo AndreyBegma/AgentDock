@@ -275,6 +275,13 @@ export const capabilitiesSchema = z.object({
    */
   prefixOverlays: z.boolean().optional(),
   /**
+   * ADR-0090: the runner records demo videos — `card.demo` provisions
+   * DemoFlow, records and uploads. `commands` lists `card.demo` on every
+   * build (its handler answers `unsupported` before S-12 stage 2), so the API
+   * sends it only when this is `true`. Absent means `false`.
+   */
+  cardDemo: z.boolean().optional(),
+  /**
    * ADR-0047: the runner's local security policy as it is now — values only,
    * no path beyond `allowedRoots`. The server cannot change it; the UI reads
    * it to explain a `policy_refused` before the person asks. Absent means
@@ -334,6 +341,10 @@ export const cardStartBranchAvailable = (capabilities: Capabilities): boolean =>
 /** Whether the API may send `tokenSaver.prefix` on `card.run` (#751); absent is `false`. */
 export const prefixOverlaysAvailable = (capabilities: Capabilities): boolean =>
   capabilities.tokenSaver === true && capabilities.prefixOverlays === true;
+
+/** Whether the API may send `card.demo` (ADR-0090); absent is `false`. */
+export const cardDemoAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardDemo === true;
 
 /** The runner's policy (ADR-0047); null for a runner older than it. */
 export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {
