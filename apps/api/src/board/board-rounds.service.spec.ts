@@ -3,10 +3,14 @@ import {
   ESCALATE_CARD_TOOL,
   TERSE_REGISTER,
 } from '@nautelle/shared';
-import { CARD_RUN_PROMPT_MAX_BYTES } from '@nautelle/shared/protocol';
+import {
+  CARD_RUN_PROMPT_MAX_BYTES,
+  type Capabilities,
+} from '@nautelle/shared/protocol';
 import {
   cardPromptEscalate,
   cardPromptSaver,
+  cardRoundDemo,
   escalationRoundPrompt,
 } from './board-rounds.service';
 
@@ -82,6 +86,40 @@ describe('cardPromptEscalate (#750 D8)', () => {
     expect(
       cardWorkerPrompt({ ...card, ...cardPromptEscalate(false) }),
     ).not.toContain(ESCALATE_CARD_TOOL);
+  });
+});
+
+describe('cardRoundDemo (C-369)', () => {
+  const runner = (cardDemo?: boolean): Capabilities => ({
+    tmux: null,
+    git: null,
+    gh: null,
+    runtimes: { claude: null, codex: null },
+    profiles: [],
+    codeSentinel: null,
+    otlp: null,
+    ...(cardDemo === undefined ? {} : { cardDemo }),
+  });
+  const on = { enabled: true, env: ['DEMO_EMAIL'] };
+
+  it('asks for a scenario when the project records and the runner can', () => {
+    const demo = cardRoundDemo(card, on, runner(true));
+    expect(demo).toEqual({
+      scenarioPath: 'demoflow/cards/C-12-add-login.demo.json',
+      env: ['DEMO_EMAIL'],
+    });
+    expect(cardWorkerPrompt({ ...card, ...(demo ? { demo } : {}) })).toContain(
+      '## Demo video',
+    );
+  });
+
+  it('leaves the round alone otherwise', () => {
+    expect(
+      cardRoundDemo(card, { enabled: false, env: [] }, runner(true)),
+    ).toBeNull();
+    expect(cardRoundDemo(card, on, runner(false))).toBeNull();
+    expect(cardRoundDemo(card, on, runner())).toBeNull();
+    expect(cardRoundDemo(card, on, null)).toBeNull();
   });
 });
 

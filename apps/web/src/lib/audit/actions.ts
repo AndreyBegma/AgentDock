@@ -161,6 +161,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
     'Opened a forward pull request for a card merged into a dependency branch that had already merged',
   'card.auto_run_toggled': 'Switched Auto-run when ready on a card',
   'card.message': 'Messaged a card session',
+  'card.review_started': "Started a review step on a card's pull request",
+  'card.review_reported': 'A review step reported its findings',
   'slot.session_message': 'Messaged a worker session',
   'attachment.added': 'Uploaded an attachment',
   'attachment.claimed': 'Attached files to a card',
@@ -172,6 +174,11 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   'llm.key_tested': 'Tested an AI provider key',
   'llm.provider_updated': 'Changed an AI provider',
   'llm.default_model_set': 'Changed the default AI model',
+  'demo.settings_updated': 'Changed the demo video settings',
+  'demo.secret_set': 'Set a Demo env secret',
+  'demo.secret_deleted': 'Removed a Demo env secret',
+  'demo.requested': 'Asked for a demo video',
+  'demo.video_uploaded': 'A runner uploaded a demo video',
 };
 
 /** The action filter's groups: the prefix before the dot. */
@@ -209,6 +216,7 @@ export const ACTION_GROUP_LABEL: Record<string, string> = {
   'attachment.': 'Attachments',
   'board.': 'Board',
   'text.': 'Text',
+  'demo.': 'Demo videos',
 };
 
 /** An action code as words; a code this build does not know shows as it came. */

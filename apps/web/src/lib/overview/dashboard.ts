@@ -14,6 +14,7 @@ import { ORCHESTRATOR_STATUS_LABEL } from '../fleet/format';
 import { slotHref } from '../fleet/workspace-url';
 import { RUN_KIND_LABEL, runHref } from '../history/format';
 import { approvalsHref as approvalsTab } from '../queue/tabs';
+import { costOrBlank } from '../usage/format';
 
 /**
  * The Overview dashboard (issue #159) is composed from the per-project routes
@@ -65,6 +66,31 @@ export function runningSlots(fleets: Iterable<FleetView>): number {
     for (const slot of fleet.slots) if (isAlive(slot)) count += 1;
   }
   return count;
+}
+
+export interface LiveSession {
+  project: ProjectSummary;
+  slot: SlotSummary;
+}
+
+/**
+ * Every alive slot of every project whose fleet answered — the ones the
+ * Running slots tile counts — longest running first. A project without a
+ * fleet contributes nothing here; the block names it instead.
+ */
+export function liveSessions(
+  projects: readonly ProjectSummary[],
+  fleets: ReadonlyMap<string, FleetView>,
+): LiveSession[] {
+  const sessions: LiveSession[] = [];
+  for (const project of projects) {
+    for (const slot of fleets.get(project.id)?.slots ?? []) {
+      if (isAlive(slot)) sessions.push({ project, slot });
+    }
+  }
+  return sessions.sort(
+    (a, b) => Date.parse(a.slot.startedAt) - Date.parse(b.slot.startedAt),
+  );
 }
 
 /**
@@ -273,6 +299,35 @@ export function costByProject(
     );
   }
   return byProject;
+}
+
+/** The Overview's spend: one cost per day, oldest first, today last. */
+export interface SpendDays {
+  values: number[];
+  /** Today's cost as `/usage` writes it; blank when today has no priced request. */
+  today: string;
+}
+
+/**
+ * The 7 daily costs of an ungrouped `interval=day` series (zero-filled by the
+ * API). A day whose requests are all unpriced is not `$0`: its figure is
+ * blank, as on `/usage`.
+ */
+export function spendDays(
+  response: Pick<UsageTimeseriesResponse, 'series'>,
+): SpendDays {
+  const points = (response.series[0]?.points ?? []).slice(-7);
+  const values = points.map((p) => {
+    const cost = Number(p.costUsd);
+    return Number.isFinite(cost) ? cost : 0;
+  });
+  const last = points.at(-1);
+  return {
+    values,
+    today: last
+      ? costOrBlank(last.costUsd, last.requests, last.unpricedRequests)
+      : '',
+  };
 }
 
 /** "Orchestrator: Not running" — the Fleet's one vocabulary, named (#213). */

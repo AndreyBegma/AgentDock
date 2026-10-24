@@ -264,6 +264,48 @@ describe('board accept with merge (e2e, #273)', () => {
     });
   });
 
+  /** #847: dragging to Completed lands the same check Accept applies. */
+  describe('POST …/move to Completed (#847)', () => {
+    const toCompleted = (body: object = {}) =>
+      post(1, 'move', { column: 'completed', index: 0, ...body });
+
+    it('an open, unmerged PR → 409 not_landed, the card stays in Finished', async () => {
+      await finished();
+      const response = await toCompleted();
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe(BOARD_ERROR.notLanded);
+      expect(response.body.message).toContain('#77');
+      expect((await w.card(1)).column).toBe('finished');
+    });
+
+    it('confirmUnlanded: true moves it', async () => {
+      await finished();
+      const response = await toCompleted({ confirmUnlanded: true });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ column: 'completed' });
+    });
+
+    it('a merged PR moves without confirmation', async () => {
+      await finished();
+      await w.ctx.prisma.boardCard.updateMany({
+        data: { prState: 'merged', mergedAt: new Date() },
+      });
+      const response = await toCompleted();
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ column: 'completed' });
+    });
+
+    it('no PR and no landing obligation moves as before', async () => {
+      await finished();
+      await w.ctx.prisma.boardCard.updateMany({
+        data: { prNumber: null, prUrl: null },
+      });
+      const response = await toCompleted();
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ column: 'completed' });
+    });
+  });
+
   describe('#329 D7: merge and delete the branch', () => {
     it('sends deleteBranch, reports branchDeleted, stores merged and closes the worktree', async () => {
       await finished();

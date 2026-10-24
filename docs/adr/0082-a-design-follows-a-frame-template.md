@@ -4,7 +4,8 @@ Status: accepted · Date: 2026-10-22 ·
 Issue: [#833](https://github.com/AndreyBegma/Nautelle/issues/833) ·
 Spec: [`docs/specs/833-standard-design-frame-templates.md`](../specs/833-standard-design-frame-templates.md) ·
 Amends: [ADR-0041](0041-a-design-revision-holds-named-frames.md) §1–2 ·
-Keeps: [ADR-0062](0062-a-design-revise-sends-only-the-frames-it-changes.md)
+Keeps: [ADR-0062](0062-a-design-revise-sends-only-the-frames-it-changes.md) ·
+Amended by [ADR-0085](0085-a-design-stores-its-devices-and-draws-responsive-frames.md) (§1: no `mobile` frame in page and flow; every frame is one responsive page)
 
 ## Context
 
@@ -34,6 +35,9 @@ what they will see, and they cannot compare variants frame by frame.
    - **page**: screen → breakdown → states and mobile (optional);
    - **component**: in context → anatomy and props → variants × states;
    - **flow**: map → steps 1…N (up to 6 by default) → breakdown → mobile (optional).
+
+   ADR-0085 removed the `mobile` frame from page and flow; every frame is one
+   page that works at the design's devices.
 2. **Frames are typed.** `design_frames.kind` holds one value of a fixed enum
    (`screen`, `breakdown`, `states`, `in_context`, `anatomy`, `state_grid`,
    `flow_map`, `flow_step`, `mobile`, `custom`, `legacy`). The `design` plan

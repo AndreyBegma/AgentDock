@@ -1,0 +1,77 @@
+{{- $fullname := include "nautelle.fullname" . -}}
+{{- /* Server components call the API directly, not through the proxy. */}}
+{{- $env := merge (deepCopy .Values.web.env) (dict "API_URL" (printf "http://%s-api:8180" $fullname)) -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-web
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "web") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "nautelle.selectorLabels" (dict "root" . "component" "web") | nindent 4 }}
+  ports:
+    - name: http
+      port: 3517
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-web
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "web") | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "nautelle.selectorLabels" (dict "root" . "component" "web") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nautelle.selectorLabels" (dict "root" . "component" "web") | nindent 8 }}
+      {{- with .Values.web.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with include "nautelle.imagePullSecrets" . | trim }}{{ . | nindent 6 }}{{ end }}
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: {{ include "nautelle.image" (dict "root" . "image" .Values.web.image) | quote }}
+          imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 3517
+          env:
+            {{- range $name := keys $env | sortAlpha }}
+            - name: {{ $name }}
+              value: {{ get $env $name | toString | quote }}
+            {{- end }}
+          # A page asks the API before it answers, so an HTTP probe would fail
+          # the web app whenever the API restarts: the socket is enough.
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+      {{- with include "nautelle.scheduling" (dict "root" . "values" .Values.web) | trim }}{{ . | nindent 6 }}{{ end }}

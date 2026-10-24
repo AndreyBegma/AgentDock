@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import type { CardCommandName } from '@nautelle/shared/protocol';
+import type {
+  CardCommandName,
+  CardReviewCommandName,
+} from '@nautelle/shared/protocol';
 import type { CardHandlers } from '../cards';
 import { permissivePolicy } from '../policy/testing';
 import { FakeClock } from '../testing/fake-clock';
@@ -28,9 +31,21 @@ const context = (over: Partial<HandlerContext> = {}): HandlerContext => ({
 });
 
 const CARD = { cardId: 'card_1', projectId: 'prj_a' };
-const cases: [CardCommandName, unknown][] = [
+const cases: [CardCommandName | CardReviewCommandName, unknown][] = [
   ['card.stop', CARD],
   ['card.close', { ...CARD, removeWorktree: true }],
+  ['card.reviewStop', { ...CARD, root: '/srv/app', shortId: 'ab12cd34' }],
+  [
+    'card.reviewPublish',
+    {
+      ...CARD,
+      root: '/srv/app',
+      prNumber: 7,
+      headSha: 'a'.repeat(40),
+      body: 'Review',
+      comments: [],
+    },
+  ],
 ];
 
 describe('cards.extract handler (#244)', () => {
@@ -75,6 +90,40 @@ describe('cards.extract handler (#244)', () => {
   });
 });
 
+describe('card.demo handler (C-369)', () => {
+  const args = {
+    cardId: 'card_1',
+    projectId: 'prj_a',
+    card: 7,
+    round: 1,
+    demoId: 'demo_1',
+    worktree: { root: '/srv/app', shortId: 'ab12cd34' },
+    scenario: 'demoflow/cards/C-7-login.demo.json',
+    env: [],
+  };
+
+  it('answers unsupported on a runner that does not record', async () => {
+    const handlers = createHandlers(context());
+    const outcome = await Promise.resolve()
+      .then(() => handlers['card.demo'](args))
+      .then(
+        () => 'resolved',
+        (error: unknown) =>
+          error instanceof CommandFailure ? error.code : String(error),
+      );
+    expect(outcome).toBe('unsupported');
+  });
+
+  it('hands the command to the demo recorder', async () => {
+    const handlers = createHandlers(
+      context({
+        demos: { 'card.demo': async () => ({ status: 'queued' as const }) },
+      }),
+    );
+    expect(await handlers['card.demo'](args)).toEqual({ status: 'queued' });
+  });
+});
+
 describe('card command handlers (#242)', () => {
   it('answers unsupported on a runner without the card executor', async () => {
     const handlers = createHandlers(context());
@@ -109,6 +158,14 @@ describe('card command handlers (#242)', () => {
         seen.push('card.close');
         return { stopped: false, worktreeRemoved: true, branchDeleted: false };
       },
+      'card.review': async () => {
+        seen.push('card.review');
+        return { phase: 'running', tmuxSession: 'nautelle-review-ab12cd34' };
+      },
+      'card.reviewStop': async () => {
+        seen.push('card.reviewStop');
+        return { stopped: true };
+      },
     };
     const handlers = createHandlers(context({ cards }));
     expect(await handlers['card.stop'](CARD)).toEqual({ stopped: true });
@@ -126,6 +183,18 @@ describe('card command handlers (#242)', () => {
         body: '',
       }),
     ).toEqual({ ahead: 0, pushed: false });
-    expect(seen).toEqual(['card.stop', 'card.close', 'card.collect']);
+    expect(
+      await handlers['card.reviewStop']({
+        ...CARD,
+        root: '/srv/app',
+        shortId: 'ab12cd34',
+      }),
+    ).toEqual({ stopped: true });
+    expect(seen).toEqual([
+      'card.stop',
+      'card.close',
+      'card.collect',
+      'card.reviewStop',
+    ]);
   });
 });

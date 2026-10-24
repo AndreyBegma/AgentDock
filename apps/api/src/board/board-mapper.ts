@@ -11,6 +11,7 @@ import {
   CARD_HOOKS_GRACE_MS,
   CARD_MERGE_POLICY_DEFAULT,
   type CardDecidingSignal,
+  type CardDemoBrief,
   type CardDependencyRef,
   type CardEscalationView,
   type CardEvidenceView,
@@ -19,7 +20,11 @@ import {
   type CardPrTarget,
   type CardPullRequestRef,
   type CardRecommendationView,
+  type CardReviewState,
+  type CardReviewStepView,
+  type CardReviewView,
   type CardRoundBrief,
+  type CardRoundCiState,
   type CardRoundView,
   type CardStackRef,
   type CardTakenView,
@@ -29,6 +34,7 @@ import {
   cardLabel,
   cardReadiness,
   cardRecommendationOf,
+  commitChecksUrl,
   FLEET_STAGES,
   type FleetStage,
   isActiveRoundPhase,
@@ -38,6 +44,7 @@ import {
   modelByType,
   type PendingQuestion,
   pendingQuestionSchema,
+  REVIEW_FIX_ROUNDS_MAX,
   type RestartEstimate,
   restartEstimateSchema,
   type StewardCardChip,
@@ -59,9 +66,12 @@ import {
 import {
   type BoardCard,
   type BoardCardPullRequest,
+  type BoardCardReviewRun,
   type BoardCardRound,
   type BoardSettings,
+  type CardCiState,
   Prisma,
+  type ProjectReviewStep,
 } from '@prisma/client';
 import type { TokenSaverCardFacts } from '../token-saver/token-saver-facts';
 import type { CardModelByTypeArm } from './launch-choice';
@@ -147,6 +157,22 @@ export const prTargetOf = (
   };
 };
 
+/** #884: an enabled review step of a project, as the review strip names it. */
+export type CardReviewStepFact = Pick<ProjectReviewStep, 'id' | 'name'>;
+
+/** #884: one run of a review step on a card's pull request. */
+export type CardReviewRunFact = Pick<
+  BoardCardReviewRun,
+  | 'stepId'
+  | 'prNumber'
+  | 'headSha'
+  | 'pass'
+  | 'state'
+  | 'blockingCount'
+  | 'nitCount'
+  | 'startedAt'
+>;
+
 /** What the mapper needs besides the rows. */
 export interface CardFacts {
   /** Cost of each round's run, a decimal string; absent when nothing is priced. */
@@ -179,6 +205,20 @@ export interface CardFacts {
   stacks?: ReadonlyMap<string, CardStackRef>;
   /** #636: where each card's PR goes, by card id; absent is not known. */
   prTargets?: ReadonlyMap<string, CardPrTarget>;
+  /**
+   * #884: each project's enabled review steps in position order, by project
+   * id; absent while review is off or no step is enabled.
+   */
+  reviewSteps?: ReadonlyMap<string, readonly CardReviewStepFact[]>;
+  /** #884: each card's review runs, by card id; absent is none. */
+  reviewRuns?: ReadonlyMap<string, readonly CardReviewRunFact[]>;
+  /**
+   * #913: why each project's runner policy refuses `session.message`
+   * (`commandPolicyRefusalOf`), by project id; absent is not refused.
+   */
+  messagesRefused?: ReadonlyMap<string, string>;
+  /** C-371: each card's newest demo recording, by card id; absent is none. */
+  demos?: ReadonlyMap<string, CardDemoBrief>;
   now: Date;
 }
 
@@ -388,6 +428,84 @@ export const pendingQuestionOf = (
   return parsed.success ? parsed.data : null;
 };
 
+/** #884: the reasons a card waits on a person because of its review. */
+const REVIEW_NEEDS_PERSON: ReadonlySet<string> = new Set([
+  'review_still_blocking',
+  'review_failed',
+]);
+
+/**
+ * #884 (ADR-0084): the review strip. The steps show the newest pass on the
+ * card's current pull request — the highest `pass`, and of it the head
+ * reviewed last — so a `review_fix` round still shows the findings it fixes.
+ * `passed` only while that pass reviewed the head CI last checked.
+ */
+export const reviewOf = (
+  card: CardWithRounds,
+  steps: readonly CardReviewStepFact[] | undefined,
+  runs: readonly CardReviewRunFact[],
+): CardReviewView | null => {
+  if (steps === undefined || steps.length === 0) return null;
+  const onPr = runs.filter((r) => r.prNumber === card.prNumber);
+  const newest = onPr.reduce<CardReviewRunFact | null>(
+    (best, r) =>
+      best === null ||
+      r.pass > best.pass ||
+      (r.pass === best.pass && r.startedAt > best.startedAt)
+        ? r
+        : best,
+    null,
+  );
+  const runOf = new Map(
+    onPr.flatMap((r) =>
+      newest !== null &&
+      r.pass === newest.pass &&
+      r.headSha === newest.headSha &&
+      r.stepId !== null
+        ? [[r.stepId, r] as const]
+        : [],
+    ),
+  );
+  const views = steps.map((step): CardReviewStepView => {
+    const run = runOf.get(step.id);
+    return {
+      id: step.id,
+      name: step.name,
+      state: run?.state ?? 'pending',
+      blockingCount: run?.blockingCount ?? 0,
+      nitCount: run?.nitCount ?? 0,
+    };
+  });
+  const running = views.findIndex((s) => s.state === 'running');
+  const lastRan = views.reduce(
+    (last, s, index) => (s.state === 'pending' ? last : index),
+    0,
+  );
+  const latest = card.rounds[0];
+  const state: CardReviewState =
+    card.needsPerson &&
+    card.needsPersonReason !== null &&
+    REVIEW_NEEDS_PERSON.has(card.needsPersonReason)
+      ? 'needs_person'
+      : latest?.trigger === 'review_fix' && isActiveRoundPhase(latest.phase)
+        ? 'fixing'
+        : running >= 0
+          ? 'running'
+          : newest?.headSha === card.ciHeadSha &&
+              views.every((s) => s.state === 'passed')
+            ? 'passed'
+            : 'idle';
+  return {
+    state,
+    ...(running >= 0 ? { currentStep: views[running].name } : {}),
+    stepIndex: running >= 0 ? running : lastRan,
+    stepCount: views.length,
+    fixRound: card.reviewFixAttempts,
+    fixLimit: REVIEW_FIX_ROUNDS_MAX,
+    steps: views,
+  };
+};
+
 /** The sum of the rounds' priced costs; `null` when none is priced. */
 const cardCost = (
   rounds: readonly BoardCardRound[],
@@ -458,8 +576,14 @@ export const toCardView = (
     isCardNeedsPersonReason(card.needsPersonReason)
       ? card.needsPersonReason
       : null,
+  review: reviewOf(
+    card,
+    facts.reviewSteps?.get(card.projectId),
+    facts.reviewRuns?.get(card.id) ?? [],
+  ),
   protectedPaths: card.protectedPaths,
   mergedAt: iso(card.mergedAt),
+  demo: facts.demos?.get(card.id) ?? null,
   prTarget: facts.prTargets?.get(card.id) ?? null,
   round: brief(card, card.rounds[0], facts),
   design: designOf(card.design),
@@ -524,10 +648,85 @@ const evidenceOf = (
       }))
     : null;
 
+/** #837: what a round pushed, as `CardRoundView` shows it. */
+export type CardRoundPush = Pick<
+  CardRoundView,
+  'pullRequest' | 'headSha' | 'commits' | 'ci'
+>;
+
+const NO_PUSH: CardRoundPush = {
+  pullRequest: null,
+  headSha: null,
+  commits: null,
+  ci: null,
+};
+
+/** #837: a head with no checks (`none`) shows none. */
+const ROUND_CI_STATE: Record<Exclude<CardCiState, 'none'>, CardRoundCiState> = {
+  pending: 'pending',
+  green: 'passed',
+  red: 'failed',
+};
+
+/**
+ * #837: each round's pull request, head, commits and checks, for `rounds`
+ * oldest first. A round's commits are its head's `headAhead` less the one
+ * the round before it on the same PR left — unknown when either is. A round
+ * recorded before #837, or one that pushed nothing, has no head: all null.
+ */
+export const roundPushesOf = (
+  rounds: readonly Pick<
+    BoardCardRound,
+    | 'prNumber'
+    | 'prUrl'
+    | 'headSha'
+    | 'headAhead'
+    | 'ciState'
+    | 'ciPassed'
+    | 'ciTotal'
+  >[],
+): CardRoundPush[] => {
+  const aheadByPr = new Map<number, number | null>();
+  return rounds.map((round) => {
+    const { headSha, prNumber, prUrl } = round;
+    if (headSha === null || prNumber === null || prUrl === null) {
+      return { ...NO_PUSH, headSha };
+    }
+    const before = aheadByPr.has(prNumber) ? aheadByPr.get(prNumber) : 0;
+    aheadByPr.set(prNumber, round.headAhead);
+    const commits =
+      round.headAhead !== null &&
+      before !== null &&
+      before !== undefined &&
+      round.headAhead >= before
+        ? round.headAhead - before
+        : null;
+    const state =
+      round.ciState === null || round.ciState === 'none'
+        ? null
+        : ROUND_CI_STATE[round.ciState];
+    return {
+      pullRequest: { number: prNumber, url: prUrl },
+      headSha,
+      commits,
+      ci:
+        state === null
+          ? null
+          : {
+              state,
+              passed: round.ciPassed ?? 0,
+              total: round.ciTotal ?? 0,
+              url: commitChecksUrl(prUrl, headSha),
+            },
+    };
+  });
+};
+
 const toRoundView = (
   card: BoardCard,
   round: BoardCardRound & { author: BoardUserRef | null },
   facts: CardFacts,
+  push: CardRoundPush = NO_PUSH,
 ): CardRoundView => ({
   id: round.id,
   round: round.round,
@@ -562,6 +761,7 @@ const toRoundView = (
   restartEstimate: restartEstimateOf(round.restartEstimate),
   warmupTokens: round.warmupTokens,
   warmupMs: round.warmupMs,
+  ...push,
 });
 
 /**
@@ -606,6 +806,13 @@ export const escalationOf = (
       }
     : null;
 
+/** The card's rounds, oldest first, each with what it pushed (#837). */
+const roundsOf = (card: CardWithPeople, facts: CardFacts): CardRoundView[] => {
+  const rounds = [...card.rounds].sort((a, b) => a.round - b.round);
+  const pushes = roundPushesOf(rounds);
+  return rounds.map((round, i) => toRoundView(card, round, facts, pushes[i]));
+};
+
 /** `attachments`: the card's and its rounds', oldest first (#309). */
 export const toCardDetail = (
   card: CardWithPeople,
@@ -638,15 +845,14 @@ export const toCardDetail = (
         }
       : null,
   sessionId: card.sessionId,
+  sessionMessageRefusal: facts.messagesRefused?.get(card.projectId) ?? null,
   sessionModel: card.sessionModel,
   sessionEffort: card.sessionEffort,
   createdBy: card.createdBy,
   movedBy: card.movedBy,
   completedBy: card.completedBy,
   createdAt: card.createdAt.toISOString(),
-  rounds: [...card.rounds]
-    .sort((a, b) => a.round - b.round)
-    .map((round) => toRoundView(card, round, facts)),
+  rounds: roundsOf(card, facts),
   pullRequests: pullRequestsOf(card.pullRequests),
   evidence: evidenceOf(card.evidence),
   attachments,

@@ -7,6 +7,10 @@ import {
   type CardCiState,
   type CardNeedsPersonReason,
   type CardPullRequestRef,
+  type CardReviewStepState,
+  type CardReviewView,
+  type CardRoundView,
+  REVIEW_FIX_ROUNDS_MAX,
 } from '@nautelle/shared';
 import { PR_STATE_LABEL } from './pull-request';
 
@@ -59,6 +63,10 @@ export const FORWARD_CONFLICT_TEXT = 'Forward PR conflicts with the base';
 export const FORWARD_FAILED_TEXT =
   'Merged into a dead branch; forward PR not opened';
 
+/** #884 (ADR-0084): the review gate stopped. */
+export const REVIEW_STILL_BLOCKING_TEXT = `Review still blocking after ${REVIEW_FIX_ROUNDS_MAX} fixes`;
+export const REVIEW_FAILED_TEXT = 'A review step did not finish';
+
 /** C-148 (ADR-0077): a push changed CI, deploy or plugin files. */
 export const PROTECTED_PATHS_TEXT = 'Protected paths changed; a person merges';
 
@@ -86,6 +94,10 @@ const needsPersonText = (
       return FORWARD_CONFLICT_TEXT;
     case 'forward_failed':
       return FORWARD_FAILED_TEXT;
+    case 'review_still_blocking':
+      return REVIEW_STILL_BLOCKING_TEXT;
+    case 'review_failed':
+      return REVIEW_FAILED_TEXT;
     case null:
       return card.ciState === 'none'
         ? CI_NOT_REPORTED_TEXT
@@ -97,7 +109,138 @@ const needsPersonText = (
 export interface ShippingBadge {
   tone: 'ok' | 'warn' | 'danger' | 'neutral';
   label: string;
+  /** #891: the review chip, whose step name truncates on a phone. */
+  review?: true;
 }
+
+/**
+ * #891: the review chip of an In progress card, in the family of the CI one.
+ * Only a running or fixing gate has one; a stopped gate is the needs-person
+ * badge (`needsPersonText`), a passed or idle one shows nothing.
+ */
+export function reviewChip(
+  review: CardReviewView | null,
+): ShippingBadge | null {
+  if (review === null) return null;
+  if (review.state === 'running') {
+    const step = review.currentStep ?? review.steps[review.stepIndex]?.name;
+    const n = Math.min(review.stepIndex + 1, review.stepCount);
+    return {
+      tone: 'warn',
+      label: step
+        ? `Reviewing · ${step} (${n}/${review.stepCount})`
+        : `Reviewing (${n}/${review.stepCount})`,
+      review: true,
+    };
+  }
+  if (review.state === 'fixing') {
+    const n = Math.min(Math.max(review.fixRound, 1), review.fixLimit);
+    return {
+      tone: 'warn',
+      label: `Fixing review (${n}/${review.fixLimit})`,
+      review: true,
+    };
+  }
+  return null;
+}
+
+/**
+ * #891: the readiness line of a Finished card whose project reviews: what it
+ * passed. `null` while review is off or the gate did not pass (an accepted
+ * card never ran it).
+ */
+export function readinessLine(
+  card: Pick<BoardCardView, 'column' | 'ciState' | 'review'>,
+): string[] | null {
+  const { review } = card;
+  if (card.column !== 'finished' || review === null) return null;
+  if (review.state !== 'passed') return null;
+  const parts = [];
+  if (card.ciState === 'green') parts.push('CI passed');
+  parts.push('Review passed');
+  if (review.fixRound > 0) parts.push('Fixes done');
+  return parts;
+}
+
+/** #891: one stop of the sheet's tracker: CI → each step → Finished. */
+export interface TrackerStep {
+  key: string;
+  label: string;
+  state: 'pending' | 'running' | 'passed' | 'blocked' | 'failed';
+  blocking: number;
+  nits: number;
+}
+
+const stepState = (state: CardReviewStepState): TrackerStep['state'] => state;
+
+export function reviewTracker(
+  card: Pick<BoardCardView, 'ciState' | 'review'>,
+): TrackerStep[] {
+  const { review } = card;
+  if (review === null) return [];
+  const ci: TrackerStep['state'] =
+    card.ciState === 'green'
+      ? 'passed'
+      : card.ciState === 'red'
+        ? 'failed'
+        : card.ciState === 'pending'
+          ? 'running'
+          : 'pending';
+  return [
+    { key: 'ci', label: 'CI', state: ci, blocking: 0, nits: 0 },
+    ...review.steps.map((s) => ({
+      key: s.id,
+      label: s.name,
+      state: stepState(s.state),
+      blocking: s.blockingCount,
+      nits: s.nitCount,
+    })),
+    {
+      key: 'finished',
+      label: 'Finished',
+      state: review.state === 'passed' ? 'passed' : 'pending',
+      blocking: 0,
+      nits: 0,
+    },
+  ];
+}
+
+export const TRACKER_STATE_LABEL: Record<TrackerStep['state'], string> = {
+  pending: 'Waiting',
+  running: 'Running',
+  passed: 'Passed',
+  blocked: 'Blocking',
+  failed: 'Did not finish',
+};
+
+/** #891: "2 blocking · 1 nit", or `null` when the step reported nothing. */
+export function findingCounts(blocking: number, nits: number): string | null {
+  const parts = [];
+  if (blocking > 0) parts.push(`${blocking} blocking`);
+  if (nits > 0) parts.push(`${nits} ${nits === 1 ? 'nit' : 'nits'}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/** #891: "src/a.ts:12", "src/a.ts", or `null` for a finding about no file. */
+export function findingPlace(finding: {
+  file?: string;
+  line?: number;
+}): string | null {
+  if (!finding.file) return null;
+  return finding.line ? `${finding.file}:${finding.line}` : finding.file;
+}
+
+/** #891: the card's review fix rounds, oldest first, each linking to its round. */
+export const reviewFixRounds = (
+  rounds: readonly Pick<CardRoundView, 'round' | 'trigger'>[],
+): { round: number; label: string }[] =>
+  rounds
+    .filter((r) => r.trigger === 'review_fix')
+    .sort((a, b) => a.round - b.round)
+    .map((r, i) => ({
+      round: r.round,
+      label: `Review fix ${i + 1} · Round ${r.round}`,
+    }));
 
 /**
  * #359 D6–D8: the one sub-state a card shows next to its PR chip.
@@ -118,6 +261,7 @@ export function shippingBadge(
     | 'needsPersonReason'
     | 'mergedAt'
     | 'protectedPaths'
+    | 'review'
   >,
 ): ShippingBadge | null {
   if (card.needsPerson) return { tone: 'danger', label: needsPersonText(card) };
@@ -126,6 +270,8 @@ export function shippingBadge(
     return { tone: 'warn', label: PROTECTED_PATHS_TEXT };
   }
   if (card.column !== 'in_progress') return null;
+  const review = reviewChip(card.review);
+  if (review) return review;
   if (card.ciState === 'red' && card.ciFixAttempts > 0) {
     const n = Math.min(card.ciFixAttempts, CARD_CI_FIX_ATTEMPTS_MAX);
     return {

@@ -8,10 +8,12 @@ import type {
   RunSummary,
   SlotSummary,
 } from '@nautelle/shared';
+import { formatUsd } from '../usage/format';
 import {
   approvalsHref,
   costByProject,
   lastSevenDays,
+  liveSessions,
   mergedPullRequests,
   mergedTodayHref,
   needsYou,
@@ -20,6 +22,7 @@ import {
   roundLabel,
   runningSlots,
   slotTitle,
+  spendDays,
   startOfToday,
   waitingApprovals,
 } from './dashboard';
@@ -182,6 +185,33 @@ describe('figures', () => {
       fleet('p2', [slot({ status: 'quota' })]),
     ];
     expect(runningSlots(fleets)).toBe(3);
+  });
+
+  test('live sessions are the slots the tile counts, longest running first', () => {
+    const projects = [project('p1'), project('p2'), project('p3')];
+    const fleets = new Map([
+      [
+        'p1',
+        fleet('p1', [
+          slot({
+            id: 'a',
+            status: 'running',
+            startedAt: '2026-10-13T09:00:00Z',
+          }),
+          slot({ id: 'b', status: 'stale' }),
+        ]),
+      ],
+      [
+        'p2',
+        fleet('p2', [
+          slot({ id: 'c', status: 'quota', startedAt: '2026-10-13T07:00:00Z' }),
+        ]),
+      ],
+    ]);
+    const sessions = liveSessions(projects, fleets);
+    expect(sessions.map((s) => s.slot.id)).toEqual(['c', 'a']);
+    expect(sessions.length).toBe(runningSlots(fleets.values()));
+    expect(sessions[0]?.project.id).toBe('p2');
   });
 
   test('approvals waiting leave out the approved-but-unmerged row', () => {
@@ -354,6 +384,41 @@ describe('labels', () => {
       ),
     ).toBe('Round Oct 13, 14:05 · up to 5 slots');
     expect(roundLabel(null, () => '')).toBeNull();
+  });
+});
+
+describe('spendDays', () => {
+  const point = (costUsd: string, requests = 1, unpricedRequests = 0) => ({
+    t: 'x',
+    costUsd,
+    tokens: 0,
+    requests,
+    unpricedRequests,
+  });
+
+  test('keeps the last 7 days and today as the figure', () => {
+    const days = spendDays({
+      series: [
+        {
+          key: null,
+          label: null,
+          points: ['9', '1', '2', '3', '4', '5', '6', '7'].map((c) => point(c)),
+        },
+      ],
+    });
+    expect(days.values).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(days.today).toBe(formatUsd('7'));
+  });
+
+  test('a day of only unpriced requests has no figure, not $0', () => {
+    const days = spendDays({
+      series: [{ key: null, label: null, points: [point('0', 2, 2)] }],
+    });
+    expect(days.today).toBe('');
+  });
+
+  test('no series is no days', () => {
+    expect(spendDays({ series: [] })).toEqual({ values: [], today: '' });
   });
 });
 

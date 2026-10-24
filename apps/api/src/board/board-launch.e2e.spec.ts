@@ -1,4 +1,5 @@
 import { BOARD_ERROR } from '@nautelle/shared';
+import { capabilities } from '../runners/testing/runner-e2e';
 import { BoardWorld, failed } from './testing/board-e2e';
 
 /** #322 D2, D3, D9: the profile and model a card's Run starts with. */
@@ -173,6 +174,43 @@ describe('board launch overrides (e2e, #322)', () => {
           work: { model: 'sonnet', effort: 'low', reason: 'Fits sonnet.' },
         },
       });
+    });
+  });
+
+  describe('C-369: a demo round', () => {
+    const recordDemos = async (cardDemo: boolean) => {
+      await w.ctx.prisma.boardSettings.upsert({
+        where: { projectId: w.a },
+        create: { projectId: w.a, demoVideosEnabled: true },
+        update: { demoVideosEnabled: true },
+      });
+      await w.ctx.prisma.projectDemoSecret.create({
+        data: { projectId: w.a, name: 'DEMO_PASSWORD', valueCiphertext: 'x' },
+      });
+      await w.ctx.prisma.runner.update({
+        where: { id: w.runnerId },
+        data: { capabilities: { ...capabilities, cardDemo } },
+      });
+    };
+
+    it('gives the session DemoFlow and the scenario section when the runner records', async () => {
+      await recordDemos(true);
+      const { number } = await w.createCard();
+      expect((await w.runCard(number)).status).toBe(200);
+      const [sent] = w.sent('card.run');
+      expect(sent.demo).toBe(true);
+      expect(sent.prompt).toContain('## Demo video');
+      expect(sent.prompt).toContain('`DEMO_PASSWORD`');
+      expect(sent.prompt).not.toContain('valueCiphertext');
+    });
+
+    it('leaves the round alone on a runner that does not record', async () => {
+      await recordDemos(false);
+      const { number } = await w.createCard();
+      expect((await w.runCard(number)).status).toBe(200);
+      const [sent] = w.sent('card.run');
+      expect(sent.demo).toBeUndefined();
+      expect(sent.prompt).not.toContain('## Demo video');
     });
   });
 

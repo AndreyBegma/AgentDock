@@ -2,6 +2,7 @@
   "name": "@nautelle/web",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "next build",
     "start": "next start -p 3517",
@@ -12,7 +13,7 @@
   },
   "dependencies": {
     "@nautelle/shared": "workspace:*",
-    "@andrewbehma/glass-ui": "0.37.0",
+    "@andrewbehma/glass-ui": "0.38.0",
     "@dagrejs/dagre": "3.1.1",
     "@radix-ui/react-context-menu": "2.3.8",
     "@radix-ui/react-dialog": "1.2.0",
@@ -24,6 +25,7 @@
     "@xterm/xterm": "6.0.0",
     "@xyflow/react": "12.12.0",
     "lucide-react": "1.52.0",
+    "luna-player": "0.2.0",
     "motion": "14.0.0",
     "next": "16.4.2",
     "react": "19.2.5",

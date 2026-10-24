@@ -1,3 +1,4 @@
+import type { LOCAL_DESIGN_REFUSALS } from '../protocol/local';
 import type { NoProfileReason, ProfileSource } from '../readiness';
 import type {
   DesignBatchMode,
@@ -271,6 +272,12 @@ export interface TaskDesignView extends TaskDesignSummary {
   warnings: DesignSkillWarning[];
   /** The viewer's presets: the project's settings, or the defaults. */
   viewports: ViewportPreset[];
+  /**
+   * #863 (ADR-0085): the devices the design is drawn for, copied at its
+   * latest Generate; a later edit of the presets leaves them. Null on a
+   * design not generated since devices were stored.
+   */
+  devices: ViewportPreset[] | null;
   /** A design turn queued or running. */
   activeTurnId: string | null;
   /** #275 D1: what the busy design is doing; null at rest. */
@@ -350,8 +357,8 @@ export interface DesignCommentRequest {
  * (operator), from the card's launch popover (#322 D1). Both are optional: an
  * empty body starts as before. Each is stored on the card only when it
  * differs from the default (D3) — `profileKey` as the card's, shared with its
- * work; `model` as its `designModel`. Plan-task designs take no body
- * (ADR-0025: the Planner owns them).
+ * work; `model` as its `designModel`. Plan-task and stack designs take no
+ * launch choice (ADR-0025: the Planner owns them).
  */
 export interface CardDesignLaunchRequest {
   /**
@@ -362,6 +369,21 @@ export interface CardDesignLaunchRequest {
   /** A model alias or id (`orchestratorModelSchema`). */
   model?: string;
 }
+
+/**
+ * #863 (ADR-0085): `POST …/design/generate` of a plan task or a stack. The
+ * devices the design is drawn for, at most `DESIGN_VIEWPORTS_MAX`, with
+ * unique names (`viewportPresetsSchema`); left out, the project's presets,
+ * or `DEFAULT_VIEWPORTS` without any. The design keeps a copy.
+ */
+export interface DesignGenerateRequest {
+  devices?: ViewportPreset[];
+}
+
+/** `POST …/board/cards/:number/design/generate`: the launch choice and the devices. */
+export interface CardDesignGenerateRequest
+  extends CardDesignLaunchRequest,
+    DesignGenerateRequest {}
 
 /** `POST /plans/:planId/tasks/:key/design/approve` (operator): picks one variant (D4). */
 export interface DesignApproveRequest {
@@ -426,6 +448,10 @@ export const DESIGN_ERROR = {
   noProfile: 'no_profile',
 } as const;
 export type DesignErrorCode = (typeof DESIGN_ERROR)[keyof typeof DESIGN_ERROR];
+
+/** C-377: every refusal a design tool passes through is one of the design routes'. */
+type DesignCodes<T extends readonly DesignErrorCode[]> = T[number];
+export type LocalDesignRefusal = DesignCodes<typeof LOCAL_DESIGN_REFUSALS>;
 
 export interface DesignErrorBody {
   statusCode: number;

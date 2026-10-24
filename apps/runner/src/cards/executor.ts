@@ -15,12 +15,18 @@ import {
   type CardCollectResult,
   type CardResumeArgs,
   type CardResumeResult,
+  type CardReviewArgs,
+  type CardReviewResult,
+  type CardReviewStopArgs,
+  type CardReviewStopResult,
   type CardRunArgs,
   type CardRunPhase,
   type CardRunPhaseChangedData,
   type CardRunResult,
+  type CardStartBranchSkip,
   type CardStopArgs,
   type CardStopResult,
+  cardReviewSessionName,
   cardRunDialogDataSchema,
   cardRunPendingQuestionDataSchema,
   cardRunPhaseChangedDataSchema,
@@ -68,11 +74,19 @@ import {
   excludeFromGit,
   removeCardWorktree,
   startFollowUpBranch,
+  takeStartBranch,
 } from './git';
 import { cardLaunchSpec, cardTokenSaver, cardWorktreePath } from './launch';
 import { type PushStep, pushCardHead } from './push';
 import { matchQuestion, readQuestion } from './question';
 import { type CardRecord, CardStore } from './record';
+import {
+  CardReviewStore,
+  cardReviewLaunchSpec,
+  cardReviewWorktreePath,
+  placeReviewWorktree,
+  removeReviewWorktree,
+} from './review';
 import {
   heldDetail,
   type TrailerCommit,
@@ -166,6 +180,9 @@ const blockingDialogOf = (pane: string): PaneDialog | null => {
   );
 };
 
+/** #884: a card's review runs beside its rounds, in a queue of its own. */
+const reviewKey = (cardId: string): string => `review:${cardId}`;
+
 /** An event's `error`: one line, at most 500 characters, no stack. */
 const eventError = (error: unknown): string =>
   (errorMessage(error).split('\n')[0] || 'the round could not start').slice(
@@ -205,6 +222,8 @@ const forcedWithoutSeed = (args: CardRunArgs): PreparedRound | null =>
  */
 export class CardExecutor {
   readonly store: CardStore;
+  /** #884: each card's review session, beside its rounds. */
+  readonly reviews: CardReviewStore;
   private readonly tmux: TmuxControl;
   /** #741: types `continue` into a round once its usage limit has reset. */
   private readonly quota: QuotaResumer;
@@ -232,6 +251,7 @@ export class CardExecutor {
 
   constructor(private readonly options: CardExecutorOptions) {
     this.store = new CardStore(options.cardsDir);
+    this.reviews = new CardReviewStore(options.cardsDir);
     this.tmux = new TmuxControl(options.deps.exec, options.tmuxServer ?? []);
     this.quota = new QuotaResumer(options.deps.clock, options.log);
   }
@@ -308,6 +328,7 @@ export class CardExecutor {
         profileKey: args.profileKey,
         // DA-15: `card.resume` launches in this mode, never in its own.
         permissionMode: args.permissionMode,
+        ...(args.demo ? { demo: true as const } : {}),
         startedAt: isoNow(deps.clock),
         // #359 D3: the spec (and design) the PR links; only round 1 sends them.
         specFiles: args.files?.length
@@ -318,7 +339,33 @@ export class CardExecutor {
       this.setPhase(record, 'starting');
       let wiring: CardWiring;
       let prepared: PreparedRound | null = null;
+      let startBranchSkipped: CardStartBranchSkip | null = null;
       try {
+        // #854 D1: a taken card's branch, when origin has it; else `branch`.
+        if (args.startBranch) {
+          startBranchSkipped = await takeStartBranch(
+            deps,
+            record,
+            args.startBranch,
+          );
+          if (startBranchSkipped === null) {
+            // The push state follows the branch the round works on.
+            Object.assign(
+              record,
+              { pushedHead: undefined, pushPr: undefined },
+              { previousBranches: undefined },
+              pushStateOf(previous, { ...args, branch: args.startBranch }),
+              { branch: args.startBranch },
+            );
+          } else {
+            this.options.log.info('cards: the round keeps its own branch', {
+              cardId: record.cardId,
+              runId: record.runId,
+              startBranch: args.startBranch,
+              reason: startBranchSkipped,
+            });
+          }
+        }
         // #359 D8: the follow-up branch, from the updated base, first.
         if (args.newBranch) await startFollowUpBranch(deps, record);
         await ensureWorktree(deps, record);
@@ -408,7 +455,12 @@ export class CardExecutor {
         ...(wiring.wiringReason ? { wiringReason: wiring.wiringReason } : {}),
       });
       if (prepared) this.options.handoff?.reportRestart(record, prepared);
-      return { phase: 'running', tmuxSession };
+      return {
+        phase: 'running',
+        tmuxSession,
+        branch: record.branch,
+        ...(startBranchSkipped ? { startBranchSkipped } : {}),
+      };
     });
   }
 
@@ -578,6 +630,140 @@ export class CardExecutor {
   }
 
   /**
+   * `card.review` (#884, ADR-0084 §5): one review step on the head of the
+   * card's PR, in a session of its own — the review worktree detached at
+   * `headSha` and tmux `nautelle-review-<shortId>` running `exec-run` with a
+   * new Claude session `session`, wired like a round, with `report_review`
+   * offered (`CARD_REVIEW_ENV`). A review session still open on the card is
+   * replaced. The card's own worktree, session and record are never touched,
+   * and the review is not polled: it reports through `report_review`, and
+   * the API stops it with `card.reviewStop`. A `headSha` origin does not have
+   * is `not_found`.
+   */
+  async review(args: CardReviewArgs): Promise<CardReviewResult> {
+    const profile = profileOf(this.options.deps, args.profileKey);
+    if (profile.runtime !== 'claude') {
+      throw new CommandFailure(
+        'unsupported_runtime',
+        `review sessions need a claude profile; ${profile.id} is ${profile.runtime}`,
+      );
+    }
+    const project = watchedProject(args, this.options.deps.watchedProjects());
+    this.ownedOrAbsent(args.cardId, args.projectId);
+    return this.serial(reviewKey(args.cardId), async () => {
+      const { deps } = this.options;
+      const tmuxSession = cardReviewSessionName(args.shortId);
+      const worktree = cardReviewWorktreePath(project.root, args.shortId);
+      // The last review's session is replaced; it reports nothing more.
+      await this.kill(tmuxSession);
+      this.reviews.remove(args.cardId);
+      try {
+        const commit = await placeReviewWorktree(
+          deps,
+          project.root,
+          worktree,
+          args.branch,
+          args.headSha,
+        );
+        if (!commit) {
+          throw new CommandFailure(
+            'not_found',
+            `${args.headSha} of ${args.branch} is not on origin`,
+          );
+        }
+        this.trust(profile, { cardId: args.cardId, worktree });
+        const dir = this.reviews.createRun(args.cardId, args.runId);
+        const wiring = wireCardRound(
+          profile,
+          deps.home,
+          dir,
+          this.options.selfCommand,
+        );
+        if (wiring.wiring === 'none') {
+          this.options.log.warn('cards: the review starts without wiring', {
+            cardId: args.cardId,
+            runId: args.runId,
+            reason: wiring.wiringReason,
+          });
+        }
+        writeJsonAtomic(
+          `${dir}/${RUN_FILES.launch}`,
+          cardReviewLaunchSpec(
+            profile,
+            args,
+            worktree,
+            this.options.otlp?.() ?? null,
+            wiring.files,
+            this.options.sessionToken?.({
+              sessionId: args.session,
+              cwd: worktree,
+            }),
+          ),
+        );
+        // Before tmux: the session's `SessionStart` must find it launched.
+        this.reviews.save({
+          cardId: args.cardId,
+          projectId: args.projectId,
+          root: project.root,
+          runId: args.runId,
+          sessionId: args.session,
+          tmuxSession,
+          worktree,
+        });
+        const created = await this.tmux.newSession(tmuxSession, worktree, [
+          ...this.options.selfCommand,
+          'exec-run',
+          dir,
+        ]);
+        if (!created.ok) {
+          throw new Error(`tmux new-session failed: ${created.stderr}`);
+        }
+      } catch (error) {
+        this.options.log.warn('cards: a review failed to start', {
+          cardId: args.cardId,
+          runId: args.runId,
+          error: errorMessage(error),
+        });
+        this.reviews.remove(args.cardId);
+        if (error instanceof CommandFailure) throw error;
+        throw new Error(eventError(error));
+      }
+      return { phase: 'running', tmuxSession };
+    });
+  }
+
+  /**
+   * `card.reviewStop` (#884): kills the card's review session and removes
+   * the review worktree. Idempotent; from the short id alone, so a review
+   * whose record is gone (`card.close`) is stopped too.
+   */
+  async stopReview(args: CardReviewStopArgs): Promise<CardReviewStopResult> {
+    const project = watchedProject(args, this.options.deps.watchedProjects());
+    this.ownedOrAbsent(args.cardId, args.projectId);
+    return this.serial(reviewKey(args.cardId), async () => {
+      const tmuxSession = cardReviewSessionName(args.shortId);
+      // tmux that cannot be read has no session to kill.
+      const alive = await this.tmux
+        .find(tmuxSession)
+        .then((session) => session !== null)
+        .catch(() => false);
+      if (alive) await this.kill(tmuxSession);
+      this.reviews.remove(args.cardId);
+      await removeReviewWorktree(
+        this.options.deps,
+        project.root,
+        cardReviewWorktreePath(project.root, args.shortId),
+      );
+      return { stopped: alive };
+    });
+  }
+
+  /** #113, #884: `sessionId` is a review session this runner launched. */
+  reviewSession(sessionId: string): boolean {
+    return this.reviews.all().some((r) => r.sessionId === sessionId);
+  }
+
+  /**
    * D6 (2): reports every running session that is gone as `ended`; #359 D1:
    * queues a push step for every live one. A poll already under way is
    * joined, not repeated.
@@ -697,6 +883,8 @@ export class CardExecutor {
         permissionMode,
         session: { id: args.sessionId, resume: true },
         prompt: STEWARD_RESUME_TEXT,
+        // C-369: the session keeps DemoFlow's MCP server.
+        ...(record.demo ? { demo: true as const } : {}),
       };
       this.trust(profile, record);
       try {
@@ -880,7 +1068,10 @@ export class CardExecutor {
    * on its workspace trust dialog. Never fails the round: a dialog left on
    * screen is reported by the poll (`noticeBlockingDialog`).
    */
-  private trust(profile: ConfigProfile, record: CardRecord): void {
+  private trust(
+    profile: ConfigProfile,
+    record: Pick<CardRecord, 'cardId' | 'worktree'>,
+  ): void {
     let trusted = false;
     let error: string | undefined;
     try {
@@ -1069,14 +1260,11 @@ export class CardExecutor {
    * #489 M4: what the round's question selector shows — reported as
    * `card_run.pending_question` whenever the screen changes, and with
    * `question: null` once it is gone, so the Board can offer its options.
-   * Content (ADR-0021): only for a project that ships it.
+   * ADR-0094: on every project, content shipped or not — the selector is
+   * the worker addressing the person; `readQuestion` redacts and caps it.
    */
   private noticePendingQuestion(record: CardRecord, pane: string | null): void {
     if (pane === null) return;
-    const project = this.options.deps
-      .watchedProjects()
-      .find((p) => p.id === record.projectId);
-    if (project?.shipContent !== true) return;
     const screen = readQuestion(pane);
     const shown = this.pendingShown.get(record.cardId);
     const key = screen ? `${record.runId}:${screen.question.key}` : null;
@@ -1246,6 +1434,7 @@ export class CardExecutor {
           }
         : {}),
       ...(step.protectedPaths ? { protectedPaths: step.protectedPaths } : {}),
+      ...(step.ahead !== undefined ? { ahead: step.ahead } : {}),
     });
     this.options.emit({
       v: 1,

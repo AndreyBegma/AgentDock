@@ -1,31 +1,17 @@
 'use client';
 
-import { Button } from '@andrewbehma/glass-ui/button';
 import { Select } from '@andrewbehma/glass-ui/field';
-import { NumberInput } from '@andrewbehma/glass-ui/number-input';
 import {
   SegmentedControl,
   SegmentedControlItem,
 } from '@andrewbehma/glass-ui/segmented-control';
 import {
   DESIGN_THEMES,
-  DESIGN_VIEWPORT_MAX_PX,
-  DESIGN_VIEWPORT_MIN_PX,
   type DesignRevisionView,
   type DesignTheme,
-  type ViewportPreset,
 } from '@nautelle/shared';
-import { Crosshair, Minus, Monitor, Plus, Smartphone } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { revisionLabel } from '../../lib/design/format';
 import type { ViewerChange, ViewerState } from '../../lib/design/viewer-state';
-import {
-  stepZoom,
-  ZOOM_MAX,
-  ZOOM_MIN,
-  ZOOM_PRESETS,
-  zoomPercent,
-} from '../../lib/design/zoom';
 
 const THEME_LABEL: Record<DesignTheme, string> = {
   light: 'Light',
@@ -117,269 +103,36 @@ export function ViewControls({
 }
 
 /**
- * The viewer's toolbar (spec 223 D11): viewport presets, a typed width,
- * light/dark, the zoom (spec 335), the variant and the revision, and pin
- * mode. Every choice is a `ViewerChange`; the page keeps them in the URL.
+ * The viewer's toolbar (spec 223 D11, #886): light/dark, the variant and the
+ * revision, beside the frame tabs on a desktop. The devices are all on the
+ * canvas and the canvas has its own zoom, so the toolbar has no viewport
+ * switch, typed width or zoom; Comment is a canvas tool. Every choice is a
+ * `ViewerChange`; the page keeps them in the URL.
  */
 export function ViewerToolbar({
   state,
-  zoom,
-  viewports,
   variants,
   revisions,
-  pinMode,
-  canPin,
   onChange,
-  onPinMode,
-  phone = false,
 }: {
   state: ViewerState;
-  /** The scale in effect: what Fit works out to, or the chosen one. */
-  zoom: number;
-  viewports: readonly ViewportPreset[];
   variants: readonly number[];
   /** The revisions of the variant in view, newest first. */
   revisions: readonly DesignRevisionView[];
-  pinMode: boolean;
-  /** Pins need an operator and a revision in view. */
-  canPin: boolean;
   onChange: (change: ViewerChange) => void;
-  onPinMode: (on: boolean) => void;
-  /**
-   * Below `lg` (C-244): the viewport presets and the zoom at the 44px tap
-   * size. The typed width is out, theme, variant and revision live in the
-   * review sheet, and Pin in the action bar.
-   */
-  phone?: boolean;
 }) {
-  // The typed width commits on Enter or blur, not on every keystroke.
-  const [width, setWidth] = useState(String(state.width));
-  useEffect(() => setWidth(String(state.width)), [state.width]);
-  const commitWidth = () => {
-    const n = Number(width);
-    if (Number.isFinite(n) && n > 0 && Math.round(n) !== state.width) {
-      onChange({ kind: 'width', width: n });
-    } else {
-      setWidth(String(state.width));
-    }
-  };
-
-  if (phone) {
-    return (
-      <div
-        role="toolbar"
-        aria-label="Mockup view"
-        className="flex shrink-0 items-center gap-2"
-      >
-        <SegmentedControl role="group" aria-label="Viewport">
-          {viewports.map((vp) => {
-            const active = vp.name === state.viewport.name;
-            const Icon = vp.width < 768 ? Smartphone : Monitor;
-            return (
-              <SegmentedControlItem
-                key={vp.name}
-                active={active}
-                layoutId="design-viewport"
-              >
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  title={`${vp.width} × ${vp.height}`}
-                  className="inline-flex min-h-(--size-tap) items-center gap-1.5 px-2 text-sm whitespace-nowrap"
-                  onClick={() =>
-                    onChange({ kind: 'viewport', viewport: vp, fit: true })
-                  }
-                >
-                  <Icon aria-hidden="true" className="size-4" />
-                  {vp.name}
-                </button>
-              </SegmentedControlItem>
-            );
-          })}
-        </SegmentedControl>
-        <fieldset className="m-0 ml-auto flex items-center border-0 p-0">
-          <legend className="sr-only">Zoom</legend>
-          <Button
-            icon
-            variant="ghost"
-            className="size-11"
-            aria-label="Zoom out"
-            disabled={zoom <= ZOOM_MIN}
-            onClick={() => onChange({ kind: 'zoom', zoom: stepZoom(zoom, -1) })}
-          >
-            <Minus aria-hidden="true" className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            className="h-11 px-0 tabular-nums"
-            aria-label="Fit to screen"
-            aria-pressed={state.zoom === 'fit'}
-            onClick={() => onChange({ kind: 'zoom', zoom: 'fit' })}
-          >
-            {state.zoom === 'fit' ? 'Fit · ' : ''}
-            {zoomPercent(zoom)}
-          </Button>
-          <Button
-            icon
-            variant="ghost"
-            className="size-11"
-            aria-label="Zoom in"
-            disabled={zoom >= ZOOM_MAX}
-            onClick={() => onChange({ kind: 'zoom', zoom: stepZoom(zoom, 1) })}
-          >
-            <Plus aria-hidden="true" className="size-4" />
-          </Button>
-        </fieldset>
-      </div>
-    );
-  }
-
   return (
     <div
       role="toolbar"
       aria-label="Mockup view"
-      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2"
+      className="flex shrink-0 flex-wrap items-center gap-2"
     >
-      {/* Three groups: when the row runs out of room a whole group wraps, never a lone Pin (#399). */}
-      <div data-toolbar-group="view" className="flex items-center gap-2">
-        <SegmentedControl size="sm" role="group" aria-label="Viewport">
-          {viewports.map((vp) => {
-            const active = vp.name === state.viewport.name;
-            return (
-              <SegmentedControlItem
-                key={vp.name}
-                active={active}
-                layoutId="design-viewport"
-              >
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  title={`${vp.width} × ${vp.height}`}
-                  className="px-2 py-1 text-xs whitespace-nowrap"
-                  onClick={() => onChange({ kind: 'viewport', viewport: vp })}
-                >
-                  {vp.name}
-                </button>
-              </SegmentedControlItem>
-            );
-          })}
-        </SegmentedControl>
-
-        <span className="flex items-center gap-1 text-xs text-ink-2">
-          <NumberInput
-            aria-label="Width in pixels"
-            className="h-8 w-20 text-xs"
-            min={DESIGN_VIEWPORT_MIN_PX}
-            max={DESIGN_VIEWPORT_MAX_PX}
-            value={width}
-            onChange={(e) => setWidth(e.target.value)}
-            onBlur={commitWidth}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitWidth();
-            }}
-          />
-          <span aria-hidden="true">× {state.viewport.height}</span>
-        </span>
-      </div>
-
-      <fieldset
-        data-toolbar-group="zoom"
-        className="m-0 flex items-center gap-1 border-0 p-0"
-        title="Ctrl/⌘ + wheel, or Ctrl/⌘ + 0 − =, over the stage or the mockup"
-      >
-        <legend className="sr-only">Zoom</legend>
-        <Button
-          size="sm"
-          icon
-          variant="ghost"
-          aria-label="Zoom out"
-          disabled={zoom <= ZOOM_MIN}
-          onClick={() => onChange({ kind: 'zoom', zoom: stepZoom(zoom, -1) })}
-        >
-          <Minus aria-hidden="true" className="size-4" />
-        </Button>
-        <SegmentedControl size="sm" role="group" aria-label="Zoom level">
-          <SegmentedControlItem
-            active={state.zoom === 'fit'}
-            layoutId="design-zoom"
-          >
-            <button
-              type="button"
-              aria-pressed={state.zoom === 'fit'}
-              className="px-2 py-1 text-xs whitespace-nowrap tabular-nums"
-              onClick={() => onChange({ kind: 'zoom', zoom: 'fit' })}
-            >
-              {state.zoom === 'fit' ? `Fit · ${zoomPercent(zoom)}` : 'Fit'}
-            </button>
-          </SegmentedControlItem>
-          {ZOOM_PRESETS.map((preset) => {
-            const active = state.zoom === preset;
-            return (
-              <SegmentedControlItem
-                key={preset}
-                active={active}
-                layoutId="design-zoom"
-              >
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  className="px-2 py-1 text-xs tabular-nums"
-                  onClick={() => onChange({ kind: 'zoom', zoom: preset })}
-                >
-                  {Math.round(preset * 100)}%
-                </button>
-              </SegmentedControlItem>
-            );
-          })}
-        </SegmentedControl>
-        <Button
-          size="sm"
-          icon
-          variant="ghost"
-          aria-label="Zoom in"
-          disabled={zoom >= ZOOM_MAX}
-          onClick={() => onChange({ kind: 'zoom', zoom: stepZoom(zoom, 1) })}
-        >
-          <Plus aria-hidden="true" className="size-4" />
-        </Button>
-        {/* Off a preset (a step, the wheel): say where it is. */}
-        {state.zoom !== 'fit' &&
-        !(ZOOM_PRESETS as readonly number[]).includes(state.zoom) ? (
-          <span className="text-xs text-ink-2 tabular-nums">
-            {zoomPercent(zoom)}
-          </span>
-        ) : null}
-      </fieldset>
-
-      <div data-toolbar-group="review" className="flex items-center gap-2">
-        <ViewControls
-          state={state}
-          variants={variants}
-          revisions={revisions}
-          onChange={onChange}
-        />
-
-        <Button
-          size="sm"
-          // Glass either way: the screen's one solid is Approve.
-          variant="glass"
-          // An outline, not a ring: glass draws its own box-shadow.
-          className={
-            pinMode ? 'outline-2 outline-offset-1 outline-accent' : undefined
-          }
-          aria-pressed={pinMode}
-          disabled={!canPin}
-          title={
-            canPin
-              ? 'Click the mockup to pin a comment to a point'
-              : 'Pins need an operator and a drawn mockup.'
-          }
-          onClick={() => onPinMode(!pinMode)}
-        >
-          <Crosshair aria-hidden="true" className="size-4" />
-          Pin
-        </Button>
-      </div>
+      <ViewControls
+        state={state}
+        variants={variants}
+        revisions={revisions}
+        onChange={onChange}
+      />
     </div>
   );
 }

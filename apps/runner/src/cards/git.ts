@@ -25,6 +25,7 @@ import type {
   CardCollectPrState,
   CardCollectResult,
   CardRunFile,
+  CardStartBranchSkip,
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
 import { CommandFailure } from '../commands/failure';
@@ -254,6 +255,128 @@ const onOrigin = async (
     throw new Error(`git ls-remote failed: ${stderrLine(listed)}`);
   }
   return listed.stdout.trim().length > 0;
+};
+
+/** The checkouts that hold `refs/heads/<branch>`, from `git worktree list`. */
+const checkoutsOf = async (
+  deps: GitDeps,
+  root: string,
+  branch: string,
+): Promise<string[]> => {
+  const listed = await gitOk(deps.exec, [
+    '-C',
+    root,
+    'worktree',
+    'list',
+    '--porcelain',
+  ]);
+  const held: string[] = [];
+  let path: string | null = null;
+  for (const line of listed.split('\n')) {
+    if (line.startsWith('worktree ')) path = line.slice('worktree '.length);
+    if (line === `branch refs/heads/${branch}` && path !== null) {
+      held.push(path);
+    }
+  }
+  return held;
+};
+
+const samePath = (a: string, b: string): boolean => {
+  const real = (p: string) => (existsSync(p) ? realpathSync(p) : p);
+  return real(a) === real(b);
+};
+
+/**
+ * #854 D1: prepares the card's worktree to work on `startBranch` — the branch
+ * a session-gone taken card was worked on — when origin has it. `null` means
+ * taken: an existing card worktree is switched to it (only when clean); a
+ * missing one is then created on it by `ensureWorktree` with the record's
+ * `branch` set to it. A local branch of that name is used when it equals,
+ * trails (fast-forwarded first) or leads origin, never when it diverged or is
+ * checked out in another checkout. Anything else is the reason the round
+ * launches on its own branch instead, and nothing is changed.
+ */
+export const takeStartBranch = async (
+  deps: GitDeps,
+  record: Pick<CardRecord, 'root' | 'worktree'>,
+  startBranch: string,
+): Promise<CardStartBranchSkip | null> => {
+  const { root, worktree } = record;
+  try {
+    if (!(await onOrigin(deps, root, startBranch))) return 'not_on_origin';
+  } catch {
+    return 'fetch_failed';
+  }
+  const fetched = await fetchRef(deps, root, startBranch);
+  const remote = await commitOf(
+    deps,
+    root,
+    `refs/remotes/origin/${startBranch}`,
+  );
+  if (!fetched || fetched.code !== 0 || !remote) return 'fetch_failed';
+  const local = await commitOf(deps, root, `refs/heads/${startBranch}`);
+  const exists = existsSync(worktree);
+  let trails = false;
+  if (local) {
+    const held = await checkoutsOf(deps, root, startBranch);
+    if (held.some((path) => !samePath(path, worktree))) {
+      return 'branch_checked_out';
+    }
+    const isAncestor = (a: string, b: string) =>
+      gitSucceeds(deps.exec, ['-C', root, 'merge-base', '--is-ancestor', a, b]);
+    trails = local !== remote && (await isAncestor(local, remote));
+    if (local !== remote && !trails && !(await isAncestor(remote, local))) {
+      return 'branch_diverged';
+    }
+  }
+  if (exists) {
+    const status = await gitOk(deps.exec, [
+      '-C',
+      worktree,
+      'status',
+      '--porcelain',
+      '--untracked-files=normal',
+    ]);
+    if (status.trim() !== '') return 'worktree_dirty';
+    await gitOk(
+      deps.exec,
+      local
+        ? ['-C', worktree, 'switch', '--quiet', startBranch]
+        : [
+            '-C',
+            worktree,
+            'switch',
+            '--quiet',
+            '--no-track',
+            '-c',
+            startBranch,
+            `refs/remotes/origin/${startBranch}`,
+          ],
+    );
+    if (trails) {
+      await gitOk(deps.exec, [
+        '-C',
+        worktree,
+        'merge',
+        '--quiet',
+        '--ff-only',
+        `refs/remotes/origin/${startBranch}`,
+      ]);
+    }
+    return null;
+  }
+  // Checked out nowhere (above), so moving it forward touches no checkout.
+  if (trails) {
+    await gitOk(deps.exec, [
+      '-C',
+      root,
+      'branch',
+      '--force',
+      startBranch,
+      `refs/remotes/origin/${startBranch}`,
+    ]);
+  }
+  return null;
 };
 
 /**
@@ -644,7 +767,14 @@ export const collectCard = async (
     root: record.root,
   });
   const protectedPaths = await protectedPathsOf(deps.exec, wt, args.base);
-  await pushCardBranch(deps, github, wt, record.branch, record.pushedHead);
+  // #630: a reconciled push adds a merge, so the head pushed is its own.
+  const headSha = await pushCardBranch(
+    deps,
+    github,
+    wt,
+    record.branch,
+    record.pushedHead,
+  );
   // #359 D3: the worker's description is the body — of a new PR, and of an
   // open one, edited. Without it, a new PR gets the API's body with the spec
   // link, and an open one keeps its body.
@@ -692,6 +822,7 @@ export const collectCard = async (
     prUrl: pr.url,
     prState: pr.state,
     protectedPaths,
+    headSha,
     ...listed,
   };
 };

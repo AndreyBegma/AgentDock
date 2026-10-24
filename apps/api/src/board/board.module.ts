@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BoardAttachmentsController } from '../attachments/board-attachments.controller';
+import { DemosModule } from '../demos/demos.module';
 import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { ReadinessModule } from '../readiness';
@@ -15,6 +16,7 @@ import { BoardDependencies } from './board-dependencies.service';
 import { BoardInboxService } from './board-inbox.service';
 import { BoardPlanCards } from './board-plan-cards';
 import { BoardPrincipals } from './board-principal';
+import { BoardReview } from './board-review';
 import { BoardRoundsService } from './board-rounds.service';
 import { BoardSessionService } from './board-session.service';
 import { BoardSessionMessages } from './board-session-message.service';
@@ -37,6 +39,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
 @Module({
   // #309: `AttachmentsService` comes from the global `AttachmentsModule`.
   imports: [
+    // C-370: a feature card's green head is recorded as a demo video.
+    DemosModule,
     LiveModule,
     ProjectsModule,
     ReadinessModule,
@@ -58,6 +62,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
     BoardPlanCards,
     // C-181: whom an automatic round runs as.
     BoardPrincipals,
+    // #884: review steps gate Finished on a card's green PR.
+    BoardReview,
     BoardRoundsService,
     BoardService,
     // #489: a person's message to a card's running session.
@@ -82,14 +88,19 @@ import { CollectRetryTimer } from './collect-retry-timer';
   // `BoardPlanCards`: a card intake and Create cards make cards (#337 D6, D7).
   // `BoardSessionMessages`: Telegram answers a card's question (#489).
   // `BoardStacks`: a confirmed intake makes a stack (#480).
+  // `BoardReview`: a review session's `report_review` (#884).
+  // `BoardDependencies`, `BoardStackRuns`: a person's session sets them (C-377).
   exports: [
     // #578: the Telegram bot accepts and dismisses suggestions.
+    BoardDependencies,
     BoardInboxService,
     BoardPlanCards,
+    BoardReview,
     BoardRoundsService,
     BoardSessionMessages,
     BoardService,
     BoardSessionService,
+    BoardStackRuns,
     BoardStacks,
     BoardTerminalService,
     BoardWaitService,

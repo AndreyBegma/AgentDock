@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { AI_DIGEST_ACTIVITY_TYPES } from '../ai';
 import { AUDIT_ACTIONS } from '../audit';
+import { CARD_DEMO_EVENTS } from '../demos';
 import {
   API_EVENT_SOURCE,
   EVENTS_DUPLICATE_EVENT,
@@ -61,6 +62,7 @@ const API_ONLY = new Set<string>([
   'card.background_stalled',
   ...STEWARD_ACTIVITY_TYPES,
   ...AI_DIGEST_ACTIVITY_TYPES,
+  ...Object.values(CARD_DEMO_EVENTS),
 ]);
 
 describe('the curated event map (spec 21 D3)', () => {
@@ -113,6 +115,8 @@ describe('the curated event map (spec 21 D3)', () => {
         'steward_incident.resolved',
         'ai_digest.sent',
         'ai_digest.skipped',
+        'card.demo_ready',
+        'card.demo_failed',
       ].sort(),
     );
   });
@@ -251,6 +255,40 @@ describe('the curated event map (spec 21 D3)', () => {
       link: '/admin/runners',
       title: 'Runner spool full: events 1–9 dropped',
     });
+  });
+});
+
+describe('card.demo_ready / card.demo_failed (C-370)', () => {
+  const api = { source: API_EVENT_SOURCE };
+
+  it('titles a ready demo as ok and a failed one as a warning with its reason', () => {
+    const ready = activityFromEvent(
+      event(CARD_DEMO_EVENTS.ready, { number: 12, demoId: 'd1' }, api),
+      'p1',
+    );
+    expect(ready).toMatchObject({
+      title: 'C-12: demo video ready',
+      severity: 'ok',
+      link: '/projects/p1/board?card=12',
+    });
+    const failed = activityFromEvent(
+      event(
+        CARD_DEMO_EVENTS.failed,
+        { number: 12, demoId: 'd1', reason: 'readyUrl never answered' },
+        api,
+      ),
+      'p1',
+    );
+    expect(failed).toMatchObject({
+      title: 'C-12: demo failed — readyUrl never answered',
+      severity: 'warn',
+    });
+  });
+
+  it('shows only what the API recorded', () => {
+    expect(
+      activityFromEvent(event(CARD_DEMO_EVENTS.ready, { number: 12 }), 'p1'),
+    ).toBeNull();
   });
 });
 

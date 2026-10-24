@@ -1283,7 +1283,7 @@ Every command needs an operator.
 
 | Command | Args | Result |
 |---|---|---|
-| `card.run` | `cardId, runId, projectId, root, base, shortId (^[a-z0-9]{8}$), branch, session { id (uuid), resume }, prompt (≤ 64 KiB, no NUL), files? ([{ path, content }] ≤ 4, repository-relative, each ≤ 192 KiB), profileKey, model, permissionMode` | `{ phase: starting\|running, tmuxSession }`, timeout 60 s |
+| `card.run` | `cardId, runId, projectId, root, base, shortId (^[a-z0-9]{8}$), branch, session { id (uuid), resume }, prompt (≤ 64 KiB, no NUL), files? ([{ path, content }] ≤ 4, repository-relative, each ≤ 192 KiB), profileKey, model, permissionMode, startBranch? (#854: a card branch ≠ `branch`, never with `newBranch`)` | `{ phase: starting\|running, tmuxSession, branch?, startBranchSkipped?: not_on_origin\|fetch_failed\|worktree_dirty\|branch_checked_out\|branch_diverged }`, timeout 60 s |
 | `card.stop` | `cardId, projectId` | `{ stopped }`, timeout 15 s |
 | `card.collect` | `cardId, projectId, root, base, branch, number, title (one line), body (≤ 16 KiB)` | `{ ahead, pushed, prNumber?, prUrl? }`, timeout 180 s |
 | `card.close` | `cardId, projectId, removeWorktree` | `{ stopped, worktreeRemoved, branchDeleted }`, timeout 30 s |
@@ -1296,6 +1296,18 @@ Every command needs an operator.
   `claude --resume <id>`) with `--model` and `--permission-mode`; the prompt is
   one argv element, never a shell string. An interactive `exec-run` inherits
   stdio (the tmux pane is the terminal) and still writes `exit.json`.
+- **Start branch (#854).** `startBranch` is the branch a session-gone taken
+  card was worked on (ADR-0083 §4). When origin has it, the card's worktree is
+  put on it from `origin/<startBranch>` — an existing clean worktree is
+  switched; a local branch of that name is used when it equals, trails
+  (fast-forwarded) or leads origin — and the round works, pushes and collects
+  there; the result's `branch` names it. Otherwise nothing changes, the round
+  launches on `branch` and `startBranchSkipped` says why. `card.run` args are
+  strict, so the API sends `startBranch` only to a runner that advertises
+  `cardStartBranch`; it then makes `startBranch` the card's branch and clears
+  `takenBranch`, and the round's `card.run_started` audit records `branch`,
+  `takenBranch` and any `startBranchSkipped` (the API's own reasons:
+  `runner_outdated`, `not_a_card_branch`, `follow_up`).
 - **Collect.** Commits leftovers as `chore: card C-<number> work in progress`,
   pushes, and opens a PR into `base` when none is open for `branch` (else
   pushes only). `ahead: 0` is "No changes".

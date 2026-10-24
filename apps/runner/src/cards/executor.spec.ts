@@ -75,6 +75,7 @@ describe('card.collect in a terminal session cwd (#282 D3)', () => {
     const result = await executor.collect(args(join(f.root, 'src')));
     expect(result).toEqual({
       staged: ['src/pairing.ts'],
+      headSha: await f.run(f.root, 'rev-parse', 'HEAD'),
       ahead: 2,
       pushed: true,
       protectedPaths: [],
@@ -165,6 +166,7 @@ describe('card.collect of a card whose worktree card.close removed (#344)', () =
     const { cwd: _cwd, ...fleet } = args(f.root);
 
     expect(await executor.collect(fleet)).toEqual({
+      headSha: head,
       ahead: 1,
       pushed: true,
       protectedPaths: [],

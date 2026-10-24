@@ -1,0 +1,102 @@
+{{- if .Values.postgresql.enabled -}}
+{{- $fullname := include "nautelle.fullname" . -}}
+{{- $values := .Values.postgresql -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-postgresql
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "postgresql") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "nautelle.selectorLabels" (dict "root" . "component" "postgresql") | nindent 4 }}
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: postgresql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}-postgresql
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "postgresql") | nindent 4 }}
+spec:
+  replicas: 1
+  serviceName: {{ $fullname }}-postgresql
+  selector:
+    matchLabels:
+      {{- include "nautelle.selectorLabels" (dict "root" . "component" "postgresql") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nautelle.selectorLabels" (dict "root" . "component" "postgresql") | nindent 8 }}
+    spec:
+      {{- with include "nautelle.imagePullSecrets" . | trim }}{{ . | nindent 6 }}{{ end }}
+      enableServiceLinks: false
+      # The alpine image's `postgres` user.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgresql
+          image: {{ include "nautelle.image" (dict "root" . "image" $values.image) | quote }}
+          imagePullPolicy: {{ $values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: postgresql
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: nautelle
+            - name: POSTGRES_DB
+              value: nautelle
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nautelle.postgresSecret" . }}
+                  key: {{ include "nautelle.postgresSecretKey" . }}
+            # A subdirectory: a fresh volume's lost+found keeps initdb from
+            # using the mount point itself.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, nautelle, -d, nautelle]
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, nautelle, -d, nautelle]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            {{- toYaml $values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      {{- with include "nautelle.scheduling" (dict "root" . "values" $values) | trim }}{{ . | nindent 6 }}{{ end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "nautelle.selectorLabels" (dict "root" . "component" "postgresql") | nindent 10 }}
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with $values.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $values.persistence.size }}
+{{- end }}

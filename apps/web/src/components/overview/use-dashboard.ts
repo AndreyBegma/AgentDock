@@ -9,17 +9,28 @@ import type {
   RunPage,
   RunSummary,
   TerminalSetupView,
+  UsageBreakdownResponse,
   UsageSummaryResponse,
+  UsageTimeseriesResponse,
 } from '@nautelle/shared';
 import { useEffect } from 'react';
 import { api } from '../../lib/api';
-import { nextHour, startOfToday } from '../../lib/overview/dashboard';
+import {
+  lastSevenDays,
+  nextHour,
+  startOfToday,
+} from '../../lib/overview/dashboard';
 import { type Section, useSection } from '../../lib/section/use-section';
+import { browserZone } from '../../lib/usage/format';
 
 /** The dashboard is a glance, not a live view: look again twice a minute. */
 const REFRESH_MS = 30_000;
 /** Merges in one day across every project; more than this is not a glance. */
 const MERGED_LIMIT = 200;
+/** Recent activity shows this many events before "All activity". */
+const RECENT_LIMIT = 8;
+/** Projects in the cost breakdown; the API caps a breakdown at 200 rows. */
+const COST_PROJECTS_LIMIT = 200;
 /** The newest failed runs per project; "Needs you" shows the last 24 h of them. */
 const FAILED_RUNS_LIMIT = 20;
 
@@ -104,7 +115,13 @@ async function loadProjectFacts(
 export interface Dashboard {
   facts: Section<ProjectFacts>;
   costToday: Section<UsageSummaryResponse>;
+  /** Today's cost per project, from the usage breakdown. */
+  costByProject: Section<UsageBreakdownResponse>;
   merged: Section<ActivityPage>;
+  /** The newest events across every project, unfiltered, as `/activity` opens. */
+  recent: Section<ActivityPage>;
+  /** Cost per local day for the last 7 days, as `/usage` cuts it. */
+  spend: Section<UsageTimeseriesResponse>;
 }
 
 /** The dashboard's sections, each loading and failing on its own. */
@@ -119,6 +136,15 @@ export function useDashboard(projects: ProjectSummary[]): Dashboard {
     });
     return api<UsageSummaryResponse>(`/usage/summary?${query}`);
   }, []);
+  const costByProject = useSection(() => {
+    const query = new URLSearchParams({
+      from: startOfToday(),
+      to: nextHour(),
+      dimension: 'project',
+      limit: String(COST_PROJECTS_LIMIT),
+    });
+    return api<UsageBreakdownResponse>(`/usage/breakdown?${query}`);
+  }, []);
   const merged = useSection(() => {
     const query = new URLSearchParams({
       type: 'pr.merged',
@@ -127,8 +153,28 @@ export function useDashboard(projects: ProjectSummary[]): Dashboard {
     });
     return api<ActivityPage>(`/activity?${query}`);
   }, []);
+  const recent = useSection(
+    () => api<ActivityPage>(`/activity?limit=${RECENT_LIMIT}`),
+    [],
+  );
+  const spend = useSection(() => {
+    const query = new URLSearchParams({
+      ...lastSevenDays(),
+      interval: 'day',
+      groupBy: 'none',
+      tz: browserZone(),
+    });
+    return api<UsageTimeseriesResponse>(`/usage/timeseries?${query}`);
+  }, []);
 
-  const retries = [facts.retry, costToday.retry, merged.retry];
+  const retries = [
+    facts.retry,
+    costToday.retry,
+    costByProject.retry,
+    merged.retry,
+    recent.retry,
+    spend.retry,
+  ];
   // biome-ignore lint/correctness/useExhaustiveDependencies: retry callbacks are stable
   useEffect(() => {
     const timer = setInterval(() => {
@@ -137,5 +183,5 @@ export function useDashboard(projects: ProjectSummary[]): Dashboard {
     return () => clearInterval(timer);
   }, []);
 
-  return { facts, costToday, merged };
+  return { facts, costToday, costByProject, merged, recent, spend };
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { builtinOverrideProblems } from './template-api';
 import {
   BUILTIN_DESIGN_TEMPLATES,
   builtinDesignTemplate,
@@ -35,6 +36,32 @@ describe('BUILTIN_DESIGN_TEMPLATES', () => {
     for (const t of BUILTIN_DESIGN_TEMPLATES) {
       for (const frame of t.frames) expect(frame.key).toBe(frame.kind);
     }
+  });
+
+  // #863 (ADR-0085): every frame is one responsive page; no device frame.
+  it('draw no mobile frame in page and flow, and still parse the mobile kind', () => {
+    expect(page.frames.map((fr) => fr.key)).toEqual([
+      'screen',
+      'breakdown',
+      'states',
+    ]);
+    expect(flow.frames.map((fr) => fr.key)).toEqual([
+      'flow_map',
+      'flow_step',
+      'breakdown',
+    ]);
+    for (const t of [page, flow]) {
+      for (const frame of t.frames) {
+        expect(frame.instruction.toLowerCase()).not.toContain('mobile');
+        expect(frame.instruction.toLowerCase()).not.toContain('narrow');
+      }
+    }
+    const old = {
+      key: 'x',
+      name: 'X',
+      frames: [{ ...page.frames[2], key: 'mobile', kind: 'mobile' }],
+    };
+    expect(designTemplateSchema.safeParse(old).success).toBe(true);
   });
 });
 
@@ -99,6 +126,62 @@ describe('resolveDesignTemplate', () => {
     expect(
       resolveDesignTemplate(page, lacking)?.frames.map((fr) => fr.key),
     ).toEqual(['screen', 'breakdown', 'states']);
+  });
+
+  // #863 (ADR-0085): an override saved before page and flow lost `mobile`.
+  it('reads an older override without the mobile frame and with current names', () => {
+    const notes = {
+      key: 'notes',
+      kind: 'custom' as const,
+      name: 'Notes',
+      instruction: 'What changed.',
+      required: false,
+      enabled: true,
+    };
+    const oldFlow = {
+      ...flow,
+      frames: [
+        ...flow.frames,
+        {
+          key: 'mobile',
+          kind: 'mobile' as const,
+          name: 'Mobile',
+          instruction: 'The steps at the narrow width.',
+          required: false,
+          enabled: true,
+        },
+        notes,
+      ],
+    };
+    expect(
+      resolveDesignTemplate(flow, oldFlow)?.frames.map((fr) => fr.key),
+    ).toEqual(['flow_map', 'flow_step', 'breakdown', 'notes']);
+
+    const oldPage = {
+      ...page,
+      frames: page.frames.map((fr) =>
+        fr.key === 'states'
+          ? {
+              ...fr,
+              name: 'States and mobile',
+              instruction:
+                'The empty, loading and error states, and the page at the narrow width.',
+            }
+          : fr.key === 'screen'
+            ? { ...fr, instruction: 'Our own words.' }
+            : fr,
+      ),
+    };
+    const resolved = resolveDesignTemplate(page, oldPage);
+    const states = resolved?.frames.find((fr) => fr.key === 'states');
+    expect(states?.name).toBe('States');
+    expect(states?.instruction).toBe('The empty, loading and error states.');
+    expect(
+      resolved?.frames.find((fr) => fr.key === 'screen')?.instruction,
+    ).toBe('Our own words.');
+    expect(builtinOverrideProblems(page, resolved as DesignTemplate)).toEqual(
+      [],
+    );
   });
 
   it("is a project's own template alone", () => {
@@ -184,6 +267,17 @@ describe('checkConformance', () => {
     expect(seven.ok).toBe(false);
     expect(seven.reason).toBe('too_many_steps');
     expect(seven.missing).toEqual([]);
+  });
+
+  it('reads a mobile frame of an older revision as extra (#863)', () => {
+    const result = checkConformance(flow, [
+      f('flow_map'),
+      ...steps(2),
+      f('breakdown'),
+      f('mobile', 'Mobile'),
+    ]);
+    expect(result.extra).toEqual(['Mobile']);
+    expect(result.missing).toEqual([]);
   });
 
   it('matches a custom frame by its name', () => {

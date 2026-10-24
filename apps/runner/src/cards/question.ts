@@ -6,6 +6,7 @@ import {
   type PendingQuestion,
   pendingQuestionSchema,
 } from '@nautelle/shared';
+import { redactText } from '../pane/redact';
 
 /**
  * #473: Claude Code's question selector — the `AskUserQuestion` tool waiting
@@ -69,6 +70,8 @@ const SEPARATOR = /^[─━-]{3,}$/;
 /** The selector's typed-answer option, and the one that leaves it to chat. */
 const OTHER_LABEL = /^Type something\.?$/;
 const CHAT_LABEL = /^Chat about this$/;
+/** The bar a longer question is quoted with (Claude Code 2.1.310, #913). */
+const QUOTE_BAR = /^│\s?/;
 
 /** One screen of the selector, as the runner answers it. */
 export interface QuestionScreen {
@@ -83,6 +86,13 @@ export interface QuestionScreen {
 
 const cut = (text: string, max: number): string =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
+
+/**
+ * ADR-0094: what the selector shows leaves the runner on every project,
+ * so it is redacted like hook content (ADR-0021 §4) before it is capped.
+ */
+const outward = (text: string, max: number): string =>
+  cut(redactText(text), max);
 
 const screenKey = (header: string | null, text: string, labels: string[]) =>
   createHash('sha256')
@@ -134,29 +144,35 @@ export const readQuestion = (pane: string): QuestionScreen | null => {
     }
     const last = options.at(-1);
     if (last) last.description.push(line);
-    else textLines.push(line);
+    else textLines.push(line.replace(QUOTE_BAR, ''));
   }
   const other = options.find((o) => OTHER_LABEL.test(o.label)) ?? null;
   const shown = options.filter((o) => o !== other && !CHAT_LABEL.test(o.label));
   if (shown.length === 0) return null;
-  const text = cut(textLines.join('\n'), PENDING_QUESTION_TEXT_MAX_CHARS);
+  const text = outward(textLines.join('\n'), PENDING_QUESTION_TEXT_MAX_CHARS);
+  const title = header
+    ? outward(header, PENDING_QUESTION_LABEL_MAX_CHARS)
+    : null;
   const listed = shown.slice(0, PENDING_QUESTION_MAX_OPTIONS).map((o) => {
     const description = o.description.join(' ');
     return {
       index: o.index,
-      label: cut(o.label, PENDING_QUESTION_LABEL_MAX_CHARS),
+      label: outward(o.label, PENDING_QUESTION_LABEL_MAX_CHARS),
       ...(description
-        ? { description: cut(description, PENDING_QUESTION_LABEL_MAX_CHARS) }
+        ? {
+            description: outward(description, PENDING_QUESTION_LABEL_MAX_CHARS),
+          }
         : {}),
     };
   });
+  // The key hashes only what is reported, so it never stands for a secret.
   const question = pendingQuestionSchema.parse({
     key: screenKey(
-      header,
+      title,
       text,
-      options.map((o) => o.label),
+      options.map((o) => outward(o.label, PENDING_QUESTION_LABEL_MAX_CHARS)),
     ),
-    header: header ? cut(header, PENDING_QUESTION_LABEL_MAX_CHARS) : null,
+    header: title,
     text,
     options: listed,
     other: other !== null,

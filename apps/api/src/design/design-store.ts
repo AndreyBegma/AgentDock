@@ -2,6 +2,7 @@ import {
   BUILTIN_DESIGN_TEMPLATES,
   builtinDesignTemplate,
   DEFAULT_DESIGN_TEMPLATE_KEY,
+  DEFAULT_VIEWPORTS,
   DESIGN_COMMENTS_PER_TURN_MAX,
   DESIGN_LEGACY_FRAME_NAME,
   type DesignConformance,
@@ -19,6 +20,8 @@ import {
   uiProfileScreenSchema,
   uiProfileSnippetSchema,
   uiProfileStyleRuleSchema,
+  type ViewportPreset,
+  viewportPresetsSchema,
 } from '@nautelle/shared';
 import type { Prisma, TaskDesignStatus, UiProfile } from '@prisma/client';
 import { z } from 'zod';
@@ -134,6 +137,29 @@ export const defaultSkillsOf = async (
     select: { defaultSkills: true },
   });
   return settings?.defaultSkills ?? [];
+};
+
+/** #863: a design's stored devices; null when unset or unreadable. */
+export const devicesOf = (
+  value: Prisma.JsonValue | null,
+): ViewportPreset[] | null => {
+  const parsed = viewportPresetsSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
+
+/**
+ * D11, #863: the project's viewport presets — the devices a Generate without
+ * a choice draws for; the built-in devices without a settings row.
+ */
+export const projectViewports = async (
+  db: Db,
+  projectId: string,
+): Promise<ViewportPreset[]> => {
+  const settings = await db.designSettings.findUnique({
+    where: { projectId },
+    select: { viewports: true },
+  });
+  return (settings && devicesOf(settings.viewports)) ?? [...DEFAULT_VIEWPORTS];
 };
 
 /** #604: the fields of a design that decide where its skills come from. */
@@ -504,17 +530,26 @@ export const conformanceOfRow = (
 
 /**
  * D8: what a design turn carries — the profile it draws from, the design's
- * installed skills, the variant's latest revision on a revise, and the
- * comments open when its batch started.
+ * installed skills and (#863) devices, the variant's latest revision on a
+ * revise, and the comments open when its batch started.
  */
 export const loadDesignPrompt = async (
   db: Db,
   project: { id: string; runnerId: string },
-  design: { id: string; variantCount: number; skills: string[] },
+  design: {
+    id: string;
+    variantCount: number;
+    skills: string[];
+    devices: Prisma.JsonValue | null;
+  },
   plan: DesignTurnPlan,
 ): Promise<DesignPromptContext> => {
   const useMemory = await useMemoryOf(db, project.id);
   const template = await designTemplateFor(db, design.id);
+  // #863: a design not generated since devices were stored draws for the
+  // project's presets.
+  const devices =
+    devicesOf(design.devices) ?? (await projectViewports(db, project.id));
   const [profile, installed, previous, comments] = await Promise.all([
     plan.profileId
       ? db.uiProfile.findUnique({ where: { id: plan.profileId } })
@@ -549,6 +584,7 @@ export const loadDesignPrompt = async (
     variantCount: design.variantCount,
     mode: plan.mode,
     template,
+    devices,
     // #833 D7: a repair turn names what the revision it repairs got wrong.
     repair: repair && !repair.ok ? repair : null,
     previous: previous

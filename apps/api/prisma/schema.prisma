@@ -96,6 +96,8 @@ model User {
   boardCardsAutoRunArmed      BoardCard[]                   @relation("BoardCardAutoRunArmedBy")
   boardCardRounds             BoardCardRound[]
   boardSettingsUpdated        BoardSettings[]
+  demoSecretsUpdated          ProjectDemoSecret[]
+  cardDemosRequested          CardDemo[]
   cardDismissals              CardDismissal[]
   textNormalizations          TextNormalization[]
   textSettingsUpdated         TextSettings[]
@@ -522,6 +524,8 @@ model Project {
   aiSummaries            AiSummary[]
   handoffNotes           HandoffNote[]
   rules                  ProjectRule[]
+  reviewSteps            ProjectReviewStep[]
+  demoSecrets            ProjectDemoSecret[]
   telegramLinks          TelegramLink[]
   telegramIntakes        TelegramIntake[]
 
@@ -1742,6 +1746,8 @@ enum RunKind {
   rules_compress
   /// An overlay proposal for one prefix part (#751 B8, ADR-0075).
   prefix_propose
+  /// One review step's session on a card's PR head (#884, ADR-0084).
+  card_review
 }
 
 enum RunStatus {
@@ -1830,6 +1836,8 @@ model Run {
   prefixParts       RunPrefixPart[]
   /// #449 DA-11: the run's handoff note, deleted with the run.
   handoffNotes      HandoffNote[]
+  /// #884: the review step run this `card_review` run is.
+  cardReviewRun     BoardCardReviewRun?
 
   @@index([projectId, startedAt])
   @@index([projectId, status])
@@ -2915,6 +2923,10 @@ model TaskDesign {
   /// card's design reads `BoardCard.designTemplate` instead.
   templateKey        String?
   templateSource     DesignTemplateChoice @default(auto)
+  /// #863 (ADR-0085): the devices the design is drawn for,
+  /// `[{ name, width, height, theme? }]` (shared `viewportPresetsSchema`),
+  /// copied at each Generate. Null until the first Generate since #863.
+  devices            Json?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
@@ -3071,6 +3083,8 @@ enum CardRoundTrigger {
   ci_fix
   /// #750 D9: the relaunch on Opus after the worker's `escalate_card`.
   escalation
+  /// #884 (ADR-0084): started by Nautelle for blocking review findings.
+  review_fix
 }
 
 /// Shared `CARD_ROUND_PHASES` (D4, D6).
@@ -3275,6 +3289,9 @@ model BoardCard {
   ciCheckedAt             DateTime?
   /// #359 D6: `ci_fix` rounds on the current PR (at most 3).
   ciFixAttempts           Int                   @default(0)
+  /// #884 (ADR-0084 §3): `review_fix` rounds on the current PR (at most 3),
+  /// counted apart from `ciFixAttempts`.
+  reviewFixAttempts       Int                   @default(0)
   /// #484: since when `ciHeadSha` has had no checks (`ciState` `none`);
   /// `null` while it has some. Reset when the head is retriggered.
   ciNoneSince             DateTime?
@@ -3407,6 +3424,9 @@ model BoardCard {
   techniqueArms        CardTechniqueArm[]
   /// #449 DA-11: the card's handoff note, deleted with the card.
   handoffNotes         HandoffNote[]
+  /// #884: every review step run on the card's PRs.
+  reviewRuns           BoardCardReviewRun[]
+  demos                CardDemo[]
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3660,8 +3680,8 @@ model BoardCardRound {
   /// #390: when this stall raised `card.background_stalled` — once per stall.
   backgroundStalledAt DateTime?
   /// #489 M4: the question selector the round's session shows now — shared
-  /// `pendingQuestionSchema` — from `card_run.pending_question`; only for a
-  /// project that ships content (ADR-0021). Cleared once it is gone.
+  /// `pendingQuestionSchema` — from `card_run.pending_question`; on every
+  /// project, redacted by the runner (ADR-0094). Cleared once it is gone.
   pendingQuestion     Json?
   /// #482: the local error the API answered the round's last refused
   /// `finish_card` with (shared `localErrorCodeSchema`), from
@@ -3695,6 +3715,21 @@ model BoardCardRound {
   /// from `round.warmup`.
   warmupTokens        Int?
   warmupMs            Int?
+  /// #837: the PR the round pushed to, from `card_run.pushed` or the collect
+  /// that followed it; `null` for a round that pushed nothing.
+  prNumber            Int?
+  prUrl               String?
+  /// #837: the last commit the round pushed — the head it left. Set only for
+  /// a head no earlier round left and other than `startHeadSha`.
+  headSha             String?
+  /// #837: commits on the branch ahead of its base at `headSha`; `null` from
+  /// a runner older than #837.
+  headAhead           Int?
+  /// #837: the checks on `headSha`, from every `card.checks` that answers for
+  /// it; `null` until one does. Counted without cancelled and skipped checks.
+  ciState             CardCiState?
+  ciPassed            Int?
+  ciTotal             Int?
 
   card   BoardCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   run    Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
@@ -3702,6 +3737,8 @@ model BoardCardRound {
 
   textNormalizations TextNormalization[]
   attachments        Attachment[]
+  /// #884: the review step runs on the head this round left.
+  reviewRuns         BoardCardReviewRun[]
 
   @@unique([cardId, round])
   @@index([phase])
@@ -3729,7 +3766,7 @@ model Attachment {
   name       String
   /// Detected from the content (D5), one of the shared `ATTACHMENT_MIMES`.
   mime       String
-  /// Bytes, at most 25 MiB.
+  /// Bytes, at most 25 MiB; a video at most 100 MiB (ADR-0090).
   size       Int
   /// Lower-case hex SHA-256 of the bytes.
   sha256     String
@@ -3744,6 +3781,8 @@ model Attachment {
   plan      Plan?                @relation(fields: [planId], references: [id], onDelete: SetNull)
   uploader  User?                @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
   assistant AssistantAttachment?
+  /// ADR-0090: the demo whose video this is.
+  demo      CardDemo?
 
   @@index([cardId, createdAt])
   @@index([planId])
@@ -3775,6 +3814,19 @@ model BoardSettings {
   /// #390: minutes in `background` before `card.background_stalled`; 5–1440,
   /// checked by the DTO.
   backgroundStallMinutes Int             @default(30)
+  /// #862, ADR-0084: a card passes its review steps before Finished. Off for
+  /// every project until a person turns it on.
+  reviewEnabled          Boolean         @default(false)
+  /// #862: mirror review findings as GitHub PR comments; opt-in.
+  publishReviewComments  Boolean         @default(false)
+  /// C-368, ADR-0090: record a demo video of a finished card. Off for every
+  /// project until a person turns it on.
+  demoVideosEnabled      Boolean         @default(false)
+  /// ADR-0090: globs of the paths that make a card's change a UI change —
+  /// shared `DEMO_UI_PATHS_DEFAULT`, at most `DEMO_UI_PATHS_MAX`.
+  demoUiPaths            String[]        @default(["apps/web/**", "**/*.tsx", "**/*.css"])
+  /// ADR-0090: send a ready demo to the project's Telegram chats too.
+  demoTelegram           Boolean         @default(true)
   updatedById            String?
   updatedAt              DateTime        @updatedAt
 
@@ -4414,6 +4466,175 @@ model ProjectRule {
   @@map("project_rules")
 }
 
+// ─── Review steps (issue #862, ADR-0084) ────────────────────────────────────
+
+/// Mirrors `REVIEW_STEP_TYPES` of the shared contract.
+enum ReviewStepType {
+  peer_review
+  skill
+}
+
+/// One step a card's PR passes before Finished, in `position` order. A project
+/// has at most one `peer_review` step (a partial unique index in the
+/// migration): created when review is first enabled, never deleted.
+model ProjectReviewStep {
+  id                      String         @id @default(cuid())
+  projectId               String
+  position                Int
+  enabled                 Boolean        @default(true)
+  /// At most `REVIEW_STEP_NAME_MAX` characters, checked by the DTO.
+  name                    String
+  type                    ReviewStepType
+  /// `peer_review` only: Markdown, at most `REVIEW_INSTRUCTIONS_MAX` characters.
+  instructions            String?
+  /// `skill` only: an invocation of the project's skill inventory.
+  skillName               String?
+  /// When the instructions were last generated from the repository; null
+  /// while they are the built-in default.
+  instructionsGeneratedAt DateTime?
+  /// When a person last edited the instructions.
+  instructionsEditedAt    DateTime?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// #884: the runs of this step on cards; kept when the step is deleted.
+  cardRuns BoardCardReviewRun[]
+
+  @@index([projectId, position])
+  @@map("project_review_steps")
+}
+
+/// Mirrors `CARD_REVIEW_RUN_STATES` of the shared contract (#884).
+enum CardReviewRunState {
+  running
+  passed
+  blocked
+  failed
+}
+
+/// #884 (ADR-0084 §4): one run of one review step on a card's PR head. A pass
+/// is every enabled step once on `(headSha, pass)`; `pass` is the card's
+/// `reviewFixAttempts` when it ran, so a fix round that pushed nothing is
+/// still reviewed again.
+model BoardCardReviewRun {
+  id            String             @id @default(cuid())
+  cardId        String
+  /// The card's latest round when the step started: the round whose head it reviews.
+  roundId       String?
+  /// Null once the step is deleted; `stepName` and `stepType` keep what ran.
+  stepId        String?
+  stepName      String
+  stepType      ReviewStepType
+  /// The step's `position` when it ran.
+  position      Int
+  prNumber      Int
+  headSha       String
+  pass          Int
+  /// The `card_review` run its cost is booked to.
+  runId         String             @unique
+  /// The review session's Claude session; `report_review` is matched by it.
+  sessionId     String             @unique @db.Uuid
+  state         CardReviewRunState @default(running)
+  /// Shared `ReviewFinding[]`; `[]` until the session reports.
+  findings      Json               @default("[]")
+  blockingCount Int                @default(0)
+  nitCount      Int                @default(0)
+  /// The session's one-paragraph summary, at most `REVIEW_SUMMARY_MAX` characters.
+  summary       String?
+  /// Why a `failed` run failed, at most 500 characters.
+  error         String?
+  /// When the findings were posted as a GitHub PR review.
+  publishedAt   DateTime?
+  startedAt     DateTime
+  finishedAt    DateTime?
+
+  card  BoardCard          @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  round BoardCardRound?    @relation(fields: [roundId], references: [id], onDelete: SetNull)
+  step  ProjectReviewStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  run   Run                @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  /// A step runs once per pass on a head; a second start loses the race.
+  @@unique([cardId, headSha, pass, stepId])
+  @@index([state])
+  @@map("board_card_review_runs")
+}
+
+// ─── Demo videos (C-368, ADR-0090) ──────────────────────────────────────────
+
+/// ADR-0090: one "Demo env" secret of a project — a value a demo scenario
+/// reads with `valueFrom.env`. The API returns names only; the runner fetches
+/// the values over HTTPS for a demo it records.
+model ProjectDemoSecret {
+  id              String   @id @default(cuid())
+  projectId       String
+  /// An environment variable name (shared `DEMO_SECRET_NAME_PATTERN`).
+  name            String
+  /// The value sealed with `APP_ENCRYPTION_KEY` (`SecretCipher`'s v1 format).
+  valueCiphertext String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  updatedById     String?
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, name])
+  @@map("project_demo_secrets")
+}
+
+/// Mirrors `DEMO_STATUSES` of the shared contract.
+enum CardDemoStatus {
+  queued
+  recording
+  ready
+  failed
+  skipped
+}
+
+/// Mirrors `DEMO_TRIGGERS` of the shared contract.
+enum CardDemoTrigger {
+  auto
+  manual
+}
+
+/// ADR-0090: one demo recording of a card's round. A failed or skipped demo
+/// is a warning on the card, never a gate on Finished or the merge. Lives as
+/// long as the card; its video is the card's attachment.
+model CardDemo {
+  id            String          @id @default(cuid())
+  cardId        String
+  /// The card round whose head it records.
+  round         Int
+  /// C-370: the PR head it records, 40 hex; null before C-370 or when unknown.
+  /// One `auto` demo per head: a poll never queues a second one.
+  headSha       String?
+  status        CardDemoStatus  @default(queued)
+  trigger       CardDemoTrigger
+  /// Why it failed or was skipped, at most `DEMO_REASON_MAX` characters.
+  reason        String?
+  /// The scenario, relative to the worktree (`demoScenarioPath`).
+  scenarioPath  String?
+  /// The video, once uploaded; `ready` has one.
+  attachmentId  String?         @unique
+  durationMs    Int?
+  /// The video's bytes.
+  size          Int?
+  /// The person whose "Record again" queued it; null for `auto`.
+  requestedById String?
+  createdAt     DateTime        @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+
+  card        BoardCard   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  attachment  Attachment? @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  requestedBy User?       @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([cardId, createdAt])
+  @@index([status])
+  @@map("card_demos")
+}
+
 // ─── LLM gateway (ADR-0059, #598) ───────────────────────────────────────────
 
 /// Mirrors `LLM_PROVIDERS` of the shared contract.
@@ -4433,6 +4654,7 @@ enum LlmFeature {
   triage
   title
   assistant_summary
+  review_instructions
 }
 
 enum LlmCallOutcome {

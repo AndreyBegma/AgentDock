@@ -107,4 +107,14 @@ describe('moveRequest', () => {
       stopWorker: true,
     });
   });
+
+  test('carries confirmUnlanded only when set (#847)', () => {
+    const move = drop('card-1', 'finished', 'completed', 0);
+    expect(moveRequest(move)).toEqual({ column: 'completed', index: 0 });
+    expect(moveRequest(move, false, true)).toEqual({
+      column: 'completed',
+      index: 0,
+      confirmUnlanded: true,
+    });
+  });
 });

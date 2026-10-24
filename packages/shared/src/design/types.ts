@@ -61,12 +61,15 @@ export const viewportPresetsSchema = z
   });
 
 /**
- * D11: a project without a `design_settings` row. The viewer offers light and
- * dark on each when the profile reports a dark theme.
+ * D11, #863 (ADR-0085): the built-in devices — what a project without a
+ * `design_settings` row offers, and what a Generate without devices draws
+ * for. The viewer offers light and dark on each when the profile reports a
+ * dark theme.
  */
 export const DEFAULT_VIEWPORTS: readonly ViewportPreset[] = [
   { name: 'Desktop', width: 1440, height: 900 },
-  { name: 'Mobile', width: 390, height: 844 },
+  { name: 'Tablet', width: 834, height: 1194 },
+  { name: 'Phone', width: 390, height: 844 },
 ];
 
 // Suggestions and designs (D2, D4)

@@ -99,6 +99,12 @@ if [ "$FAKE_MODE" = question-tall ]; then
   printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-answered.txt"
   sleep 60
 fi
+if [ "$FAKE_MODE" = question-pane ]; then
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-80x24.txt"
+  IFS= read -r line
+  printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-answered.txt"
+  sleep 60
+fi
 if [ "$FAKE_MODE" = trust ]; then
   printf '\\033[2J\\033[H'; cat "$FIXTURES/../../collectors/tmux/__fixtures__/trust.txt"
   sleep 60
@@ -153,6 +159,7 @@ const setup = async (
     profile('claude-quoted', 'quoted'),
     profile('claude-question', 'question'),
     profile('claude-question-tall', 'question-tall'),
+    profile('claude-question-pane', 'question-pane'),
     profile('claude-quota', 'quota'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
@@ -413,7 +420,7 @@ describe.skipIf(!tmuxInstalled)(
       await t.tmux('kill-session', '-t', `=${session}:`);
     });
 
-    it('#489: reports the question screen with its options, only with content shipped, and null once answered', async () => {
+    it('#489, #913: reports the question screen with its options whether or not content is shipped, and null once answered', async () => {
       for (const shipContent of [false, true]) {
         const t = await setup({ shipContent });
         await t.executor.run(
@@ -441,11 +448,7 @@ describe.skipIf(!tmuxInstalled)(
         );
         await t.paneShows(session, 'glass-ui');
         for (let i = 0; i < 3; i++) await t.executor.poll();
-        if (!shipContent) {
-          expect(screens()).toEqual([]);
-          await t.tmux('kill-session', '-t', `=${session}:`);
-          continue;
-        }
+        // ADR-0094: the selector is no session content (ADR-0021).
         expect(screens()).toEqual([
           expect.objectContaining({
             header: 'glass-ui',
@@ -465,6 +468,44 @@ describe.skipIf(!tmuxInstalled)(
         expect(screens()[1]).toBeNull();
         await t.tmux('kill-session', '-t', `=${session}:`);
       }
+    });
+
+    it("#913: reports C-369's selector in an 80x24 pane on a project that ships no content", async () => {
+      const t = await setup({ shipContent: false });
+      await t.executor.run(
+        t.args({
+          cardId: 'card_q',
+          runId: 'run_q',
+          profileKey: 'claude-question-pane',
+        }),
+      );
+      const session = 'nautelle-card-ab12cd34';
+      await t.paneShows(session, 'Chat about this');
+      for (let i = 0; i < 3; i++) await t.executor.poll();
+      const screens = t.events
+        .filter((e) => e.type === 'card_run.pending_question')
+        .map((e) => (e.data as { question: unknown }).question);
+      expect(screens).toEqual([
+        expect.objectContaining({
+          header: 'C-369 order',
+          text: expect.stringMatching(
+            /^C-368 hasn't landed yet: .* go ahead\?$/s,
+          ),
+          options: [
+            expect.objectContaining({ index: 1, label: 'Wait for C-368' }),
+            expect.objectContaining({
+              index: 2,
+              label: 'Build against the draft',
+            }),
+            expect.objectContaining({ index: 3, label: 'Provisioning only' }),
+          ],
+          other: true,
+        }),
+      ]);
+      expect(
+        t.events.filter((e) => e.type === 'card_run.question'),
+      ).toHaveLength(1);
+      await t.tmux('kill-session', '-t', `=${session}:`);
     });
 
     it('#624: trusts the worktree before the launch; a dialog still up after the wait is reported once, never answered', async () => {
@@ -534,6 +575,7 @@ describe.skipIf(!tmuxInstalled)(
       expect(result).toEqual({
         phase: 'running',
         tmuxSession: 'nautelle-card-ab12cd34',
+        branch: 'card/c12-export-csv',
       });
 
       const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
@@ -888,6 +930,7 @@ describe.skipIf(!tmuxInstalled)(
           prUrl: 'https://github.com/acme/widget/pull/7',
           prState: 'draft',
           protectedPaths: [],
+          ahead: 1,
         },
       ]);
       expect(
@@ -948,6 +991,73 @@ describe.skipIf(!tmuxInstalled)(
       await t.executor.settled();
       expect(t.events.some((e) => e.type === 'card_run.pushed')).toBe(false);
       expect(t.f.gh.calls).toEqual([]);
+    });
+
+    it('#854 D1: startBranch on origin is the round’s branch — the worktree, the result and the pushes; else the card’s own, with the reason', async () => {
+      const t = await setup();
+      const taken = 'feat/12-export-csv';
+      const session = join(t.f.ws, 'session');
+      await t.f.run(
+        t.f.root,
+        'worktree',
+        'add',
+        '-q',
+        '-b',
+        taken,
+        session,
+        'refs/remotes/origin/main',
+      );
+      t.f.write(session, { 'src/csv.ts': 'export const csv = 1;\n' });
+      const pushed = await t.f.commitAll(session, 'feat: csv');
+      await t.f.run(session, 'push', '-q', 'origin', taken);
+      await t.f.run(t.f.root, 'worktree', 'remove', '--force', session);
+      await t.f.run(t.f.root, 'branch', '-q', '-D', taken);
+
+      const missing = await t.executor.run(
+        t.args({
+          cardId: 'card_m',
+          runId: 'run_m',
+          shortId: 'cd34ef56',
+          profileKey: 'claude-slow',
+          startBranch: 'feat/never-pushed',
+        }),
+      );
+      expect(missing).toMatchObject({
+        branch: 'card/c12-export-csv',
+        startBranchSkipped: 'not_on_origin',
+      });
+      await t.tmux('kill-session', '-t', '=nautelle-card-cd34ef56');
+
+      const draft = cardDraftPullRequest({
+        number: 12,
+        title: 'Export as CSV',
+        issueNumber: null,
+      });
+      const result = await t.executor.run(
+        t.args({
+          profileKey: 'claude-slow',
+          pullRequest: draft,
+          startBranch: taken,
+        }),
+      );
+      expect(result).toEqual({
+        phase: 'running',
+        tmuxSession: 'nautelle-card-ab12cd34',
+        branch: taken,
+      });
+      const worktree = join(t.f.ws, '.wt-widget-card-ab12cd34');
+      expect(await t.f.run(worktree, 'branch', '--show-current')).toBe(taken);
+      expect(await t.f.run(worktree, 'rev-parse', 'HEAD')).toBe(pushed);
+
+      t.f.write(worktree, { 'src/header.ts': 'export const h = 1;\n' });
+      const next = await t.f.commitAll(worktree, 'feat: header row');
+      t.clock.advance(CARD_PUSH_MIN_INTERVAL_MS);
+      await t.executor.poll();
+      await t.executor.settled();
+      expect(
+        await t.f.run(t.f.origin, 'rev-parse', `refs/heads/${taken}`),
+      ).toBe(next);
+      await t.tmux('kill-session', '-t', '=nautelle-card-ab12cd34');
     });
 
     it('#359 D8: newBranch resumes the session on a fresh branch from the updated base, opening a second draft PR; Completed removes both branches', async () => {

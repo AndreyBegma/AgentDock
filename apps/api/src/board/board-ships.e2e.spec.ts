@@ -1,4 +1,4 @@
-import type { BoardCardDetail } from '@nautelle/shared';
+import { type BoardCardDetail, CARD_PR_HEAD_LAG_MS } from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
 import { BoardService } from './board.service';
 import { BoardShipping } from './board-shipping';
@@ -694,6 +694,44 @@ describe('a card ships itself (e2e, #359)', () => {
       );
     });
 
+    it('#895: a fix round whose merge GitHub does not show yet is not fixed again, nor finished on the old head', async () => {
+      const MERGE_HEAD = 'c'.repeat(40);
+      checksAnswer({ mergeable: 'CONFLICTING' });
+      await started();
+      await ended();
+      expect((await latest()).round).toMatchObject({
+        trigger: 'ci_fix',
+        startHeadSha: HEAD_SHA,
+      });
+      // The fix round merges the base and pushes it; GitHub still shows the
+      // PR at the old head, conflicting.
+      await pushed({ headSha: MERGE_HEAD });
+      await ended();
+      await shipping.poll();
+      await w.work.settled();
+      let card = await w.card(1);
+      expect(card).toMatchObject({
+        column: 'in_progress',
+        ciFixAttempts: 1,
+        needsPerson: false,
+      });
+      expect(card.rounds).toHaveLength(2);
+
+      // An old head that went green would not finish the card either.
+      checksAnswer({});
+      await shipping.poll();
+      await w.work.settled();
+      expect((await w.card(1)).column).toBe('in_progress');
+
+      // GitHub shows the merge: its own checks decide.
+      checksAnswer({ headSha: MERGE_HEAD });
+      await shipping.poll();
+      await w.work.settled();
+      card = await w.card(1);
+      expect(card).toMatchObject({ column: 'finished', ciHeadSha: MERGE_HEAD });
+      expect(card.rounds).toHaveLength(2);
+    });
+
     it('red during the round waits for the round to be over', async () => {
       checksAnswer({
         checks: [{ name: 'ci/check', bucket: 'pending', link: null }],
@@ -952,6 +990,226 @@ describe('a card ships itself (e2e, #359)', () => {
       expect(merge).toMatchObject({ pr: 77, headSha: NEW_HEAD });
       expect(await w.card(1)).toMatchObject({ needsPerson: false });
       expect((await w.card(1)).mergedAt).not.toBeNull();
+    });
+
+    it('#895: a pushed head GitHub does not show yet is waited for, not refused as pushed nothing', async () => {
+      await finishedUnmerged();
+      await pushed({ headSha: NEW_HEAD });
+      // GitHub still shows the PR at the head the round started from.
+      checksAnswer({});
+      await ended();
+      await shipping.poll();
+      await w.work.settled();
+      expect(await w.card(1)).toMatchObject({
+        column: 'in_progress',
+        needsPerson: false,
+        mergedAt: null,
+      });
+      expect(w.sent('card.merge')).toEqual([]);
+      expect(await w.audit('card.auto_run_failed')).toEqual([]);
+
+      // GitHub catches up: the pushed head is merged.
+      checksAnswer({ headSha: NEW_HEAD });
+      await shipping.poll();
+      await w.work.settled();
+      const [merge] = w.sent('card.merge');
+      expect(merge).toMatchObject({ pr: 77, headSha: NEW_HEAD });
+      expect((await w.card(1)).mergedAt).not.toBeNull();
+    });
+
+    it('#895: a PR still at the old head past the lag is taken as it is', async () => {
+      await finishedUnmerged();
+      await pushed({ headSha: NEW_HEAD });
+      checksAnswer({});
+      await ended();
+      expect((await w.card(1)).column).toBe('in_progress');
+      const { round } = await latest();
+      await w.ctx.prisma.boardCardRound.update({
+        where: { id: round.id },
+        data: {
+          startedAt: new Date(Date.now() - CARD_PR_HEAD_LAG_MS - 120_000),
+          finishedAt: new Date(Date.now() - CARD_PR_HEAD_LAG_MS - 60_000),
+        },
+      });
+      await shipping.poll();
+      await w.work.settled();
+      expect(await w.card(1)).toMatchObject({
+        column: 'finished',
+        needsPerson: true,
+        needsPersonReason: 'round_pushed_nothing',
+      });
+      expect(w.sent('card.merge')).toEqual([]);
+    });
+  });
+
+  describe("#837: each round's pull request, commits and CI", () => {
+    const NEW_HEAD = 'b'.repeat(40);
+    const checksPage = (sha: string) =>
+      `https://github.com/acme/widget/commit/${sha}/checks`;
+    const rounds = async () => (await detail()).rounds;
+
+    it('a push records the round’s PR, head and commits, and its checks as they answer', async () => {
+      checksAnswer({
+        checks: [
+          { name: 'ci/check', bucket: 'pending', link: null },
+          { name: 'lint', bucket: 'pass', link: null },
+          { name: 'old', bucket: 'cancel', link: null },
+        ],
+      });
+      await started();
+      await pushed({ prNumber: 77, prUrl: PR_URL, prState: 'draft', ahead: 2 });
+      expect((await rounds())[0]).toMatchObject({
+        pullRequest: { number: 77, url: PR_URL },
+        headSha: HEAD_SHA,
+        commits: 2,
+        ci: null,
+      });
+
+      await ended();
+      expect((await rounds())[0]?.ci).toEqual({
+        state: 'pending',
+        passed: 1,
+        total: 2,
+        url: checksPage(HEAD_SHA),
+      });
+
+      checksAnswer(RED);
+      await shipping.poll();
+      await w.work.settled();
+      expect((await rounds())[0]?.ci).toEqual({
+        state: 'failed',
+        passed: 1,
+        total: 2,
+        url: checksPage(HEAD_SHA),
+      });
+    });
+
+    it('a round that pushed nothing, or only the head it started on, shows nulls', async () => {
+      w.handlers['card.collect'] = () =>
+        ok({
+          ahead: 2,
+          pushed: true,
+          prNumber: 77,
+          prUrl: PR_URL,
+          headSha: HEAD_SHA,
+        });
+      await w.ctx.prisma.project.update({
+        where: { id: w.a },
+        data: { baseBranch: 'main' },
+      });
+      await started();
+      await ended();
+      expect((await w.card(1)).column).toBe('finished');
+      expect((await post(1, 'feedback', { text: 'Again.' })).status).toBe(200);
+      await ended();
+
+      const [first, second] = await rounds();
+      expect(first).toMatchObject({
+        pullRequest: { number: 77, url: PR_URL },
+        headSha: HEAD_SHA,
+        commits: 2,
+        ci: { state: 'passed', passed: 1, total: 1, url: checksPage(HEAD_SHA) },
+      });
+      expect(second).toMatchObject({
+        pullRequest: null,
+        headSha: null,
+        commits: null,
+        ci: null,
+      });
+    });
+
+    it('a later round counts only its own commits, and its new head gets its own checks', async () => {
+      w.handlers['card.collect'] = () =>
+        ok({
+          ahead: 2,
+          pushed: true,
+          prNumber: 77,
+          prUrl: PR_URL,
+          headSha: HEAD_SHA,
+        });
+      await w.ctx.prisma.project.update({
+        where: { id: w.a },
+        data: { baseBranch: 'main' },
+      });
+      await started();
+      await ended();
+      expect((await post(1, 'feedback', { text: 'More.' })).status).toBe(200);
+      w.handlers['card.collect'] = () =>
+        ok({
+          ahead: 5,
+          pushed: true,
+          prNumber: 77,
+          prUrl: PR_URL,
+          headSha: NEW_HEAD,
+        });
+      checksAnswer({
+        headSha: NEW_HEAD,
+        checks: [{ name: 'ci/check', bucket: 'pending', link: null }],
+      });
+      await ended();
+
+      const [first, second] = await rounds();
+      expect(first).toMatchObject({ headSha: HEAD_SHA, commits: 2 });
+      expect(first?.ci?.state).toBe('passed');
+      expect(second).toMatchObject({
+        pullRequest: { number: 77, url: PR_URL },
+        headSha: NEW_HEAD,
+        commits: 3,
+        ci: {
+          state: 'pending',
+          passed: 0,
+          total: 1,
+          url: checksPage(NEW_HEAD),
+        },
+      });
+
+      checksAnswer({ headSha: NEW_HEAD });
+      await shipping.poll();
+      await w.work.settled();
+      const [, done] = await rounds();
+      expect(done?.ci).toMatchObject({ state: 'passed', passed: 1, total: 1 });
+      expect((await rounds())[0]?.ci?.state).toBe('passed');
+    });
+
+    it('a push without the PR fields takes the card’s PR, and a later head resets the checks', async () => {
+      await started();
+      await pushed({ prNumber: 77, prUrl: PR_URL, ahead: 1 });
+      const { round } = await latest();
+      await w.ctx.prisma.boardCardRound.update({
+        where: { id: round.id },
+        data: { ciState: 'green', ciPassed: 1, ciTotal: 1 },
+      });
+      await pushed({ headSha: NEW_HEAD, ahead: 2 });
+      expect((await rounds())[0]).toMatchObject({
+        pullRequest: { number: 77, url: PR_URL },
+        headSha: NEW_HEAD,
+        commits: 2,
+        ci: null,
+      });
+    });
+
+    it('a round recorded before #837 — no head stored — reads as nulls', async () => {
+      await started();
+      await pushed({ prNumber: 77, prUrl: PR_URL, ahead: 1 });
+      const { round } = await latest();
+      await w.ctx.prisma.boardCardRound.update({
+        where: { id: round.id },
+        data: {
+          prNumber: null,
+          prUrl: null,
+          headSha: null,
+          headAhead: null,
+          ciState: null,
+          ciPassed: null,
+          ciTotal: null,
+        },
+      });
+      expect((await rounds())[0]).toMatchObject({
+        pullRequest: null,
+        headSha: null,
+        commits: null,
+        ci: null,
+      });
     });
   });
 

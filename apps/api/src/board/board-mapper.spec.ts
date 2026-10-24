@@ -3,12 +3,15 @@ import type { ProfileAgentdock } from '@nautelle/shared/protocol';
 import type { BoardCard, BoardCardRound } from '@prisma/client';
 import {
   type CardFacts,
+  type CardReviewRunFact,
   type CardWithRounds,
   escalationOf,
   hooksCauseOf,
   quotaWaitOf,
   recommendationOf,
   restartOf,
+  reviewOf,
+  roundPushesOf,
   stewardChipOf,
   takenOf,
 } from './board-mapper';
@@ -297,6 +300,76 @@ describe('escalationOf (#750 D9)', () => {
   });
 });
 
+describe('roundPushesOf (#837)', () => {
+  const PR = 'https://github.com/acme/widget/pull/7';
+  const sha = (c: string) => c.repeat(40);
+  const pushed = (over: Partial<BoardCardRound> = {}) =>
+    round({
+      prNumber: 7,
+      prUrl: PR,
+      headSha: sha('a'),
+      headAhead: 2,
+      ciState: null,
+      ciPassed: null,
+      ciTotal: null,
+      ...over,
+    });
+  const none = {
+    prNumber: null,
+    prUrl: null,
+    headSha: null,
+    headAhead: null,
+    ciState: null,
+    ciPassed: null,
+    ciTotal: null,
+  };
+
+  it('gives a round that pushed nothing, or one from before #837, nulls', () => {
+    expect(roundPushesOf([round(none)])).toEqual([
+      { pullRequest: null, headSha: null, commits: null, ci: null },
+    ]);
+  });
+
+  it("counts a round's commits from the head the round before it left on the PR", () => {
+    const pushes = roundPushesOf([
+      pushed({ headAhead: 2 }),
+      round(none),
+      pushed({ headSha: sha('b'), headAhead: 5 }),
+      pushed({ prNumber: 8, prUrl: `${PR.slice(0, -1)}8`, headAhead: 1 }),
+    ]);
+    expect(pushes.map((p) => p.commits)).toEqual([2, null, 3, 1]);
+    expect(pushes[2]?.pullRequest).toEqual({ number: 7, url: PR });
+    expect(pushes[2]?.headSha).toBe(sha('b'));
+  });
+
+  it('leaves the count unknown when a head has no ahead, or it shrank', () => {
+    const pushes = roundPushesOf([
+      pushed({ headAhead: null }),
+      pushed({ headSha: sha('b'), headAhead: 4 }),
+      pushed({ headSha: sha('c'), headAhead: 1 }),
+    ]);
+    expect(pushes.map((p) => p.commits)).toEqual([null, null, null]);
+  });
+
+  it("shows the head's checks, linked to its checks page; none without any", () => {
+    const [pending, passed, failed, noChecks] = roundPushesOf([
+      pushed({ ciState: 'pending', ciPassed: 1, ciTotal: 3 }),
+      pushed({ headSha: sha('b'), ciState: 'green', ciPassed: 4, ciTotal: 4 }),
+      pushed({ headSha: sha('c'), ciState: 'red', ciPassed: 2, ciTotal: 4 }),
+      pushed({ headSha: sha('d'), ciState: 'none', ciPassed: 0, ciTotal: 0 }),
+    ]);
+    expect(pending?.ci).toEqual({
+      state: 'pending',
+      passed: 1,
+      total: 3,
+      url: `https://github.com/acme/widget/commit/${sha('a')}/checks`,
+    });
+    expect(passed?.ci?.state).toBe('passed');
+    expect(failed?.ci).toMatchObject({ state: 'failed', passed: 2, total: 4 });
+    expect(noChecks?.ci).toBeNull();
+  });
+});
+
 describe('takenOf (#845 D2, D10)', () => {
   const alive = { alive: new Set(['ses_live']) };
 
@@ -333,5 +406,139 @@ describe('takenOf (#845 D2, D10)', () => {
     expect(
       takenOf(card({ source: 'manual', trackedSessionId: null }), alive),
     ).toBeNull();
+  });
+});
+
+describe('reviewOf (#884)', () => {
+  const HEAD = 'a'.repeat(40);
+  const NEXT = 'b'.repeat(40);
+  const steps = [
+    { id: 'peer', name: 'Peer review' },
+    { id: 'sec', name: 'Security review' },
+    { id: 'perf', name: 'Performance' },
+  ];
+  const reviewed = (
+    over: Partial<BoardCard> = {},
+    rounds: BoardCardRound[] = [],
+  ) =>
+    ({
+      ...card({
+        prNumber: 7,
+        ciHeadSha: HEAD,
+        reviewFixAttempts: 0,
+        needsPerson: false,
+        needsPersonReason: null,
+        ...over,
+      }),
+      rounds,
+    }) as CardWithRounds;
+  const run = (over: Partial<CardReviewRunFact>): CardReviewRunFact => ({
+    stepId: 'peer',
+    prNumber: 7,
+    headSha: HEAD,
+    pass: 0,
+    state: 'passed',
+    blockingCount: 0,
+    nitCount: 0,
+    startedAt: new Date(now.getTime() - 60_000),
+    ...over,
+  });
+
+  it('is null while review is off or no step is enabled', () => {
+    expect(reviewOf(reviewed(), undefined, [])).toBeNull();
+    expect(reviewOf(reviewed(), [], [])).toBeNull();
+  });
+
+  it('is idle with every step pending before CI is green', () => {
+    expect(reviewOf(reviewed(), steps, [])).toEqual({
+      state: 'idle',
+      stepIndex: 0,
+      stepCount: 3,
+      fixRound: 0,
+      fixLimit: 3,
+      steps: steps.map((s) => ({
+        id: s.id,
+        name: s.name,
+        state: 'pending',
+        blockingCount: 0,
+        nitCount: 0,
+      })),
+    });
+  });
+
+  it('names the running step and its index', () => {
+    const view = reviewOf(reviewed(), steps, [
+      run({ nitCount: 2 }),
+      run({ stepId: 'sec', state: 'running' }),
+    ]);
+    expect(view).toMatchObject({
+      state: 'running',
+      currentStep: 'Security review',
+      stepIndex: 1,
+    });
+    expect(view?.steps.map((s) => [s.state, s.nitCount])).toEqual([
+      ['passed', 2],
+      ['running', 0],
+      ['pending', 0],
+    ]);
+  });
+
+  it('is passed once every step passed on the head CI checked, nits allowed', () => {
+    const runs = steps.map((s) => run({ stepId: s.id, nitCount: 1 }));
+    expect(reviewOf(reviewed(), steps, runs)).toMatchObject({
+      state: 'passed',
+      stepIndex: 2,
+    });
+    expect(reviewOf(reviewed({ ciHeadSha: NEXT }), steps, runs)?.state).toBe(
+      'idle',
+    );
+  });
+
+  it('shows the blocked pass while its review_fix round works, with the round count', () => {
+    const fixing = reviewed({ reviewFixAttempts: 1 }, [
+      { trigger: 'review_fix', phase: 'running' } as BoardCardRound,
+    ]);
+    const view = reviewOf(fixing, steps, [
+      run({}),
+      run({ stepId: 'sec', state: 'blocked', blockingCount: 2 }),
+      run({ stepId: 'perf' }),
+    ]);
+    expect(view).toMatchObject({ state: 'fixing', fixRound: 1, fixLimit: 3 });
+    expect(view?.steps[1]).toMatchObject({
+      state: 'blocked',
+      blockingCount: 2,
+    });
+  });
+
+  it('reads only the newest pass on the current PR', () => {
+    const view = reviewOf(reviewed({ reviewFixAttempts: 1 }), steps, [
+      run({ state: 'blocked', blockingCount: 1 }),
+      run({ pass: 1, headSha: HEAD, state: 'running' }),
+      run({ prNumber: 6, pass: 3, stepId: 'perf', state: 'failed' }),
+    ]);
+    expect(view?.steps.map((s) => s.state)).toEqual([
+      'running',
+      'pending',
+      'pending',
+    ]);
+  });
+
+  it('needs a person when the fix budget is spent or a step failed', () => {
+    for (const reason of ['review_still_blocking', 'review_failed']) {
+      expect(
+        reviewOf(
+          reviewed({ needsPerson: true, needsPersonReason: reason }),
+          steps,
+          [run({ state: 'failed' })],
+        )?.state,
+      ).toBe('needs_person');
+    }
+    expect(
+      reviewOf(
+        reviewed({ needsPerson: true, needsPersonReason: 'ci_still_failing' }),
+        steps,
+        [],
+      )?.state,
+    ).toBe('idle');
   });
 });

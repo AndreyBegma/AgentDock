@@ -7,12 +7,20 @@ node_modules/
 dist/
 .next/
 out/
+# Astro's generated types (apps/docs)
+.astro/
 
 # Runner release assets (apps/runner/scripts/build-release.sh)
 apps/runner/release/
+# Image digests and the GitHub Release body (deploy/images/release-images.sh)
+.release/
 
 # Turbo
 .turbo/
+
+# Rendered Helm chart (deploy/helm/check-chart.sh) and packaged charts
+.helm-out/
+deploy/helm/*.tgz
 
 # Local data — board card attachments (ATTACHMENTS_DIR, #309)
 data/

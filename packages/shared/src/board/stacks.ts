@@ -155,10 +155,21 @@ export interface BoardStackDetail
   updatedAt: string;
 }
 
-/** `PATCH …/board/stacks/:number` (operator). */
+/** C-377: a stage's new title, by its 0-based position; empty clears it. */
+export interface StackStageTitle {
+  position: number;
+  title: string;
+}
+
+/**
+ * `PATCH …/board/stacks/:number` (operator). `stages` renames stages; a
+ * position that is not a stage of the stack refuses the whole change
+ * (`stack_refused`).
+ */
 export interface UpdateBoardStackRequest {
   title?: string;
   body?: string;
+  stages?: StackStageTitle[];
 }
 
 /**

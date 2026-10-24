@@ -37,7 +37,12 @@ import {
   type CardPrOpenResult,
 } from '@nautelle/shared/protocol';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { type BoardCard, Prisma, type RunStatus } from '@prisma/client';
+import {
+  type BoardCard,
+  type BoardCardRound,
+  Prisma,
+  type RunStatus,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { type AuditContext, SYSTEM_ACTOR } from '../audit/audit.types';
 import { PrismaService } from '../database/prisma.service';
@@ -801,6 +806,46 @@ export class BoardWork implements OnModuleInit {
   }
 
   /**
+   * #837: the head a round left — the commit, the PR it went to and the
+   * commits ahead of the base there. A head the round found (`startHeadSha`)
+   * or an earlier round left is not this round's: it pushed nothing new. A
+   * new head starts its checks over. Answers whether the round changed.
+   */
+  async recordRoundHead(
+    round: Pick<
+      BoardCardRound,
+      'id' | 'cardId' | 'round' | 'startHeadSha' | 'headSha'
+    >,
+    head: {
+      headSha: string;
+      /** Null from a runner older than #837. */
+      ahead: number | null;
+      pr: { number: number; url: string } | null;
+    },
+  ): Promise<boolean> {
+    if (head.headSha === round.startHeadSha) return false;
+    const earlier = await this.prisma.boardCardRound.count({
+      where: {
+        cardId: round.cardId,
+        round: { lt: round.round },
+        headSha: head.headSha,
+      },
+    });
+    if (earlier > 0) return false;
+    const newHead = round.headSha !== head.headSha;
+    await this.prisma.boardCardRound.update({
+      where: { id: round.id },
+      data: {
+        headSha: head.headSha,
+        ...(head.ahead !== null || newHead ? { headAhead: head.ahead } : {}),
+        ...(head.pr ? { prNumber: head.pr.number, prUrl: head.pr.url } : {}),
+        ...(newHead ? { ciState: null, ciPassed: null, ciTotal: null } : {}),
+      },
+    });
+    return true;
+  }
+
+  /**
    * #709: a stacked PR is never merged into a dependency branch whose own PR
    * has merged — its work would never reach the project base. A dependency
    * merged on GitHub is recorded first, and the PR moved onto the base; one
@@ -1324,6 +1369,7 @@ export class BoardWork implements OnModuleInit {
         prBaseCardId: null,
         ciState: 'pending',
         ciFixAttempts: 0,
+        reviewFixAttempts: 0,
         needsPerson: false,
         needsPersonReason: null,
       },
@@ -1871,6 +1917,14 @@ export class BoardWork implements OnModuleInit {
           branch: target.branch,
           state: output.prState ?? 'open',
           round: round?.round ?? 1,
+        });
+      }
+      // #837: the head the round's collect pushed is the one it left.
+      if (round && output.headSha !== undefined) {
+        await this.recordRoundHead(round, {
+          headSha: output.headSha,
+          ahead: output.ahead,
+          pr: open ? { number: prNumber, url: prUrl } : null,
         });
       }
       // A terminal card's earlier failure no longer holds once one succeeds.

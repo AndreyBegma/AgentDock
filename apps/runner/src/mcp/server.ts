@@ -19,6 +19,8 @@ import {
   ESCALATE_CARD_MCP_TOOL,
   MCP_TOOLS,
   type McpToolDefinition,
+  REPORT_REVIEW_MCP_TOOL,
+  REVIEW_SESSION_TOOLS,
 } from './tools';
 
 /** Asks the daemon one local method; the context (cwd, ppid) is the caller's. */
@@ -96,17 +98,38 @@ const withCardNote = async (
 };
 
 /**
+ * The tools a session is offered. With `escalate` (#750 D8), `escalate_card`
+ * too. With `review` (#884), the session is a review step: `report_review`
+ * and the read tools (`REVIEW_SESSION_TOOLS`) only — never `finish_card`,
+ * `escalate_card` or a tool that changes the Board; `review` wins over
+ * `escalate`.
+ */
+export const mcpToolsOf = (options: {
+  escalate?: boolean;
+  review?: boolean;
+}): readonly McpToolDefinition[] => {
+  if (options.review) {
+    return [
+      ...MCP_TOOLS.filter((t) => REVIEW_SESSION_TOOLS.includes(t.name)),
+      REPORT_REVIEW_MCP_TOOL,
+    ];
+  }
+  return options.escalate ? [...MCP_TOOLS, ESCALATE_CARD_MCP_TOOL] : MCP_TOOLS;
+};
+
+/**
  * The tools of spec 201 D20, `finish_card` (#242 D6) and the Board tools
  * (#845), each a thin call to one local method (D7) — `board_wait` loops its
  * method. `finish_card` meets the artifact guard (#445 D8) in the daemon,
- * never here (DR-10). With `escalate` (#750 D8), `escalate_card` is listed
- * too.
+ * never here (DR-10). Which of them are listed: `mcpToolsOf`.
  */
 export const buildMcpServer = (
   request: McpRequest,
   options: {
     cardNote?: McpCardNote;
     escalate?: boolean;
+    /** #884: a review session (`CARD_REVIEW_ENV`). */
+    review?: boolean;
     /** Tests only: the clock `board_wait` measures its timeout with. */
     waitClock?: BoardWaitClock;
   } = {},
@@ -124,14 +147,15 @@ export const buildMcpServer = (
     },
     () => resumeContext(options.cardNote),
   );
-  const tools: readonly McpToolDefinition[] = options.escalate
-    ? [...MCP_TOOLS, ESCALATE_CARD_MCP_TOOL]
-    : MCP_TOOLS;
-  for (const tool of tools) {
+  for (const tool of mcpToolsOf(options)) {
     server.registerTool(
       tool.name,
       { description: tool.description, inputSchema: tool.input },
       async (input: Record<string, unknown>): Promise<CallToolResult> => {
+        const call = tool.route?.(input) ?? {
+          method: tool.method,
+          args: input,
+        };
         // #845 D8: the tool's wait is a loop of short server holds.
         const result: LocalResult<unknown> =
           tool.method === 'board.wait'
@@ -144,7 +168,7 @@ export const buildMcpServer = (
                 },
                 options.waitClock,
               )
-            : await request(tool.method, input);
+            : await request(call.method, call.args);
         if (!result.ok)
           return errorResult(result.error.code, result.error.message);
         const data = z.record(z.string(), z.unknown()).safeParse(result.data);

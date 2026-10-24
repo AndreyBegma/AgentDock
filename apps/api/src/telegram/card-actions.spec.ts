@@ -6,6 +6,7 @@ import { CALLBACK_DATA_MAX } from './callback-data';
 import {
   acceptConfirm,
   actionOfWord,
+  boardErrorText,
   CARD_ACTION_CALLBACK,
   CARD_CONFIRM_CALLBACK,
   CARD_MERGE_CALLBACK,
@@ -21,6 +22,7 @@ const card = {
   shortId: 'ab12cd34',
   source: 'manual' as const,
   prNumber: 514,
+  prTarget: null,
   baseBranch: 'develop',
 };
 const pr = (extra: Partial<CardPullRequestView> = {}): CardPullRequestView => ({
@@ -91,6 +93,38 @@ describe('Telegram card actions (#578)', () => {
     ]);
     expect(CARD_MERGE_CALLBACK.decode(keyboard[0]?.[1]?.callback_data)).toEqual(
       { card: 'ab12cd34', head: HEAD.slice(0, 12) },
+    );
+  });
+
+  it('Accept and merge names a stacked PR’s target branch (ADR-0064, C-372)', () => {
+    const stacked = (merged: boolean) => ({
+      ...card,
+      prTarget: {
+        branch: 'card/c11-api',
+        stackedOn: { number: 11, label: 'C-11', merged },
+      },
+    });
+    expect(acceptConfirm(stacked(false), pr()).text).toBe(
+      [
+        'Accept C-12?',
+        "This merges PR #514 into C-11's branch (card/c11-api) and moves the card to Completed.",
+        "Its work reaches the base when C-11's pull request merges.",
+      ].join('\n'),
+    );
+    expect(acceptConfirm(stacked(true), pr()).text).toContain(
+      "C-11's own pull request has already merged, so Nautelle moves this one onto the base before it merges.",
+    );
+    expect(
+      acceptConfirm(
+        { ...card, prTarget: { branch: 'main', stackedOn: null } },
+        pr(),
+      ).text,
+    ).toContain('This merges PR #514 into main and');
+  });
+
+  it('a merge refused for a merged dependency says so, as the web does', () => {
+    expect(boardErrorText('merge_failed', 'base_merged')).toContain(
+      'Retarget it on GitHub first.',
     );
   });
 

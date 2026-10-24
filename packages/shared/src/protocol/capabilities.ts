@@ -1,9 +1,16 @@
 import { z } from 'zod';
+import { DEMO_REASON_MAX } from '../demos/contracts';
 import { mcpServerNameSchema } from '../token-saver/contracts';
 import { boundedName, LIST_MAX, TEXT_NAME_MAX, TEXT_PATH_MAX } from './bounded';
 // Type-only: `./commands` imports this module's schemas.
 import type { CommandName } from './commands';
-import { type RunnerPolicy, runnerPolicySchema } from './policy';
+import {
+  type PolicyGatedCommand,
+  policyAllowsCommand,
+  policyRefusalMessage,
+  type RunnerPolicy,
+  runnerPolicySchema,
+} from './policy';
 
 /** At most this many MCP server names on one runtime profile (#445). */
 export const PROFILE_MCP_SERVERS_MAX = 64;
@@ -24,6 +31,18 @@ export const profileAgentdockSchema = z.object({
   telemetry: z.boolean(),
 });
 export type ProfileAgentdock = z.infer<typeof profileAgentdockSchema>;
+
+/**
+ * C-369: the runner's DemoFlow, as `demoflow` in capabilities. `version` is
+ * the pinned one; `ready` is `demoflow setup` passing; `reason` (not ready
+ * only) is the short cause, redacted, without a stack trace.
+ */
+export const demoflowStatusSchema = z.object({
+  version: boundedName(TEXT_NAME_MAX),
+  ready: z.boolean(),
+  reason: z.string().max(DEMO_REASON_MAX).optional(),
+});
+export type DemoflowStatus = z.infer<typeof demoflowStatusSchema>;
 
 /** At most this many env entries, and this many args, on one runtime profile (C-123). */
 export const PROFILE_ENV_MAX = 64;
@@ -257,6 +276,12 @@ export const capabilitiesSchema = z.object({
    */
   cardEscalate: z.boolean().optional(),
   /**
+   * #854: the runner takes `startBranch` on `card.run` and puts the card's
+   * worktree on it when origin has it. Absent means `false` — the API sends
+   * no `startBranch` and the round launches on the card's own branch.
+   */
+  cardStartBranch: z.boolean().optional(),
+  /**
    * #751 B1: the runner sends `prefix.measured` on every launch. Absent means
    * `false` — the Prefix section then has nothing from this runner.
    */
@@ -268,6 +293,22 @@ export const capabilitiesSchema = z.object({
    * `true`. Absent means `false`.
    */
   prefixOverlays: z.boolean().optional(),
+  /**
+   * ADR-0090: the runner records demo videos — `card.demo` provisions
+   * DemoFlow, records and uploads. `commands` lists `card.demo` on every
+   * build (its handler answers `unsupported` before S-12 stage 2), so the API
+   * sends it only when this is `true`. Absent means `false`. C-369: it also
+   * means the runner takes `demo` on `card.run`.
+   */
+  cardDemo: z.boolean().optional(),
+  /**
+   * C-369: the runner's pinned DemoFlow — the version it runs through `npx`
+   * and whether it is set up (Node new enough, the package fetched,
+   * `demoflow setup` installed Chromium). `reason` says why it is not ready —
+   * before the first demo, that it has not been set up yet. Absent: a runner
+   * that does not record.
+   */
+  demoflow: demoflowStatusSchema.optional(),
   /**
    * ADR-0047: the runner's local security policy as it is now — values only,
    * no path beyond `allowedRoots`. The server cannot change it; the UI reads
@@ -321,9 +362,17 @@ export const cardFreshStartAvailable = (capabilities: Capabilities): boolean =>
 export const cardEscalateAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardEscalate === true;
 
+/** Whether the API may send `card.run`'s `startBranch` (#854); absent is `false`. */
+export const cardStartBranchAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardStartBranch === true;
+
 /** Whether the API may send `tokenSaver.prefix` on `card.run` (#751); absent is `false`. */
 export const prefixOverlaysAvailable = (capabilities: Capabilities): boolean =>
   capabilities.tokenSaver === true && capabilities.prefixOverlays === true;
+
+/** Whether the API may send `card.demo` (ADR-0090); absent is `false`. */
+export const cardDemoAvailable = (capabilities: Capabilities): boolean =>
+  capabilities.cardDemo === true;
 
 /** The runner's policy (ADR-0047); null for a runner older than it. */
 export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {
@@ -331,6 +380,21 @@ export const runnerPolicyOf = (capabilities: unknown): RunnerPolicy | null => {
     .object({ policy: runnerPolicySchema })
     .safeParse(capabilities);
   return parsed.success ? parsed.data.policy : null;
+};
+
+/**
+ * #913: the `policy_refused` message the runner gives `name` while its
+ * reported policy has it off — the rule and the CLI line that lifts it — or
+ * null when it allows it or reports no policy.
+ */
+export const commandPolicyRefusalOf = (
+  capabilities: unknown,
+  name: PolicyGatedCommand,
+): string | null => {
+  const policy = runnerPolicyOf(capabilities);
+  return policy === null || policyAllowsCommand(policy, name)
+    ? null
+    : policyRefusalMessage('commands', `${name} is off on this runner`, name);
 };
 
 /** What a runner said it serves (#233, ADR-0023): names only, never paths or versions. */

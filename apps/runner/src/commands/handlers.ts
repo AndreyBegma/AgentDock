@@ -13,6 +13,7 @@ import {
   closeCardPr,
   mergeCard,
   openCardPr,
+  publishCardReview,
   retargetCardPr,
   retriggerCardCi,
 } from '../cards';
@@ -25,6 +26,7 @@ import {
   stopOrchestrator,
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
+import type { DemoHandlers } from '../demos';
 import type { Exec } from '../detect/exec';
 import type { DocsHandlers } from '../docs';
 import type { HandoffHandlers } from '../handoff';
@@ -109,6 +111,8 @@ export interface HandlerContext {
   repo?: RepoHandlers;
   /** The launch prefix's calls (#751); absent means this runner does not serve them. */
   prefix?: PrefixHandlers;
+  /** Demo videos (C-369); absent means this runner does not record them. */
+  demos?: DemoHandlers;
 }
 
 const noRepo = (): never => {
@@ -167,6 +171,13 @@ const noDocs = (): never => {
 
 const noPlanner = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve plans');
+};
+
+const noDemo = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not record demo videos',
+  );
 };
 
 const noUiProfile = (): never => {
@@ -320,6 +331,18 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
+    // #884: review steps (ADR-0084), advertised like every handler (ADR-0023).
+    'card.review': (args) => context.cards?.['card.review'](args) ?? noCards(),
+    'card.reviewStop': (args) =>
+      context.cards?.['card.reviewStop'](args) ?? noCards(),
+    'card.reviewPublish': (args) =>
+      context.cards
+        ? publishCardReview(args, {
+            exec: context.exec,
+            watchedProjects: context.watchedProjects,
+          })
+        : noCards(),
+    'card.demo': (args) => context.demos?.['card.demo'](args) ?? noDemo(),
     'cards.extract': (args) =>
       context.capture?.['cards.extract'](args) ?? noCapture(),
     'text.normalize': (args) =>

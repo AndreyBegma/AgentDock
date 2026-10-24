@@ -6,11 +6,13 @@ import {
   CARD_CI_CHECKS_STORED_MAX,
   cardAutoMergeDefault,
   cardAutoMergeEnabled,
+  cardCheckCounts,
   cardCiChecksOf,
   cardCiMergeable,
   cardCiStateOf,
   cardDraftPullRequest,
   cardFollowUpBranch,
+  commitChecksUrl,
   failedCardChecks,
 } from './shipping';
 import { CARD_CI_FIX_ATTEMPTS_MAX, CARD_ROUND_TRIGGERS } from './types';
@@ -89,6 +91,30 @@ describe('cardCiMergeable (C-182)', () => {
   it('is true when every check passed', () => {
     expect(cardCiMergeable([check('a', 'pass'), check('b', 'pass')])).toBe(
       true,
+    );
+  });
+});
+
+describe('a round head’s checks (#837)', () => {
+  it('counts passed checks of those that ran, without cancelled and skipped ones', () => {
+    expect(cardCheckCounts([])).toEqual({ passed: 0, total: 0 });
+    expect(
+      cardCheckCounts([
+        check('a', 'pass'),
+        check('b', 'fail'),
+        check('c', 'pending'),
+        check('d', 'cancel'),
+        check('e', 'skipping'),
+      ]),
+    ).toEqual({ passed: 1, total: 3 });
+  });
+
+  it('links the commit’s checks page in the PR’s repository', () => {
+    expect(
+      commitChecksUrl('https://github.com/acme/widget/pull/812', 'abc1234'),
+    ).toBe('https://github.com/acme/widget/commit/abc1234/checks');
+    expect(commitChecksUrl('https://example.com/elsewhere', 'abc1234')).toBe(
+      'https://example.com/elsewhere',
     );
   });
 });

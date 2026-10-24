@@ -4,6 +4,7 @@ import {
   type SessionMessageOutcome,
 } from '@nautelle/shared';
 import { ApiError } from '../api';
+import { describePolicyRefusal } from '../runners/policy';
 
 /** What became of a message, as the line under the composer says it. */
 export const SESSION_MESSAGE_OUTCOME: Record<
@@ -55,9 +56,11 @@ const ERRORS: Record<string, string> = {
 /** A failed send, said plainly. */
 export const sessionMessageError = (error: unknown): string => {
   if (error instanceof ApiError) {
-    if (error.status === 403) return ERRORS.forbidden ?? error.message;
     const code =
       typeof error.body?.error === 'string' ? error.body.error : undefined;
+    // #913: the runner's policy says which rule and how to lift it.
+    if (code === 'policy_refused') return describePolicyRefusal(error.message);
+    if (error.status === 403) return ERRORS.forbidden ?? error.message;
     return (code && ERRORS[code]) ?? error.message;
   }
   return error instanceof Error ? error.message : 'The message was not sent.';

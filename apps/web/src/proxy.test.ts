@@ -24,7 +24,7 @@ describe('proxy', () => {
   });
 
   test('the sign-in pages are public', () => {
-    for (const path of ['/login', '/register', '/pending']) {
+    for (const path of ['/login', '/register', '/pending', '/setup']) {
       expect(redirectOf(visit(path))).toBeNull();
     }
   });
@@ -181,6 +181,15 @@ describe('security headers (F-27)', () => {
       "'self' wss://dock.example.com",
     );
     expect(directives(csp).get('script-src')).toBe("'self' 'nonce-n'");
+  });
+
+  test('a same-origin live path needs nothing beyond self (ADR-0088)', () => {
+    const csp = contentSecurityPolicy({
+      nonce: 'n',
+      liveUrl: '/api/live',
+      dev: false,
+    });
+    expect(directives(csp).get('connect-src')).toBe("'self'");
   });
 
   test('a malformed live URL only drops the extra origin', () => {

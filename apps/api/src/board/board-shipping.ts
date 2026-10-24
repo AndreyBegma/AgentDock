@@ -3,15 +3,18 @@ import {
   CARD_CI_FIX_ATTEMPTS_MAX,
   CARD_CI_MISSING_MS,
   CARD_CI_POLL_MS,
+  CARD_PR_HEAD_LAG_MS,
   CARD_ROUND_AT_ONCE_MS,
   type CardCiFixInput,
   type CardCiState,
   type CardCollectOutcome,
   type CardNeedsPersonReason,
   cardAutoMergeEnabled,
+  cardCheckCounts,
   cardCiMergeable,
   cardCiStateOf,
   cardLabel,
+  DEMO_MERGE_WAIT_MS,
   failedCardChecks,
   isActiveRoundPhase,
 } from '@nautelle/shared';
@@ -29,15 +32,26 @@ import { AuditService } from '../audit/audit.service';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BudgetExceededError } from '../budgets/budget-error';
 import { PrismaService } from '../database/prisma.service';
+import {
+  CardDemosService,
+  type DemoPrFiles,
+} from '../demos/card-demos.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure } from './board-error';
 import type { CardWithRounds } from './board-mapper';
+import { BoardReview } from './board-review';
 import { BoardRoundsService } from './board-rounds.service';
 import { BOARD_SYSTEM_ACTOR, type BoardProject, BoardWork } from './board-work';
 
 /** The poller runs outside tests; a test drives `poll` and `check` itself. */
 export const shippingAutoStart = (env: NodeJS.ProcessEnv = process.env) =>
   env.APP_ENV !== 'test';
+
+/**
+ * #884: how long after a step's report the gate is asked again — the
+ * reporting session's MCP call is answered first.
+ */
+const REVIEW_GATE_DELAY_MS = 2_000;
 
 /** #359 D6: the reason `needsPerson` is audited with. */
 export const CI_STILL_FAILING =
@@ -86,6 +100,28 @@ export const roundUnshippable = (
 };
 
 /**
+ * #895: whether the PR GitHub reports is behind the latest round's push — it
+ * still shows the head the round started from, though the round pushed
+ * another (`headSha`, #837). Its checks and mergeability are the old head's,
+ * so nothing is decided on them. A PR still behind `CARD_PR_HEAD_LAG_MS`
+ * after the round ended is taken as it is: the branch was moved back.
+ */
+export const prHeadBehind = (
+  round: Pick<
+    CardWithRounds['rounds'][number],
+    'startHeadSha' | 'headSha' | 'finishedAt'
+  > | null,
+  headSha: string,
+  now: number = Date.now(),
+): boolean =>
+  round !== null &&
+  round.headSha !== null &&
+  round.headSha !== headSha &&
+  round.startHeadSha === headSha &&
+  (round.finishedAt === null ||
+    now - round.finishedAt.getTime() < CARD_PR_HEAD_LAG_MS);
+
+/**
  * #359 D6: the project's own checks, as the fix prompt names them —
  * `orchestrator.checks`, one command per line; `null` without them.
  */
@@ -130,24 +166,52 @@ const roundSinceMove = (card: CardWithRounds): boolean => {
  * card that ships itself, either In progress with its round over — CI
  * decides where it goes (D7) — or with checks still running.
  */
-const WATCHED = {
-  source: { notIn: ['fleet', 'terminal'] },
-  prNumber: { not: null },
-  prState: { in: ['open', 'draft'] },
-  mergedAt: null,
-  needsPerson: false,
-  OR: [
-    {
-      column: 'in_progress',
-      rounds: { none: { phase: { in: [...ACTIVE_CARD_ROUND_PHASES] } } },
-    },
-    { column: { in: ['in_progress', 'finished'] }, ciState: 'pending' },
-    // #636: stacked on a dependency that merged — still to be retargeted.
-    // #709: any stacked PR — its dependency, or the PR itself, may merge on
-    // GitHub unseen.
-    { column: { in: ['in_progress', 'finished'] }, prBase: { not: null } },
-  ],
-} satisfies Prisma.BoardCardWhereInput;
+const watched = (now: number) =>
+  ({
+    source: { notIn: ['fleet', 'terminal'] },
+    prNumber: { not: null },
+    prState: { in: ['open', 'draft'] },
+    mergedAt: null,
+    needsPerson: false,
+    OR: [
+      {
+        column: 'in_progress',
+        rounds: { none: { phase: { in: [...ACTIVE_CARD_ROUND_PHASES] } } },
+      },
+      { column: { in: ['in_progress', 'finished'] }, ciState: 'pending' },
+      // #894: a Finished card whose checks have not reported yet, or went red
+      // while it waited, is still decided by its CI — a merge, or a fix round.
+      // One that holds a protected path is never merged, so it is not read.
+      {
+        column: 'finished',
+        ciState: { in: ['none', 'red'] },
+        protectedPaths: { isEmpty: true },
+        // A stacked card is landed through its dependency, not read here; a
+        // card whose checks were never read has no CI to wait for.
+        prBaseCardId: null,
+        ciCheckedAt: { not: null },
+      },
+      // #636: stacked on a dependency that merged — still to be retargeted.
+      // #709: any stacked PR — its dependency, or the PR itself, may merge on
+      // GitHub unseen.
+      { column: { in: ['in_progress', 'finished'] }, prBase: { not: null } },
+      // C-370 (ADR-0095): a green Finished card whose merge waits for its demo
+      // — merged once the demo ends, or once the wait is over.
+      {
+        column: 'finished',
+        ciState: 'green',
+        protectedPaths: { isEmpty: true },
+        prBaseCardId: null,
+        demos: {
+          some: {
+            createdAt: {
+              gte: new Date(now - DEMO_MERGE_WAIT_MS - 2 * CARD_CI_POLL_MS),
+            },
+          },
+        },
+      },
+    ],
+  }) satisfies Prisma.BoardCardWhereInput;
 
 /**
  * A card ships itself (issue #359, ADR-0035), the API's half: Nautelle
@@ -175,12 +239,38 @@ export class BoardShipping
     private readonly rounds: BoardRoundsService,
     private readonly commands: BoardCommands,
     private readonly audit: AuditService,
+    private readonly review: BoardReview,
+    private readonly demos: CardDemosService,
   ) {}
 
   onModuleInit(): void {
     this.work.onRoundCollected((cardId, outcome) =>
       this.afterRound(cardId, outcome),
     );
+    // #884: a step that reported moves the gate on without waiting for the
+    // poll; a test drives `check` itself.
+    if (shippingAutoStart()) {
+      this.review.onReported((cardId) => {
+        const timer = setTimeout(() => {
+          void this.check(cardId).catch((error: unknown) =>
+            this.logger.error(
+              `the review gate of ${cardId} failed`,
+              error instanceof Error ? error.stack : String(error),
+            ),
+          );
+        }, REVIEW_GATE_DELAY_MS);
+        timer.unref();
+      });
+      // C-370: a demo that ended lets a merge that waited for it go on.
+      this.demos.onSettled((cardId) => {
+        void this.check(cardId).catch((error: unknown) =>
+          this.logger.error(
+            `the merge of ${cardId} after its demo failed`,
+            error instanceof Error ? error.stack : String(error),
+          ),
+        );
+      });
+    }
   }
 
   onApplicationBootstrap(): void {
@@ -210,7 +300,7 @@ export class BoardShipping
     this.polling = true;
     try {
       const cards = await this.prisma.boardCard.findMany({
-        where: WATCHED,
+        where: watched(Date.now()),
         select: { id: true, project: { select: { runnerId: true } } },
         orderBy: { updatedAt: 'asc' },
       });
@@ -335,7 +425,15 @@ export class BoardShipping
         card.protectedPaths.length > 0 ||
         !(await this.autoMergeOn(project)));
     const forward = await this.work.forwarded(card.id, prNumber);
-    if (mergeOnly && card.prBase === null && !forward) return;
+    // #837: checks still running are read on, for the round that left the head.
+    if (
+      mergeOnly &&
+      card.prBase === null &&
+      !forward &&
+      card.ciState !== 'pending'
+    ) {
+      return;
+    }
 
     const result = boardOutput(
       'card.checks',
@@ -350,6 +448,17 @@ export class BoardShipping
         { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
       ),
     );
+    // #895: GitHub has not moved the PR to the round's push yet; the next
+    // poll reads it again.
+    if (
+      (result.state === 'open' || result.state === 'draft') &&
+      prHeadBehind(card.rounds[0] ?? null, result.headSha)
+    ) {
+      this.logger.log(
+        `PR #${prNumber} of ${cardLabel(card.number)} still shows ${result.headSha.slice(0, 8)}, not the pushed ${card.rounds[0]?.headSha?.slice(0, 8)}`,
+      );
+      return;
+    }
     const state = cardCiStateOf(result.checks);
     // A head with no checks is "no checks" only on its second read: CI
     // registers its checks a moment after a push.
@@ -359,6 +468,10 @@ export class BoardShipping
       card.ciHeadSha === result.headSha &&
       card.ciCheckedAt !== null;
     const noneSince = await this.store(card, result, state);
+    // C-370: a demo of an older head is no longer the PR's.
+    if (result.state === 'open' || result.state === 'draft') {
+      await this.demos.supersede(project.id, card.id, result.headSha);
+    }
 
     if (result.state === 'merged') {
       await this.mergedOutside(project, card, result);
@@ -387,7 +500,19 @@ export class BoardShipping
       await this.work.forwardConflict(project, card);
       return;
     }
-    if (mergeOnly) return;
+    // #894: a Finished card whose checks went red is fixed, merge or not.
+    if (mergeOnly && !(card.column === 'finished' && state === 'red')) {
+      // C-370: a Finished card that is not merged here still gets its demo.
+      if (
+        card.column === 'finished' &&
+        state === 'green' &&
+        !card.needsPerson &&
+        !isActiveRoundPhase(card.rounds[0]?.phase)
+      ) {
+        await this.recordDemo(project, card, result.headSha);
+      }
+      return;
+    }
     // D6: a fix round waits for the worker's round to be over.
     if (isActiveRoundPhase(card.rounds[0]?.phase) || card.needsPerson) return;
 
@@ -405,13 +530,81 @@ export class BoardShipping
         if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))
           return;
       }
+      // #884 (ADR-0084 §3): the review steps pass the head before Finished;
+      // a card that needs a person goes there, and is never merged.
+      const gate = await this.review.gate(project, card, result.headSha);
+      if (gate === 'wait') return;
       if (!(await this.toFinished(project, card))) return;
+      if (gate === 'needs_person') return;
+    } else if (state === 'red') {
+      // #894: the checks of a card that finished while they ran went red.
+      await this.fix(project, card, result, false);
+      return;
+    } else if (result.mergeable === 'CONFLICTING') {
+      // A PR that cannot merge is not tried; a person or a conflict round
+      // deals with it.
+      return;
     } else if (state !== 'green') {
       if (!noChecks) return;
       if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))
         return;
     }
+    // C-370 (ADR-0095): the head that ships is recorded first, so the merge
+    // can wait for its demo.
+    await this.recordDemo(project, card, result.headSha);
     await this.autoMerge(project, card.number, result);
+  }
+
+  /**
+   * C-370 (ADR-0095): a feature card's head that ships, recorded as a demo
+   * when its PR touches the project's UI paths. A demo never holds the card
+   * up: whatever goes wrong here is logged, and shipping goes on.
+   */
+  private async recordDemo(
+    project: BoardProject,
+    card: CardWithRounds,
+    headSha: string,
+  ): Promise<void> {
+    try {
+      await this.demos.autoRecord(project, card, headSha, () =>
+        this.prFiles(project, card),
+      );
+    } catch (error) {
+      this.logger.error(
+        `the demo of ${cardLabel(card.number)} was not recorded`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  /** C-370: the files the card's PR changes, read on the runner. */
+  private async prFiles(
+    project: BoardProject,
+    card: CardWithRounds,
+  ): Promise<DemoPrFiles> {
+    if (card.prNumber === null) return { error: 'the card has no PR' };
+    try {
+      const result = await this.commands.inspectPr(
+        project.runnerId,
+        { projectId: project.id, root: project.rootPath, pr: card.prNumber },
+        { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
+      );
+      if (result.status === 'ok') {
+        return {
+          files: result.output.files.map((file) => file.path),
+          truncated: result.output.filesTruncated,
+        };
+      }
+      return {
+        error:
+          result.status === 'error'
+            ? (result.error.message ?? result.error.code)
+            : 'the runner did not answer',
+      };
+    } catch (error) {
+      if (!(error instanceof BoardFailure)) throw error;
+      return { error: error.message };
+    }
   }
 
   /**
@@ -575,6 +768,16 @@ export class BoardShipping
         data: { state: prState },
       });
     }
+    // #837: the round that left this head keeps its checks as they answer.
+    const counts = cardCheckCounts(result.checks);
+    await this.prisma.boardCardRound.updateMany({
+      where: { cardId: card.id, headSha: result.headSha },
+      data: {
+        ciState: state,
+        ciPassed: counts.passed,
+        ciTotal: counts.total,
+      },
+    });
     this.work.publish(card.projectId, card.id);
     return noneSince;
   }
@@ -710,7 +913,8 @@ export class BoardShipping
    * (`protectedPaths`) — only a person merges it, whatever the setting.
    * C-182 (ADR-0080): nor a head whose checks are not all passed
    * (`cardCiMergeable`) — none, a cancelled or a skipped one: `needsPerson`
-   * with `ci_not_green`, as for #542.
+   * with `ci_not_green`, as for #542. C-370 (ADR-0095): a demo in flight
+   * holds the merge, at most `DEMO_MERGE_WAIT_MS`.
    */
   private async autoMerge(
     project: BoardProject,
@@ -740,6 +944,9 @@ export class BoardShipping
       await this.refuseMerge(project, card, headSha, unshippable);
       return;
     }
+    // C-370 (ADR-0095): the merge waits for a demo in flight — at most
+    // `DEMO_MERGE_WAIT_MS`; the demo's end, or the poll, asks again.
+    if (await this.demos.holdsMerge(card.id)) return;
     try {
       await this.work.mergePr(project, card, headSha, true, BOARD_SYSTEM_ACTOR);
     } catch (error) {

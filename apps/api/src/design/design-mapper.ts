@@ -16,6 +16,7 @@ import type { Prisma } from '@prisma/client';
 import { userRef, userSelect } from '../planner/plan-mapper';
 import {
   conformanceOfRow,
+  devicesOf,
   frameNameSelect,
   frameNamesOf,
 } from './design-store';
@@ -184,6 +185,7 @@ export const toDesignView = (
   comments: row.comments.map(toCommentView),
   warnings: extra.warnings,
   viewports: extra.viewports,
+  devices: devicesOf(row.devices),
   activeTurnId: extra.activeTurnId,
   busySince: row.busySince?.toISOString() ?? null,
   progress: extra.progress,

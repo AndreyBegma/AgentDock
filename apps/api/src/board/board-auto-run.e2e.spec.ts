@@ -24,6 +24,7 @@ describe('card readiness and auto-run (e2e, #443)', () => {
     w.operator.send('post', `${cardPath(number)}/move`, {
       column: 'completed',
       index: 0,
+      confirmUnlanded: true,
     });
   const finish = async (number: number) => {
     expect((await w.runCard(number)).status).toBe(200);
@@ -376,6 +377,7 @@ describe('card readiness and auto-run (e2e, #443)', () => {
       w.admin.send('post', `${cardPath(number)}/move`, {
         column: 'completed',
         index: 0,
+        confirmUnlanded: true,
       });
     const adminId = async () =>
       (

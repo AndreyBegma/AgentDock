@@ -106,6 +106,8 @@ describe('card.collect (#242 D8)', () => {
 
     const first = await collectCard(deps, record, args);
     expect(first).toEqual({
+      // #837: the pushed commit, now the PR's head.
+      headSha: await f.run(record.worktree, 'rev-parse', 'HEAD'),
       ahead: 2,
       pushed: true,
       protectedPaths: [],
@@ -142,6 +144,8 @@ describe('card.collect (#242 D8)', () => {
     f.write(record.worktree, { 'src/export.ts': 'export const csv = 2;\n' });
     const second = await collectCard(deps, record, args);
     expect(second).toEqual({
+      // #837: the pushed commit, now the PR's head.
+      headSha: await f.run(record.worktree, 'rev-parse', 'HEAD'),
       ahead: 3,
       pushed: true,
       protectedPaths: [],
@@ -174,6 +178,31 @@ describe('card.collect (#242 D8)', () => {
     ).toBe('refused');
     writeFileSync(join(record.worktree, 'notes.md'), 'left over\n');
     expect((await collectCard(deps, record, args)).pushed).toBe(true);
+  });
+
+  it('#895: pushes a round whose only new commit merges the base, and reports it as the head', async () => {
+    const { f, record, deps, args, originHead } = await setup();
+    f.write(record.worktree, { 'src/export.ts': 'export const csv = 1;\n' });
+    const pushed = await f.commitAll(record.worktree, 'feat: export as CSV');
+    await collectCard(deps, record, args);
+    expect(await originHead()).toBe(pushed);
+    // The base moves on; the next round only merges it into the branch.
+    f.write(f.root, { 'src/app.txt': 'v2\n' });
+    await f.commitAll(f.root, 'feat: v2');
+    await f.run(f.root, 'push', '-q', 'origin', 'main');
+    await f.run(record.worktree, 'fetch', '-q', 'origin', 'main');
+    await f.run(record.worktree, 'merge', '-q', '--no-edit', 'origin/main');
+    const merge = await f.run(record.worktree, 'rev-parse', 'HEAD');
+    expect(merge).not.toBe(pushed);
+
+    const result = await collectCard(
+      deps,
+      { ...record, pushedHead: pushed },
+      args,
+    );
+
+    expect(result).toMatchObject({ pushed: true, headSha: merge, ahead: 2 });
+    expect(await originHead()).toBe(merge);
   });
 });
 
@@ -263,6 +292,7 @@ describe('card.collect after card.close removed the worktree (#344)', () => {
     expect((await removeCardWorktree(deps, record)).branchDeleted).toBe(false);
 
     expect(await collectBranch(deps, record, args)).toEqual({
+      headSha: head,
       ahead: 1,
       pushed: true,
       protectedPaths: [],
@@ -330,7 +360,9 @@ describe('card.collect reports the open PR (#329 D3, D6)', () => {
       head: BRANCH,
     });
     writeFileSync(join(record.worktree, 'notes.md'), 'work\n');
-    expect(await collectCard(deps, record, args)).toEqual({
+    const result = await collectCard(deps, record, args);
+    expect(result).toEqual({
+      headSha: await f.run(record.worktree, 'rev-parse', 'HEAD'),
       ahead: 1,
       pushed: true,
       protectedPaths: [],

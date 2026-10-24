@@ -23,6 +23,7 @@ import {
   profileAgentdockOf,
   type Role,
 } from '@nautelle/shared';
+import { commandPolicyRefusalOf } from '@nautelle/shared/protocol';
 import {
   BadRequestException,
   Injectable,
@@ -45,6 +46,7 @@ import { TextOwners } from '../text/text-owners';
 import { TokenEconomyService } from '../token-economy/token-economy.service';
 import { tokenSaverFactsOf } from '../token-saver/token-saver-facts';
 import { BoardCommands, boardOutput } from './board-commands';
+import { demoFactsFor } from './board-demo-facts';
 import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
 import {
@@ -56,6 +58,7 @@ import {
   toCardView,
   toSettingsView,
 } from './board-mapper';
+import { reviewFactsFor, reviewFindingsFor } from './board-review-facts';
 import { BoardStacks } from './board-stacks';
 import {
   ACTIVE_PHASES,
@@ -290,12 +293,17 @@ export class BoardService implements OnModuleInit {
     if (!card || hiddenFrom(card, role)) {
       throw boardError(404, BOARD_ERROR.notFound, 'Card not found');
     }
-    const [facts, attachments, byType] = await Promise.all([
+    const [facts, attachments, byType, findings] = await Promise.all([
       this.facts([card]),
       this.attachments.views(card.id),
       this.modelByTypeOf(card),
+      reviewFindingsFor(this.prisma, card),
     ]);
-    return toCardDetail(card, facts, attachments, byType);
+    const detail = toCardDetail(card, facts, attachments, byType);
+    // #891: only a card with a review strip carries findings.
+    return detail.review === null
+      ? detail
+      : { ...detail, reviewFindings: findings };
   }
 
   /**
@@ -417,6 +425,14 @@ export class BoardService implements OnModuleInit {
     const profileAgentdock = new Map(
       projects.map((p) => [p.id, profileAgentdockOf(p.runner.capabilities)]),
     );
+    const messagesRefused = new Map<string, string>();
+    for (const p of projects) {
+      const refusal = commandPolicyRefusalOf(
+        p.runner.capabilities,
+        'session.message',
+      );
+      if (refusal !== null) messagesRefused.set(p.id, refusal);
+    }
     const costs = new Map<string, string>();
     for (const [runId, u] of usage) {
       if (u.costUsd !== null) costs.set(runId, u.costUsd);
@@ -427,6 +443,7 @@ export class BoardService implements OnModuleInit {
       alive: new Set(alive.map((s) => s.id)),
       runProfileKeys,
       profileAgentdock,
+      messagesRefused,
       attachmentCounts,
       dependencies: deps,
       stacks,
@@ -439,6 +456,10 @@ export class BoardService implements OnModuleInit {
         cards.flatMap((c) => (c.rounds[0] ? [c.rounds[0].id] : [])),
       ),
       prTargets: await this.prTargets(cards),
+      // #884: the review strip of each card.
+      ...(await reviewFactsFor(this.prisma, cards)),
+      // C-371: the demo chip of each card.
+      ...(await demoFactsFor(this.prisma, cards)),
       now: new Date(),
     };
   }
@@ -997,6 +1018,19 @@ export class BoardService implements OnModuleInit {
   ): Promise<BoardCardDetail> {
     const project = await this.work.project(projectId);
     const card = await this.work.card(projectId, number);
+    // #847 (ADR-0064): Completed means landed, whichever route gets there.
+    // A fleet card keeps its own rule (#282 D4).
+    if (
+      dto.column === 'completed' &&
+      card.column !== 'completed' &&
+      card.source !== 'fleet' &&
+      dto.confirmUnlanded !== true
+    ) {
+      const missing = await this.work.missingLanding(project, card.id);
+      if (missing !== null) {
+        throw boardError(409, BOARD_ERROR.notLanded, missing);
+      }
+    }
     await this.work.move(
       project,
       card,

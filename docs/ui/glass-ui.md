@@ -87,7 +87,7 @@ process state.
 | activity / agents | `Timeline`, `LogViewer`, `TraceTree`, `CodeBlock`, `Terminal`, `CronInput` |
 | forms | `Field`, `Input`, `Select`, `Combobox`, `Toggle`, `Checkbox`, `RadioGroup`, `NumberInput`, `DateInput`, `Textarea` |
 | overlays | `DialogRoot`, `SheetRoot`, `Menu*`, `ContextMenu*`, `Popover*`, `Tooltip`, `toast`, `FloatingWindow` (0.35.0: a non-modal window dragged by its bar, resized from every edge and corner, minimized by Escape, its geometry persisted under `storageKey`; a bottom `Sheet` below `md`), `Launcher` (0.35.0: the round floating button with a badge that opens it, above the `BottomCapsule` below `lg`) |
-| misc | `Card` (`hue`), `Tabs`, `SegmentedControl`, `Disclosure`, `Tree`, `Avatar`, `KeyHint`, `Separator`, `SplitPane`, `ResizableFrame` (0.30.0: a controlled-width frame with splitter edges — the design viewer's mockup) |
+| misc | `Card` (`hue`), `Tabs`, `SegmentedControl`, `Disclosure`, `Tree`, `Avatar`, `KeyHint`, `Separator`, `SplitPane`, `ResizableFrame` (0.30.0: a controlled-width frame with splitter edges; the design viewer drew its mockup in it until the device canvas, #886) |
 
 ## Added in 0.29.0
 
@@ -155,6 +155,7 @@ Until then Nautelle does without it rather than drawing it here (ADR-0011).
 | `BottomCapsuleTab` has no `badge` | The capsule's Approvals and Fleet tabs cannot carry the rail's counts; below `lg` the waiting approvals and the slots that need a person are rows of a "Needs you" `ActionList` at the top of More's sheet (`components/shell/capsule.tsx`, #521). |
 | No `PhoneBackBar` (the phone way out of a full-screen layer or sheet, stack S-6) | `components/shell/phone-back-bar.tsx` composes it from `Button` and `glass-strong` with the API proposed for glass-ui (`kind`, `label`, `title`, `subtitle`, `action`, `onExit`): a 44 px Back (named "Back to <destination>") or Close in a bar at the bottom edge, above the safe area and `--keyboard-inset`, below `lg` only; `placement="inline"` puts it in a sheet's footer. `FullScreenLayer` draws it when given `onBack` or `onClose` and pads its end by 6 rem plus the safe area (#675). It moves to the glass-ui primitive once one is released.|
 | `Toggle` has no `disabled` | `components/board/card-options.tsx` makes a locked toggle inert and dimmed and drops its change handler. |
+| No pannable, zoomable canvas of frames (stack S-10) | `components/canvas/frame-canvas.tsx` composes `FrameCanvas` from `Button`, `Separator` and `glass` with the API proposed for glass-ui (#866, see [The frame canvas](#the-frame-canvas-866)). It moves to the glass-ui primitive once one is released. |
 
 `Board` was checked at 390 px for #242: its columns scroll sideways inside the
 board and the page does not, so it needs no release for the phone. Below
@@ -162,3 +163,33 @@ board and the page does not, so it needs no release for the phone. Below
 (`components/shell/narrow.ts`, #497), and on a coarse pointer each control on a
 card, stack or plan-task face is a 44 px touch target (`components/board/tap.ts`)
 while a fine pointer sees the face unchanged.
+
+## The frame canvas (#866)
+
+`FrameCanvas` (`components/canvas/frame-canvas.tsx`) is the canvas of stack
+S-10 (approved mockup: `docs/specs/stacks/S-10-replace-the-design-viewer-with-a-figma-l/design/1/`):
+one template's frames drawn once per device, side by side, panned and zoomed
+like Figma. It is composed here until glass-ui ships the primitive (see
+"Missing in glass-ui"); the props below are the API proposed for it.
+
+| Prop | What it is |
+|---|---|
+| `frames` | `{ id, name, width, height, icon?, active?, content }[]`, laid out in a row, top-aligned, `gap` frame px apart (default 80). Each frame is drawn at its own size and labelled "Phone · 390×844" above it; `active` draws the frame and its label in the accent. |
+| `zoom`, `onZoomChange` | the `Zoom` of `lib/design/zoom.ts`: `'fit'` is Fit all, a number is the scale. The range (25–200 %), the whole-percent steps and the wheel curve are the viewer's (spec 335), reused, not copied. |
+| `pan`, `onPanChange` | where the world's origin sits, in stage px; ignored while `zoom` is `'fit'`. Every gesture reports both values, so a viewer can keep them in the URL (debounce the URL write: a drag reports on every move). |
+| `tools` | a glass group in the top-left corner, for a tool switch. |
+| `focus`, `onFocused` | #886: `{ frameId, point }`, a point in a frame's own px to bring to the middle of the stage, at 50 % or more, once the stage is measured — the design viewer centres a selected comment's pin this way. It is applied once per value; `onFocused` tells the owner to drop it. |
+| `label`, `className` | the stage's accessible name (default "Canvas"); the stage's size comes from `className`. |
+
+Gestures:
+
+- Drag on empty space (or with the middle button) pans; a trackpad scroll and the wheel pan, Shift + wheel sideways. A pointer pressed inside a frame never pans, so a frame's own drags keep the pointer (an edge drag, spec 394), and while it is down Fit all holds the scale it started at.
+- Ctrl/⌘ + wheel, a trackpad pinch and a two-finger touch pinch zoom around the pointer. Small wheel deltas add up until they move the whole-percent zoom.
+- The glass group at the bottom left: Zoom out, the level, Zoom in, **Fit all** (every frame and its label in the stage, never above 100 %) and **100%** (real size, around the stage's centre). With the stage focused, Ctrl/⌘ + `0` / `-` / `=` do the same as in the viewer.
+- Labels are drawn at 1 / scale, so they keep their on-screen size at any zoom.
+
+`useFrameCanvas()` inside a frame's `content` (or `tools`) returns `scale`,
+`pointInFrame(pointer, frameId)` and `frameAt(pointer)` — a pointer in the
+frame's own px at the current scale, where pins are stored — and
+`zoomByWheel(deltaY, pointer?)` for a Ctrl/⌘ + wheel an iframe forwards
+(spec 396). The pure geometry is `lib/canvas/geometry.ts`.

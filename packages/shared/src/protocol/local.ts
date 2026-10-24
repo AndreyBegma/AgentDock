@@ -10,6 +10,15 @@ import {
   CARD_ESCALATION_REASONS,
   CARD_RECOMMENDABLE_MODELS,
 } from '../assess/limits';
+import { DESIGN_COMMENT_MAX } from '../design/limits';
+import { taskDesignStatusSchema } from '../design/types';
+import {
+  REVIEW_FINDING_BODY_MAX,
+  REVIEW_FINDING_SEVERITIES,
+  REVIEW_FINDING_TITLE_MAX,
+  REVIEW_FINDINGS_MAX,
+  REVIEW_SUMMARY_MAX,
+} from '../review/contracts';
 import {
   pendingQuestionSchema,
   sessionMessageInputSchema,
@@ -63,6 +72,25 @@ export const LOCAL_BOARD_REFUSALS = [
   'no_profile',
   'command_unavailable',
   'policy_refused',
+  // C-377 (ADR-0089): stacks and dependencies.
+  'stack_refused',
+  'dependency_cycle',
+  'invalid_dependency',
+] as const;
+
+/**
+ * C-377 (ADR-0089): the design routes' own refusals (`DESIGN_ERROR`) the
+ * design tools answer with unchanged. The design module checks each is a
+ * `DesignErrorCode`.
+ */
+export const LOCAL_DESIGN_REFUSALS = [
+  'design_off',
+  'design_busy',
+  'no_open_comments',
+  'design_approved',
+  'task_frozen',
+  'unsupported_runtime',
+  'runner_outdated',
 ] as const;
 
 export const localErrorCodeSchema = z.enum([
@@ -95,6 +123,8 @@ export const localErrorCodeSchema = z.enum([
    * escalated, or in the A arm of `model-by-type`.
    */
   'not_escalatable',
+  /** #884: `card.reviewReport` from a session that is not a running review step. */
+  'not_a_review_session',
   /** `card.track` from a session that is not a person's own `manual` one (issue #282 D1). */
   'not_a_manual_session',
   /**
@@ -111,7 +141,13 @@ export const localErrorCodeSchema = z.enum([
   'card_taken',
   /** #845: `card.release` of a card the calling session neither holds nor queued. */
   'not_taken',
+  /**
+   * C-377 (ADR-0089): a design approve from a session that is not a person's
+   * own `manual` one — approving stays a person's gate.
+   */
+  'needs_person',
   ...LOCAL_BOARD_REFUSALS,
+  ...LOCAL_DESIGN_REFUSALS,
 ]);
 export type LocalErrorCode = z.infer<typeof localErrorCodeSchema>;
 
@@ -326,6 +362,46 @@ export const localCardEscalateResultSchema = z.object({
 });
 
 /**
+ * `card.reviewReport` (#884, ADR-0084 §4): a review session's `report_review`
+ * tool, called once with every finding. The review run is resolved from the
+ * request's `session.id` — the uuid the API gave the review session — never
+ * from an argument; any other session is answered `not_a_review_session`.
+ */
+export const localReviewFindingSchema = z.strictObject({
+  severity: z.enum(REVIEW_FINDING_SEVERITIES),
+  /** Relative to the repository root. */
+  file: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1_000)
+    .refine((f) => !f.startsWith('/') && !f.split('/').includes('..'), {
+      message: 'must be relative to the repository root',
+    })
+    .optional(),
+  /** 1-based, in `file`. */
+  line: z.number().int().positive().optional(),
+  title: z.string().trim().min(1).max(REVIEW_FINDING_TITLE_MAX),
+  body: z.string().trim().max(REVIEW_FINDING_BODY_MAX),
+});
+export type LocalReviewFinding = z.infer<typeof localReviewFindingSchema>;
+
+export const localCardReviewReportArgsSchema = z.strictObject({
+  findings: z.array(localReviewFindingSchema).max(REVIEW_FINDINGS_MAX),
+  summary: z.string().trim().max(REVIEW_SUMMARY_MAX).optional(),
+});
+export type LocalCardReviewReportArgs = z.infer<
+  typeof localCardReviewReportArgsSchema
+>;
+export const localCardReviewReportResultSchema = z.object({
+  /** The card's per-project number (`C-<number>`). */
+  number: z.number().int().positive(),
+  recorded: z.literal(true),
+  blocking: z.number().int().nonnegative(),
+  nits: z.number().int().nonnegative(),
+});
+
+/**
  * A card's title and body limits and its kinds; `BOARD_CARD_TITLE_MAX`,
  * `BOARD_CARD_BODY_MAX` and `BOARD_CARD_KINDS` in the board module. Defined
  * here because the board module imports this one.
@@ -428,6 +504,91 @@ export const localCardTakenSchema = z.object({
 });
 export type LocalCardTaken = z.infer<typeof localCardTakenSchema>;
 
+// C-377 (ADR-0089): a person's session works stacks, designs and dependencies.
+
+/** `STACK_TITLE_MAX` in the planner module. */
+export const LOCAL_STACK_TITLE_MAX = 80;
+/** `STACK_STAGE_TITLE_MAX` in the planner module. */
+export const LOCAL_STACK_STAGE_TITLE_MAX = 80;
+/** `INTAKE_SPLIT_MAX`: the most stages `stack.create` makes. */
+export const LOCAL_STACK_STAGES_MAX = 8;
+/** `BULK_CARDS_MAX`: the most cards one `stack.create` groups. */
+export const LOCAL_STACK_CARDS_MAX = 100;
+/** `MANUAL_STACK_CARDS_MIN`: a stack made by hand groups two cards or more. */
+export const LOCAL_STACK_CARDS_MIN = 2;
+/** Comments one design `revise` leaves before it revises. */
+export const LOCAL_DESIGN_COMMENTS_MAX = 20;
+/** `STACK_RUN_STATES` in the board module. */
+export const LOCAL_STACK_RUN_STATES = [
+  'running',
+  'paused',
+  'stopped',
+  'done',
+] as const;
+
+const stackNumberSchema = z.number().int().positive();
+const oneLine = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .regex(/^[^\r\n]*$/, 'must be one line');
+const stackRefArgsSchema = z.strictObject({ stack: stackNumberSchema });
+
+/** A design as the stack and design tools brief it. */
+export const localDesignBriefSchema = z.object({
+  needed: z.boolean(),
+  status: taskDesignStatusSchema,
+  variantCount: z.number().int().nonnegative(),
+  approvedRevisionId: z.string().min(1).nullable(),
+  /** A Generate or Revise is under way. */
+  busy: z.boolean(),
+});
+export type LocalDesignBrief = z.infer<typeof localDesignBriefSchema>;
+
+/**
+ * One stack as `board.list` and the stack methods answer it: its stages with
+ * their cards by number, its design (null when it has none) and its run
+ * (null before it was run).
+ */
+export const localStackSchema = z.object({
+  number: stackNumberSchema,
+  /** `S-<number>`. */
+  label: z.string().min(1),
+  title: z.string(),
+  /** The column of its least advanced unfinished card. */
+  column: boardColumnSchema,
+  accepted: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  /** 0-based; null once every card is Completed. */
+  currentStage: z.number().int().nonnegative().nullable(),
+  stages: z.array(
+    z.object({
+      /** 0-based. */
+      position: z.number().int().nonnegative(),
+      title: z.string(),
+      cards: z.array(cardNumberSchema),
+    }),
+  ),
+  design: localDesignBriefSchema.nullable(),
+  run: z
+    .object({
+      state: z.enum(LOCAL_STACK_RUN_STATES),
+      queued: z.number().int().nonnegative(),
+      waiting: z.number().int().nonnegative(),
+      running: z.number().int().nonnegative(),
+      pause: z
+        .object({
+          code: z.string().min(1),
+          message: z.string(),
+          card: cardNumberSchema.nullable(),
+        })
+        .nullable(),
+    })
+    .nullable(),
+});
+export type LocalStack = z.infer<typeof localStackSchema>;
+
 /** One card as `board.list` answers it. */
 export const localBoardListCardSchema = z.object({
   number: cardNumberSchema,
@@ -474,6 +635,8 @@ export const localBoardListResultSchema = z.object({
     cardMergePolicy: z.enum(LOCAL_CARD_MERGE_POLICIES),
   }),
   cards: z.array(localBoardListCardSchema),
+  /** C-377: every stack of the project (with `column`, those in that column). */
+  stacks: z.array(localStackSchema),
 });
 
 /** One round as `board.card` summarises it. */
@@ -707,6 +870,179 @@ export const localCardReleaseResultSchema = z.object({
   next: localTakenCardSchema.nullable(),
 });
 
+// C-377 (ADR-0089): the stack, design and dependency methods.
+
+/**
+ * `stack.create` (C-377): one call groups the cards into a new stack with
+ * every stage — each card of a stage depends on every card of the stage
+ * before — in one transaction. A card in Inbox, in a stack already or not of
+ * the project, or a dependency cycle, refuses the whole call.
+ */
+export const localStackCreateArgsSchema = z
+  .strictObject({
+    title: oneLine(LOCAL_STACK_TITLE_MAX).min(1),
+    body: z.string().max(LOCAL_CARD_BODY_MAX).optional(),
+    /** A shared design holds Run of every card until it is approved. */
+    design: z.boolean().optional(),
+    stages: z
+      .array(
+        z.strictObject({
+          title: oneLine(LOCAL_STACK_STAGE_TITLE_MAX).optional(),
+          cards: z.array(cardNumberSchema).min(1).max(LOCAL_STACK_CARDS_MAX),
+        }),
+      )
+      .min(1)
+      .max(LOCAL_STACK_STAGES_MAX),
+  })
+  .superRefine((args, ctx) => {
+    const cards = args.stages.flatMap((s) => s.cards);
+    if (cards.length < LOCAL_STACK_CARDS_MIN) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['stages'],
+        message: `A stack groups at least ${LOCAL_STACK_CARDS_MIN} cards`,
+      });
+    }
+    if (cards.length > LOCAL_STACK_CARDS_MAX) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['stages'],
+        message: `A stack groups at most ${LOCAL_STACK_CARDS_MAX} cards`,
+      });
+    }
+    if (new Set(cards).size !== cards.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['stages'],
+        message: 'A card is in one stage only',
+      });
+    }
+  });
+
+/**
+ * `stack.addCard` (C-377): a card in no stack joins a stage — an existing
+ * one, or a new last one (`stage` = the number of stages).
+ */
+export const localStackAddCardArgsSchema = z.strictObject({
+  stack: stackNumberSchema,
+  card: cardNumberSchema,
+  /** 0-based. */
+  stage: z.number().int().min(0).max(LOCAL_STACK_STAGES_MAX),
+});
+
+/** `stack.removeCard` (C-377): the card leaves the stack and stays on the board. */
+export const localStackRemoveCardArgsSchema = z.strictObject({
+  stack: stackNumberSchema,
+  card: cardNumberSchema,
+});
+
+/** `stack.update` (C-377): the title, the description and stage titles. */
+export const localStackUpdateArgsSchema = z
+  .strictObject({
+    stack: stackNumberSchema,
+    title: oneLine(LOCAL_STACK_TITLE_MAX).min(1).optional(),
+    body: z.string().max(LOCAL_CARD_BODY_MAX).optional(),
+    /** Each names a stage by its 0-based position; an empty title clears it. */
+    stages: z
+      .array(
+        z.strictObject({
+          position: z.number().int().min(0).max(LOCAL_STACK_STAGES_MAX),
+          title: oneLine(LOCAL_STACK_STAGE_TITLE_MAX),
+        }),
+      )
+      .min(1)
+      .max(LOCAL_STACK_STAGES_MAX + 1)
+      .optional(),
+  })
+  .refine(
+    (args) =>
+      args.title !== undefined ||
+      args.body !== undefined ||
+      args.stages !== undefined,
+    { message: 'Nothing to change: give title, body or stages' },
+  );
+
+/** One revision of a design, as the design tools list it. */
+export const localDesignRevisionSchema = z.object({
+  id: z.string().min(1),
+  /** 1-based. */
+  variant: z.number().int().positive(),
+  revision: z.number().int().positive(),
+  title: z.string(),
+  /** A variant not picked on approve. */
+  archived: z.boolean(),
+});
+
+/**
+ * `stack.designView` / `card.designView` (C-377): the design's state, its
+ * revisions and its open comments — the `status` action of the design tools.
+ */
+export const localDesignViewSchema = localDesignBriefSchema.extend({
+  owner: z.enum(['card', 'stack']),
+  number: z.number().int().positive(),
+  revisions: z.array(localDesignRevisionSchema),
+  /** Comments no revision has addressed yet; Revise sends them. */
+  openComments: z.array(
+    z.object({
+      id: z.string().min(1),
+      revisionId: z.string().min(1),
+      body: z.string(),
+    }),
+  ),
+  /** Why the last batch ended without a revision; null at rest. */
+  lastFailure: z
+    .object({ reason: z.string().min(1), message: z.string() })
+    .nullable(),
+});
+export type LocalDesignView = z.infer<typeof localDesignViewSchema>;
+
+/** The design actions that write; `status` is the view method. */
+export const LOCAL_DESIGN_ACTIONS = ['generate', 'approve', 'revise'] as const;
+
+const designActionFields = {
+  action: z.enum(LOCAL_DESIGN_ACTIONS),
+  /**
+   * `revise`: general comments left on `revisionId` (default the newest
+   * revision of a variant still in play) before it revises.
+   */
+  comments: z
+    .array(z.string().trim().min(1).max(DESIGN_COMMENT_MAX))
+    .min(1)
+    .max(LOCAL_DESIGN_COMMENTS_MAX)
+    .optional(),
+  /**
+   * `approve`: the revision to approve — default the newest of the only
+   * variant still in play; `revise`: the revision the comments are left on.
+   */
+  revisionId: z.string().min(1).max(64).optional(),
+};
+
+/**
+ * `stack.design` / `card.design` (C-377): Generate, Approve or Revise, as
+ * the design page does. Approve is a person's gate: a session that is not a
+ * person's own `manual` one is `needs_person`.
+ */
+export const localStackDesignArgsSchema = z.strictObject({
+  stack: stackNumberSchema,
+  ...designActionFields,
+});
+export const localCardDesignArgsSchema = z.strictObject({
+  card: cardNumberSchema,
+  ...designActionFields,
+});
+
+/** `card.depend` / `card.undepend` (C-377): one dependency of a card. */
+export const localCardDependArgsSchema = z
+  .strictObject({ card: cardNumberSchema, dependsOn: cardNumberSchema })
+  .refine((args) => args.card !== args.dependsOn, {
+    message: 'A card does not depend on itself',
+  });
+export const localCardDependResultSchema = z.object({
+  number: cardNumberSchema,
+  /** The cards it runs after now, by number. */
+  dependsOn: z.array(cardNumberSchema),
+});
+
 /**
  * The local method allowlist (D7). Each later change adds its method here and
  * its handler to the API's router in the same change.
@@ -796,6 +1132,12 @@ export const localMethods = {
     minRole: 'operator',
     needsProject: true,
   },
+  'card.reviewReport': {
+    args: localCardReviewReportArgsSchema,
+    result: localCardReviewReportResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
   'card.track': {
     args: localCardTrackArgsSchema,
     result: localCardTrackResultSchema,
@@ -867,6 +1209,80 @@ export const localMethods = {
   'card.release': {
     args: cardRefArgsSchema,
     result: localCardReleaseResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  // C-377 (ADR-0089): the design views answer any session of the project;
+  // the rest only a person's own `manual` one, as the #845 control methods.
+  'stack.create': {
+    args: localStackCreateArgsSchema,
+    result: localStackSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'stack.addCard': {
+    args: localStackAddCardArgsSchema,
+    result: localStackSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'stack.removeCard': {
+    args: localStackRemoveCardArgsSchema,
+    result: localStackSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'stack.update': {
+    args: localStackUpdateArgsSchema,
+    result: localStackSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'stack.run': {
+    args: stackRefArgsSchema,
+    result: localStackSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'stack.stop': {
+    args: stackRefArgsSchema,
+    result: localStackSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'stack.designView': {
+    args: stackRefArgsSchema,
+    result: localDesignViewSchema,
+    minRole: 'viewer',
+    needsProject: true,
+  },
+  'stack.design': {
+    args: localStackDesignArgsSchema,
+    result: localDesignViewSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.designView': {
+    args: cardRefArgsSchema,
+    result: localDesignViewSchema,
+    minRole: 'viewer',
+    needsProject: true,
+  },
+  'card.design': {
+    args: localCardDesignArgsSchema,
+    result: localDesignViewSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.depend': {
+    args: localCardDependArgsSchema,
+    result: localCardDependResultSchema,
+    minRole: 'operator',
+    needsProject: true,
+  },
+  'card.undepend': {
+    args: localCardDependArgsSchema,
+    result: localCardDependResultSchema,
     minRole: 'operator',
     needsProject: true,
   },

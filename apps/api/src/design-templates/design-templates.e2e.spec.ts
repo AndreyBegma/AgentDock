@@ -4,6 +4,7 @@ import {
   type DesignTemplatesView,
   type DesignTemplateView,
 } from '@nautelle/shared';
+import type { Prisma } from '@prisma/client';
 import { CardDesignHarness } from '../design/testing/card-design-e2e';
 
 const custom = (
@@ -161,6 +162,42 @@ describe('design templates API (e2e, #833)', () => {
     expect((await h.auditOf('design.template_deleted')).length).toBe(1);
   });
 
+  // #863 (ADR-0085): an override stored while flow still had a mobile frame.
+  it('lists an older flow override without its mobile frame, and saves it back', async () => {
+    const flow = BUILTIN_DESIGN_TEMPLATES[2];
+    const mobile: DesignTemplateFrame = {
+      key: 'mobile',
+      kind: 'mobile',
+      name: 'Mobile',
+      instruction: 'The steps at the narrow width.',
+      required: false,
+      enabled: true,
+    };
+    await h.ctx.prisma.designTemplate.create({
+      data: {
+        projectId: h.projectId,
+        key: 'flow',
+        name: flow.name,
+        definition: {
+          frames: [...flow.frames, mobile, custom()],
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+    const listed = (await list()).templates.find((t) => t.key === 'flow');
+    expect(listed?.overridden).toBe(true);
+    expect(listed?.frames.map((f) => f.key)).toEqual([
+      'flow_map',
+      'flow_step',
+      'breakdown',
+      'notes',
+    ]);
+    const saved = await h.admin.send('put', url('flow'), {
+      name: listed?.name,
+      frames: listed?.frames,
+    });
+    expect(saved.status).toBe(200);
+  });
+
   it('keeps the templates of one project from another’s members, and from an operator’s writes', async () => {
     expect((await h.outsider.get(url())).status).toBe(404);
     expect(
@@ -210,7 +247,7 @@ describe('design templates API (e2e, #833)', () => {
       });
       const prompt = await promptFor('page');
       expect(prompt).toContain('# Frames to draw');
-      expect(prompt).not.toContain('States and mobile');
+      expect(prompt).not.toContain('States — kind');
     });
 
     it('carries a custom template’s frames with their instructions', async () => {

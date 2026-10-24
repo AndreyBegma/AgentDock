@@ -8,8 +8,10 @@ import {
   type CardChange,
   type CardCiFixInput,
   type CardEscalationReason,
+  type CardReviewFixFinding,
   type CardRoundPhase,
   type CardRoundTrigger,
+  type CardWorkerDemo,
   cardAttachmentSnapshotSchema,
   cardBranch,
   cardChange,
@@ -21,9 +23,11 @@ import {
   cardLabel,
   cardNextRoundPrompt,
   cardRecommendationOf,
+  cardReviewFixPrompt,
   cardSpecPath,
   cardSpecPrBody,
   cardWorkerPrompt,
+  demoScenarioPath,
   isActiveRoundPhase,
   stackDesignPath,
   stackLabel,
@@ -34,11 +38,13 @@ import {
   type CardRunArgs,
   type CardRunFile,
   capabilitiesSchema,
+  cardDemoAvailable,
   cardDocsBranch,
   cardEffortAvailable,
   cardEscalateAvailable,
   cardFreshStartAvailable,
   cardRunArgsSchema,
+  cardStartBranchAvailable,
   ISSUE_TITLE_MAX,
   ORCHESTRATOR_DEFAULTS,
   type OrchestratorPermissionMode,
@@ -103,11 +109,27 @@ import {
   isOpusModel,
   MODEL_BY_TYPE,
   rememberedChoice,
+  startBranchChoice,
+  startBranchOutcome,
 } from './launch-choice';
 
 type Tx = Prisma.TransactionClient;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** #884: why a `review_fix` round starts — the blocking findings on the head. */
+export interface CardReviewFixInput {
+  reason: 'review';
+  headSha: string;
+  findings: readonly CardReviewFixFinding[];
+}
+
+/** Why one of Nautelle's own fix rounds starts. */
+type RoundFix = CardCiFixInput | CardReviewFixInput;
+
+/** #884: the rounds Nautelle starts itself, as a person, on the card's PR. */
+const isFixRound = (trigger: CardRoundTrigger): boolean =>
+  trigger === 'ci_fix' || trigger === 'review_fix';
 
 /** #750: `card.escalate` refused — answered `not_escalatable`. */
 export class CardNotEscalatable extends Error {
@@ -259,6 +281,21 @@ export const cardPromptEscalate = (escalate: boolean): { escalate?: true } =>
   escalate ? { escalate: true } : {};
 
 /**
+ * C-369 (ADR-0090 §2): a round gets DemoFlow's MCP server and the scenario
+ * section when the project records demo videos and the runner can record
+ * them (`cardDemo`) — `card.run` is strict, so an older runner never sees
+ * `demo`. `env` is the project's secret names, never a value.
+ */
+export const cardRoundDemo = (
+  card: { number: number; title: string },
+  demos: { enabled: boolean; env: readonly string[] },
+  capabilities: Capabilities | null,
+): CardWorkerDemo | null =>
+  demos.enabled && capabilities !== null && cardDemoAvailable(capabilities)
+    ? { scenarioPath: demoScenarioPath(card), env: demos.env }
+    : null;
+
+/**
  * Starting a round (issue #242 D4, D5, D9, D12, D13): Run — round 1 or a
  * retry — and feedback. Everything that can be refused is refused before a
  * row exists or a command is sent; the round is then a `runs` row of kind
@@ -286,6 +323,23 @@ export class BoardRoundsService {
     private readonly principals: BoardPrincipals,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
+
+  /** C-369: whether the project records demo videos, and its secret names. */
+  private async demoSettings(
+    projectId: string,
+  ): Promise<{ enabled: boolean; env: string[] }> {
+    const settings = await this.prisma.boardSettings.findUnique({
+      where: { projectId },
+      select: { demoVideosEnabled: true },
+    });
+    if (!settings?.demoVideosEnabled) return { enabled: false, env: [] };
+    const secrets = await this.prisma.projectDemoSecret.findMany({
+      where: { projectId },
+      orderBy: { name: 'asc' },
+      select: { name: true },
+    });
+    return { enabled: true, env: secrets.map((s) => s.name) };
+  }
 
   /**
    * `POST …/run`: round 1, or a retry after failed / ended / cancelled.
@@ -344,9 +398,12 @@ export class BoardRoundsService {
       null,
       autoRunAfter,
       stacked,
+      // #854: the gone session's branch, for the Run to continue.
+      takenBy !== null ? card.takenBranch : null,
     );
     if (takenBy !== null) {
-      // The Run is the card's worker now; `takenBranch` stays recorded.
+      // The Run is the card's worker now; `start` moved it onto `takenBranch`
+      // when the runner took it (#854 D2), else `takenBranch` stays recorded.
       await this.prisma.boardCard.updateMany({
         where: { id: card.id, trackedSessionId: takenBy },
         data: { trackedSessionId: null },
@@ -406,18 +463,7 @@ export class BoardRoundsService {
         'A CI fix resumes the card worker, which has not run',
       );
     }
-    const started = card.rounds.find((r) => r.authorId !== null);
-    const actor = await this.principals.actor(
-      projectId,
-      started?.authorId ?? null,
-    );
-    const run = started
-      ? await this.prisma.run.findUnique({
-          where: { id: started.runId },
-          select: { args: true },
-        })
-      : null;
-    const permissionMode = run ? permissionModeOf(run.args) : undefined;
+    const { actor, permissionMode } = await this.fixLaunchOf(card);
     await this.start(
       card,
       'ci_fix',
@@ -427,6 +473,63 @@ export class BoardRoundsService {
       [],
       input,
     );
+  }
+
+  /**
+   * #884 (ADR-0084 §3): Nautelle's round for the blocking findings of the
+   * review steps on the card's PR head — the card's session resumed, the
+   * `review_fix` prompt. Counts one of the PR's review fix rounds, apart from
+   * its `ci_fix` attempts. Runs as `ciFix` does: as the person who started
+   * the card's latest round, in that round's mode.
+   */
+  async reviewFix(
+    projectId: string,
+    number: number,
+    input: Omit<CardReviewFixInput, 'reason'>,
+  ): Promise<void> {
+    const card = await this.work.card(projectId, number);
+    if (card.sessionId === null) {
+      throw boardError(
+        409,
+        BOARD_ERROR.wrongColumn,
+        'A review fix resumes the card worker, which has not run',
+      );
+    }
+    const { actor, permissionMode } = await this.fixLaunchOf(card);
+    await this.start(
+      card,
+      'review_fix',
+      permissionMode ? { permissionMode } : {},
+      null,
+      actor,
+      [],
+      { reason: 'review', ...input },
+    );
+  }
+
+  /**
+   * C-181 (D-09, D-10): who a fix round runs as — the person who started the
+   * card's latest round — and that round's mode.
+   */
+  async fixLaunchOf(card: CardWithRounds): Promise<{
+    actor: BoardActor;
+    permissionMode: OrchestratorPermissionMode | undefined;
+  }> {
+    const started = card.rounds.find((r) => r.authorId !== null);
+    const actor = await this.principals.actor(
+      card.projectId,
+      started?.authorId ?? null,
+    );
+    const run = started
+      ? await this.prisma.run.findUnique({
+          where: { id: started.runId },
+          select: { args: true },
+        })
+      : null;
+    return {
+      actor,
+      permissionMode: run ? permissionModeOf(run.args) : undefined,
+    };
   }
 
   /**
@@ -694,12 +797,14 @@ export class BoardRoundsService {
     actor: BoardActor,
     /** #309 D3: pending uploads that come with the feedback. */
     claimIds: readonly string[] = [],
-    /** #359 D6: why a `ci_fix` round starts. */
-    ciFix: CardCiFixInput | null = null,
+    /** #359 D6, #884: why a `ci_fix` or `review_fix` round starts. */
+    fix: RoundFix | null = null,
     /** #443: the accepted dependency an Auto-run when ready round starts after. */
     autoRunAfter: number | null = null,
     /** #636: the dependency a Run stacks the card on; `null` is the base. */
     stacked: StackedBase | null = null,
+    /** #854: the branch a session-gone taken card was worked on. */
+    taken: string | null = null,
   ): Promise<void> {
     const project = await this.work.project(card.projectId);
     if (isActiveRoundPhase(card.rounds[0]?.phase)) throw this.running();
@@ -877,6 +982,17 @@ export class BoardRoundsService {
           title: card.title,
           issueNumber: issue.number,
         }));
+    // #854 D1: a session-gone taken card's Run starts on the branch the
+    // session worked — when it is a card branch and the runner takes the
+    // field; the runner then uses it only when origin has it.
+    const startChoice = startBranchChoice(
+      taken,
+      branch,
+      followUp,
+      capabilities !== null && cardStartBranchAvailable(capabilities),
+    );
+    const startBranch =
+      startChoice?.kind === 'send' ? startChoice.branch : null;
     // #379: a spec in an external docs repository goes in through its own
     // pull request, before the worker starts; the card's branch never holds it.
     let specPr = cardSpecPrOf(card);
@@ -964,6 +1080,11 @@ export class BoardRoundsService {
       card.escalatedAt === null &&
       capabilities !== null &&
       cardEscalateAvailable(capabilities);
+    const demo = cardRoundDemo(
+      card,
+      await this.demoSettings(project.id),
+      capabilities,
+    );
     const nextRound = (change: CardChange | null) =>
       cardNextRoundPrompt({
         label: cardLabel(card.number),
@@ -972,8 +1093,10 @@ export class BoardRoundsService {
       });
     // #750 D9: an escalation resumes the card's work, with the finding.
     const nextPrompt = nextRound(changeSinceLastRound(card, attachmentBriefs));
-    const prompt = ciFix
-      ? cardCiFixPrompt(ciFix)
+    const prompt = fix
+      ? fix.reason === 'review'
+        ? cardReviewFixPrompt(fix)
+        : cardCiFixPrompt(fix)
       : resume || (trigger === 'feedback' && feedback !== null)
         ? escalation
           ? escalationRoundPrompt(card, nextPrompt, nextRound(null))
@@ -983,7 +1106,8 @@ export class BoardRoundsService {
             title: card.title,
             body: card.body,
             kind: card.kind,
-            branch,
+            // #854: the branch the round is expected to work on.
+            branch: startBranch ?? branch,
             base,
             specPath,
             specPr: specPr
@@ -1025,6 +1149,7 @@ export class BoardRoundsService {
             ...cardPromptSaver(saver),
             // #750 D8: the text goes with the tool the runner offers.
             ...cardPromptEscalate(escalate),
+            demo,
           });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null && specPr === null
@@ -1060,6 +1185,8 @@ export class BoardRoundsService {
         : {}),
       ...(followUp ? { newBranch: true } : {}),
       ...(escalate ? { escalate: true as const } : {}),
+      ...(startBranch !== null ? { startBranch } : {}),
+      ...(demo !== null ? { demo: true as const } : {}),
       ...withCardPrefix(saver.args, prefix.prefix),
     };
     const valid = cardRunArgsSchema.safeParse({ ...draft, runId: 'pending' });
@@ -1121,8 +1248,9 @@ export class BoardRoundsService {
           cardBody: card.body,
           cardKind: card.kind,
           cardAttachments: attachmentBriefs,
-          // C-181: a `ci_fix` round runs as a person but is Nautelle's own.
-          authorId: trigger === 'ci_fix' ? null : actor.userId,
+          // C-181: a `ci_fix` round runs as a person but is Nautelle's own;
+          // #884: so is a `review_fix` round.
+          authorId: isFixRound(trigger) ? null : actor.userId,
           phase: 'queued',
           startedAt: now,
           // #542: the head the round starts on; a follow-up starts a new PR.
@@ -1178,7 +1306,9 @@ export class BoardRoundsService {
           // person acting, so automation resumes.
           ...(trigger === 'ci_fix'
             ? { ciFixAttempts: { increment: 1 } }
-            : { needsPerson: false, needsPersonReason: null }),
+            : trigger === 'review_fix'
+              ? { reviewFixAttempts: { increment: 1 } }
+              : { needsPerson: false, needsPersonReason: null }),
           // #359 D8: the next PR starts with nothing of the merged one.
           ...(followUp
             ? {
@@ -1191,6 +1321,7 @@ export class BoardRoundsService {
                 ciHeadSha: null,
                 ciCheckedAt: null,
                 ciFixAttempts: 0,
+                reviewFixAttempts: 0,
                 ciNoneSince: null,
                 ciRetriggeredSha: null,
               }
@@ -1232,7 +1363,11 @@ export class BoardRoundsService {
       round: round.round,
       runId: round.runId,
       trigger,
-      ...(ciFix ? { ciFix: ciFix.reason } : {}),
+      ...(fix
+        ? fix.reason === 'review'
+          ? { reviewFix: fix.findings.length }
+          : { ciFix: fix.reason }
+        : {}),
       ...(autoRunAfter !== null ? { autoRunAfter } : {}),
       branch,
       ...(followUp ? { newBranch: true } : {}),
@@ -1286,7 +1421,31 @@ export class BoardRoundsService {
         where: { id: round.id, tmuxSession: null },
         data: { tmuxSession: output.tmuxSession },
       });
-      await this.record(trigger, actor, project.id, card.id, after, 'ok');
+      // #854 D2: on the taken branch now, the card continues it from here.
+      const onBranch = output.branch ?? branch;
+      if (taken !== null && onBranch === taken) {
+        await this.prisma.boardCard.update({
+          where: { id: card.id },
+          data: { branch: taken, takenBranch: null },
+        });
+      }
+      await this.record(
+        trigger,
+        actor,
+        project.id,
+        card.id,
+        {
+          ...after,
+          ...(taken !== null
+            ? {
+                branch: onBranch,
+                takenBranch: taken,
+                ...startBranchOutcome(startChoice, output.startBranchSkipped),
+              }
+            : {}),
+        },
+        'ok',
+      );
     } catch (error) {
       if (!(error instanceof BoardFailure)) throw error;
       // No answer: the runner may have started it; its events settle it.

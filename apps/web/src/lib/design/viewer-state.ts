@@ -1,38 +1,43 @@
 import {
   DEFAULT_VIEWPORTS,
   DESIGN_THEMES,
-  DESIGN_VIEWPORT_MAX_PX,
-  DESIGN_VIEWPORT_MIN_PX,
   type DesignFrameView,
   type DesignRevisionView,
   type DesignTheme,
+  type TaskDesignView,
   type ViewportPreset,
 } from '@nautelle/shared';
+import type { Point } from '../canvas/geometry';
 import { clampZoom, type Zoom } from './zoom';
 
 /**
- * The viewer's state (spec 223 D11), all of it in the URL so a link opens
- * the same screen: `?variant=2&rev=<revisionId>&frame=1&vp=Mobile&theme=dark&w=412`.
- * Anything missing or wrong falls back to a default rather than failing.
+ * The viewer's state (spec 223 D11, #886), all of it in the URL so a link
+ * opens the same view:
+ * `?variant=2&rev=<revisionId>&frame=1&device=Tablet&theme=dark&zoom=0.5&pan=120,-40`.
+ * Anything missing or wrong falls back to a default rather than failing; the
+ * `vp` and `w` of the single-frame viewer are ignored.
  */
 export interface ViewerState {
   variant: number;
   /** The revision in view; null while the design has none. */
   revision: DesignRevisionView | null;
   /**
-   * #441: the frame in view, by position — `frame`, clamped to the
+   * #441: the frame in view — the tab — by position: `frame`, clamped to the
    * revision's frames, else the first.
    */
   frame: number;
-  /** The preset in view; its name is `vp`. */
-  viewport: ViewportPreset;
+  /** #886: the devices every frame is drawn at, side by side, in order. */
+  devices: readonly ViewportPreset[];
+  /**
+   * The device a screen comment names: `device`, else the first. Selecting
+   * a comment or dropping a pin moves it.
+   */
+  device: ViewportPreset;
   theme: DesignTheme;
-  /** The frame's width: `w`, else the preset's. */
-  width: number;
-  /** True when `w` differs from the preset's width. */
-  customWidth: boolean;
-  /** `zoom`: `fit` (the default) or a scale such as 0.75 (spec 335 D4). */
+  /** `zoom`: `fit` (Fit all, the default) or a scale such as 0.75 (spec 335 D4). */
   zoom: Zoom;
+  /** `pan`: where the canvas's origin sits, in stage px; read only while `zoom` is a number. */
+  pan: Point;
 }
 
 /** The URL keys, so a link and the parser agree. */
@@ -40,14 +45,21 @@ export const VIEWER_PARAM = {
   variant: 'variant',
   revision: 'rev',
   frame: 'frame',
-  viewport: 'vp',
+  device: 'device',
   theme: 'theme',
-  width: 'w',
   zoom: 'zoom',
+  pan: 'pan',
 } as const;
+
+/** The single-frame viewer's preset and typed width (before #886): dropped on any change. */
+const LEGACY_PARAMS = ['vp', 'w'] as const;
 
 /** A zoom's longest spelling in a link: `0.123456` is already past any use. */
 const ZOOM_PARAM_MAX = 8;
+/** A pan's longest spelling: `-123456,-123456`. */
+const PAN_PARAM_MAX = 15;
+/** Past this a pan shows nothing of the canvas; such a link falls back to the origin. */
+const PAN_MAX_PX = 100_000;
 
 /**
  * `zoom=fit`, a number clamped to the bounds, anything else is Fit. WI-61:
@@ -66,11 +78,34 @@ export function parseZoom(raw: string | null): Zoom {
   return Number.isFinite(n) && n > 0 ? clampZoom(n) : 'fit';
 }
 
-export const clampWidth = (width: number): number =>
-  Math.min(
-    DESIGN_VIEWPORT_MAX_PX,
-    Math.max(DESIGN_VIEWPORT_MIN_PX, Math.round(width)),
-  );
+const ORIGIN: Point = { x: 0, y: 0 };
+
+/** `pan=x,y` in whole stage px; anything else is the origin. */
+export function parsePan(raw: string | null): Point {
+  if (raw === null || raw.length > PAN_PARAM_MAX) return ORIGIN;
+  const match = /^(-?\d+),(-?\d+)$/.exec(raw);
+  if (!match) return ORIGIN;
+  const x = Number(match[1]);
+  const y = Number(match[2]);
+  return Math.abs(x) <= PAN_MAX_PX && Math.abs(y) <= PAN_MAX_PX
+    ? { x, y }
+    : ORIGIN;
+}
+
+/**
+ * #886: the devices a design is shown at — the ones stored on it at its
+ * latest Generate (#863), else the project's presets, else the built-in
+ * devices. A revision drawn before devices were stored opens with the
+ * project's presets.
+ */
+export const devicesOf = (
+  design: Pick<TaskDesignView, 'devices' | 'viewports'>,
+): readonly ViewportPreset[] =>
+  design.devices && design.devices.length > 0
+    ? design.devices
+    : design.viewports.length > 0
+      ? design.viewports
+      : DEFAULT_VIEWPORTS;
 
 const isTheme = (value: string | null): value is DesignTheme =>
   value !== null && (DESIGN_THEMES as readonly string[]).includes(value);
@@ -108,9 +143,9 @@ export const frameOf = (state: ViewerState): DesignFrameView | null =>
 export function resolveViewerState(
   params: URLSearchParams,
   revisions: readonly DesignRevisionView[],
-  viewports: readonly ViewportPreset[],
+  devices: readonly ViewportPreset[],
 ): ViewerState {
-  const presets = viewports.length > 0 ? viewports : DEFAULT_VIEWPORTS;
+  const shown = devices.length > 0 ? devices : DEFAULT_VIEWPORTS;
   const variants = variantsOf(revisions);
 
   // A revision named in the URL wins: it also fixes the variant.
@@ -129,24 +164,21 @@ export function resolveViewerState(
   const frame =
     asFrame !== null && asFrame < (revision?.frames.length ?? 0) ? asFrame : 0;
 
-  const viewport =
-    presets.find((p) => p.name === params.get(VIEWER_PARAM.viewport)) ??
-    presets[0];
+  const device =
+    shown.find((d) => d.name === params.get(VIEWER_PARAM.device)) ?? shown[0];
   const themeParam = params.get(VIEWER_PARAM.theme);
-  const theme = isTheme(themeParam) ? themeParam : (viewport.theme ?? 'light');
-
-  const w = positiveInt(params.get(VIEWER_PARAM.width));
-  const width = w === null ? viewport.width : clampWidth(w);
+  const theme = isTheme(themeParam) ? themeParam : (shown[0].theme ?? 'light');
+  const zoom = parseZoom(params.get(VIEWER_PARAM.zoom));
 
   return {
     variant,
     revision,
     frame,
-    viewport,
+    devices: shown,
+    device,
     theme,
-    width,
-    customWidth: width !== viewport.width,
-    zoom: parseZoom(params.get(VIEWER_PARAM.zoom)),
+    zoom,
+    pan: zoom === 'fit' ? ORIGIN : parsePan(params.get(VIEWER_PARAM.pan)),
   };
 }
 
@@ -155,27 +187,40 @@ export type ViewerChange =
   | { kind: 'variant'; variant: number }
   | { kind: 'revision'; revisionId: string }
   | { kind: 'frame'; frame: number }
-  | {
-      kind: 'viewport';
-      viewport: ViewportPreset;
-      /** Back to Fit too: a phone's preset switch refits the mockup (C-244). */
-      fit?: boolean;
-    }
+  | { kind: 'device'; device: string }
   | { kind: 'theme'; theme: DesignTheme }
-  | { kind: 'width'; width: number }
-  | { kind: 'zoom'; zoom: Zoom };
+  /** The canvas's zoom and pan, written together: a gesture reports both. */
+  | { kind: 'view'; zoom: Zoom; pan: Point }
+  /**
+   * #886: where a comment was left — its revision, tab, device and theme —
+   * so selecting it opens that view. A null device or theme keeps the one
+   * in view.
+   */
+  | {
+      kind: 'place';
+      revisionId: string;
+      frame: number;
+      device: string | null;
+      theme: DesignTheme | null;
+    };
+
+const setFrame = (params: URLSearchParams, frame: number) => {
+  // The first frame is the default: it leaves the URL clean.
+  if (frame <= 0) params.delete(VIEWER_PARAM.frame);
+  else params.set(VIEWER_PARAM.frame, String(Math.floor(frame)));
+};
 
 /**
- * The next query string. Choosing a variant or a preset drops what it
- * replaces: a variant shows its latest revision, a preset its own width and
- * theme. The frame stays: the revisions of a variant usually share frames,
- * and one past the end reads as the first.
+ * The next query string. Choosing a variant drops the revision it replaces:
+ * a variant shows its latest revision. The tab stays: the revisions of a
+ * variant usually share frames, and one past the end reads as the first.
  */
 export function applyViewerChange(
   params: URLSearchParams,
   change: ViewerChange,
 ): string {
   const next = new URLSearchParams(params);
+  for (const key of LEGACY_PARAMS) next.delete(key);
   switch (change.kind) {
     case 'variant':
       next.set(VIEWER_PARAM.variant, String(change.variant));
@@ -186,28 +231,35 @@ export function applyViewerChange(
       next.delete(VIEWER_PARAM.variant);
       break;
     case 'frame':
-      // The first frame is the default: it leaves the URL clean.
-      if (change.frame <= 0) next.delete(VIEWER_PARAM.frame);
-      else next.set(VIEWER_PARAM.frame, String(Math.floor(change.frame)));
+      setFrame(next, change.frame);
       break;
-    case 'viewport':
-      next.set(VIEWER_PARAM.viewport, change.viewport.name);
-      next.delete(VIEWER_PARAM.width);
-      if (change.fit) next.delete(VIEWER_PARAM.zoom);
-      if (change.viewport.theme) {
-        next.set(VIEWER_PARAM.theme, change.viewport.theme);
-      }
+    case 'device':
+      next.set(VIEWER_PARAM.device, change.device);
       break;
     case 'theme':
       next.set(VIEWER_PARAM.theme, change.theme);
       break;
-    case 'width':
-      next.set(VIEWER_PARAM.width, String(clampWidth(change.width)));
+    case 'view':
+      // Fit all is the default and has no pan: it leaves the URL clean.
+      if (change.zoom === 'fit') {
+        next.delete(VIEWER_PARAM.zoom);
+        next.delete(VIEWER_PARAM.pan);
+      } else {
+        next.set(VIEWER_PARAM.zoom, String(clampZoom(change.zoom)));
+        next.set(
+          VIEWER_PARAM.pan,
+          `${Math.round(change.pan.x)},${Math.round(change.pan.y)}`,
+        );
+      }
       break;
-    case 'zoom':
-      // Fit is the default: it leaves the URL clean.
-      if (change.zoom === 'fit') next.delete(VIEWER_PARAM.zoom);
-      else next.set(VIEWER_PARAM.zoom, String(clampZoom(change.zoom)));
+    case 'place':
+      next.set(VIEWER_PARAM.revision, change.revisionId);
+      next.delete(VIEWER_PARAM.variant);
+      setFrame(next, change.frame);
+      if (change.device !== null) {
+        next.set(VIEWER_PARAM.device, change.device);
+      }
+      if (change.theme !== null) next.set(VIEWER_PARAM.theme, change.theme);
       break;
   }
   const query = next.toString();

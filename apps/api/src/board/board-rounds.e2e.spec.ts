@@ -5,8 +5,8 @@ import {
   cardFeedbackPrompt,
 } from '@nautelle/shared';
 import { BudgetGate } from '../budgets/budget-gate';
-import { Feed } from '../budgets/testing/budgets-e2e';
-import { seedPrices } from '../prices/seed-prices';
+import { Feed, seedSnapshotPrices } from '../budgets/testing/budgets-e2e';
+import { capabilities } from '../runners/testing/runner-e2e';
 import { ingest } from '../usage/testing/usage-e2e';
 import { BoardWorld, failed, ROOT_A } from './testing/board-e2e';
 
@@ -138,7 +138,7 @@ describe('board rounds (e2e)', () => {
     });
 
     it('counts a round toward the operator who started it, and refuses their next one once their user budget is spent (D-10)', async () => {
-      await seedPrices(w.ctx.prisma);
+      await seedSnapshotPrices(w.ctx.prisma);
       await w.createCard();
       await w.createCard();
       expect((await w.runCard(1)).status).toBe(200);
@@ -647,5 +647,133 @@ describe('board rounds (e2e)', () => {
     await w.runCard(1);
     const [record] = await w.audit('card.run_started');
     expect(record.result).toBe('error');
+  });
+
+  describe('#854: Run of a session-gone taken card', () => {
+    const TAKEN = 'feat/42-pairing';
+
+    /** C-1, taken by a manual session on `branch` that has ended. */
+    const goneTaken = async (branch = TAKEN) => {
+      await w.deliver(
+        'hook.session_started',
+        {
+          source: 'startup',
+          cwd: ROOT_A,
+          gitBranch: branch,
+          permissionMode: 'default',
+        },
+        {
+          source: 'hook',
+          session: { runtime: 'claude', id: 'manual-854' },
+          project: { repo: 'acme/widget', root: ROOT_A },
+        },
+      );
+      const session = await w.ctx.prisma.agentSession.findFirstOrThrow({
+        where: { externalId: 'manual-854' },
+        select: { id: true },
+      });
+      await w.ctx.prisma.agentSession.update({
+        where: { id: session.id },
+        data: { endedAt: new Date() },
+      });
+      const card = await w.createCard();
+      await w.ctx.prisma.boardCard.update({
+        where: { id: card.id },
+        data: {
+          column: 'in_progress',
+          trackedSessionId: session.id,
+          takenBranch: branch,
+        },
+      });
+      return card;
+    };
+
+    const advertiseStartBranch = () =>
+      w.ctx.prisma.runner.update({
+        where: { id: w.runnerId },
+        data: { capabilities: { ...capabilities, cardStartBranch: true } },
+      });
+
+    it('starts from the taken branch; the card continues it, takenBranch cleared', async () => {
+      await advertiseStartBranch();
+      await goneTaken();
+      w.handlers['card.run'] = (args) => ({
+        status: 'ok',
+        output: {
+          phase: 'starting',
+          tmuxSession: `nautelle-card-${String(args.shortId)}`,
+          branch: args.startBranch,
+        },
+      });
+
+      expect((await w.runCard(1)).status).toBe(200);
+
+      const [sent] = w.sent('card.run');
+      expect(sent.startBranch).toBe(TAKEN);
+      expect(sent.branch).not.toBe(TAKEN);
+      expect(String(sent.prompt)).toContain(`Branch: ${TAKEN}`);
+      expect(await w.card(1)).toMatchObject({
+        branch: TAKEN,
+        takenBranch: null,
+        trackedSessionId: null,
+      });
+      const [record] = await w.audit('card.run_started');
+      expect(record.after).toMatchObject({ branch: TAKEN, takenBranch: TAKEN });
+      expect(record.after).not.toHaveProperty('startBranchSkipped');
+    });
+
+    it('not on origin: the card keeps its own branch and the launch event says why', async () => {
+      await advertiseStartBranch();
+      await goneTaken();
+      w.handlers['card.run'] = (args) => ({
+        status: 'ok',
+        output: {
+          phase: 'starting',
+          tmuxSession: `nautelle-card-${String(args.shortId)}`,
+          branch: args.branch,
+          startBranchSkipped: 'not_on_origin',
+        },
+      });
+
+      expect((await w.runCard(1)).status).toBe(200);
+
+      const [sent] = w.sent('card.run');
+      const card = await w.card(1);
+      expect(card.branch).toBe(sent.branch);
+      expect(card.takenBranch).toBe(TAKEN);
+      const [record] = await w.audit('card.run_started');
+      expect(record.after).toMatchObject({
+        branch: sent.branch,
+        takenBranch: TAKEN,
+        startBranchSkipped: 'not_on_origin',
+      });
+    });
+
+    it('a runner without cardStartBranch gets today’s command', async () => {
+      await goneTaken();
+
+      expect((await w.runCard(1)).status).toBe(200);
+
+      const [sent] = w.sent('card.run');
+      expect(sent).not.toHaveProperty('startBranch');
+      expect((await w.card(1)).takenBranch).toBe(TAKEN);
+      const [record] = await w.audit('card.run_started');
+      expect(record.after).toMatchObject({
+        startBranchSkipped: 'runner_outdated',
+      });
+    });
+
+    it('never sends a branch that is not a card branch', async () => {
+      await advertiseStartBranch();
+      await goneTaken('chore/pairing');
+
+      expect((await w.runCard(1)).status).toBe(200);
+
+      expect(w.sent('card.run')[0]).not.toHaveProperty('startBranch');
+      const [record] = await w.audit('card.run_started');
+      expect(record.after).toMatchObject({
+        startBranchSkipped: 'not_a_card_branch',
+      });
+    });
   });
 });

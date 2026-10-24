@@ -7,6 +7,7 @@ import type {
   CardWorkClass,
 } from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
+import type { CardDemoBrief } from '../demos/contracts';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { DesignTemplateChoice } from '../design/templates';
 import type { FleetStage } from '../fleet';
@@ -25,6 +26,10 @@ import type {
   QuotaLimit,
 } from '../protocol';
 import type { ProfileSource } from '../readiness';
+import type {
+  CardReviewFindingView,
+  CardReviewView,
+} from '../review/contracts';
 import type { PendingQuestion } from '../session-message/contracts';
 import type { StewardCardChip } from '../steward/contracts';
 import type { CardKindSource } from '../text/limits';
@@ -231,6 +236,12 @@ export interface BoardCardView {
   /** #542: why `needsPerson` is set; `null` while it is not, or unknown. */
   needsPersonReason: CardNeedsPersonReason | null;
   /**
+   * #884 (ADR-0084): the review strip — where the card's review steps stand
+   * on its PR. `null` when review is off for the project or no step is
+   * enabled.
+   */
+  review: CardReviewView | null;
+  /**
    * C-148 (ADR-0077): the protected paths (`PROTECTED_PATHS`) the card's
    * latest push changed. Non-empty, the card is never auto-merged — only a
    * person merges it, and the card says why.
@@ -238,6 +249,11 @@ export interface BoardCardView {
   protectedPaths: string[];
   /** #359 D8: the latest PR merged (ISO) — the Merged badge; `null` otherwise. */
   mergedAt: string | null;
+  /**
+   * C-371 (ADR-0090): the card's newest demo recording — the tile's chip.
+   * `null` while it has none; optional so older fixtures stay valid.
+   */
+  demo?: CardDemoBrief | null;
   /**
    * #636: the branch the card's PR targets — its worktree's start. `null`
    * before the card has a branch.
@@ -494,6 +510,50 @@ export interface CardRoundView {
   /** #449 D9: from `round.warmup`; null until the round's first edit. */
   warmupTokens?: number | null;
   warmupMs?: number | null;
+  /**
+   * C-332: the model and effort the round ran with, for the Rounds tab; absent
+   * reads as null until the API records them per round.
+   */
+  model?: string | null;
+  effort?: CardEffort | null;
+  // #837 — optional so older fixtures stay valid; absent reads as null.
+  /**
+   * #837: the pull request the round pushed to; null for a round that pushed
+   * nothing, or one recorded before #837.
+   */
+  pullRequest?: CardRoundPullRequestView | null;
+  /** #837: the last commit the round pushed — the head it left; null as `pullRequest`. */
+  headSha?: string | null;
+  /**
+   * #837: the commits the round added to its pull request; null when a
+   * runner older than #837 pushed it, or the round pushed nothing.
+   */
+  commits?: number | null;
+  /**
+   * #837: the checks on `headSha`, kept as they last answered — also once a
+   * later round moved the PR's head on; null while `headSha` has none.
+   */
+  ci?: CardRoundCiView | null;
+}
+
+/** #837: a round's pull request, as `CardRoundView.pullRequest`. */
+export interface CardRoundPullRequestView {
+  number: number;
+  url: string;
+}
+
+/** #837: a round head's checks — `green` reads `passed`, `red` `failed`. */
+export const CARD_ROUND_CI_STATES = ['pending', 'passed', 'failed'] as const;
+export type CardRoundCiState = (typeof CARD_ROUND_CI_STATES)[number];
+
+/** #837: the checks on a round's head (`card.checks`), as `CardRoundView.ci`. */
+export interface CardRoundCiView {
+  state: CardRoundCiState;
+  /** Checks that passed, of `total`; cancelled and skipped ones are not counted. */
+  passed: number;
+  total: number;
+  /** The head commit's checks page on GitHub. */
+  url: string;
 }
 
 /** #322 D6: one recommended model, with its one-line reason. */
@@ -546,6 +606,11 @@ export interface CardRecommendationView {
 export interface BoardCardDetail extends BoardCardView {
   /** Markdown. */
   body: string;
+  /**
+   * #891: the findings of the review pass `review` shows, blocking first. Empty
+   * or absent when review is off or the pass found nothing.
+   */
+  reviewFindings?: CardReviewFindingView[];
   issueOnRun: boolean;
   specOnRun: boolean;
   /**
@@ -590,6 +655,13 @@ export interface BoardCardDetail extends BoardCardView {
   specPr: { repo: string; number: number; url: string } | null;
   /** The card's Claude session (D6); `null` before the first Run. */
   sessionId: string | null;
+  /**
+   * #913: while a round is active, why its runner's local policy refuses a
+   * message into the session — the rule and the CLI line that lifts it, in
+   * the runner's words. Null when it takes messages or is not known; absent
+   * reads as null.
+   */
+  sessionMessageRefusal?: string | null;
   /**
    * #750 D7: the model and effort `sessionId` was started with — a Run on
    * another pair starts a fresh session. Null for a card with no session or

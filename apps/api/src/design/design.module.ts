@@ -39,5 +39,7 @@ import { UiProfileProjector } from './ui-profile-projector';
     UiProfileProjector,
     UiProfileService,
   ],
+  // C-377: a person's session drives stack and card designs (`LocalModule`).
+  exports: [DesignService],
 })
 export class DesignModule {}

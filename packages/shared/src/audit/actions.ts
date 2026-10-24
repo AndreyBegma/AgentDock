@@ -205,6 +205,16 @@ export const AUDIT_ACTIONS = [
    */
   'card.ci_retriggered',
   /**
+   * #884: a review step started on the head of a card's PR (`after: { number,
+   * step, stepType, pr, headSha, pass, runId, tmuxSession, model }`).
+   */
+  'card.review_started',
+  /**
+   * #884: a review step reported its findings (`after: { number, step, pr,
+   * headSha, pass, blocking, nits }`).
+   */
+  'card.review_reported',
+  /**
    * #636: the dependency a card's PR was stacked on merged, and the PR was
    * moved onto the project base (`after: { number, pr, from, base,
    * dependency }`).
@@ -250,6 +260,16 @@ export const AUDIT_ACTIONS = [
   'llm.provider_updated',
   /** ADR-0059: the instance default model changed. */
   'llm.default_model_set',
+  /** ADR-0090: the project's Demo videos settings (`before`/`after`: the changed fields). */
+  'demo.settings_updated',
+  /** ADR-0090: a Demo env secret set or replaced (`after: { name, replaced }`), never its value. */
+  'demo.secret_set',
+  /** ADR-0090: a Demo env secret deleted (`before: { name }`). */
+  'demo.secret_deleted',
+  /** ADR-0090: "Record again" queued a manual demo (`after: { cardId, number, demoId, round }`). */
+  'demo.requested',
+  /** ADR-0090: the runner uploaded a demo's video (`after: { cardId, demoId, attachmentId, size }`). */
+  'demo.video_uploaded',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

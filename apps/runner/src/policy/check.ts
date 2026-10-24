@@ -4,7 +4,7 @@ import {
   type PolicyRule,
   permissionModeAllowed,
   policyAllowsCommand,
-  policyFixHint,
+  policyRefusalMessage,
 } from '@nautelle/shared/protocol';
 import { CommandFailure } from '../commands/failure';
 import type { Exec } from '../detect/exec';
@@ -25,7 +25,7 @@ export const policyRefusal = (
   detail?: string,
 ): PolicyRefusal => ({
   rule,
-  message: `refused by this runner's policy (${rule}): ${why}. On the runner's machine: \`${policyFixHint(rule, detail)}\``,
+  message: policyRefusalMessage(rule, why, detail),
 });
 
 /** The `policy_refused` failure a handler throws for `refusal`. */

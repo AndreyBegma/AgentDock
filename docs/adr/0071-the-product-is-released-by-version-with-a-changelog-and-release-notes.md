@@ -3,7 +3,8 @@
 Status: accepted · Date: 2026-10-20 ·
 Card: C-294 ·
 Spec: [`docs/specs/card-294-versioned-releases-with-generated-releas.md`](../specs/card-294-versioned-releases-with-generated-releas.md) ·
-Keeps: [ADR-0049](0049-runner-releases-are-signed-and-cut-only-from-protected-tags.md)
+Keeps: [ADR-0049](0049-runner-releases-are-signed-and-cut-only-from-protected-tags.md) ·
+Amended by [ADR-0088](0088-nautelle-installs-from-published-images-with-one-compose-file.md) (a `vX.Y.Z` tag publishes the images)
 
 ## Context
 
@@ -69,6 +70,7 @@ merged pull request.
   person; a release is not finished, and not tagged, until they have.
 - `vX.Y.Z` tags trigger nothing in CI: the release-runner pipeline matches
   `runner-v*` only, and a push to `main` runs the full suite as before.
+  ADR-0088 changes this: a `vX.Y.Z` tag now publishes the API and web images.
 - A new user sees the dot once, for the version current when they sign up.
 - The changelog ships inside the web and API builds, so a release needs a
   merge into `develop` before its promotion; the skill orders the two pull

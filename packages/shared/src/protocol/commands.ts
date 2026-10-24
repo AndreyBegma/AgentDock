@@ -10,8 +10,10 @@ import {
   cardPrCloseCommands,
   cardPrOpenCommands,
   cardPrRetargetCommands,
+  cardReviewCommands,
 } from './commands/cards';
 import { controlCommands } from './commands/control';
+import { demoCommands } from './commands/demos';
 import { docsCommands } from './commands/docs';
 import { githubCommands } from './commands/github';
 import { handoffCommands } from './commands/handoff';
@@ -178,6 +180,8 @@ export const commands = {
   ...cardCiRetriggerCommands,
   ...cardPrRetargetCommands,
   ...cardPrOpenCommands,
+  ...cardReviewCommands,
+  ...demoCommands,
   ...captureCommands,
   ...textCommands,
   ...assessCommands,

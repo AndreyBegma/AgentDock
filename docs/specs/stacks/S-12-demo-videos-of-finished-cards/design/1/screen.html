@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-scale="desk" data-palette="navy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nautelle — C-412 demo</title>
+<style>
+:root {
+  --font-sans: 'SF Pro Text', 'SF Pro Display', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --text-display: 28px; --text-display-lh: 32px;
+  --text-heading: 20px; --text-heading-lh: 28px;
+  --text-section: 15px; --text-section-lh: 22px;
+  --text-body: 14px; --text-body-lh: 20px;
+  --text-label: 12px; --text-label-lh: 16px;
+  --radius-control: 6px; --radius-surface: 8px; --radius-sheet: 12px;
+  --size-row: 32px; --size-control: 28px; --size-control-sm: 32px; --size-field: 28px; --size-nav: 28px; --size-tap: 44px; --size-chip: 28px;
+  --focus-width: 3px; --focus-offset: 4px;
+  --dur-fast: 100ms; --dur-base: 150ms; --dur-sheet: 260ms;
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --press-scale: 0.97;
+  --glass-blur: 26px; --glass-blur-strong: 40px;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-ground: #0a1022; --color-surface: #111a33; --color-raised: #18223f; --color-paper: #1b2647; --color-canvas: #0a1022;
+  --color-content: rgb(27 38 71 / 0.96);
+  --color-ink: #f2f2f6; --color-ink-2: rgb(242 242 246 / 0.62); --color-ink-3: rgb(242 242 246 / 0.53);
+  --color-line: rgb(255 255 255 / 0.1); --color-line-strong: rgb(255 255 255 / 0.18); --color-hover: rgb(255 255 255 / 0.06);
+  --color-focus: #b4b2ff;
+  --color-accent: #5b5bf6; --color-on-accent: #ffffff; --color-accent-soft: rgb(91 91 246 / 0.2); --color-accent-ink: #b4b2ff;
+  --color-ok: #5fd3a0; --color-warn: #e3b341; --color-danger: #ff6b60; --color-info: #5fb4f0; --color-info-soft: rgb(95 180 240 / 0.16);
+  --color-hue-1: #5b9cf6; --color-hue-1-soft: rgb(91 156 246 / 0.18); --color-hue-1-line: rgb(91 156 246 / 0.5); --color-hue-1-ink: #a4c8ff; --color-hue-1-glow: rgb(91 156 246 / 0.45);
+  --color-hue-2: #2fbf94; --color-hue-2-soft: rgb(47 191 148 / 0.18); --color-hue-2-line: rgb(47 191 148 / 0.5); --color-hue-2-ink: #7ee0c0; --color-hue-2-glow: rgb(47 191 148 / 0.45);
+  --color-hue-3: #7cc95a; --color-hue-3-soft: rgb(124 201 90 / 0.18); --color-hue-3-line: rgb(124 201 90 / 0.5); --color-hue-3-ink: #ade58f; --color-hue-3-glow: rgb(124 201 90 / 0.45);
+  --color-hue-4: #e69f00; --color-hue-4-soft: rgb(230 159 0 / 0.18); --color-hue-4-line: rgb(230 159 0 / 0.5); --color-hue-4-ink: #f5c25c; --color-hue-4-glow: rgb(230 159 0 / 0.45);
+  --color-hue-5: #e8743b; --color-hue-5-soft: rgb(232 116 59 / 0.18); --color-hue-5-line: rgb(232 116 59 / 0.5); --color-hue-5-ink: #f9a77c; --color-hue-5-glow: rgb(232 116 59 / 0.45);
+  --color-hue-6: #f0606e; --color-hue-6-soft: rgb(240 96 110 / 0.18); --color-hue-6-line: rgb(240 96 110 / 0.5); --color-hue-6-ink: #ff9da5; --color-hue-6-glow: rgb(240 96 110 / 0.45);
+  --color-hue-7: #a68bfa; --color-hue-7-soft: rgb(166 139 250 / 0.18); --color-hue-7-line: rgb(166 139 250 / 0.5); --color-hue-7-ink: #cbbcff; --color-hue-7-glow: rgb(166 139 250 / 0.45);
+  --color-hue-8: #cc79a7; --color-hue-8-soft: rgb(204 121 167 / 0.18); --color-hue-8-line: rgb(204 121 167 / 0.5); --color-hue-8-ink: #efabd1; --color-hue-8-glow: rgb(204 121 167 / 0.45);
+  --color-scrim: rgb(10 16 34 / 0.3);
+  --canvas-glow: 18%;
+  --glass-sheen: rgb(255 255 255 / 0.06);
+  --glass-scrim: rgb(9 9 12 / 0.55); --glass-scrim-strong: rgb(9 9 12 / 0.64);
+  --glass-brightness: 0.85; --glass-brightness-strong: 0.7;
+  --glass-edge: rgb(255 255 255 / 0.14); --glass-spec: rgb(255 255 255 / 0.2);
+  --glass-shadow: rgb(0 0 0 / 0.35); --glass-shadow-strong: rgb(0 0 0 / 0.45); --glass-shadow-clear: rgb(0 0 0 / 0.15);
+  --control-spec: rgb(255 255 255 / 0.05);
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-ground: #ffffff; --color-surface: #f8faff; --color-raised: #f0f4fb; --color-paper: #ffffff; --color-canvas: #e9eef8;
+  --color-content: rgb(255 255 255 / 0.96);
+  --color-ink: #18181b; --color-ink-2: rgb(24 24 27 / 0.72); --color-ink-3: rgb(24 24 27 / 0.64);
+  --color-line: rgb(0 0 0 / 0.1); --color-line-strong: rgb(0 0 0 / 0.23); --color-hover: rgb(0 0 0 / 0.06);
+  --color-focus: #4f46e5;
+  --color-accent: #4f46e5; --color-on-accent: #ffffff; --color-accent-soft: rgb(79 70 229 / 0.12); --color-accent-ink: #4338ca;
+  --color-ok: #0a8156; --color-warn: #b45309; --color-danger: #dc2626; --color-info: #03629a; --color-info-soft: rgb(3 98 154 / 0.12);
+  --color-hue-1: #1f64d6; --color-hue-1-soft: rgb(31 100 214 / 0.12); --color-hue-1-line: rgb(31 100 214 / 0.45); --color-hue-1-ink: #1550b0; --color-hue-1-glow: rgb(31 100 214 / 0.28);
+  --color-hue-2: #00805e; --color-hue-2-soft: rgb(0 128 94 / 0.12); --color-hue-2-line: rgb(0 128 94 / 0.45); --color-hue-2-ink: #006a4e; --color-hue-2-glow: rgb(0 128 94 / 0.28);
+  --color-hue-3: #3a7d1c; --color-hue-3-soft: rgb(58 125 28 / 0.12); --color-hue-3-line: rgb(58 125 28 / 0.45); --color-hue-3-ink: #2f6617; --color-hue-3-glow: rgb(58 125 28 / 0.28);
+  --color-hue-4: #b36b00; --color-hue-4-soft: rgb(179 107 0 / 0.12); --color-hue-4-line: rgb(179 107 0 / 0.45); --color-hue-4-ink: #8a5200; --color-hue-4-glow: rgb(179 107 0 / 0.28);
+  --color-hue-5: #c24e00; --color-hue-5-soft: rgb(194 78 0 / 0.12); --color-hue-5-line: rgb(194 78 0 / 0.45); --color-hue-5-ink: #9c3d00; --color-hue-5-glow: rgb(194 78 0 / 0.28);
+  --color-hue-6: #d02a3e; --color-hue-6-soft: rgb(208 42 62 / 0.12); --color-hue-6-line: rgb(208 42 62 / 0.45); --color-hue-6-ink: #ad1f31; --color-hue-6-glow: rgb(208 42 62 / 0.28);
+  --color-hue-7: #7244e0; --color-hue-7-soft: rgb(114 68 224 / 0.12); --color-hue-7-line: rgb(114 68 224 / 0.45); --color-hue-7-ink: #5b30c4; --color-hue-7-glow: rgb(114 68 224 / 0.28);
+  --color-hue-8: #b0457f; --color-hue-8-soft: rgb(176 69 127 / 0.12); --color-hue-8-line: rgb(176 69 127 / 0.45); --color-hue-8-ink: #933668; --color-hue-8-glow: rgb(176 69 127 / 0.28);
+  --color-scrim: rgb(10 16 34 / 0.22);
+  --canvas-glow: 10%;
+  --glass-sheen: rgb(0 0 0 / 0.06);
+  --glass-scrim: rgb(255 255 255 / 0.52); --glass-scrim-strong: rgb(255 255 255 / 0.64);
+  --glass-brightness: 1.15; --glass-brightness-strong: 1.3;
+  --glass-edge: rgb(0 0 0 / 0.18); --glass-spec: rgb(0 0 0 / 0.2);
+  --glass-shadow: rgb(0 0 0 / 0.12); --glass-shadow-strong: rgb(0 0 0 / 0.16); --glass-shadow-clear: rgb(0 0 0 / 0.08);
+  --control-spec: rgb(255 255 255 / 0.05);
+}
+:root {
+  --color-status-running: var(--color-hue-2); --color-status-running-soft: var(--color-hue-2-soft); --color-status-running-ink: var(--color-hue-2-ink); --color-status-running-glow: var(--color-hue-2-glow);
+  --color-status-waiting: var(--color-hue-1); --color-status-waiting-soft: var(--color-hue-1-soft); --color-status-waiting-ink: var(--color-hue-1-ink); --color-status-waiting-glow: var(--color-hue-1-glow);
+  --color-status-paused: var(--color-hue-4); --color-status-paused-soft: var(--color-hue-4-soft); --color-status-paused-ink: var(--color-hue-4-ink);
+  --color-status-blocked: var(--color-hue-5); --color-status-blocked-soft: var(--color-hue-5-soft); --color-status-blocked-ink: var(--color-hue-5-ink);
+  --color-status-done: var(--color-hue-3); --color-status-done-soft: var(--color-hue-3-soft); --color-status-done-ink: var(--color-hue-3-ink);
+  --color-status-error: var(--color-hue-6); --color-status-error-soft: var(--color-hue-6-soft); --color-status-error-ink: var(--color-hue-6-ink);
+  --color-series-1: var(--color-accent); --color-series-2: var(--color-hue-4); --color-series-3: var(--color-hue-2); --color-series-4: var(--color-hue-8); --color-series-6: var(--color-hue-5);
+  --glass-filter: blur(var(--glass-blur)) saturate(180%) brightness(var(--glass-brightness));
+  --glass-filter-strong: blur(var(--glass-blur-strong)) saturate(180%) brightness(var(--glass-brightness-strong));
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: 16px; background: var(--color-ground); color: var(--color-ink); }
+body { margin: 0; min-height: 100vh; font-family: var(--font-sans); font-size: var(--text-body); line-height: var(--text-body-lh); color: var(--color-ink); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+h1, h2, h3, p { margin: 0; }
+code, pre, kbd, .mono { font-family: var(--font-mono); }
+:focus-visible { outline: var(--focus-width) solid var(--color-focus); outline-offset: var(--focus-offset); }
+a { color: var(--color-accent-ink); text-decoration: underline; text-underline-offset: 4px; }
+.num { font-variant-numeric: tabular-nums; }
+td.num, th.num { text-align: right; }
+.text-section { font-size: var(--text-section); line-height: var(--text-section-lh); font-weight: 600; }
+.text-label { font-size: var(--text-label); line-height: var(--text-label-lh); font-weight: 500; }
+.ink-2 { color: var(--color-ink-2); }
+.ink-3 { color: var(--color-ink-3); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.canvas { position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60vmax 50vmax at 10% 0%, color-mix(in oklab, var(--color-hue-1) var(--canvas-glow), transparent), transparent 70%),
+    radial-gradient(50vmax 45vmax at 95% 35%, color-mix(in oklab, var(--color-hue-7) var(--canvas-glow), transparent), transparent 70%),
+    radial-gradient(70vmax 50vmax at 45% 110%, color-mix(in oklab, var(--color-hue-1) var(--canvas-glow), transparent), transparent 70%); }
+.glass { background: linear-gradient(var(--glass-sheen), var(--glass-sheen)), var(--glass-scrim); backdrop-filter: var(--glass-filter); -webkit-backdrop-filter: var(--glass-filter); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-spec), 0 12px 32px var(--glass-shadow); }
+.glass-strong { background: linear-gradient(var(--glass-sheen), var(--glass-sheen)), var(--glass-scrim-strong); backdrop-filter: var(--glass-filter-strong); -webkit-backdrop-filter: var(--glass-filter-strong); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-spec), 0 20px 48px var(--glass-shadow-strong); }
+.surface-content { background: var(--color-content); border: 1px solid var(--color-line); box-shadow: 0 1px 2px var(--glass-shadow-clear); }
+.shell { display: flex; gap: 12px; padding: 12px; min-height: 100vh; }
+.shell__rail { position: sticky; top: 12px; height: calc(100vh - 24px); width: 232px; flex-shrink: 0; border-radius: var(--radius-surface); padding: 12px 8px; display: flex; flex-direction: column; gap: 12px; }
+.shell__col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.topbar { height: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 16px; border-radius: var(--radius-surface); }
+.topbar__title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.main { margin: 0 auto; width: 100%; max-width: 64rem; padding-bottom: 24px; display: flex; flex-direction: column; gap: 24px; }
+.main--wide { max-width: 80rem; }
+@media (max-width: 639px) { .shell { padding: 8px 16px; gap: 8px; } .shell__rail { display: none; } }
+@media (min-width: 640px) and (max-width: 1023px) { .shell__rail { width: 64px; } .nav-item__label, .nav-group__title { display: none; } }
+.brand { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; font-weight: 600; color: var(--color-ink); }
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-group__title { padding: 8px 12px 4px; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--color-ink-3); }
+.nav-item { position: relative; display: flex; align-items: center; gap: 10px; height: var(--size-nav); padding: 0 12px; border-radius: var(--radius-control); color: var(--color-ink-2); font-size: 14px; text-decoration: none; transition: background-color var(--dur-fast), color var(--dur-fast); }
+.nav-item:hover { background: var(--color-hover); color: var(--color-ink); }
+.nav-item[aria-current='page'] { background: var(--color-accent-soft); color: var(--color-accent-ink); font-weight: 500; }
+.nav-item--primary { height: 38px; border: 1px solid color-mix(in oklab, var(--color-accent) 45%, transparent); color: var(--color-ink); }
+.nav-item--primary .nav-item__glyph { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: var(--color-accent); color: var(--color-on-accent); }
+.nav-item__badge { margin-left: auto; }
+.nav-item svg { flex-shrink: 0; }
+.btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; font-family: inherit; font-weight: 600; user-select: none; height: var(--size-control); padding: 0 16px; font-size: 14px; line-height: 20px; border-radius: var(--radius-control); border: 1px solid transparent; background: transparent; color: var(--color-ink); cursor: pointer; text-decoration: none; transition: background-color var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast), transform var(--dur-fast) var(--ease-sheet); }
+.btn:active { transform: scale(var(--press-scale)); }
+.btn:disabled, .btn[aria-disabled='true'] { opacity: 0.4; pointer-events: none; }
+.btn--solid { background: var(--color-accent); color: var(--color-on-accent); }
+.btn--solid:hover { background: color-mix(in oklab, var(--color-accent) 88%, var(--color-on-accent)); }
+.btn--glass { background: var(--color-raised); border-color: var(--color-line-strong); box-shadow: inset 0 1px 0 var(--control-spec); color: var(--color-ink); }
+.btn--glass:hover { background: linear-gradient(var(--color-hover), var(--color-hover)), var(--color-raised); }
+.btn--ghost { color: var(--color-ink-2); }
+.btn--ghost:hover { color: var(--color-ink); background: var(--color-hover); }
+.btn--danger { background: color-mix(in oklab, var(--color-danger) 12%, transparent); border-color: color-mix(in oklab, var(--color-danger) 30%, transparent); color: var(--color-danger); }
+.btn--link { height: auto; padding: 0; color: var(--color-accent-ink); font-weight: 500; border-radius: 2px; }
+.btn--link:hover { text-decoration: underline; text-underline-offset: 4px; }
+.btn--sm { height: var(--size-control-sm); padding: 0 12px; font-size: 12px; line-height: 16px; border-radius: calc(var(--radius-control) - 4px); }
+.btn--icon { padding: 0; aspect-ratio: 1; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field__label { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--color-ink-2); }
+.field__hint { font-size: 12px; line-height: 16px; color: var(--color-ink-3); }
+.input, .select, .textarea { width: 100%; height: var(--size-field); padding: 0 10px; font-family: inherit; font-size: 14px; color: var(--color-ink); background: var(--color-surface); border: 1px solid var(--color-line-strong); border-radius: var(--radius-control); transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
+.input::placeholder { color: var(--color-ink-3); }
+.input:focus, .select:focus { outline: none; border-color: color-mix(in oklab, var(--color-ink) 70%, transparent); box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-ink) 22%, transparent); }
+.select { appearance: none; padding-right: 28px; background-image: linear-gradient(45deg, transparent 50%, var(--color-ink-3) 50%), linear-gradient(135deg, var(--color-ink-3) 50%, transparent 50%); background-position: calc(100% - 14px) 50%, calc(100% - 10px) 50%; background-size: 4px 4px; background-repeat: no-repeat; }
+.search { position: relative; display: flex; align-items: center; }
+.search svg { position: absolute; left: 8px; color: var(--color-ink-3); pointer-events: none; }
+.search .input { padding-left: 28px; }
+.toggle { position: relative; display: inline-flex; flex-shrink: 0; width: 32px; height: 18px; border-radius: 999px; background: var(--color-line-strong); border: 0; cursor: pointer; transition: background-color var(--dur-fast); }
+.toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 999px; background: #fff; transition: transform var(--dur-base) var(--ease-sheet); }
+.toggle[aria-checked='true'] { background: var(--color-accent); }
+.toggle[aria-checked='true']::after { transform: translateX(14px); }
+.checkbox { appearance: none; width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--color-line-strong); background: var(--color-surface); display: inline-grid; place-content: center; margin: 0; flex-shrink: 0; }
+.checkbox:checked { background: var(--color-accent); border-color: var(--color-accent); }
+.checkbox:checked::after { content: ''; width: 8px; height: 4px; border: 2px solid var(--color-on-accent); border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+.card { border-radius: var(--radius-surface); padding: 16px; }
+.card--sm { padding: 12px; }
+.card--flush { padding: 0; overflow: hidden; }
+.card--raised { background: var(--color-raised); border: 1px solid var(--color-line); }
+[data-hue='1'] { --hue: var(--color-hue-1); --hue-soft: var(--color-hue-1-soft); --hue-line: var(--color-hue-1-line); --hue-ink: var(--color-hue-1-ink); --hue-glow: var(--color-hue-1-glow); }
+[data-hue='2'] { --hue: var(--color-hue-2); --hue-soft: var(--color-hue-2-soft); --hue-line: var(--color-hue-2-line); --hue-ink: var(--color-hue-2-ink); --hue-glow: var(--color-hue-2-glow); }
+[data-hue='7'] { --hue: var(--color-hue-7); --hue-soft: var(--color-hue-7-soft); --hue-line: var(--color-hue-7-line); --hue-ink: var(--color-hue-7-ink); --hue-glow: var(--color-hue-7-glow); }
+.section { display: flex; flex-direction: column; gap: 12px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
+.section-header h2 { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--color-ink); }
+.section-header p { font-size: 13px; line-height: 20px; color: var(--color-ink-2); }
+.section__body { border-radius: var(--radius-surface); padding: 16px; }
+.section__body--flush { padding: 0; overflow: hidden; }
+.page-header { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+@media (min-width: 640px) { .page-header { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; } }
+.page-header__text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.page-header__eyebrow { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--color-ink-3); }
+.page-header__title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.page-header h1 { font-size: var(--text-display); line-height: var(--text-display-lh); letter-spacing: -0.02em; font-weight: 600; }
+.page-header__desc { max-width: 65ch; font-size: 14px; color: var(--color-ink-2); }
+.page-header__meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--color-ink-3); }
+.page-header__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-shrink: 0; }
+.badge { display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; border-radius: 999px; height: 18px; min-width: 18px; padding: 0 4px; font-size: 10px; background: var(--color-hover); color: var(--color-ink-2); }
+.badge--md { height: 20px; min-width: 20px; padding: 0 6px; font-size: 12px; }
+.badge--ok { background: color-mix(in oklab, var(--color-ok) 14%, transparent); color: var(--color-ok); }
+.badge--warn { background: color-mix(in oklab, var(--color-warn) 14%, transparent); color: var(--color-warn); }
+.badge--danger { background: color-mix(in oklab, var(--color-danger) 14%, transparent); color: var(--color-danger); }
+.badge--count.badge--warn { background: var(--color-warn); color: var(--color-ground); }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--hue); flex-shrink: 0; }
+.pill { display: inline-flex; flex-shrink: 0; align-items: center; gap: 8px; height: 24px; padding: 0 10px; border-radius: 999px; white-space: nowrap; font-size: 12px; font-weight: 500; line-height: 1; background: var(--color-hover); color: var(--color-ink-2); }
+.pill--sm { height: 20px; gap: 6px; padding: 0 8px; font-size: 11px; }
+.pill__dot { position: relative; width: 8px; height: 8px; border-radius: 999px; background: var(--color-ink-3); flex-shrink: 0; }
+.pill--sm .pill__dot { width: 6px; height: 6px; }
+.pill[data-status='running'] { background: var(--color-status-running-soft); color: var(--color-status-running-ink); }
+.pill[data-status='running'] .pill__dot { background: var(--color-status-running); }
+.pill[data-status='running'] .pill__dot::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: inherit; opacity: 0.6; animation: gu-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+.pill[data-status='waiting'] { background: var(--color-status-waiting-soft); color: var(--color-status-waiting-ink); }
+.pill[data-status='waiting'] .pill__dot { background: var(--color-status-waiting); }
+.pill[data-status='paused'] { background: var(--color-status-paused-soft); color: var(--color-status-paused-ink); }
+.pill[data-status='paused'] .pill__dot { background: var(--color-status-paused); }
+.pill[data-status='done'] { background: var(--color-status-done-soft); color: var(--color-status-done-ink); }
+.pill[data-status='done'] .pill__dot { background: var(--color-status-done); }
+.pill[data-status='error'] { background: var(--color-status-error-soft); color: var(--color-status-error-ink); }
+.pill[data-status='error'] .pill__dot { background: var(--color-status-error); }
+@keyframes gu-ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pill__dot::after { animation: none !important; } .btn:active { transform: none; } }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table thead { border-bottom: 1px solid var(--color-line); text-align: left; font-size: 12px; font-weight: 500; color: var(--color-ink-3); }
+.table th, .table td { padding: 10px 12px; vertical-align: middle; text-align: left; }
+.table th { font-weight: 500; }
+.table tbody tr { border-bottom: 1px solid var(--color-line); transition: background-color var(--dur-fast); }
+.table tbody tr:last-child { border-bottom: 0; }
+.table tbody tr:hover { background: var(--color-hover); }
+.table .cell-meta { color: var(--color-ink-3); font-size: 12px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.toolbar__search { width: 240px; }
+.toolbar__spacer { flex: 1; }
+.segmented { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; }
+.segmented--sm { height: var(--size-control); padding: 2px; }
+.segmented button { position: relative; height: 100%; min-height: 20px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--color-ink-2); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.segmented button[aria-checked='true'] { background: var(--color-accent-soft); color: var(--color-accent-ink); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-line); }
+.tab { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 500; color: var(--color-ink-2); cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--color-ink); }
+.tab[aria-selected='true'] { color: var(--color-ink); }
+.tab[aria-selected='true']::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--color-accent); }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; font-size: 14px; margin: 0; }
+.kv dt { color: var(--color-ink-3); }
+.kv dd { margin: 0; color: var(--color-ink); min-width: 0; }
+.kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--color-line-strong); font-family: var(--font-sans); font-size: 11px; color: var(--color-ink-3); }
+.sep-v { width: 1px; height: 16px; background: var(--color-line); margin: 0 4px; }
+.avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 999px; background: var(--color-accent-soft); color: var(--color-accent-ink); font-size: 11px; font-weight: 600; }
+.code { font-family: var(--font-mono); font-size: 12px; padding: 1px 5px; border-radius: 4px; background: var(--color-hover); }
+.live-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--color-ok); flex-shrink: 0; }
+.capsule-wrap { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 8px; justify-content: center; }
+.capsule { display: flex; gap: 2px; padding: 4px; border-radius: 999px; }
+.capsule__tab { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 14px; border-radius: 999px; font-size: 11px; font-weight: 500; color: var(--color-ink-2); text-decoration: none; }
+.capsule__tab[aria-current='page'] { background: var(--color-accent-soft); color: var(--color-accent-ink); }
+.capsule__plus { width: 52px; height: 52px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: var(--color-ink); border: 1px solid var(--glass-edge); }
+
+/* Screen-specific */
+.view { display: none; flex-direction: column; gap: 24px; min-width: 0; }
+.view.is-active { display: flex; }
+.crumb { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--color-ink-2); min-width: 0; white-space: nowrap; }
+.crumb a { color: var(--color-ink-2); text-decoration: none; }
+.crumb a:hover { color: var(--color-ink); }
+.crumb b { color: var(--color-ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.crumb svg { color: var(--color-ink-3); flex-shrink: 0; }
+.topbar__search { width: 224px; justify-content: flex-start; gap: 8px; padding: 0 8px; }
+.capsule-wrap { display: none; }
+@media (max-width: 639px) {
+  .topbar__search, .crumb__project, .crumb__sep1 { display: none; }
+  .topbar { padding: 0 8px 0 12px; gap: 8px; }
+  .main { padding-bottom: 104px; }
+  .capsule-wrap { display: flex; }
+  .hide-phone { display: none !important; }
+  .page-header__actions { width: 100%; }
+}
+.card-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
+@media (max-width: 1023px) { .card-layout { grid-template-columns: minmax(0, 1fr); } }
+.col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.tabs-scroll { overflow-x: auto; scrollbar-width: none; }
+.tabs-scroll::-webkit-scrollbar { display: none; }
+.tabs-scroll .tabs { min-width: max-content; }
+.title-inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* luna-player */
+.player { --pl-bg: color-mix(in oklab, var(--color-ground) 30%, #000); --pl-ink: #f2f2f6; border-radius: var(--radius-surface); overflow: hidden; background: var(--pl-bg); color: var(--pl-ink); border: 1px solid var(--color-line); }
+.player__stage { position: relative; aspect-ratio: 16 / 9; container-type: inline-size; overflow: hidden; background: #0b0f1d; }
+.rec { position: absolute; inset: 3.2cqi 3.2cqi 0; border-radius: 1cqi 1cqi 0 0; background: #f8faff; color: #18181b; overflow: hidden; font-family: var(--font-sans); font-size: 1.5cqi; line-height: 1.35; box-shadow: 0 2cqi 6cqi rgb(0 0 0 / 0.5); }
+.rec__bar { display: flex; align-items: center; gap: 0.8cqi; height: 3.6cqi; padding: 0 1.6cqi; background: #eef2fa; border-bottom: 1px solid rgb(0 0 0 / 0.08); }
+.rec__bar i { width: 1cqi; height: 1cqi; border-radius: 99px; background: rgb(0 0 0 / 0.18); }
+.rec__url { margin-left: 1.6cqi; flex: 1; max-width: 46cqi; height: 2.2cqi; border-radius: 99px; background: #fff; border: 1px solid rgb(0 0 0 / 0.08); padding: 0 1.2cqi; display: flex; align-items: center; font-family: var(--font-mono); font-size: 1.15cqi; color: rgb(24 24 27 / 0.6); }
+.rec__body { display: grid; grid-template-columns: 14cqi 1fr; height: calc(100% - 3.6cqi); }
+.rec__nav { background: #f0f4fb; border-right: 1px solid rgb(0 0 0 / 0.06); padding: 1.6cqi 1.2cqi; display: flex; flex-direction: column; gap: 0.9cqi; }
+.rec__nav span { height: 1.6cqi; border-radius: 0.5cqi; background: rgb(0 0 0 / 0.07); }
+.rec__nav span.on { background: rgb(79 70 229 / 0.18); }
+.rec__main { padding: 2cqi 2.4cqi; display: flex; flex-direction: column; gap: 1.6cqi; }
+.rec__head { display: flex; align-items: flex-end; justify-content: space-between; }
+.rec__h { font-size: 2.6cqi; font-weight: 600; letter-spacing: -0.02em; }
+.rec__sub { font-size: 1.2cqi; color: rgb(24 24 27 / 0.6); }
+.rec__btn { position: relative; display: inline-flex; align-items: center; gap: 0.6cqi; height: 3cqi; padding: 0 1.4cqi; border-radius: 0.6cqi; background: #4f46e5; color: #fff; font-weight: 600; font-size: 1.3cqi; box-shadow: 0 0 0 0.5cqi rgb(79 70 229 / 0.28); }
+.rec__tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2cqi; }
+.rec__tile { border: 1px solid rgb(0 0 0 / 0.1); border-radius: 0.8cqi; background: #fff; padding: 1.2cqi; display: flex; flex-direction: column; gap: 0.4cqi; }
+.rec__tile b { font-size: 2.2cqi; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rec__tile small { font-size: 1.1cqi; color: rgb(24 24 27 / 0.6); }
+.rec__rows { border: 1px solid rgb(0 0 0 / 0.1); border-radius: 0.8cqi; background: #fff; overflow: hidden; }
+.rec__row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1cqi; padding: 0.9cqi 1.2cqi; border-top: 1px solid rgb(0 0 0 / 0.06); font-size: 1.2cqi; }
+.rec__row:first-child { border-top: 0; color: rgb(24 24 27 / 0.55); font-weight: 500; }
+.rec__row span:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.rec__cursor { position: absolute; width: 2.6cqi; height: 2.6cqi; right: 6cqi; top: 13.4cqi; filter: drop-shadow(0 0.3cqi 0.4cqi rgb(0 0 0 / 0.35)); }
+.rec__ripple { position: absolute; right: 7.4cqi; top: 12.2cqi; width: 3cqi; height: 3cqi; border-radius: 99px; border: 0.3cqi solid rgb(79 70 229 / 0.6); }
+.player__step { position: absolute; left: 1.6cqi; top: 1.6cqi; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: rgb(9 9 12 / 0.62); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: var(--pl-ink); font-size: 12px; font-weight: 500; border: 1px solid rgb(255 255 255 / 0.14); }
+.player__step b { font-weight: 600; font-variant-numeric: tabular-nums; color: rgb(242 242 246 / 0.7); }
+.player__big { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 56px; height: 56px; border-radius: 999px; border: 1px solid rgb(255 255 255 / 0.22); background: rgb(9 9 12 / 0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: var(--pl-ink); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: transform var(--dur-fast) var(--ease-sheet), opacity var(--dur-base); }
+.player__big:active { transform: translate(-50%, -50%) scale(var(--press-scale)); }
+.player.is-playing .player__big { opacity: 0; pointer-events: none; }
+.player__bar { display: flex; align-items: center; gap: 10px; padding: 8px 10px; font-size: 12px; }
+.pl-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--pl-ink); cursor: pointer; flex-shrink: 0; font: inherit; font-size: 12px; font-weight: 600; }
+.pl-btn:hover { background: rgb(255 255 255 / 0.1); }
+.pl-time { font-family: var(--font-mono); font-size: 11px; color: rgb(242 242 246 / 0.75); white-space: nowrap; }
+.scrub { position: relative; flex: 1; height: 4px; border-radius: 999px; background: rgb(255 255 255 / 0.18); min-width: 60px; }
+.scrub__fill { position: absolute; inset: 0 auto 0 0; width: 36%; border-radius: inherit; background: var(--color-accent); }
+.scrub__mark { position: absolute; top: -2px; width: 2px; height: 8px; border-radius: 1px; background: rgb(255 255 255 / 0.55); }
+.scrub__thumb { position: absolute; top: 50%; left: 36%; width: 12px; height: 12px; border-radius: 999px; background: #fff; transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgb(0 0 0 / 0.4); }
+.chapters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.chapter { width: 100%; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: var(--size-row); padding: 4px 8px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.chapter:hover { background: var(--color-hover); }
+.chapter[aria-current='true'] { background: var(--color-accent-soft); }
+.chapter[aria-current='true'] .chapter__n { background: var(--color-accent); color: var(--color-on-accent); }
+.chapter__n { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 999px; background: var(--color-hover); color: var(--color-ink-2); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chapter__t { display: flex; flex-direction: column; min-width: 0; }
+.chapter__t small { font-family: var(--font-mono); font-size: 11px; color: var(--color-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chapter__time { font-family: var(--font-mono); font-size: 12px; color: var(--color-ink-3); }
+.demo-body { display: flex; flex-direction: column; gap: 16px; }
+.demo-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 767px) { .demo-grid { grid-template-columns: minmax(0, 1fr); } }
+.demo-meta { gap: 6px 16px; font-size: 13px; }
+.sub-h { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--color-ink-3); margin-bottom: 6px; }
+.checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.checks li { display: flex; gap: 8px; align-items: flex-start; }
+.checks .checkbox { margin-top: 2px; }
+
+/* Board */
+.board { display: grid; grid-template-columns: repeat(4, minmax(248px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.lane { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.lane__head { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 4px; font-size: 13px; font-weight: 600; }
+.tile { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 12px; border-radius: var(--radius-surface); text-align: left; font: inherit; color: var(--color-ink); cursor: pointer; transition: border-color var(--dur-fast), transform var(--dur-fast) var(--ease-sheet); }
+.tile:hover { border-color: var(--color-line-strong); }
+.tile:active { transform: scale(0.99); }
+.tile__top { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-ink-3); }
+.tile__title { font-size: 14px; line-height: 20px; font-weight: 500; }
+.tile__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.demo-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px 0 5px; border-radius: 999px; background: var(--color-hover); color: var(--color-ink-2); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.demo-chip svg { color: var(--color-ink); }
+.tile[aria-current='true'] { border-color: color-mix(in oklab, var(--color-accent) 55%, transparent); }
+
+/* Settings */
+.set-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px 16px; border-top: 1px solid var(--color-line); }
+.set-row:first-child { border-top: 0; }
+.set-row__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.set-row__title { font-size: 14px; font-weight: 500; }
+.set-row__hint { font-size: 13px; line-height: 20px; color: var(--color-ink-2); max-width: 62ch; }
+.path-list { list-style: none; margin: 0; padding: 0; }
+.path-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; padding: 4px 8px 4px 16px; border-top: 1px solid var(--color-line); font-family: var(--font-mono); font-size: 13px; }
+.path-list li:first-child { border-top: 0; }
+.add-row { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--color-line); background: var(--color-hover); }
+.runner-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.runner-id { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="canvas" aria-hidden="true"></div>
+<div class="shell">
+  <aside class="shell__rail glass">
+    <div class="brand"><span class="swatch" data-hue="1" style="width:16px;height:16px;border-radius:5px"></span><span class="nav-item__label">Nautelle</span></div>
+    <nav class="nav-group" aria-label="Workspace">
+      <div class="nav-group__title">Workspace</div>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span class="nav-item__label">Overview</span></a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="nav-item__label">Projects</span></a>
+    </nav>
+    <nav class="nav-group" aria-label="Project">
+      <div class="nav-group__title">nautelle-web</div>
+      <a class="nav-item nav-item--primary" href="#" data-view="board"><span class="nav-item__glyph"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg></span><span class="nav-item__label">Work</span></a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="nav-item__label">Activity</span></a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01"/></svg><span class="nav-item__label">Fleet</span></a>
+      <a class="nav-item" href="#" data-view="settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><span class="nav-item__label">Settings</span></a>
+    </nav>
+  </aside>
+  <div class="shell__col">
+    <header class="topbar glass">
+      <div class="topbar__title">
+        <nav class="crumb" aria-label="Breadcrumb">
+          <a class="crumb__project" href="#">nautelle-web</a>
+          <svg class="crumb__sep1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          <a id="crumb-mid" href="#" data-view="board">Work</a>
+          <svg id="crumb-sep2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          <b id="crumb-leaf">C-412</b>
+        </nav>
+        <span class="live-dot" aria-label="Live"></span>
+      </div>
+      <button class="btn btn--glass topbar__search" aria-label="Open command palette"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="ink-3" style="flex:1;text-align:left;font-weight:400">Search…</span><kbd class="kbd">⌘K</kbd></button>
+      <button class="btn btn--ghost btn--icon" aria-label="Notifications"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+      <span class="sep-v"></span>
+      <button class="btn btn--ghost" style="padding:0 6px" aria-label="Account"><span class="avatar">AB</span></button>
+    </header>
+
+    <main id="main-content" class="main main--wide">
+
+      <!-- CARD -->
+      <section class="view" data-view-panel="card" aria-label="Card C-412">
+        <header class="page-header">
+          <div class="page-header__text">
+            <span class="page-header__eyebrow"><span class="mono">C-412</span> · Feature · Stage 2 of S-9</span>
+            <div class="page-header__title-row">
+              <h1>Add usage export to the Budget page</h1>
+              <span class="pill" data-status="waiting"><span class="pill__dot"></span>Waiting for review</span>
+            </div>
+            <div class="page-header__meta"><span>Round <b class="num" style="color:var(--color-ink)">2</b></span><span>PR <b class="mono" style="color:var(--color-ink)">#918</b></span><span>Checks <b style="color:var(--color-ok)">green</b></span><span>Updated 6 min ago</span></div>
+          </div>
+          <div class="page-header__actions">
+            <button class="btn btn--glass">Feedback</button>
+            <button class="btn btn--solid"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v12M13 6h3a2 2 0 0 1 2 2v7"/></svg>Merge</button>
+            <button class="btn btn--ghost btn--icon" aria-label="More actions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+          </div>
+        </header>
+
+        <div class="tabs-scroll">
+          <div class="tabs" role="tablist" aria-label="Card">
+            <button class="tab" role="tab" aria-selected="true">Overview</button>
+            <button class="tab" role="tab" aria-selected="false">Review</button>
+            <button class="tab" role="tab" aria-selected="false">Rounds <span class="badge">2</span></button>
+            <button class="tab" role="tab" aria-selected="false">Files</button>
+            <button class="tab" role="tab" aria-selected="false">Edit</button>
+          </div>
+        </div>
+
+        <div class="card-layout" role="tabpanel">
+          <div class="col">
+            <section class="section" aria-labelledby="demo-h">
+              <div class="section-header">
+                <div style="min-width:0">
+                  <div class="title-inline"><h2 id="demo-h">Demo</h2><span class="pill pill--sm" data-status="done"><span class="pill__dot"></span>Ready</span></div>
+                  <p>Recorded on the runner when the checks turned green. Watch it before you merge.</p>
+                </div>
+                <div style="display:flex;gap:4px;flex-shrink:0">
+                  <button class="btn btn--glass btn--sm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg><span class="hide-phone">Record again</span></button>
+                  <button class="btn btn--ghost btn--sm btn--icon" aria-label="Download demo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></button>
+                </div>
+              </div>
+              <div class="section__body surface-content demo-body">
+                <div class="player" id="player">
+                  <div class="player__stage">
+                    <div class="rec" aria-hidden="true">
+                      <div class="rec__bar"><i></i><i></i><i></i><span class="rec__url">localhost:3000/projects/web/settings?tab=budget</span></div>
+                      <div class="rec__body">
+                        <div class="rec__nav"><span></span><span></span><span class="on"></span><span></span><span></span><span style="margin-top:auto"></span></div>
+                        <div class="rec__main">
+                          <div class="rec__head"><div><div class="rec__sub">nautelle-web · Settings</div><div class="rec__h">Budget</div></div><span class="rec__btn">↓ Export CSV</span></div>
+                          <div class="rec__tiles">
+                            <div class="rec__tile"><small>Spend this month</small><b>$124.80</b></div>
+                            <div class="rec__tile"><small>Tokens</small><b>9.4M</b></div>
+                            <div class="rec__tile"><small>Runs</small><b>212</b></div>
+                          </div>
+                          <div class="rec__rows">
+                            <div class="rec__row"><span>Agent</span><span>Tokens</span><span>Cost</span></div>
+                            <div class="rec__row"><span>Claude Code · Opus</span><span>6,102,440</span><span>$92.10</span></div>
+                            <div class="rec__row"><span>Claude Code · Sonnet</span><span>2,880,105</span><span>$27.44</span></div>
+                            <div class="rec__row"><span>Codex</span><span>412,930</span><span>$5.26</span></div>
+                          </div>
+                        </div>
+                      </div>
+                      <span class="rec__ripple"></span>
+                      <svg class="rec__cursor" viewBox="0 0 24 24"><path d="M4 2l16 9-7 2-3 7z" fill="#fff" stroke="#18181b" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                    </div>
+                    <span class="player__step"><b>2/4</b> Click “Export CSV”</span>
+                    <button class="player__big" id="player-big" aria-label="Play demo"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg></button>
+                  </div>
+                  <div class="player__bar">
+                    <button class="pl-btn" id="player-toggle" aria-label="Play"><svg id="ic-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg><svg id="ic-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></button>
+                    <span class="pl-time">0:42 / 1:58</span>
+                    <div class="scrub" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="118" aria-valuenow="42" tabindex="0">
+                      <span class="scrub__fill"></span>
+                      <span class="scrub__mark" style="left:15%"></span><span class="scrub__mark" style="left:43%"></span><span class="scrub__mark" style="left:71%"></span>
+                      <span class="scrub__thumb"></span>
+                    </div>
+                    <button class="pl-btn hide-phone" aria-label="Playback speed">1×</button>
+                    <button class="pl-btn" aria-label="Full screen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+                  </div>
+                </div>
+
+                <div class="demo-grid">
+                  <div>
+                    <div class="sub-h">Steps</div>
+                    <ol class="chapters">
+                      <li><button class="chapter"><span class="chapter__n">1</span><span class="chapter__t">Open the Budget settings<small>/projects/web/settings?tab=budget</small></span><span class="chapter__time">0:00</span></button></li>
+                      <li><button class="chapter" aria-current="true"><span class="chapter__n">2</span><span class="chapter__t">Click “Export CSV”<small>button[name=export]</small></span><span class="chapter__time">0:18</span></button></li>
+                      <li><button class="chapter"><span class="chapter__n">3</span><span class="chapter__t">Pick “This month” and confirm<small>dialog · Export usage</small></span><span class="chapter__time">0:51</span></button></li>
+                      <li><button class="chapter"><span class="chapter__n">4</span><span class="chapter__t">The file downloads<small>usage-2026-10.csv · 14 KB</small></span><span class="chapter__time">1:24</span></button></li>
+                    </ol>
+                  </div>
+                  <div>
+                    <div class="sub-h">Recording</div>
+                    <dl class="kv demo-meta">
+                      <dt>Recorded</dt><dd>6 min ago · round 2</dd>
+                      <dt>Commit</dt><dd><span class="code">a1c9f03</span> <span class="badge badge--ok">latest</span></dd>
+                      <dt>Trigger</dt><dd>Checks turned green</dd>
+                      <dt>Runner</dt><dd>build-01 · DemoFlow <span class="mono" style="font-size:12px">0.9.2</span></dd>
+                      <dt>Telegram</dt><dd style="display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--color-ink-3)"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>Sent to Nautelle team</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section" aria-labelledby="sum-h">
+              <div class="section-header"><div><h2 id="sum-h">Summary</h2><p>What the agent was asked to build.</p></div></div>
+              <div class="section__body surface-content" style="display:flex;flex-direction:column;gap:12px">
+                <p style="font-size:14px;color:var(--color-ink-2);max-width:72ch">A person can download this month's usage as CSV from Project settings → Budget: one row per run, with agent, model, tokens and cost. The export runs on the API and streams; the web app never builds the file itself.</p>
+                <ul class="checks">
+                  <li><input type="checkbox" class="checkbox" checked aria-label="Done"> “Export CSV” on the Budget tab downloads <span class="code">usage-YYYY-MM.csv</span></li>
+                  <li><input type="checkbox" class="checkbox" checked aria-label="Done"> Another project's runs are never in the file (authorization test)</li>
+                  <li><input type="checkbox" class="checkbox" checked aria-label="Done"> A month with no runs exports the header row only</li>
+                </ul>
+              </div>
+            </section>
+          </div>
+
+          <aside class="col">
+            <div class="card surface-content" style="display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="text-section">Pull request</span><span class="badge badge--md badge--ok">Checks green</span></div>
+              <dl class="kv" style="font-size:13px;gap:6px 16px">
+                <dt>Number</dt><dd><a href="#">#918</a></dd>
+                <dt>Branch</dt><dd class="mono" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">card/c412-usage-export</dd>
+                <dt>Checks</dt><dd class="num">14 passed</dd>
+                <dt>Changes</dt><dd class="num">9 files · <span style="color:var(--color-ok)">+412</span> <span style="color:var(--color-danger)">−38</span></dd>
+                <dt>Review</dt><dd>Approved by reviewer agent</dd>
+              </dl>
+            </div>
+            <div class="card surface-content" style="display:flex;flex-direction:column;gap:12px">
+              <span class="text-section">Slot</span>
+              <dl class="kv" style="font-size:13px;gap:6px 16px">
+                <dt>Agent</dt><dd>Claude Code · Sonnet</dd>
+                <dt>Slot</dt><dd>slot-3</dd>
+                <dt>Spend</dt><dd class="num">$3.42</dd>
+                <dt>Time</dt><dd class="num">38 min</dd>
+              </dl>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- BOARD -->
+      <section class="view" data-view-panel="board" aria-label="Work">
+        <header class="page-header">
+          <div class="page-header__text">
+            <span class="page-header__eyebrow">nautelle-web</span>
+            <div class="page-header__title-row"><h1>Work</h1></div>
+            <div class="page-header__meta"><span><b class="num" style="color:var(--color-ink)">9</b> cards</span><span><b class="num" style="color:var(--color-ink)">2</b> running</span><span><b class="num" style="color:var(--color-ink)">3</b> waiting on you</span></div>
+          </div>
+          <div class="page-header__actions">
+            <button class="btn btn--solid"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New card</button>
+            <button class="btn btn--ghost btn--icon" aria-label="More actions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+          </div>
+        </header>
+        <div class="toolbar">
+          <div class="search toolbar__search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input class="input" placeholder="Search cards" aria-label="Search cards"></div>
+          <select class="select hide-phone" style="width:auto" aria-label="Agent"><option>Any agent</option></select>
+          <span class="toolbar__spacer"></span>
+          <div class="segmented segmented--sm glass" role="radiogroup" aria-label="View"><button role="radio" aria-checked="true">Board</button><button role="radio" aria-checked="false">List</button></div>
+        </div>
+        <div class="board">
+          <div class="lane">
+            <div class="lane__head">To do <span class="badge">2</span></div>
+            <button class="tile surface-content"><span class="tile__top"><span class="mono">C-418</span>· Feature</span><span class="tile__title">Show cost per card on the Budget chart</span><span class="tile__foot"><span class="pill pill--sm"><span class="pill__dot"></span>Queued</span></span></button>
+            <button class="tile surface-content"><span class="tile__top"><span class="mono">C-421</span>· Bug</span><span class="tile__title">Budget alert fires twice after midnight UTC</span><span class="tile__foot"><span class="pill pill--sm"><span class="pill__dot"></span>Queued</span></span></button>
+          </div>
+          <div class="lane">
+            <div class="lane__head">In progress <span class="badge">2</span></div>
+            <button class="tile surface-content"><span class="tile__top"><span class="mono">C-415</span>· Feature</span><span class="tile__title">Empty state for the Sessions list</span><span class="tile__foot"><span class="pill pill--sm" data-status="running"><span class="pill__dot"></span>Running</span></span></button>
+            <button class="tile surface-content"><span class="tile__top"><span class="mono">C-410</span>· Feature</span><span class="tile__title">Members tab: invite by link</span><span class="tile__foot"><span class="pill pill--sm" data-status="done"><span class="pill__dot"></span>Checks green</span><span class="pill pill--sm" data-status="running"><span class="pill__dot"></span>Recording demo</span></span></button>
+          </div>
+          <div class="lane">
+            <div class="lane__head">Review <span class="badge badge--count badge--warn">3</span></div>
+            <button class="tile surface-content" data-view="card" aria-current="true"><span class="tile__top"><span class="mono">C-412</span>· Feature</span><span class="tile__title">Add usage export to the Budget page</span><span class="tile__foot"><span class="pill pill--sm" data-status="waiting"><span class="pill__dot"></span>Waiting</span><span class="demo-chip" title="Demo ready"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>1:58</span></span></button>
+            <button class="tile surface-content"><span class="tile__top"><span class="mono">C-409</span>· Feature</span><span class="tile__title">Dark theme for the Telegram mini app</span><span class="tile__foot"><span class="pill pill--sm" data-status="waiting"><span class="pill__dot"></span>Waiting</span><span class="badge badge--md badge--danger">Demo failed</span></span></button>
+            <button class="tile surface-content"><span class="tile__top"><span class="mono">C-404</span>· Feature</span><span class="tile__title">Planner: copy a task's document</span><span class="tile__foot"><span class="pill pill--sm" data-status="waiting"><span class="pill__dot"></span>Waiting</span><span class="badge badge--md badge--warn">Demo outdated</span></span></button>
+          </div>
+          <div class="lane">
+            <div class="lane__head">Done <span class="badge">2</span></div>
+            <button class="tile surface-content"><span class="tile__top"><span class="mono">C-401</span>· Bug</span><span class="tile__title">API: retry runner heartbeat on 502</span><span class="tile__foot"><span class="pill pill--sm" data-status="done"><span class="pill__dot"></span>Merged</span></span></button>
+            <button class="tile surface-content"><span class="tile__top"><span class="mono">C-398</span>· Feature</span><span class="tile__title">Fleet: slot hue on the activity feed</span><span class="tile__foot"><span class="pill pill--sm" data-status="done"><span class="pill__dot"></span>Merged</span><span class="demo-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>0:47</span></span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" data-view-panel="settings" aria-label="Project settings" style="max-width:64rem;width:100%;margin:0 auto">
+        <header class="page-header">
+          <div class="page-header__text">
+            <span class="page-header__eyebrow">nautelle-web</span>
+            <div class="page-header__title-row"><h1>Settings</h1></div>
+            <p class="page-header__desc">How this project's fleet works: board, review, design and the demos it records.</p>
+          </div>
+        </header>
+        <div class="tabs-scroll">
+          <div class="tabs" role="tablist" aria-label="Project settings">
+            <button class="tab" role="tab" aria-selected="false">General</button>
+            <button class="tab" role="tab" aria-selected="false">Board</button>
+            <button class="tab" role="tab" aria-selected="false">Review</button>
+            <button class="tab" role="tab" aria-selected="false">Design</button>
+            <button class="tab" role="tab" aria-selected="true">Demo videos</button>
+            <button class="tab" role="tab" aria-selected="false">Budget</button>
+            <button class="tab" role="tab" aria-selected="false">Members</button>
+          </div>
+        </div>
+
+        <section class="section">
+          <div class="section-header"><div><h2>Demo videos</h2><p>A short video of a UI card, recorded on the runner, so you see the change before you merge it.</p></div></div>
+          <div class="section__body section__body--flush surface-content">
+            <div class="set-row">
+              <div class="set-row__text"><span class="set-row__title">Record when a UI card turns green</span><span class="set-row__hint">The runner records once the checks pass. “Record again” on a card works either way.</span></div>
+              <button type="button" class="toggle" role="switch" aria-checked="true" aria-label="Record demos automatically"></button>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-header"><div><h2>UI paths</h2><p>A card is a UI card when its pull request changes a file under one of these paths.</p></div></div>
+          <div class="section__body section__body--flush surface-content">
+            <ul class="path-list">
+              <li>apps/web/**<button class="btn btn--ghost btn--sm btn--icon" aria-label="Remove apps/web/**"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></li>
+              <li>packages/glass-ui/src/**<button class="btn btn--ghost btn--sm btn--icon" aria-label="Remove packages/glass-ui/src/**"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></li>
+            </ul>
+            <div class="add-row"><input class="input mono" style="font-size:13px" placeholder="apps/admin/**" aria-label="New UI path"><button class="btn btn--glass">Add</button></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-header"><div><h2>Telegram</h2><p>Send a ready demo to the project's chat with Merge and Feedback buttons.</p></div></div>
+          <div class="section__body section__body--flush surface-content">
+            <div class="set-row">
+              <div class="set-row__text"><span class="set-row__title">Send ready demos</span><span class="set-row__hint">Chat: <b style="color:var(--color-ink);font-weight:500">Nautelle team</b> <span class="badge badge--ok">Linked</span></span></div>
+              <button type="button" class="toggle" role="switch" aria-checked="true" aria-label="Send ready demos to Telegram"></button>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-header"><div><h2>Demo env</h2><p>Secrets the app needs while it is recorded, like a test login. Only the runner reads them.</p></div><button class="btn btn--glass btn--sm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add secret</button></div>
+          <div class="section__body section__body--flush surface-content">
+            <table class="table">
+              <thead><tr><th>Name</th><th>Value</th><th class="hide-phone">Updated</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                <tr><td class="mono" style="font-size:12px">DEMO_ADMIN_EMAIL</td><td class="ink-3">••••••••</td><td class="cell-meta hide-phone">3 days ago</td><td style="text-align:right"><button class="btn btn--ghost btn--icon btn--sm" aria-label="Secret actions"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button></td></tr>
+                <tr><td class="mono" style="font-size:12px">DEMO_ADMIN_PASSWORD</td><td class="ink-3">••••••••</td><td class="cell-meta hide-phone">3 days ago</td><td style="text-align:right"><button class="btn btn--ghost btn--icon btn--sm" aria-label="Secret actions"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button></td></tr>
+                <tr><td class="mono" style="font-size:12px">STRIPE_TEST_KEY</td><td class="ink-3">••••••••</td><td class="cell-meta hide-phone">Oct 12</td><td style="text-align:right"><button class="btn btn--ghost btn--icon btn--sm" aria-label="Secret actions"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-header"><div><h2>Runner</h2><p>DemoFlow records on the project's runner.</p></div><button class="btn btn--glass btn--sm">Check again</button></div>
+          <div class="section__body surface-content">
+            <div class="runner-row">
+              <span class="runner-id"><span class="live-dot" aria-hidden="true"></span>build-01</span>
+              <span class="badge badge--md badge--ok">DemoFlow 0.9.2</span>
+              <span class="badge badge--md badge--ok">Chromium ready</span>
+              <span class="ink-3" style="font-size:12px">Checked 2 min ago</span>
+            </div>
+          </div>
+        </section>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<div class="capsule-wrap">
+  <nav class="capsule glass-strong" aria-label="Primary">
+    <a class="capsule__tab" href="#" data-view="board"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>Work</a>
+    <a class="capsule__tab" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/></svg>Fleet</a>
+    <a class="capsule__tab" href="#" data-view="settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Settings</a>
+    <a class="capsule__tab" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>More</a>
+  </nav>
+  <button class="capsule__plus glass-strong" aria-label="New card"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+</div>
+
+<script>
+(function () {
+  var panels = document.querySelectorAll('[data-view-panel]');
+  var mid = document.getElementById('crumb-mid');
+  var sep = document.getElementById('crumb-sep2');
+  var leaf = document.getElementById('crumb-leaf');
+  function show(view) {
+    panels.forEach(function (p) { p.classList.toggle('is-active', p.getAttribute('data-view-panel') === view); });
+    document.querySelectorAll('.nav-item[data-view], .capsule__tab[data-view]').forEach(function (a) {
+      var target = a.getAttribute('data-view');
+      var on = target === view || (target === 'board' && view === 'card');
+      if (on) { a.setAttribute('aria-current', 'page'); } else { a.removeAttribute('aria-current'); }
+    });
+    var isCard = view === 'card';
+    mid.style.display = isCard ? '' : 'none';
+    sep.style.display = isCard ? '' : 'none';
+    leaf.textContent = isCard ? 'C-412' : (view === 'board' ? 'Work' : 'Settings');
+    document.documentElement.scrollTop = 0;
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-view]');
+    if (t) { e.preventDefault(); show(t.getAttribute('data-view')); }
+  });
+  var player = document.getElementById('player');
+  var playIc = document.getElementById('ic-play');
+  var pauseIc = document.getElementById('ic-pause');
+  var toggleBtn = document.getElementById('player-toggle');
+  function togglePlay() {
+    var playing = player.classList.toggle('is-playing');
+    playIc.style.display = playing ? 'none' : '';
+    pauseIc.style.display = playing ? '' : 'none';
+    toggleBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  }
+  document.getElementById('player-big').addEventListener('click', togglePlay);
+  toggleBtn.addEventListener('click', togglePlay);
+  show('card');
+})();
+</script>
+</body>
+</html>

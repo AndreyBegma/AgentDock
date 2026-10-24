@@ -189,6 +189,58 @@ describe('card.run args', () => {
   });
 });
 
+describe('card.run startBranch (#854)', () => {
+  it('a command without it is what an older runner already takes', () => {
+    const parsed = cardRunArgsSchema.safeParse(runArgs);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).not.toHaveProperty('startBranch');
+  });
+
+  it('accepts a card branch other than branch', () => {
+    expect(
+      cardRunArgsSchema.safeParse({ ...runArgs, startBranch: 'feat/12-login' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('refuses the card branch itself, a non-card branch and a follow-up', () => {
+    for (const extra of [
+      { startBranch: runArgs.branch },
+      { startBranch: 'main' },
+      { startBranch: 'chore/login' },
+      {
+        startBranch: 'feat/12-login',
+        newBranch: true,
+        session: { ...runArgs.session, resume: true },
+      },
+    ]) {
+      expect(
+        cardRunArgsSchema.safeParse({ ...runArgs, ...extra }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('the result names the branch taken, or why not', () => {
+    const base = { phase: 'running', tmuxSession: 'nautelle-card-ab12cd34' };
+    expect(cardRunResultSchema.safeParse(base).success).toBe(true);
+    expect(
+      cardRunResultSchema.safeParse({ ...base, branch: 'feat/12-login' })
+        .success,
+    ).toBe(true);
+    expect(
+      cardRunResultSchema.safeParse({
+        ...base,
+        branch: runArgs.branch,
+        startBranchSkipped: 'not_on_origin',
+      }).success,
+    ).toBe(true);
+    expect(
+      cardRunResultSchema.safeParse({ ...base, startBranchSkipped: 'nope' })
+        .success,
+    ).toBe(false);
+  });
+});
+
 describe('card.run attachments (#309 D9)', () => {
   const ref = (id: string) => ({
     id,
@@ -338,6 +390,17 @@ describe('card.stop, card.collect, card.close', () => {
     expect(
       cardCollectResultSchema.safeParse({ ahead: 2, pushed: true, prNumber: 7 })
         .success,
+    ).toBe(false);
+  });
+
+  it('collect reports the head it pushed (#837): a full SHA only', () => {
+    const pushed = { ahead: 2, pushed: true };
+    expect(
+      cardCollectResultSchema.safeParse({ ...pushed, headSha: 'a'.repeat(40) })
+        .data?.headSha,
+    ).toBe('a'.repeat(40));
+    expect(
+      cardCollectResultSchema.safeParse({ ...pushed, headSha: 'abc' }).success,
     ).toBe(false);
   });
 

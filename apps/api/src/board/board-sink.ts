@@ -205,7 +205,14 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
       },
       include: {
         card: {
-          select: { number: true, column: true, branch: true, ciHeadSha: true },
+          select: {
+            number: true,
+            column: true,
+            branch: true,
+            ciHeadSha: true,
+            prNumber: true,
+            prUrl: true,
+          },
         },
       },
     });
@@ -263,6 +270,18 @@ export class BoardSink implements RunnerEventSink, OnApplicationBootstrap {
         round: round.round,
       });
     }
+    // #837: without a PR in the push, the card's own on this branch.
+    const pr =
+      data.prNumber !== undefined && data.prUrl !== undefined
+        ? { number: data.prNumber, url: data.prUrl }
+        : round.card.prNumber !== null && round.card.prUrl !== null
+          ? { number: round.card.prNumber, url: round.card.prUrl }
+          : null;
+    await this.work.recordRoundHead(round, {
+      headSha: data.headSha,
+      ahead: data.ahead ?? null,
+      pr,
+    });
     this.work.publish(data.projectId, round.cardId);
   }
 

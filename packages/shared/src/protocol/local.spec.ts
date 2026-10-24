@@ -7,6 +7,16 @@ import {
   mayDecideActionRequest,
 } from '../action-requests';
 import {
+  BULK_CARDS_MAX,
+  MANUAL_STACK_CARDS_MIN,
+  STACK_RUN_STATES,
+} from '../board';
+import {
+  INTAKE_SPLIT_MAX,
+  STACK_STAGE_TITLE_MAX,
+  STACK_TITLE_MAX,
+} from '../planner';
+import {
   HOOK_CLI_EVENT,
   HOOK_CLI_NAMES,
   HOOK_CONTENT_MAX_CHARS,
@@ -15,8 +25,15 @@ import {
   hookEventHasContent,
   LOCAL_BOARD_REFUSALS,
   LOCAL_BOARD_WAIT_HOLD_MAX_SEC,
+  LOCAL_DESIGN_REFUSALS,
   LOCAL_REQUEST_TIMEOUT_MS,
   LOCAL_ROLE_CAP,
+  LOCAL_STACK_CARDS_MAX,
+  LOCAL_STACK_CARDS_MIN,
+  LOCAL_STACK_RUN_STATES,
+  LOCAL_STACK_STAGE_TITLE_MAX,
+  LOCAL_STACK_STAGES_MAX,
+  LOCAL_STACK_TITLE_MAX,
   localActionRequestArgsSchema,
   localErrorCodeSchema,
   localMethodNames,
@@ -515,6 +532,121 @@ describe('the Board from a session (#845)', () => {
         pullRequestUrl: 'http://example.com/pull/7',
       }).ok,
     ).toBe(false);
+  });
+});
+
+describe('stacks, designs and dependencies from a session (C-377)', () => {
+  const READS = ['stack.designView', 'card.designView'] as const;
+  const CONTROLS = [
+    'stack.create',
+    'stack.addCard',
+    'stack.removeCard',
+    'stack.update',
+    'stack.run',
+    'stack.stop',
+    'stack.design',
+    'card.design',
+    'card.depend',
+    'card.undepend',
+  ] as const;
+
+  it('reads at viewer and writes at operator, always in a project', () => {
+    for (const name of READS) {
+      expect(localMethods[name].minRole).toBe('viewer');
+      expect(localMethods[name].needsProject).toBe(true);
+    }
+    for (const name of CONTROLS) {
+      expect(localMethods[name].minRole).toBe('operator');
+      expect(localMethods[name].needsProject).toBe(true);
+    }
+  });
+
+  it('keeps the limits of the board and planner modules', () => {
+    expect(LOCAL_STACK_TITLE_MAX).toBe(STACK_TITLE_MAX);
+    expect(LOCAL_STACK_STAGE_TITLE_MAX).toBe(STACK_STAGE_TITLE_MAX);
+    expect(LOCAL_STACK_STAGES_MAX).toBe(INTAKE_SPLIT_MAX);
+    expect(LOCAL_STACK_CARDS_MAX).toBe(BULK_CARDS_MAX);
+    expect(LOCAL_STACK_CARDS_MIN).toBe(MANUAL_STACK_CARDS_MIN);
+    expect([...LOCAL_STACK_RUN_STATES]).toEqual([...STACK_RUN_STATES]);
+  });
+
+  it('creates a stack of titled stages, each card in one stage', () => {
+    const stages = [{ title: 'Foundations', cards: [1, 2] }, { cards: [3] }];
+    expect(
+      parseLocalRequest('stack.create', { title: 'Install', stages }).ok,
+    ).toBe(true);
+    for (const args of [
+      { title: 'One card', stages: [{ cards: [1] }] },
+      { title: 'Twice', stages: [{ cards: [1, 2] }, { cards: [2] }] },
+      { title: 'two\nlines', stages },
+      { title: 'Empty stage', stages: [{ cards: [1, 2] }, { cards: [] }] },
+      { title: 'No stages', stages: [] },
+      { title: 'Stack', stages, extra: true },
+    ]) {
+      expect(parseLocalRequest('stack.create', args).ok).toBe(false);
+    }
+  });
+
+  it('updates stage titles and refuses an empty update', () => {
+    expect(
+      parseLocalRequest('stack.update', {
+        stack: 12,
+        stages: [
+          { position: 0, title: 'Foundations' },
+          { position: 1, title: 'Features' },
+        ],
+      }).ok,
+    ).toBe(true);
+    expect(parseLocalRequest('stack.update', { stack: 12 }).ok).toBe(false);
+    expect(
+      parseLocalRequest('stack.update', {
+        stack: 12,
+        stages: [{ position: 0, title: 'a\nb' }],
+      }).ok,
+    ).toBe(false);
+  });
+
+  it('takes only the design actions that write; status is the view method', () => {
+    for (const action of ['generate', 'approve', 'revise']) {
+      expect(parseLocalRequest('stack.design', { stack: 1, action }).ok).toBe(
+        true,
+      );
+      expect(parseLocalRequest('card.design', { card: 1, action }).ok).toBe(
+        true,
+      );
+    }
+    expect(
+      parseLocalRequest('stack.design', { stack: 1, action: 'status' }).ok,
+    ).toBe(false);
+    expect(
+      parseLocalRequest('card.design', {
+        card: 1,
+        action: 'revise',
+        comments: ['   '],
+      }).ok,
+    ).toBe(false);
+  });
+
+  it('refuses a card that depends on itself', () => {
+    expect(parseLocalRequest('card.depend', { card: 2, dependsOn: 1 }).ok).toBe(
+      true,
+    );
+    expect(parseLocalRequest('card.depend', { card: 2, dependsOn: 2 }).ok).toBe(
+      false,
+    );
+  });
+
+  it('passes the stack and design refusals through, and needs_person', () => {
+    for (const code of [
+      ...LOCAL_BOARD_REFUSALS,
+      ...LOCAL_DESIGN_REFUSALS,
+      'needs_person',
+    ]) {
+      expect(localErrorCodeSchema.safeParse(code).success).toBe(true);
+    }
+    expect(LOCAL_BOARD_REFUSALS).toContain('stack_refused');
+    expect(LOCAL_BOARD_REFUSALS).toContain('dependency_cycle');
+    expect(LOCAL_DESIGN_REFUSALS).toContain('no_open_comments');
   });
 });
 

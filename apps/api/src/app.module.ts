@@ -16,6 +16,7 @@ import { BullmqModule } from './bullmq';
 import { CaptureModule } from './capture';
 import { ControlModule } from './control';
 import { DatabaseModule } from './database/database.module';
+import { DemosModule } from './demos';
 import { DesignModule } from './design/design.module';
 import { UiProfileLearnModule } from './design/learn/learn.module';
 import { DesignTemplatesModule } from './design-templates/design-templates.module';
@@ -36,9 +37,11 @@ import { ProjectRulesModule } from './project-rules';
 import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queue';
 import { ReadinessModule } from './readiness';
+import { ReviewModule } from './review';
 import { RunnersModule } from './runners/runners.module';
 import { SchedulesModule } from './schedules';
 import { SessionsModule } from './sessions/sessions.module';
+import { SetupModule } from './setup/setup.module';
 import { SkillsModule } from './skills';
 import { StewardModule } from './steward';
 import { StewardDigestModule } from './steward-digest';
@@ -49,6 +52,7 @@ import { TerminalSetupModule } from './terminal-setup';
 import { TextModule } from './text';
 import { TokenEconomyModule } from './token-economy';
 import { TokenSaverModule } from './token-saver';
+import { UpdatesModule } from './updates/updates.module';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
 import { WorkModule } from './work';
@@ -64,6 +68,8 @@ import { WorkflowsModule } from './workflows';
     BullmqModule,
     AuditModule,
     AuthModule,
+    // C-367: the first-run setup — the first admin, created in the browser.
+    SetupModule,
     AdminModule,
     RunnersModule,
     LiveModule,
@@ -127,6 +133,10 @@ import { WorkflowsModule } from './workflows';
     BudgetsModule,
     // Issue #528: per-project coding rules and their Markdown import.
     ProjectRulesModule,
+    // Issue #862: per-project review steps and generated peer review.
+    ReviewModule,
+    // C-368: demo videos of finished cards (ADR-0090).
+    DemosModule,
     // Issue #447: the Steward digest. Global, and here alone: its conditional
     // queue must not be registered while the graph loads.
     StewardDigestModule,
@@ -142,6 +152,8 @@ import { WorkflowsModule } from './workflows';
     SummariesModule,
     // #660: Ask the Board and triage hints.
     BoardAiModule,
+    // C-374: the daily check for a newer Nautelle release (ADR-0091).
+    UpdatesModule,
   ],
   controllers: [HealthController],
 })

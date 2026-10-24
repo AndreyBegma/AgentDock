@@ -54,6 +54,7 @@ export const RUN_KIND_LABEL: Record<RunKind, string> = {
   ui_profile_learn: 'UI profile learning',
   rules_compress: 'Rules compression',
   prefix_propose: 'Prefix overlay proposal',
+  card_review: 'Card review step',
 };
 
 export const isRunKind = (value: string): value is RunKind =>
