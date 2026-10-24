@@ -145,6 +145,33 @@ export interface CardDemoView {
   finishedAt: string | null;
 }
 
+/**
+ * Server event (ADR-0014) of a demo that became `ready` or `failed` while the
+ * project's `demoTelegram` is on (C-372, ADR-0095). The `card.demo`
+ * notification comes from it, on Telegram only. It names the card and the
+ * demo — never the scenario or the video.
+ */
+export const CARD_DEMO_EVENT = 'card.demo';
+
+export interface CardDemoEventData {
+  cardId: string;
+  number: number;
+  title: string;
+  round: number;
+  demoId: string;
+  status: 'ready' | 'failed';
+  /** With `failed`: why, one line. */
+  reason: string | null;
+  /** With `ready`: bytes of the video. */
+  size: number | null;
+}
+
+/**
+ * Telegram's limit on a file a bot uploads (`sendVideo`, 50 MB). A bigger
+ * demo goes to the chat as a message with a link to the card instead.
+ */
+export const TELEGRAM_BOT_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+
 /** Stable codes in the `error` field of a demo route's error body. */
 export const DEMO_ERROR = {
   notFound: 'not_found',

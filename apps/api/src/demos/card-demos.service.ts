@@ -6,6 +6,8 @@ import {
   attachmentContentPath,
   BOARD_CHANGED_EVENT,
   type BoardChangedData,
+  CARD_DEMO_EVENT,
+  type CardDemoEventData,
   type CardDemoView,
   cardLabel,
   DEMO_ACTIVE_STATUSES,
@@ -15,7 +17,10 @@ import {
   isDemoActive,
   type Role,
 } from '@nautelle/shared';
-import type { DemoStatusData } from '@nautelle/shared/protocol';
+import {
+  API_EVENT_SOURCE,
+  type DemoStatusData,
+} from '@nautelle/shared/protocol';
 import {
   ForbiddenException,
   Injectable,
@@ -34,6 +39,7 @@ import { hiddenFrom } from '../board/inbox-access';
 import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { bearerToken } from '../runners/credentials';
+import { recordServerEvent } from '../server-events/server-events';
 import { DemoSettingsService } from './demo-settings.service';
 import { demoError, demoNotActive, demoNotFound } from './demos-error';
 
@@ -304,7 +310,7 @@ export class CardDemosService {
           `${cardLabel(demo.cardNumber)}-demo.${ext}`,
           { ...file, originalname: `demo.${ext}` },
         );
-        return tx.cardDemo.update({
+        const ready = await tx.cardDemo.update({
           where: { id: demo.demoId },
           data: {
             status: 'ready',
@@ -316,6 +322,8 @@ export class CardDemosService {
           },
           include: REQUESTED_BY,
         });
+        await this.telegramEvent(tx, ready);
+        return ready;
       });
       await this.audit.record({
         actor: { type: 'runner', runnerId: demo.runnerId },
@@ -365,17 +373,26 @@ export class CardDemosService {
       : {};
     const from: DemoStatus[] =
       data.status === 'recording' ? ['queued'] : ACTIVE;
-    const { count } = await this.prisma.cardDemo.updateMany({
-      where: { id: demo.id, status: { in: from } },
-      data:
-        data.status === 'recording'
-          ? { status: 'recording', startedAt: at, ...scenario }
-          : {
-              status: data.status,
-              reason: data.reason ?? null,
-              finishedAt: at,
-              ...scenario,
-            },
+    const count = await this.prisma.$transaction(async (tx) => {
+      const moved = await tx.cardDemo.updateMany({
+        where: { id: demo.id, status: { in: from } },
+        data:
+          data.status === 'recording'
+            ? { status: 'recording', startedAt: at, ...scenario }
+            : {
+                status: data.status,
+                reason: data.reason ?? null,
+                finishedAt: at,
+                ...scenario,
+              },
+      });
+      if (moved.count > 0 && data.status === 'failed') {
+        const failed = await tx.cardDemo.findUniqueOrThrow({
+          where: { id: demo.id },
+        });
+        await this.telegramEvent(tx, failed);
+      }
+      return moved.count;
     });
     if (count > 0) this.publish(data.projectId, data.cardId);
   }
@@ -397,6 +414,58 @@ export class CardDemosService {
       SELECT status::text AS status FROM card_demos WHERE id = ${demoId} FOR UPDATE`;
     if (rows.length === 0) throw demoNotFound();
     if (!isDemoActive(rows[0].status)) throw demoNotActive();
+  }
+
+  /**
+   * C-372: the `card.demo` server event of a demo that became ready or
+   * failed, in the transaction that moved it, so the Telegram message and the
+   * demo commit together — only while the project's `demoTelegram` is on. A
+   * skipped demo sends nothing.
+   */
+  private async telegramEvent(
+    tx: Prisma.TransactionClient,
+    demo: CardDemo,
+  ): Promise<void> {
+    if (demo.status !== 'ready' && demo.status !== 'failed') return;
+    const card = await tx.boardCard.findUniqueOrThrow({
+      where: { id: demo.cardId },
+      select: {
+        id: true,
+        number: true,
+        title: true,
+        project: {
+          select: {
+            runnerId: true,
+            rootPath: true,
+            repo: true,
+            boardSettings: { select: { demoTelegram: true } },
+          },
+        },
+      },
+    });
+    if (!(card.project.boardSettings?.demoTelegram ?? true)) return;
+    const data: CardDemoEventData = {
+      cardId: card.id,
+      number: card.number,
+      title: card.title,
+      round: demo.round,
+      demoId: demo.id,
+      status: demo.status,
+      reason: demo.status === 'failed' ? demo.reason : null,
+      size: demo.status === 'ready' ? demo.size : null,
+    };
+    await recordServerEvent(tx, {
+      source: API_EVENT_SOURCE,
+      type: CARD_DEMO_EVENT,
+      ts: new Date(),
+      project: {
+        runnerId: card.project.runnerId,
+        rootPath: card.project.rootPath,
+        repo: card.project.repo,
+      },
+      data: { ...data },
+      dedupeKey: `${CARD_DEMO_EVENT}:${demo.id}`,
+    });
   }
 
   /** The card's sheet and tile refresh, as on any card change. */

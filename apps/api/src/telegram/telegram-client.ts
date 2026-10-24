@@ -8,6 +8,11 @@ const POLL_GRACE_MS = 10_000;
 const DESCRIPTION_MAX = 200;
 /** #594: a file download — a photo or a voice message — gives up after this long. */
 const DOWNLOAD_TIMEOUT_MS = 60_000;
+/**
+ * C-372: one video upload, at most 50 MB. Under the delivery lease (60 s), so
+ * a slow upload fails and retries rather than being claimed twice.
+ */
+const UPLOAD_TIMEOUT_MS = 50_000;
 
 /** Anything shaped like a bot token: `<bot id>:<secret>`. */
 const TOKEN_SHAPE = /\d{3,}:[A-Za-z0-9_-]{20,}/g;
@@ -174,6 +179,14 @@ export interface BotCommand {
   description: string;
 }
 
+/**
+ * C-372: the video `sendVideo` sends — its bytes, uploaded, or the `file_id`
+ * Telegram gave an earlier upload of the same file, sent again for free.
+ */
+export type TelegramVideoInput =
+  | { bytes: Uint8Array; fileName: string; mimeType: string }
+  | { fileId: string };
+
 /** What `sendMessage` may attach: buttons, or a prompt to reply to it. */
 export type TelegramReplyMarkup =
   | { inline_keyboard: InlineKeyboard }
@@ -283,7 +296,7 @@ const networkError = (error: unknown): TelegramApiError => {
 
 /**
  * The Bot API over HTTPS (spec 22 D7): `getMe`, the `getUpdates` long poll,
- * `sendMessage`, `editMessageText` (#574), `answerCallbackQuery` (D12),
+ * `sendMessage`, `sendVideo` (C-372), `editMessageText` (#574), `answerCallbackQuery` (D12),
  * `setMyCommands` (#500), `setChatMenuButton` (#580), and `getFile` with
  * the file download (#594). Stateless — the token is passed per call, read from
  * `BotTokenStore` by the caller. The base URL is `TELEGRAM_API_BASE`, which
@@ -361,6 +374,47 @@ export class TelegramClient {
     return isObject(result) && typeof result.message_id === 'number'
       ? result.message_id
       : null;
+  }
+
+  /**
+   * C-372: sends a video with a plain-text `caption` and buttons. The sent
+   * message's id and the video's `file_id`, for sending it again without
+   * uploading it; either is null when Telegram's answer does not name it.
+   */
+  async sendVideo(
+    token: string,
+    chatId: bigint | number,
+    video: TelegramVideoInput,
+    caption: string,
+    replyMarkup?: TelegramReplyMarkup,
+  ): Promise<{ messageId: number | null; fileId: string | null }> {
+    const form = new FormData();
+    form.set('chat_id', String(chatId));
+    form.set('caption', caption);
+    form.set('supports_streaming', 'true');
+    if (replyMarkup) form.set('reply_markup', JSON.stringify(replyMarkup));
+    if ('fileId' in video) {
+      form.set('video', video.fileId);
+    } else {
+      form.set(
+        'video',
+        new Blob([video.bytes], { type: video.mimeType }),
+        video.fileName,
+      );
+    }
+    const result = await this.call(
+      token,
+      'sendVideo',
+      form,
+      AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+    );
+    if (!isObject(result)) return { messageId: null, fileId: null };
+    const sent = isObject(result.video) ? result.video.file_id : undefined;
+    return {
+      messageId:
+        typeof result.message_id === 'number' ? result.message_id : null,
+      fileId: typeof sent === 'string' && sent.length > 0 ? sent : null,
+    };
   }
 
   /** #620: "typing…" in the chat, for five seconds or until the next message. */
@@ -493,7 +547,7 @@ export class TelegramClient {
   private async call(
     token: string,
     method: string,
-    body: object,
+    body: object | FormData,
     signal: AbortSignal = AbortSignal.timeout(CALL_TIMEOUT_MS),
   ): Promise<unknown> {
     const base = this.options.apiBase.replace(/\/+$/, '');
@@ -501,8 +555,13 @@ export class TelegramClient {
     try {
       response = await this.options.fetch(`${base}/bot${token}/${method}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        // A form sets its own multipart content type, with the boundary.
+        ...(body instanceof FormData
+          ? { body }
+          : {
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(body),
+            }),
         signal,
       });
     } catch (error) {
