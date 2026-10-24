@@ -1,10 +1,13 @@
-# Kubernetes (Helm)
+---
+title: Kubernetes (Helm)
+description: Run the Nautelle control plane on a Kubernetes cluster from the Helm chart.
+---
 
 The Helm chart runs the Nautelle control plane on a Kubernetes cluster: the
 published `ghcr.io/andreybegma/nautelle-api` and `nautelle-web` images, a Caddy
 proxy that gives both one address, and optionally its own PostgreSQL and Redis
-([ADR-0092](../adr/0092-nautelle-runs-on-kubernetes-from-a-helm-chart-published-with-each-release.md)).
-It is the same install as the compose file of [Installing Nautelle](install.md),
+([ADR-0092](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0092-nautelle-runs-on-kubernetes-from-a-helm-chart-published-with-each-release.md)).
+It is the same install as the compose file of [Install](../../getting-started/install/),
 in Kubernetes objects.
 
 The chart is the control plane only. Runners stay on the machines that hold
@@ -31,7 +34,7 @@ kubectl -n nautelle port-forward svc/nautelle 8000:80
 
 Then open <http://localhost:8000>. The chart's version is the product's: chart
 `X.Y.Z` runs the images of release `X.Y.Z`. The releases are listed in
-[docs/releases](../releases/README.md).
+[docs/releases](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/releases/README.md).
 
 On its first start the API waits for the database, migrates it and generates
 its encryption and audit keys into the `/data` volume; the startup probe gives
@@ -44,7 +47,7 @@ installs the chart as it is on that branch, with the `:latest` images.
 ## First run
 
 Open the one-time setup link the API logs and create the first administrator
-there ([ADR-0087](../adr/0087-the-first-admin-is-created-in-the-browser-with-a-one-time-setup-token.md)).
+there ([ADR-0087](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0087-the-first-admin-is-created-in-the-browser-with-a-one-time-setup-token.md)).
 Each start of the API logs a new link; to find the current one:
 
 ```sh
@@ -135,7 +138,7 @@ tunnel for anything beyond a trusted network.
 
 `existingSecret` names a Secret whose every key becomes an environment
 variable of the API. It is the place for anything in
-[`apps/api/.env.example`](../../apps/api/.env.example) that is a secret:
+[`apps/api/.env.example`](https://github.com/AndreyBegma/Nautelle/blob/develop/apps/api/.env.example) that is a secret:
 `DEEPL_API_KEY`, `SPEECH_TO_TEXT_API_KEY`, `ADMIN_EMAIL` and
 `ADMIN_PASSWORD`. The Telegram bot, the GitHub App and the LLM provider keys
 are set in the web app and need none of this.
@@ -187,7 +190,7 @@ neither, and the same for Redis.
 ## Settings
 
 The full list, with comments, is
-[`values.yaml`](../../deploy/helm/nautelle/values.yaml). The ones you are most
+[`values.yaml`](https://github.com/AndreyBegma/Nautelle/blob/develop/deploy/helm/nautelle/values.yaml). The ones you are most
 likely to set:
 
 | Value | Default | Meaning |
@@ -272,7 +275,7 @@ nautelle-runner install-service
 The runner connects out to `<nautelleUrl>/api` and keeps a WebSocket open; it
 needs no access to the cluster. A runner refuses plain HTTP to any host but
 localhost unless `pair` gets `--insecure`
-([apps/runner](../../apps/runner/README.md)). A runner behind a
+([apps/runner](https://github.com/AndreyBegma/Nautelle/blob/develop/apps/runner/README.md)). A runner behind a
 `kubectl port-forward` stops when the port-forward does, so pair long-lived
 runners against an Ingress or a tunnel.
 

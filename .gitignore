@@ -7,6 +7,8 @@ node_modules/
 dist/
 .next/
 out/
+# Astro's generated types (apps/docs)
+.astro/
 
 # Runner release assets (apps/runner/scripts/build-release.sh)
 apps/runner/release/

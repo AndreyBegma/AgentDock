@@ -1,4 +1,4 @@
-# Nautelle — the public install (ADR-0088, docs/guides/install.md).
+# Nautelle — the public install (ADR-0088, https://andreybegma.github.io/Nautelle/).
 #
 # Published images, PostgreSQL, Redis and a Caddy proxy that splits one origin:
 # /api/* → api (prefix stripped, WebSockets included), everything else → web.

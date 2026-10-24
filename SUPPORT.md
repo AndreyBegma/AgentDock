@@ -2,7 +2,7 @@
 
 | You want to | Go to |
 |---|---|
-| Install or run Nautelle | [Installing Nautelle](docs/guides/install.md), the wiki's [Getting started](https://github.com/AndreyBegma/Nautelle/wiki/Getting-Started) and [Self-hosting](https://github.com/AndreyBegma/Nautelle/wiki/Self-Hosting) |
+| Install or run Nautelle | The [documentation](https://andreybegma.github.io/Nautelle/), the wiki's [Getting started](https://github.com/AndreyBegma/Nautelle/wiki/Getting-Started) and [Self-hosting](https://github.com/AndreyBegma/Nautelle/wiki/Self-Hosting) |
 | Pair or update a runner | [Installing the runner](https://github.com/AndreyBegma/Nautelle/wiki/Installing-the-Runner) and [`apps/runner/README.md`](apps/runner/README.md) |
 | Understand a feature | The [wiki](https://github.com/AndreyBegma/Nautelle/wiki) |
 | Understand why it is built this way | [`docs/`](docs/README.md): ADRs, architecture, specs |

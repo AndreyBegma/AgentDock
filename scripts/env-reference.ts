@@ -1,0 +1,192 @@
+/**
+ * Generates the environment variable reference of the documentation site
+ * (ADR-0093) from the `.env.example` files, its source of truth:
+ *
+ *   bun scripts/env-reference.ts          writes the page
+ *   bun scripts/env-reference.ts --check  exits 1 when the page is stale
+ *
+ * A variable is a `KEY=value` line, or `# KEY=value` for an optional one shown
+ * with its default or an example. The comment block right above a run of
+ * variables describes all of them; a comment block followed by a blank line
+ * (a file's introduction) describes none. `bun run check` runs `--check`, so a
+ * variable added to an example without regenerating the page fails CI.
+ */
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+
+const root = resolve(import.meta.dir, '..');
+
+export const PAGE = 'apps/docs/src/content/docs/configuration/environment.md';
+
+export interface Source {
+  /** The example file, relative to the repository root. */
+  file: string;
+  title: string;
+  /** Where these variables go, in a sentence. */
+  intro: string;
+}
+
+export const SOURCES: Source[] = [
+  {
+    file: 'deploy/compose/.env.example',
+    title: 'Install settings',
+    intro:
+      'These live in `nautelle/.env`, next to the compose file. `install.sh` writes the file and fills both passwords; a re-run keeps what is there.',
+  },
+  {
+    file: 'apps/api/.env.example',
+    title: 'API',
+    intro:
+      'In a compose install these go in `nautelle/api.env`, one `KEY=value` per line, and `docker compose up -d` applies them. The install already sets the URLs, `APP_ENV`, `TRUST_PROXY`, `DATABASE_URL` and `REDIS_URL`; the variables only the test suite reads matter to contributors alone.',
+  },
+  {
+    file: 'apps/web/.env.example',
+    title: 'Web app',
+    intro:
+      'The published web image is built for any host and needs none of these. They matter when you build the web app yourself or run it from source.',
+  },
+];
+
+export interface EnvGroup {
+  /** Variable names, in file order. */
+  names: string[];
+  /** Each variable's value in the file: a default, an example or empty. */
+  values: string[];
+  /** Whether the line is commented out, so the variable is optional. */
+  optional: boolean;
+  /** The comment block above, one line per entry, `#` stripped. */
+  description: string[];
+}
+
+const VARIABLE = /^(#\s*)?([A-Z][A-Z0-9_]*)=(.*)$/;
+
+/** The variables of one `.env.example`, grouped under their comment block. */
+export const parseEnvExample = (text: string): EnvGroup[] => {
+  const groups: EnvGroup[] = [];
+  let comment: string[] = [];
+  let current: EnvGroup | undefined;
+  for (const raw of text.split('\n')) {
+    const line = raw.trimEnd();
+    const variable = VARIABLE.exec(line);
+    if (variable) {
+      const [, hash, name, value] = variable;
+      const optional = hash !== undefined;
+      if (current && current.optional === optional) {
+        current.names.push(name);
+        current.values.push(value);
+      } else {
+        current = {
+          names: [name],
+          values: [value],
+          optional,
+          description: comment,
+        };
+        groups.push(current);
+        comment = current.description;
+      }
+      continue;
+    }
+    if (line.startsWith('#')) {
+      if (current) {
+        current = undefined;
+        comment = [];
+      }
+      comment.push(line.replace(/^#\s?/, ''));
+      continue;
+    }
+    // A blank line ends a run of variables and detaches a comment block.
+    current = undefined;
+    comment = [];
+  }
+  return groups;
+};
+
+/** Markdown-safe table cell text: pipes and angle brackets outside code. */
+const cell = (text: string): string =>
+  text
+    .split(/(`[^`]*`)/)
+    .map((part, index) =>
+      index % 2 === 1
+        ? part.replace(/\|/g, '\\|')
+        : part
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\|/g, '\\|'),
+    )
+    .join('');
+
+const code = (text: string): string =>
+  text.includes('`') ? `\`\` ${text} \`\`` : `\`${text}\``;
+
+const row = (group: EnvGroup): string => {
+  const names = group.names.map(code).join('<br/>');
+  const values = group.values
+    .map((value) =>
+      value === ''
+        ? group.optional
+          ? '—'
+          : '_empty_'
+        : code(value.replace(/\|/g, '\\|')),
+    )
+    .join('<br/>');
+  const kind = group.optional ? 'optional' : 'set';
+  const description = cell(group.description.join(' ').trim()) || '—';
+  return `| ${names} | ${values} | ${kind} | ${description} |`;
+};
+
+/** The whole reference page for the given sources and their file contents. */
+export const renderReference = (
+  sources: { source: Source; text: string }[],
+): string => {
+  const lines = [
+    '---',
+    'title: Environment variables',
+    'description: Every setting Nautelle reads, generated from the .env.example files.',
+    '---',
+    '',
+    '<!-- Generated by scripts/env-reference.ts from the .env.example files. Do not edit: change the example and run `bun run docs:env`. -->',
+    '',
+    'This page is generated from the `.env.example` files in the repository, so it lists every variable they document. **set** means the example sets the variable; **optional** means it is commented out, and the value shown is its default or an example.',
+    '',
+  ];
+  for (const { source, text } of sources) {
+    lines.push(
+      `## ${source.title}`,
+      '',
+      `${source.intro} Source: [\`${source.file}\`](https://github.com/AndreyBegma/Nautelle/blob/develop/${source.file}).`,
+      '',
+      '| Variable | Value in the example | | Description |',
+      '|---|---|---|---|',
+      ...parseEnvExample(text).map(row),
+      '',
+    );
+  }
+  return lines.join('\n');
+};
+
+if (import.meta.main) {
+  const page = renderReference(
+    SOURCES.map((source) => ({
+      source,
+      text: readFileSync(join(root, source.file), 'utf8'),
+    })),
+  );
+  const path = join(root, PAGE);
+  if (process.argv.includes('--check')) {
+    let current = '';
+    try {
+      current = readFileSync(path, 'utf8');
+    } catch {}
+    if (current !== page) {
+      console.error(
+        `env-reference: ${PAGE} is out of date with the .env.example files; run \`bun run docs:env\` and commit it.`,
+      );
+      process.exit(1);
+    }
+    console.log('env-reference: the environment page is up to date');
+  } else {
+    writeFileSync(path, page);
+    console.log(`env-reference: wrote ${PAGE}`);
+  }
+}

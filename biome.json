@@ -41,6 +41,7 @@
       "!**/node_modules",
       "!**/dist",
       "!**/.next",
+      "!**/.astro",
       "!**/.turbo",
       "!**/generated",
       "!**/next-env.d.ts",

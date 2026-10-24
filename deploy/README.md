@@ -378,8 +378,8 @@ Once both images are pushed, the `chart` step runs
 stamps the chart's `version` and `appVersion` with `X.Y.Z` (`Chart.yaml` holds
 only the placeholders `0.0.0` and `latest`), lints and packages it and pushes
 it as `oci://ghcr.io/andreybegma/charts/nautelle:X.Y.Z` with the same
-`ghcr_token`. [docs/guides/kubernetes.md](../docs/guides/kubernetes.md)
-installs from it.
+`ghcr_token`. The [Kubernetes (Helm)](https://andreybegma.github.io/Nautelle/operations/kubernetes/) page of
+the documentation site installs from it.
 
 The `github-release` step then waits for the chart and creates the `vX.Y.Z` GitHub Release, marked
 latest, with a body from `scripts/release-notes.ts`: the "Summary" and "What
@@ -389,7 +389,8 @@ edits the release. Runner releases are created with `--latest=false`, so the
 repository's latest release stays the product's.
 
 The public install, `deploy/compose/` and
-[docs/guides/install.md](../docs/guides/install.md), pulls these images. The
+the [install guide](https://andreybegma.github.io/Nautelle/getting-started/install/),
+pull these images. The
 web image is built with `NEXT_PUBLIC_LIVE_URL=/api/live`, a path the browser
 resolves against the page's own origin, and `API_URL=http://api:8180`, the API
 service in the compose file. One image therefore serves any host. Staging
@@ -444,3 +445,31 @@ cosign verify --key deploy/images/cosign.pub ghcr.io/andreybegma/nautelle-api:X.
 docker buildx imagetools inspect ghcr.io/andreybegma/nautelle-api:X.Y.Z --format '{{ json .SBOM }}'
 curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh -s -- --version X.Y.Z
 ```
+
+## Publishing the docs
+
+Decision: [ADR-0093](../docs/adr/0093-the-user-documentation-is-a-starlight-site-published-to-github-pages.md).
+The same tag `vX.Y.Z` runs `.woodpecker/release-docs.yml`. It calls
+`deploy/docs/publish-docs.sh`, which checks that the settings page matches the
+`.env.example` files, builds `apps/docs` and force-pushes the build as the
+only commit of the `gh-pages` branch. GitHub Pages serves it at
+https://andreybegma.github.io/Nautelle/. A pre-release tag builds and
+publishes nothing.
+
+### One-time setup
+
+1. **Woodpecker secret.** Add `pages_token` to `AndreyBegma/Nautelle`,
+   restricted to the **tag** event only, like the secrets above. It is a
+   fine-grained GitHub token for this repository with *Contents: read and
+   write*.
+2. **GitHub Pages.** In the repository's *Settings › Pages*, choose *Deploy
+   from a branch* and the branch `gh-pages`, folder `/ (root)`, after the
+   first release has pushed it.
+
+### Each release
+
+Nothing to do: the tag that publishes the images publishes the docs. To
+rehearse, run the pipeline by hand with a message that contains
+`[docs-release]` on a branch other than `develop`: it builds the site and
+publishes nothing. Locally, `bun run --cwd apps/docs build` builds it into
+`apps/docs/dist`, and `bun run docs:dev` serves it with live reload.

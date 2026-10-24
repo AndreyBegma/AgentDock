@@ -9,9 +9,9 @@ import type { ProductRelease, ProductUpdateView } from '@nautelle/shared';
 /** The release the admin dismissed the notice for, per browser. */
 export const DISMISSED_PRODUCT_RELEASE_KEY = 'nautelle.productUpdate.dismissed';
 
-/** How to upgrade an install (docs/guides/install.md). */
+/** How to upgrade an install (the docs site). */
 export const UPGRADE_GUIDE_URL =
-  'https://github.com/AndreyBegma/Nautelle/blob/main/docs/guides/install.md#upgrading';
+  'https://andreybegma.github.io/Nautelle/operations/upgrade/';
 
 /** `Nautelle 0.16.0 is available` — the banner's title. */
 export const productUpdateTitle = (latest: ProductRelease): string =>

@@ -76,11 +76,11 @@ of anything under `.agentdock/` in a worktree.
   runners older than itself, and the admin's runner list shows which ones a
   newer runner release exists for.
 - **Downgrades** are not supported. Restore the backup taken before the
-  upgrade instead ([install guide](install.md#backup)).
+  upgrade instead ([Backup and restore](https://andreybegma.github.io/Nautelle/operations/backup/)).
 
 ## Knowing a new release exists
 
 The API checks the repository's latest product release at most once a day and
 shows admins a notice in the web app with a link to its release notes; the
 running version is on Account › About. `NAUTELLE_UPDATE_CHECK=false` in
-`api.env` turns the check off ([install guide](install.md#settings)).
+`api.env` turns the check off ([Configuration](https://andreybegma.github.io/Nautelle/configuration/overview/)).

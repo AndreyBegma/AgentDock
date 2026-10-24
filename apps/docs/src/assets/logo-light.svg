@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 248 64" width="248" height="64" role="img" aria-label="Nautelle">
+  <path fill="#18181b" fill-rule="evenodd" transform="translate(4 4) scale(1.75)" d="M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H10a8 8 0 0 1-8-8V10a8 8 0 0 1 8-8zM14.5 6v14H7zM16.5 9.5V20h6zM7 22h18l-2.5 3.5h-13zM20 8.25a2.25 2.25 0 1 0 4.5 0a2.25 2.25 0 1 0-4.5 0z"/>
+  <circle fill="#5b5bf6" transform="translate(4 4) scale(1.75)" cx="22.25" cy="8.25" r="2.25"/>
+  <text x="72" y="43" fill="#18181b" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="34" font-weight="650" letter-spacing="-0.5">Nautelle</text>
+</svg>
