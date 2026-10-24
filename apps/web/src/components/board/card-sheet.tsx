@@ -98,6 +98,7 @@ import {
   takenSessionHref,
   takenState,
 } from '../../lib/board/taken';
+import { withoutDemoVideos } from '../../lib/demos/format';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { useReadiness } from '../../lib/readiness/use-readiness';
@@ -740,11 +741,14 @@ export function CardDetailBody({
   const terminalCard = isTerminalCard(card);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [demoVideoIds, setDemoVideoIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const user = useCurrentUser();
   const feedbackFiles = useAttachmentUploads(projectId);
   const { removing, remove } = useRemoveAttachment(projectId, onSaved);
-  const { card: cardFiles, byRound } = splitByRound(card.attachments);
+  const { card: cardFiles, byRound } = splitByRound(
+    withoutDemoVideos(card.attachments, demoVideoIds),
+  );
   const filesEditable = canOperate && card.column !== 'completed';
   const notes = useTextNotes(
     projectId,
@@ -1416,6 +1420,7 @@ export function CardDetailBody({
   // C-371: first, so watching the demo and accepting is one place.
   const demoSection = card.demo ? (
     <DemoSection
+      onVideoIds={setDemoVideoIds}
       projectId={projectId}
       card={card}
       canOperate={canOperate}

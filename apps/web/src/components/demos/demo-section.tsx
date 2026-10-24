@@ -22,6 +22,7 @@ import { fetchCardDemos, requestCardDemo } from '../../lib/demos/actions';
 import {
   DEMO_PILL_STATUS,
   DEMO_STATUS_LABEL,
+  demoVideoIds,
   describeDemoError,
   formatDuration,
   scenarioUrl,
@@ -269,11 +270,14 @@ export function DemoSection({
   card,
   canOperate,
   accept,
+  onVideoIds,
 }: {
   projectId: string;
   card: BoardCardDetail;
   canOperate: boolean;
   accept: { busy: boolean; run: () => void } | null;
+  /** The attachment ids of the demos' videos, so the card's own Attachments list can leave them out (ADR-0090). */
+  onVideoIds?: (ids: string[]) => void;
 }) {
   const [demos, setDemos] = useState<CardDemoView[]>();
   const [pickedId, setPickedId] = useState<string>();
@@ -295,6 +299,10 @@ export function DemoSection({
   useEffect(() => {
     void load();
   }, [load, brief?.status, brief?.durationMs]);
+
+  useEffect(() => {
+    if (demos) onVideoIds?.(demoVideoIds(demos));
+  }, [demos, onVideoIds]);
 
   if (!demos) return <Skeleton className="h-48 w-full" />;
   if (demos.length === 0) return null;

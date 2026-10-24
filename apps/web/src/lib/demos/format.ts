@@ -1,5 +1,6 @@
 import {
   type CardDemoBrief,
+  type CardDemoView,
   DEMO_ERROR,
   type DemoRunnerView,
   type DemoStatus,
@@ -123,4 +124,20 @@ export function describeDemoError(error: unknown): string {
     }
   }
   return describeError(error);
+}
+
+/** The attachment ids of the demos' videos. */
+export function demoVideoIds(demos: readonly CardDemoView[]): string[] {
+  return demos.flatMap((d) => (d.attachmentId ? [d.attachmentId] : []));
+}
+
+/**
+ * ADR-0090: a demo's video belongs to the Demo section only, so the card's
+ * Attachments list leaves it out.
+ */
+export function withoutDemoVideos<T extends { id: string }>(
+  attachments: readonly T[],
+  videoIds: readonly string[],
+): T[] {
+  return attachments.filter((a) => !videoIds.includes(a.id));
 }
