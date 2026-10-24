@@ -6,7 +6,9 @@ import {
   attachmentContentPath,
   BOARD_CHANGED_EVENT,
   type BoardChangedData,
+  CARD_DEMO_EVENT,
   CARD_DEMO_EVENTS,
+  type CardDemoEventData,
   type CardDemoView,
   cardLabel,
   DEMO_ACTIVE_STATUSES,
@@ -44,6 +46,7 @@ import { PrismaService } from '../database/prisma.service';
 import { LiveService } from '../live/live.service';
 import { bearerToken } from '../runners/credentials';
 import { recordServerEvent } from '../server-events/server-events';
+import { demoOutdated } from './demo-outdated';
 import { DemoRunner } from './demo-runner';
 import { DemoSettingsService } from './demo-settings.service';
 import { demoError, demoNotActive, demoNotFound } from './demos-error';
@@ -277,7 +280,8 @@ export class CardDemosService {
       });
       return { row, stale };
     });
-    for (const demoId of stale) await this.failedEvent(demoId);
+    // C-372: a demo its runner lost is not news for Telegram.
+    for (const demoId of stale) await this.failedEvent(demoId, false);
     await this.audit.record({
       ...ctx,
       action: 'demo.requested',
@@ -528,6 +532,7 @@ export class CardDemosService {
           include: REQUESTED_BY,
         });
         await this.activity(tx, CARD_DEMO_EVENTS.ready, demo.demoId);
+        await this.telegramEvent(tx, demo.demoId);
         return ready;
       });
       await this.audit.record({
@@ -670,10 +675,12 @@ export class CardDemosService {
     this.settled(row.cardId);
   }
 
-  private async failedEvent(demoId: string): Promise<void> {
-    await this.prisma.$transaction((tx) =>
-      this.activity(tx, CARD_DEMO_EVENTS.failed, demoId),
-    );
+  /** The activity entry of a failed demo and, C-372, its Telegram line. */
+  private async failedEvent(demoId: string, telegram = true): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.activity(tx, CARD_DEMO_EVENTS.failed, demoId);
+      if (telegram) await this.telegramEvent(tx, demoId);
+    });
   }
 
   /**
@@ -762,6 +769,61 @@ export class CardDemosService {
       SELECT status::text AS status FROM card_demos WHERE id = ${demoId} FOR UPDATE`;
     if (rows.length === 0) throw demoNotFound();
     if (!isDemoActive(rows[0].status)) throw demoNotActive();
+  }
+
+  /**
+   * C-372: the `card.demo` server event of a demo that became ready or
+   * failed, in the transaction that records its activity — only while the
+   * project's `demoTelegram` is on. A skipped demo sends nothing, and neither
+   * does one that is no longer the card's (`demoOutdated`).
+   */
+  private async telegramEvent(
+    tx: Prisma.TransactionClient,
+    demoId: string,
+  ): Promise<void> {
+    const demo = await tx.cardDemo.findUnique({ where: { id: demoId } });
+    if (!demo || (demo.status !== 'ready' && demo.status !== 'failed')) return;
+    const card = await tx.boardCard.findUniqueOrThrow({
+      where: { id: demo.cardId },
+      select: {
+        id: true,
+        number: true,
+        title: true,
+        ciHeadSha: true,
+        project: {
+          select: {
+            runnerId: true,
+            rootPath: true,
+            repo: true,
+            boardSettings: { select: { demoTelegram: true } },
+          },
+        },
+      },
+    });
+    if (!(card.project.boardSettings?.demoTelegram ?? true)) return;
+    if (await demoOutdated(tx, demo, card.ciHeadSha)) return;
+    const data: CardDemoEventData = {
+      cardId: card.id,
+      number: card.number,
+      title: card.title,
+      round: demo.round,
+      demoId: demo.id,
+      status: demo.status,
+      reason: demo.status === 'failed' ? demo.reason : null,
+      size: demo.status === 'ready' ? demo.size : null,
+    };
+    await recordServerEvent(tx, {
+      source: API_EVENT_SOURCE,
+      type: CARD_DEMO_EVENT,
+      ts: new Date(),
+      project: {
+        runnerId: card.project.runnerId,
+        rootPath: card.project.rootPath,
+        repo: card.project.repo,
+      },
+      data: { ...data },
+      dedupeKey: `${CARD_DEMO_EVENT}:${demo.id}`,
+    });
   }
 
   /** The card's sheet and tile refresh, as on any card change. */

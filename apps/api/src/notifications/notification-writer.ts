@@ -116,6 +116,13 @@ export class NotificationWriter {
         ruleOf.get(recipient.userId),
       );
       if (!channels.inApp && !channels.telegram) continue;
+      // A Telegram-only kind (C-372) is nothing to a user with no linked chat.
+      if (
+        !kindAllowsChannel(input.kind, 'inApp') &&
+        !linked.has(recipient.userId)
+      ) {
+        continue;
+      }
       const mute = muteOf.get(recipient.userId);
       const muted = mute !== undefined && muteActive(mute.until, input.at);
 

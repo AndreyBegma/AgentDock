@@ -42,12 +42,58 @@ export const serverError = (): FakeReply => ({
   body: { ok: false, error_code: 502, description: 'Bad Gateway' },
 });
 
+/** A file of a multipart call (C-372), as the fake records it. */
+export interface FakeUpload {
+  name: string;
+  type: string;
+  size: number;
+}
+
+/**
+ * A multipart call's fields (C-372): `chat_id` as a number and
+ * `reply_markup` parsed, as a JSON call has them; a file as a `FakeUpload`.
+ */
+const readForm = async (
+  bytes: Buffer,
+  contentType: string,
+): Promise<Record<string, unknown>> => {
+  const form = await new Response(new Uint8Array(bytes), {
+    headers: { 'content-type': contentType },
+  }).formData();
+  const body: Record<string, unknown> = {};
+  for (const [key, value] of form.entries()) {
+    if (typeof value !== 'string') {
+      const upload: FakeUpload = {
+        name: value.name,
+        type: value.type,
+        size: value.size,
+      };
+      body[key] = upload;
+    } else if (key === 'chat_id') {
+      body[key] = Number(value);
+    } else if (key === 'reply_markup') {
+      body[key] = JSON.parse(value) as unknown;
+    } else {
+      // `FormData` sends a field's line breaks as CRLF; Telegram shows them
+      // as the plain line breaks a JSON call sends.
+      body[key] = value.replace(/\r\n/g, '\n');
+    }
+  }
+  return body;
+};
+
 const readBody = (req: IncomingMessage): Promise<Record<string, unknown>> =>
   new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => chunks.push(c));
     req.on('end', () => {
-      const text = Buffer.concat(chunks).toString('utf8');
+      const bytes = Buffer.concat(chunks);
+      const contentType = req.headers['content-type'] ?? '';
+      if (contentType.startsWith('multipart/form-data')) {
+        readForm(bytes, contentType).then(resolve, reject);
+        return;
+      }
+      const text = bytes.toString('utf8');
       try {
         resolve(text ? (JSON.parse(text) as Record<string, unknown>) : {});
       } catch (error) {
@@ -60,7 +106,8 @@ const readBody = (req: IncomingMessage): Promise<Record<string, unknown>> =>
 /**
  * A stand-in for the Bot API on 127.0.0.1 (spec 22: "Telegram is tested only
  * against the mock base URL"). It records every call, answers `getMe`,
- * `getUpdates`, `sendMessage` (each with a new `message_id`),
+ * `getUpdates`, `sendMessage` (each with a new `message_id`), `sendVideo`
+ * (multipart, with a `file_id` per upload — C-372),
  * `editMessageText`, `answerCallbackQuery`, `sendChatAction`, `setMyCommands`,
  * `setChatMenuButton` and `getFile` like Telegram does, serves the files it
  * was given at `/file/bot<token>/<path>` (#594), refuses unknown tokens with 401,
@@ -144,6 +191,11 @@ export class FakeTelegram {
     return this.calls.filter((c) => c.method === 'sendMessage');
   }
 
+  /** C-372: the videos the bot sent, uploaded or by `file_id`. */
+  videos(): FakeCall[] {
+    return this.calls.filter((c) => c.method === 'sendVideo');
+  }
+
   /** The messages the bot rewrote in place (#576). */
   edited(): FakeCall[] {
     return this.calls.filter((c) => c.method === 'editMessageText');
@@ -206,6 +258,21 @@ export class FakeTelegram {
           status: 200,
           body: { ok: true, result: { message_id: this.calls.length } },
         };
+      case 'sendVideo': {
+        const video = body.video;
+        const fileId =
+          typeof video === 'string' ? video : `video-${this.calls.length}`;
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            result: {
+              message_id: this.calls.length,
+              video: { file_id: fileId, file_unique_id: fileId },
+            },
+          },
+        };
+      }
       case 'editMessageText':
         return {
           status: 200,

@@ -238,12 +238,14 @@ export class NotificationMatcher
       // One item per disable: a second disable after a re-enable is news, not
       // a repeat of the first (spec 25 D10). A card's item is per card and
       // round; folding by slot would merge different cards (issue #242).
-      // A Steward incident is its own item: one per incident (#447 D13).
+      // A Steward incident is its own item: one per incident (#447 D13), and
+      // a demo one per demo (C-372).
       fold:
         draft.kind !== 'schedule.disabled' &&
         draft.kind !== 'card.finished' &&
         draft.kind !== 'card.waiting' &&
         draft.kind !== 'card.background_stalled' &&
+        draft.kind !== 'card.demo' &&
         draft.kind !== 'steward.incident',
     };
   }

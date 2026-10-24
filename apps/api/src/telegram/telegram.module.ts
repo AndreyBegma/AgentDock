@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ApprovalsModule } from '../approvals';
 import { AssistantModule } from '../assistant';
+import { AttachmentsStoreModule } from '../attachments/attachments-store.module';
 import { AuthModule } from '../auth';
 import { BoardModule } from '../board';
 import { ControlModule } from '../control';
@@ -26,6 +27,7 @@ import { TelegramBoardService } from './telegram-board.service';
 import { TelegramCardService } from './telegram-card.service';
 import { TelegramClient } from './telegram-client';
 import { TelegramDeliveryService } from './telegram-delivery.service';
+import { TelegramDemoService } from './telegram-demo.service';
 import { TelegramGuard } from './telegram-guard.service';
 import { TelegramIntakeService } from './telegram-intake.service';
 import { TelegramIntegrationService } from './telegram-integration.service';
@@ -53,6 +55,8 @@ import { TelegramWebAppService } from './telegram-web-app.service';
  * stored through the global `AttachmentsService`, and voice messages,
  * transcribed by `SpeechToText`. #620: any other text goes to the AI
  * assistant as the linked user (`TelegramAssistantService`, ADR-0061).
+ * C-372: a card's demo video goes to the chat with Merge and Feedback
+ * (`TelegramDemoService`, ADR-0096).
  */
 @Module({
   imports: [
@@ -71,6 +75,8 @@ import { TelegramWebAppService } from './telegram-web-app.service';
     AuthModule,
     // #620: free text runs an assistant turn as the chat's linked user.
     AssistantModule,
+    // C-372: a demo video is read from the store to upload it to the chat.
+    AttachmentsStoreModule,
   ],
   controllers: [
     TelegramLinkController,
@@ -95,6 +101,7 @@ import { TelegramWebAppService } from './telegram-web-app.service';
     TelegramBoardService,
     TelegramIntakeService,
     TelegramCardService,
+    TelegramDemoService,
     TelegramAssistantService,
     TelegramWebAppService,
     TelegramRoutes,
