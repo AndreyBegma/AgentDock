@@ -32,7 +32,10 @@ import { AuditService } from '../audit/audit.service';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BudgetExceededError } from '../budgets/budget-error';
 import { PrismaService } from '../database/prisma.service';
-import { CardDemosService, type DemoPrFiles } from '../demos/card-demos.service';
+import {
+  CardDemosService,
+  type DemoPrFiles,
+} from '../demos/card-demos.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure } from './board-error';
 import type { CardWithRounds } from './board-mapper';
@@ -165,50 +168,50 @@ const roundSinceMove = (card: CardWithRounds): boolean => {
  */
 const watched = (now: number) =>
   ({
-  source: { notIn: ['fleet', 'terminal'] },
-  prNumber: { not: null },
-  prState: { in: ['open', 'draft'] },
-  mergedAt: null,
-  needsPerson: false,
-  OR: [
-    {
-      column: 'in_progress',
-      rounds: { none: { phase: { in: [...ACTIVE_CARD_ROUND_PHASES] } } },
-    },
-    { column: { in: ['in_progress', 'finished'] }, ciState: 'pending' },
-    // #894: a Finished card whose checks have not reported yet, or went red
-    // while it waited, is still decided by its CI — a merge, or a fix round.
-    // One that holds a protected path is never merged, so it is not read.
-    {
-      column: 'finished',
-      ciState: { in: ['none', 'red'] },
-      protectedPaths: { isEmpty: true },
-      // A stacked card is landed through its dependency, not read here; a
-      // card whose checks were never read has no CI to wait for.
-      prBaseCardId: null,
-      ciCheckedAt: { not: null },
-    },
-    // #636: stacked on a dependency that merged — still to be retargeted.
-    // #709: any stacked PR — its dependency, or the PR itself, may merge on
-    // GitHub unseen.
-    { column: { in: ['in_progress', 'finished'] }, prBase: { not: null } },
-    // C-370 (ADR-0095): a green Finished card whose merge waits for its demo
-    // — merged once the demo ends, or once the wait is over.
-    {
-      column: 'finished',
-      ciState: 'green',
-      protectedPaths: { isEmpty: true },
-      prBaseCardId: null,
-      demos: {
-        some: {
-          createdAt: {
-            gte: new Date(now - DEMO_MERGE_WAIT_MS - 2 * CARD_CI_POLL_MS),
+    source: { notIn: ['fleet', 'terminal'] },
+    prNumber: { not: null },
+    prState: { in: ['open', 'draft'] },
+    mergedAt: null,
+    needsPerson: false,
+    OR: [
+      {
+        column: 'in_progress',
+        rounds: { none: { phase: { in: [...ACTIVE_CARD_ROUND_PHASES] } } },
+      },
+      { column: { in: ['in_progress', 'finished'] }, ciState: 'pending' },
+      // #894: a Finished card whose checks have not reported yet, or went red
+      // while it waited, is still decided by its CI — a merge, or a fix round.
+      // One that holds a protected path is never merged, so it is not read.
+      {
+        column: 'finished',
+        ciState: { in: ['none', 'red'] },
+        protectedPaths: { isEmpty: true },
+        // A stacked card is landed through its dependency, not read here; a
+        // card whose checks were never read has no CI to wait for.
+        prBaseCardId: null,
+        ciCheckedAt: { not: null },
+      },
+      // #636: stacked on a dependency that merged — still to be retargeted.
+      // #709: any stacked PR — its dependency, or the PR itself, may merge on
+      // GitHub unseen.
+      { column: { in: ['in_progress', 'finished'] }, prBase: { not: null } },
+      // C-370 (ADR-0095): a green Finished card whose merge waits for its demo
+      // — merged once the demo ends, or once the wait is over.
+      {
+        column: 'finished',
+        ciState: 'green',
+        protectedPaths: { isEmpty: true },
+        prBaseCardId: null,
+        demos: {
+          some: {
+            createdAt: {
+              gte: new Date(now - DEMO_MERGE_WAIT_MS - 2 * CARD_CI_POLL_MS),
+            },
           },
         },
       },
-    },
-  ],
-}) satisfies Prisma.BoardCardWhereInput;
+    ],
+  }) satisfies Prisma.BoardCardWhereInput;
 
 /**
  * A card ships itself (issue #359, ADR-0035), the API's half: Nautelle

@@ -26,9 +26,9 @@ describe('demo UI paths (C-370)', () => {
   });
 
   it('takes regex characters literally', () => {
-    expect(demoUiPathMatches('app/(home)/page.tsx', 'app/(home)/page.tsx')).toBe(
-      true,
-    );
+    expect(
+      demoUiPathMatches('app/(home)/page.tsx', 'app/(home)/page.tsx'),
+    ).toBe(true);
     expect(demoUiPathMatches('a.b', 'axb')).toBe(false);
     expect(demoUiPathMatches('[id].tsx', '[id].tsx')).toBe(true);
   });

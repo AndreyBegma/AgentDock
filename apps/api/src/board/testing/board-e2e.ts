@@ -266,15 +266,13 @@ export class BoardWorld {
       });
     // C-370: an offline runner, or one that does not serve `card.demo`
     // (`unserved`), cannot take a demo.
-    jest
-      .spyOn(this.demoRunner, 'unavailable')
-      .mockImplementation(async () => {
-        if (this.offline) return 'The runner is offline';
-        if (this.unserved.has('card.demo')) {
-          return 'The runner does not record demos; update it';
-        }
-        return null;
-      });
+    jest.spyOn(this.demoRunner, 'unavailable').mockImplementation(async () => {
+      if (this.offline) return 'The runner is offline';
+      if (this.unserved.has('card.demo')) {
+        return 'The runner does not record demos; update it';
+      }
+      return null;
+    });
     jest
       .spyOn(this.demoRunner, 'record')
       .mockImplementation(
