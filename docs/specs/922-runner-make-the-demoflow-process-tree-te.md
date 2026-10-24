@@ -16,3 +16,14 @@ The `ProcessTree` only learns a descendant by polling (every 20 ms in the test).
   - document what is still not caught.
 - Make the test deterministic: have the child write its pid to a file and wait for that file before the root exits. No sleep-based timing.
 - Run the spec 50 times in a loop locally under `stress`-like load (e.g. `bun test --rerun-each 50 src/demos/process.spec.ts`) and note the result in the PR.
+
+## What the runner catches now
+- Every descendant a listing sees while its parent runs, as before.
+- Every process, from `/proc`, in a session the tree owns: the root's session (the root leads it, since it is started `detached`) and the session of every process it has seen. Linux does not reuse a pid while it names a live session, so this is safe after the root exits.
+- The root's process group, which is killed even after the root has exited.
+- A process that `exec`s another command line after it was seen: on Linux a process is identified by its start time in `/proc/<pid>/stat`, not by its command line.
+- The table is listed right after spawn and again on the root's `exit`.
+
+## What is still not caught
+- A process that called `setsid` and whose parent exited before any listing saw it. Nothing links it to the tree any more.
+- Off Linux (a table from `ps`, without session ids or start times): anything reparented unseen outside the root's process group, and a seen process that `exec`s another command line.
