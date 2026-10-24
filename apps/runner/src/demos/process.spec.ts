@@ -49,18 +49,22 @@ const spawn = createDemoflowSpawn(exec, { pollMs: 20, killGraceMs: 200 });
 const SPAWN_TEST_MS = 20_000;
 
 describe.if(hasSetsid)('createDemoflowSpawn', () => {
-  it('kills the whole tree past the time limit, a new session included', async () => {
-    // `setsid` puts the "app" in a session of its own, as DemoFlow does.
-    const exit = await spawn(
-      'sh',
-      ['-c', 'setsid sleep 30 & echo $!; sleep 30'],
-      { cwd: '/', env, timeoutMs: 400 },
-    );
-    expect(exit.timedOut).toBe(true);
-    const app = Number(exit.stdout.trim());
-    expect(app).toBeGreaterThan(0);
-    expect(await gone(app)).toBe(true);
-  }, SPAWN_TEST_MS);
+  it(
+    'kills the whole tree past the time limit, a new session included',
+    async () => {
+      // `setsid` puts the "app" in a session of its own, as DemoFlow does.
+      const exit = await spawn(
+        'sh',
+        ['-c', 'setsid sleep 30 & echo $!; sleep 30'],
+        { cwd: '/', env, timeoutMs: 400 },
+      );
+      expect(exit.timedOut).toBe(true);
+      const app = Number(exit.stdout.trim());
+      expect(app).toBeGreaterThan(0);
+      expect(await gone(app)).toBe(true);
+    },
+    SPAWN_TEST_MS,
+  );
 
   // C-384: the "app" writes its pid to `app`; the root waits for a file
   // before it exits, so nothing depends on how fast the machine is.
@@ -74,72 +78,84 @@ describe.if(hasSetsid)('createDemoflowSpawn', () => {
     }
   };
 
-  it('kills what DemoFlow left running in a new session once it was seen', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'demo-tree-'));
-    const lister = createProcessLister(exec);
-    // `ready` once a listing has the app in it, while the root still runs.
-    const list = async () => {
-      const table = await lister();
-      if (appPid(dir) > 0 && table?.has(appPid(dir))) {
-        writeFileSync(join(dir, 'ready'), 'seen');
+  it(
+    'kills what DemoFlow left running in a new session once it was seen',
+    async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'demo-tree-'));
+      const lister = createProcessLister(exec);
+      // `ready` once a listing has the app in it, while the root still runs.
+      const list = async () => {
+        const table = await lister();
+        if (appPid(dir) > 0 && table?.has(appPid(dir))) {
+          writeFileSync(join(dir, 'ready'), 'seen');
+        }
+        return table;
+      };
+      try {
+        const exit = await createDemoflowSpawn(exec, {
+          list,
+          pollMs: 20,
+          killGraceMs: 200,
+        })(
+          'sh',
+          [
+            '-c',
+            `setsid sh -c 'echo $$ > "$0/app"; exec sleep 30' "$0" & ${until('ready')}; echo done >&2; exit 2`,
+            dir,
+          ],
+          { cwd: '/', env, timeoutMs: 10_000 },
+        );
+        expect(exit.timedOut).toBe(false);
+        expect(exit.code).toBe(2);
+        expect(exit.stderr).toBe('done\n');
+        expect(await gone(appPid(dir))).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
       }
-      return table;
-    };
-    try {
-      const exit = await createDemoflowSpawn(exec, {
-        list,
-        pollMs: 20,
-        killGraceMs: 200,
-      })(
-        'sh',
-        [
-          '-c',
-          `setsid sh -c 'echo $$ > "$0/app"; exec sleep 30' "$0" & ${until('ready')}; echo done >&2; exit 2`,
-          dir,
-        ],
-        { cwd: '/', env, timeoutMs: 10_000 },
-      );
-      expect(exit.timedOut).toBe(false);
-      expect(exit.code).toBe(2);
-      expect(exit.stderr).toBe('done\n');
-      expect(await gone(appPid(dir))).toBe(true);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  }, SPAWN_TEST_MS);
+    },
+    SPAWN_TEST_MS,
+  );
 
-  it('kills what DemoFlow left running in its session, never listed while the root ran', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'demo-tree-'));
-    try {
-      // Polls too rare to see the app before the root exits.
-      const exit = await createDemoflowSpawn(exec, {
-        pollMs: 60_000,
-        killGraceMs: 200,
-      })(
-        'sh',
-        [
-          '-c',
-          `sh -c 'echo $$ > "$0/app"; exec sleep 30' "$0" & ${until('app')}; exit 0`,
-          dir,
-        ],
-        { cwd: '/', env, timeoutMs: 10_000 },
-      );
-      expect(exit.timedOut).toBe(false);
-      expect(exit.code).toBe(0);
-      expect(await gone(appPid(dir))).toBe(true);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  }, SPAWN_TEST_MS);
+  it(
+    'kills what DemoFlow left running in its session, never listed while the root ran',
+    async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'demo-tree-'));
+      try {
+        // Polls too rare to see the app before the root exits.
+        const exit = await createDemoflowSpawn(exec, {
+          pollMs: 60_000,
+          killGraceMs: 200,
+        })(
+          'sh',
+          [
+            '-c',
+            `sh -c 'echo $$ > "$0/app"; exec sleep 30' "$0" & ${until('app')}; exit 0`,
+            dir,
+          ],
+          { cwd: '/', env, timeoutMs: 10_000 },
+        );
+        expect(exit.timedOut).toBe(false);
+        expect(exit.code).toBe(0);
+        expect(await gone(appPid(dir))).toBe(true);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    SPAWN_TEST_MS,
+  );
 
-  it('gives the process exactly the environment it is handed', async () => {
-    const exit = await spawn('sh', ['-c', 'echo "$PORT:$SECRET:$HOME"'], {
-      cwd: '/',
-      env: { ...env, PORT: '3000', SECRET: 's3' },
-      timeoutMs: 5_000,
-    });
-    expect(exit.stdout).toBe('3000:s3:\n');
-  }, SPAWN_TEST_MS);
+  it(
+    'gives the process exactly the environment it is handed',
+    async () => {
+      const exit = await spawn('sh', ['-c', 'echo "$PORT:$SECRET:$HOME"'], {
+        cwd: '/',
+        env: { ...env, PORT: '3000', SECRET: 's3' },
+        timeoutMs: 5_000,
+      });
+      expect(exit.stdout).toBe('3000:s3:\n');
+    },
+    SPAWN_TEST_MS,
+  );
 });
 
 describe('parseProcStat', () => {
@@ -234,7 +250,12 @@ describe('readProcTable', () => {
         [2, { ppid: 0, args: '[kthreadd]', sid: 0 }],
         [
           42,
-          { ppid: 1, args: 'node server.js --port  3000', sid: 42, start: 5678 },
+          {
+            ppid: 1,
+            args: 'node server.js --port  3000',
+            sid: 42,
+            start: 5678,
+          },
         ],
       ]);
     } finally {
