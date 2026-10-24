@@ -75,9 +75,12 @@ COPY --from=prod-deps --chown=node:node /app/node_modules node_modules/
 COPY --from=builder --chown=node:node /app/node_modules/.prisma node_modules/.prisma/
 COPY --from=builder --chown=node:node /app/packages/shared packages/shared/
 COPY --from=builder --chown=node:node /app/apps/api apps/api/
-# The attachments volume's mount point (ADR-0031): a new named volume takes
-# this directory's owner, so the API (uid node) can write into it.
-RUN mkdir -p /data/attachments && chown node:node /data/attachments
+# The data volume (NAUTELLE_DATA_DIR): secrets.json with the keys the API
+# generates on first boot (C-366) and the attachments (ADR-0031). A new volume
+# takes these directories' owner, so the API (uid node) can write into them.
+# Back it up with the database: without secrets.json the encrypted data is lost.
+RUN mkdir -p /data/attachments && chown node:node /data /data/attachments
+VOLUME ["/data"]
 
 USER node
 WORKDIR /app/apps/api
