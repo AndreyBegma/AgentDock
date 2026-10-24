@@ -34,13 +34,8 @@ import {
   type UploadOptions,
   uploadDemoVideo,
 } from './api';
-import { DEMOFLOW_FEATURES, DEMOFLOW_VERSION, demoflowCommand } from './pin';
-import {
-  createDemoflowSpawn,
-  type DemoflowSpawn,
-  freePort,
-  portInUse,
-} from './process';
+import { demoflowCommand } from './pin';
+import { createDemoflowSpawn, type DemoflowSpawn, freePort } from './process';
 import { boundedReason, type DemoflowProvisioner } from './provision';
 import {
   failureReason,
@@ -51,7 +46,9 @@ import {
 
 /** ADR-0090: a recording is killed, app and all, after this long. */
 export const DEMO_RUN_TIMEOUT_MS = 10 * 60_000;
-/** Demos waiting behind the one recording; one more is `busy`. */
+/** Demos recording at once when `maxConcurrent` is not set (C-387). */
+export const DEMO_DEFAULT_MAX_CONCURRENT = 2;
+/** Demos waiting behind the ones recording; one more is `busy`. */
 export const DEMO_QUEUE_MAX = 16;
 /** DemoFlow's project config, at the root of the repository. */
 export const DEMOFLOW_CONFIG_FILE = 'demoflow.config.json';
@@ -81,45 +78,40 @@ export interface PortPlan {
 }
 
 export interface PortProbes {
-  portInUse: (port: number) => Promise<boolean>;
   freePort: () => Promise<number>;
 }
 
+/** DemoFlow's `${PORT}` / `${PORT:-n}` and `${BASE_URL}`, filled as it does. */
+const filled = (text: string, port: number, baseUrl?: string): string =>
+  text
+    .replace(/\$\{PORT(?::-[^}]*)?\}/g, String(port))
+    .replace(/\$\{BASE_URL\}/g, baseUrl ?? '');
+
 /**
- * The port the card's app runs on. With port templating (a later DemoFlow)
- * the runner picks a free one and DemoFlow starts a fresh app there. DemoFlow
- * 0.4.0 starts the app on the port its `readyUrl` names and reuses whatever
- * already answers there, so the runner refuses when that port is taken.
+ * The port the card's app runs on: one free port per demo, which DemoFlow
+ * (`--port`, `--fresh-app`) gives the app as `${PORT}` and `PORT`, and which
+ * it refuses to share with an app that already answers there. A config with no
+ * `devCommand`, or whose app is not on this machine, is refused.
  */
 export const planPort = async (
   config: z.infer<typeof demoflowConfigSchema>,
-  features: { portTemplating: boolean },
   probes: PortProbes,
 ): Promise<PortPlan | string> => {
   if (!config.devCommand) {
     return `${DEMOFLOW_CONFIG_FILE} has no devCommand: the runner records only an app DemoFlow starts itself`;
   }
+  const port = await probes.freePort();
+  const baseUrl = filled(config.baseUrl, port);
   let ready: URL;
   try {
-    ready = new URL(config.devCommand.readyUrl);
+    ready = new URL(filled(config.devCommand.readyUrl, port, baseUrl));
   } catch {
     return `the readyUrl of ${DEMOFLOW_CONFIG_FILE} is not a URL`;
   }
   if (!LOOPBACK.has(ready.hostname)) {
     return `the readyUrl of ${DEMOFLOW_CONFIG_FILE} is not on this machine (${ready.hostname})`;
   }
-  if (features.portTemplating) {
-    const port = await probes.freePort();
-    return {
-      port,
-      args: ['--base-url', `http://127.0.0.1:${port}`, '--fresh-app'],
-    };
-  }
-  const port = Number(ready.port || (ready.protocol === 'https:' ? 443 : 80));
-  if (await probes.portInUse(port)) {
-    return `port ${port} (the readyUrl of ${DEMOFLOW_CONFIG_FILE}) is already in use; DemoFlow ${DEMOFLOW_VERSION} would record what runs there instead of this card's app`;
-  }
-  return { port, args: [] };
+  return { port, args: ['--port', String(port), '--fresh-app'] };
 };
 
 /** `path` is `dir` or inside it, both real paths. */
@@ -140,7 +132,8 @@ export interface DemoRecorderDeps {
   workDir: string;
   spawn?: DemoflowSpawn;
   probes?: PortProbes;
-  features?: { portTemplating: boolean };
+  /** Demos recording at once; the rest wait in order. */
+  maxConcurrent?: number;
   timeoutMs?: number;
   upload?: UploadOptions;
 }
@@ -162,14 +155,16 @@ interface Job {
  */
 export class DemoRecorder {
   private readonly queue: Job[] = [];
-  private current: Job | null = null;
+  private readonly current = new Set<Job>();
+  /** Ports picked for demos still running: two picks never share one. */
+  private readonly reserved = new Set<number>();
   private readonly spawn: DemoflowSpawn;
   private readonly probes: PortProbes;
 
   constructor(private readonly deps: DemoRecorderDeps) {
     this.spawn =
       deps.spawn ?? createDemoflowSpawn(deps.exec, { log: deps.log });
-    this.probes = deps.probes ?? { portInUse, freePort };
+    this.probes = deps.probes ?? { freePort };
   }
 
   /** `card.demo`: refused at once when the project is not watched. */
@@ -178,7 +173,7 @@ export class DemoRecorder {
       { projectId: args.projectId, root: args.worktree.root },
       this.deps.watchedProjects(),
     );
-    if (this.current?.args.demoId === args.demoId) {
+    if ([...this.current].some((job) => job.args.demoId === args.demoId)) {
       return { status: 'recording' };
     }
     if (this.queue.some((job) => job.args.demoId === args.demoId)) {
@@ -191,27 +186,32 @@ export class DemoRecorder {
       );
     }
     this.queue.push({ args, project });
-    const status = this.current === null ? 'recording' : 'queued';
+    const status = this.current.size < this.limit ? 'recording' : 'queued';
     this.drain();
     return { status };
   }
 
   /** Resolves once nothing records and nothing waits; for tests and shutdown. */
   async idle(): Promise<void> {
-    while (this.current !== null || this.queue.length > 0) {
+    while (this.current.size > 0 || this.queue.length > 0) {
       await new Promise((done) => setTimeout(done, 10));
     }
   }
 
+  private get limit(): number {
+    return this.deps.maxConcurrent ?? DEMO_DEFAULT_MAX_CONCURRENT;
+  }
+
   private drain(): void {
-    if (this.current !== null) return;
-    const next = this.queue.shift();
-    if (!next) return;
-    this.current = next;
-    void this.run(next).finally(() => {
-      this.current = null;
-      this.drain();
-    });
+    while (this.current.size < this.limit) {
+      const next = this.queue.shift();
+      if (!next) return;
+      this.current.add(next);
+      void this.run(next).finally(() => {
+        this.current.delete(next);
+        this.drain();
+      });
+    }
   }
 
   private async run(job: Job): Promise<void> {
@@ -263,9 +263,37 @@ export class DemoRecorder {
     }
   }
 
+  /** A free port no other running demo holds; released by the caller. */
+  private async pickPort(): Promise<number> {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const port = await this.probes.freePort();
+      if (!this.reserved.has(port)) {
+        this.reserved.add(port);
+        return port;
+      }
+    }
+    throw new Error('no free port for the demo');
+  }
+
   private async record(
     job: Job,
     started: (scenarioPath: string) => void,
+  ): Promise<Outcome> {
+    let port: number | null = null;
+    try {
+      return await this.recordOn(job, started, async () => {
+        port = await this.pickPort();
+        return port;
+      });
+    } finally {
+      if (port !== null) this.reserved.delete(port);
+    }
+  }
+
+  private async recordOn(
+    job: Job,
+    started: (scenarioPath: string) => void,
+    pick: () => Promise<number>,
   ): Promise<Outcome> {
     const { args } = job;
     const worktree = cardWorktreePath(
@@ -298,11 +326,7 @@ export class DemoRecorder {
         `the repository has no valid ${DEMOFLOW_CONFIG_FILE} with a baseUrl`,
       );
     }
-    const plan = await planPort(
-      config,
-      this.deps.features ?? DEMOFLOW_FEATURES,
-      this.probes,
-    );
+    const plan = await planPort(config, { freePort: pick });
     if (typeof plan === 'string') return failed(plan);
 
     started(args.scenario);

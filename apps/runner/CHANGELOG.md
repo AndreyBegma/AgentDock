@@ -5,6 +5,15 @@ what to do on every machine that runs the runner.
 
 ## Unreleased
 
+- **Demos record in parallel on a port of their own.** The runner pins
+  DemoFlow 0.6.0 and runs `demoflow run … --port <free port> --fresh-app`, so
+  a demo no longer waits for or is refused because the app's port is taken.
+  Up to `demos.maxConcurrent` demos record at once (default 2, 1 to 8, set in
+  `runner.json`); the rest queue as before. A project's `demoflow.config.json`
+  should write `${PORT}` where the port goes, for example
+  `"baseUrl": "http://127.0.0.1:${PORT:-3000}"` with `"readyUrl":
+  "${BASE_URL}/"`; DemoFlow fails a demo whose fixed port is already taken.
+
 ## 0.16.0
 
 **Upgrade note — demo videos need Node.js 22 or later on the machine.** The

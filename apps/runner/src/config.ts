@@ -24,6 +24,9 @@ import { policyConfigSchema } from './policy/schema';
 /** D11: skill runs per runner before the next one queues. */
 export const SKILL_RUNS_DEFAULT_MAX_CONCURRENT = 2;
 
+/** C-387: demo recordings per runner before the next one queues. */
+export const DEMOS_DEFAULT_MAX_CONCURRENT = 2;
+
 /** Spec 19 D1: `queue.pollSeconds` defaults to 60 and is never below 15. */
 export const QUEUE_POLL_DEFAULT_SECONDS = 60;
 export const QUEUE_POLL_MIN_SECONDS = 15;
@@ -130,6 +133,20 @@ export const runnerConfigSchema = z.object({
         .max(SKILL_RUN_MAX_TIMEOUT_SEC)
         .default(SKILL_RUN_MAX_TIMEOUT_SEC),
       keepPatchesLocal: z.boolean().default(false),
+    })
+    .prefault({}),
+  /**
+   * Demo videos (C-387): recordings at the same time before the next one
+   * queues. Each runs a Chromium and an FFmpeg, so the default is low.
+   */
+  demos: z
+    .object({
+      maxConcurrent: z
+        .number()
+        .int()
+        .min(1)
+        .max(8)
+        .default(DEMOS_DEFAULT_MAX_CONCURRENT),
     })
     .prefault({}),
   /**

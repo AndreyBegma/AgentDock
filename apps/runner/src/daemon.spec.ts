@@ -73,6 +73,7 @@ describe('daemon — OTLP receiver (spec 13)', () => {
     fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
     queue: { pollSeconds: 60 },
     sessions: { enabled: false },
+    demos: { maxConcurrent: 2 },
     skills: {
       maxConcurrentRuns: 2,
       maxTimeoutSec: 21_600,
@@ -357,6 +358,7 @@ describe('daemon — local socket (spec 201)', () => {
         fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
         queue: { pollSeconds: 60 },
         sessions: { enabled: false },
+        demos: { maxConcurrent: 2 },
         skills: {
           maxConcurrentRuns: 2,
           maxTimeoutSec: 21_600,
@@ -610,6 +612,7 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
         fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
         queue: { pollSeconds: 60 },
         sessions: { enabled: false },
+        demos: { maxConcurrent: 2 },
         skills: {
           maxConcurrentRuns: 2,
           maxTimeoutSec: 21_600,
@@ -693,6 +696,7 @@ describe('daemon — filter stats (#445 amendment 5)', () => {
         fleet: { pollSeconds: 15, prPollSeconds: 60, eventsPollSeconds: 5 },
         queue: { pollSeconds: 60 },
         sessions: { enabled: false },
+        demos: { maxConcurrent: 2 },
         skills: {
           maxConcurrentRuns: 2,
           maxTimeoutSec: 21_600,
