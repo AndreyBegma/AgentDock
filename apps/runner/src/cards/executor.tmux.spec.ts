@@ -99,7 +99,7 @@ if [ "$FAKE_MODE" = question-tall ]; then
   printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-answered.txt"
   sleep 60
 fi
-if [ "$FAKE_MODE" = question-80x24 ]; then
+if [ "$FAKE_MODE" = question-pane ]; then
   printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-80x24.txt"
   IFS= read -r line
   printf '\\033[2J\\033[H'; cat "$FIXTURES/ask-user-question-answered.txt"
@@ -159,7 +159,7 @@ const setup = async (
     profile('claude-quoted', 'quoted'),
     profile('claude-question', 'question'),
     profile('claude-question-tall', 'question-tall'),
-    profile('claude-question-80x24', 'question-80x24'),
+    profile('claude-question-pane', 'question-pane'),
     profile('claude-quota', 'quota'),
     { id: 'codex-default', runtime: 'codex', env: {}, args: [] },
   ];
@@ -476,7 +476,7 @@ describe.skipIf(!tmuxInstalled)(
         t.args({
           cardId: 'card_q',
           runId: 'run_q',
-          profileKey: 'claude-question-80x24',
+          profileKey: 'claude-question-pane',
         }),
       );
       const session = 'nautelle-card-ab12cd34';
