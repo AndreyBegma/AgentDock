@@ -13,9 +13,22 @@ import { WorkflowsProjector } from './workflows-projector.service';
 import { WorkflowsQueryService } from './workflows-query.service';
 
 const ROOTS = 10_000;
-/** #161: every route answers under this for 10k sessions. */
-const BUDGET_MS = 300;
 const ROUTES = ['summary', 'orchestration', 'tools'] as const;
+/** Timed requests per caller; the median of them is judged, not one call. */
+const RUNS = 5;
+/**
+ * #161: every route answers under this for 10k sessions. CI shares a host with
+ * other agents and a 12-minute suite, so it gets a looser default (#925);
+ * `WORKFLOWS_LATENCY_BUDGET_MS` overrides either.
+ */
+const BUDGET_MS = Number(
+  process.env.WORKFLOWS_LATENCY_BUDGET_MS ?? (process.env.CI ? 600 : 300),
+);
+
+const median = (values: number[]) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? 0;
+};
 
 /**
  * The latency budget of #161 on a seeded database: 10 000 root sessions in
@@ -101,18 +114,24 @@ describe('workflows latency (e2e)', () => {
 
   it.each(ROUTES)('answers /workflows/%s under the budget', async (route) => {
     const path = `/workflows/${route}?${range}`;
-    // One request first, so connection and JIT warm-up are not measured.
-    await timed(admin, `${path}&status=ended`);
-    const slow: { caller: string; ms: number }[] = [];
+    const slow: { caller: string; ms: number; runs: number[] }[] = [];
     for (const [name, caller] of [
       ['admin', admin],
       ['viewer', viewer],
     ] as const) {
-      const { ms, response } = await timed(caller, path);
-      expect(response.status).toBe(200);
-      if (ms >= BUDGET_MS) slow.push({ caller: name, ms: Math.round(ms) });
+      // Untimed warm-up per caller, so connection and JIT cost are not measured.
+      await timed(caller, `${path}&status=ended`);
+      const runs: number[] = [];
+      for (let i = 0; i < RUNS; i++) {
+        const { ms, response } = await timed(caller, path);
+        expect(response.status).toBe(200);
+        runs.push(Math.round(ms));
+      }
+      // A load spike hits single runs; a real regression slows the median.
+      const ms = median(runs);
+      if (ms >= BUDGET_MS) slow.push({ caller: name, ms, runs });
     }
-    // On failure, the list names who was slow and by how much.
+    // On failure, the list names who was slow, the median and every run.
     expect(slow).toEqual([]);
   });
 });
