@@ -31,8 +31,9 @@ ones:
   supported.
 - **git** and **tmux**: every card and every fleet slot runs in its own
   worktree and tmux session.
-- **Claude Code** (and **Codex**, if you use Codex workers), signed in on that
-  machine. Their credentials never leave it.
+- **Claude Code**, signed in on that machine; its credentials never leave it.
+  Card workers and fleet slots run Claude Code today. Codex sessions on the
+  machine are listed too; Codex workers are not built yet.
 - The **GitHub CLI** (`gh`) signed in with `gh auth login`, for pull requests
   and checks.
 - Your repositories cloned on the machine. Only GitHub repositories can be

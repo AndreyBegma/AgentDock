@@ -17,7 +17,7 @@ it does.
 | **Queue** | GitHub issues labelled `cs:ready`. Nautelle creates no agent by itself: queue an issue and the orchestrator dispatches it. |
 | **Round** | One pass of the orchestrator over the queue and its running slots. |
 | **Slot** | One dispatched issue: its own worktree and tmux session, named after the issue (`i42`). |
-| **Worker** | The Claude Code or Codex session in a slot. |
+| **Worker** | The Claude Code session in a slot. Codex workers are planned (ADR-0013), not built yet. |
 | **Fence** | The paths a worker may and may not touch, set in its brief and enforced for Claude workers. |
 
 ## The Fleet page
@@ -37,6 +37,6 @@ can run on it; **Connect project** shows whether it is there.
 
 - [ADR-0004](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0004-github-issues-are-the-task-queue.md): GitHub issues are the task queue.
 - [ADR-0005](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md): drive the orchestrator skill, do not reimplement it.
-- [ADR-0013](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0013-codex-workers-and-their-fence.md): Codex workers and their fence.
+- [ADR-0013](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0013-codex-workers-and-their-fence.md): Codex workers and their fence (planned).
 - [ADR-0030](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0030-terminal-work-and-fleet-work-appear-on-the-board.md): terminal work and fleet work appear on the Board.
 - [ADR-0045](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0045-a-person-may-message-a-running-session-the-orchestrator-is-told.md): a person may message a running session.
