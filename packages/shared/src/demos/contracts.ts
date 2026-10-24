@@ -145,6 +145,25 @@ export interface CardDemoView {
   finishedAt: string | null;
 }
 
+/**
+ * `BoardCardView.demo` (C-371): the card's newest recording, for the board
+ * tile's chip. `null` while the card has none.
+ */
+export interface CardDemoBrief {
+  status: DemoStatus;
+  durationMs: number | null;
+}
+
+/**
+ * `GET /projects/:projectId/demos/runner` (C-371): what the project's runner
+ * reports about recording. `demoflow` is its pinned DemoFlow, `null` for a
+ * runner that never reported one; `supported` is `capabilities.cardDemo`.
+ */
+export interface DemoRunnerView {
+  supported: boolean;
+  demoflow: { version: string; ready: boolean; reason: string | null } | null;
+}
+
 /** Stable codes in the `error` field of a demo route's error body. */
 export const DEMO_ERROR = {
   notFound: 'not_found',

@@ -46,6 +46,7 @@ import { TextOwners } from '../text/text-owners';
 import { TokenEconomyService } from '../token-economy/token-economy.service';
 import { tokenSaverFactsOf } from '../token-saver/token-saver-facts';
 import { BoardCommands, boardOutput } from './board-commands';
+import { demoFactsFor } from './board-demo-facts';
 import { BoardDependencies } from './board-dependencies.service';
 import { boardError, cardNotFound } from './board-error';
 import {
@@ -457,6 +458,8 @@ export class BoardService implements OnModuleInit {
       prTargets: await this.prTargets(cards),
       // #884: the review strip of each card.
       ...(await reviewFactsFor(this.prisma, cards)),
+      // C-371: the demo chip of each card.
+      ...(await demoFactsFor(this.prisma, cards)),
       now: new Date(),
     };
   }

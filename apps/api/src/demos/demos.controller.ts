@@ -1,6 +1,7 @@
 import {
   type CardDemoView,
   DEMO_UPLOAD_HEADERS,
+  type DemoRunnerView,
   type DemoSecretView,
   type DemoSettingsView,
   demoIdSchema,
@@ -74,6 +75,13 @@ export class DemoSettingsController {
     @Body() dto: UpdateDemoSettingsDto,
   ): Promise<DemoSettingsView> {
     return this.settings.update(access.projectId, dto, user.id, ctx);
+  }
+
+  @Get('runner')
+  runner(
+    @ProjectAccess() access: ResolvedProjectAccess,
+  ): Promise<DemoRunnerView> {
+    return this.settings.runner(access.projectId);
   }
 
   @Get('secrets')
