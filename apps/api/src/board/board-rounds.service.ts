@@ -11,6 +11,7 @@ import {
   type CardReviewFixFinding,
   type CardRoundPhase,
   type CardRoundTrigger,
+  type CardWorkerDemo,
   cardAttachmentSnapshotSchema,
   cardBranch,
   cardChange,
@@ -26,6 +27,7 @@ import {
   cardSpecPath,
   cardSpecPrBody,
   cardWorkerPrompt,
+  demoScenarioPath,
   isActiveRoundPhase,
   stackDesignPath,
   stackLabel,
@@ -36,6 +38,7 @@ import {
   type CardRunArgs,
   type CardRunFile,
   capabilitiesSchema,
+  cardDemoAvailable,
   cardDocsBranch,
   cardEffortAvailable,
   cardEscalateAvailable,
@@ -278,6 +281,21 @@ export const cardPromptEscalate = (escalate: boolean): { escalate?: true } =>
   escalate ? { escalate: true } : {};
 
 /**
+ * C-369 (ADR-0090 §2): a round gets DemoFlow's MCP server and the scenario
+ * section when the project records demo videos and the runner can record
+ * them (`cardDemo`) — `card.run` is strict, so an older runner never sees
+ * `demo`. `env` is the project's secret names, never a value.
+ */
+export const cardRoundDemo = (
+  card: { number: number; title: string },
+  demos: { enabled: boolean; env: readonly string[] },
+  capabilities: Capabilities | null,
+): CardWorkerDemo | null =>
+  demos.enabled && capabilities !== null && cardDemoAvailable(capabilities)
+    ? { scenarioPath: demoScenarioPath(card), env: demos.env }
+    : null;
+
+/**
  * Starting a round (issue #242 D4, D5, D9, D12, D13): Run — round 1 or a
  * retry — and feedback. Everything that can be refused is refused before a
  * row exists or a command is sent; the round is then a `runs` row of kind
@@ -305,6 +323,23 @@ export class BoardRoundsService {
     private readonly principals: BoardPrincipals,
     @Optional() private readonly budgets?: BudgetGate,
   ) {}
+
+  /** C-369: whether the project records demo videos, and its secret names. */
+  private async demoSettings(
+    projectId: string,
+  ): Promise<{ enabled: boolean; env: string[] }> {
+    const settings = await this.prisma.boardSettings.findUnique({
+      where: { projectId },
+      select: { demoVideosEnabled: true },
+    });
+    if (!settings?.demoVideosEnabled) return { enabled: false, env: [] };
+    const secrets = await this.prisma.projectDemoSecret.findMany({
+      where: { projectId },
+      orderBy: { name: 'asc' },
+      select: { name: true },
+    });
+    return { enabled: true, env: secrets.map((s) => s.name) };
+  }
 
   /**
    * `POST …/run`: round 1, or a retry after failed / ended / cancelled.
@@ -1045,6 +1080,11 @@ export class BoardRoundsService {
       card.escalatedAt === null &&
       capabilities !== null &&
       cardEscalateAvailable(capabilities);
+    const demo = cardRoundDemo(
+      card,
+      await this.demoSettings(project.id),
+      capabilities,
+    );
     const nextRound = (change: CardChange | null) =>
       cardNextRoundPrompt({
         label: cardLabel(card.number),
@@ -1109,6 +1149,7 @@ export class BoardRoundsService {
             ...cardPromptSaver(saver),
             // #750 D8: the text goes with the tool the runner offers.
             ...cardPromptEscalate(escalate),
+            demo,
           });
     const files: CardRunFile[] = [
       ...(firstStart && specPath !== null && specPr === null
@@ -1145,6 +1186,7 @@ export class BoardRoundsService {
       ...(followUp ? { newBranch: true } : {}),
       ...(escalate ? { escalate: true as const } : {}),
       ...(startBranch !== null ? { startBranch } : {}),
+      ...(demo !== null ? { demo: true as const } : {}),
       ...withCardPrefix(saver.args, prefix.prefix),
     };
     const valid = cardRunArgsSchema.safeParse({ ...draft, runId: 'pending' });

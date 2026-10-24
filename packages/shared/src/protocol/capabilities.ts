@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEMO_REASON_MAX } from '../demos/contracts';
 import { mcpServerNameSchema } from '../token-saver/contracts';
 import { boundedName, LIST_MAX, TEXT_NAME_MAX, TEXT_PATH_MAX } from './bounded';
 // Type-only: `./commands` imports this module's schemas.
@@ -24,6 +25,18 @@ export const profileAgentdockSchema = z.object({
   telemetry: z.boolean(),
 });
 export type ProfileAgentdock = z.infer<typeof profileAgentdockSchema>;
+
+/**
+ * C-369: the runner's DemoFlow, as `demoflow` in capabilities. `version` is
+ * the pinned one; `ready` is `demoflow setup` passing; `reason` (not ready
+ * only) is the short cause, without a path or a stack trace.
+ */
+export const demoflowStatusSchema = z.object({
+  version: boundedName(TEXT_NAME_MAX),
+  ready: z.boolean(),
+  reason: z.string().max(DEMO_REASON_MAX).optional(),
+});
+export type DemoflowStatus = z.infer<typeof demoflowStatusSchema>;
 
 /** At most this many env entries, and this many args, on one runtime profile (C-123). */
 export const PROFILE_ENV_MAX = 64;
@@ -278,9 +291,16 @@ export const capabilitiesSchema = z.object({
    * ADR-0090: the runner records demo videos — `card.demo` provisions
    * DemoFlow, records and uploads. `commands` lists `card.demo` on every
    * build (its handler answers `unsupported` before S-12 stage 2), so the API
-   * sends it only when this is `true`. Absent means `false`.
+   * sends it only when this is `true`. Absent means `false`. C-369: it also
+   * means the runner takes `demo` on `card.run`.
    */
   cardDemo: z.boolean().optional(),
+  /**
+   * C-369: the runner's pinned DemoFlow — the version it runs through `npx`
+   * and whether `demoflow setup` succeeded (Chromium and FFmpeg found).
+   * `reason` says why it is not ready. Absent: a runner that does not record.
+   */
+  demoflow: demoflowStatusSchema.optional(),
   /**
    * ADR-0047: the runner's local security policy as it is now — values only,
    * no path beyond `allowedRoots`. The server cannot change it; the UI reads

@@ -328,6 +328,7 @@ export class CardExecutor {
         profileKey: args.profileKey,
         // DA-15: `card.resume` launches in this mode, never in its own.
         permissionMode: args.permissionMode,
+        ...(args.demo ? { demo: true as const } : {}),
         startedAt: isoNow(deps.clock),
         // #359 D3: the spec (and design) the PR links; only round 1 sends them.
         specFiles: args.files?.length
@@ -882,6 +883,8 @@ export class CardExecutor {
         permissionMode,
         session: { id: args.sessionId, resume: true },
         prompt: STEWARD_RESUME_TEXT,
+        // C-369: the session keeps DemoFlow's MCP server.
+        ...(record.demo ? { demo: true as const } : {}),
       };
       this.trust(profile, record);
       try {
