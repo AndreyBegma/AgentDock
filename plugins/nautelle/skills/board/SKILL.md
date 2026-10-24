@@ -12,8 +12,10 @@ Card numbers are per project: `C-42` is `{ card: 42 }`.
 
 **Tools:** read — `board_list`, `board_card`, `board_wait`. Control — `card_create`,
 `card_run`, `card_move`, `card_feedback`, `card_message`, `card_stop`,
-`take_card`, `release_card`. Also `finish_card`, `request_action`,
-`action_status`.
+`take_card`, `release_card`. Stacks, designs and dependencies — `stack_create`,
+`stack_add_card`, `stack_remove_card`, `stack_update`, `stack_run`,
+`stack_stop`, `stack_design`, `card_design`, `card_depend`, `card_undepend`
+(below). Also `finish_card`, `request_action`, `action_status`.
 
 Control tools answer only the person's own terminal session. A card worker or
 fleet slot gets `not_a_manual_session`: say so in one line and stop; it has no
@@ -121,6 +123,28 @@ Finished; ask what the person wants instead of re-filing it.
 
 Never create a card that duplicates one in `board_list`. `kind` only when obvious.
 
+## Stacks, designs and dependencies
+
+Only when the person asks for them. `board_list` shows every stack: number,
+title, stages with their card numbers, design status and run. Stack numbers are
+per project: `S-3` is `{ stack: 3 }`; stages are 0-based.
+
+| The person says | You |
+|---|---|
+| "group C-1..C-4 into a stack" | `stack_create {title, stages: [{cards: [1, 2]}, {cards: [3, 4]}]}`: each stage runs after the one before. `design: true` when they want one shared design first. |
+| "add / take out C-5" | `stack_add_card {stack, card, stage}` (`stage` = the number of stages adds a last one), `stack_remove_card {stack, card}`. |
+| "rename it", "name the stages" | `stack_update {stack, title?, body?, stages?: [{position, title}]}`. |
+| "run / stop the stack" | `stack_run {stack}`, `stack_stop {stack}`. |
+| "C-5 after C-4" | `card_depend {card: 5, dependsOn: 4}`; `card_undepend` removes it. |
+| A design | `stack_design` or `card_design` with `action`: `status`, `generate`, `revise` (with `comments`), `approve`. |
+
+Approving a design is the person's gate. Approve only when the person tells you
+to in this session; `needs_person` means approve it in the web app. With several
+variants in play, `status` lists the revisions: ask which one, then pass
+`revisionId`. `stack_refused`, `dependency_cycle`, `invalid_dependency`,
+`design_busy`, `design_off`, `no_open_comments` and `design_approved` come back
+by name: say what was refused and why, do not retry around it.
+
 ## Card questions (D7)
 
 A `question` event carries the text and options. Read `board_card` for the
@@ -161,6 +185,7 @@ still has to do.
 | `not_a_manual_session` | Not the person's terminal session. Stop. |
 | `forbidden` | The person's role cannot do it. Say so. |
 | `completed_needs_person` | Use `card_accept`. |
+| `needs_person` | A design approval is the person's: in the web app. |
 | `card_taken` | A running round or another live session has the card. Leave it. |
 | `not_taken` | You do not hold the card. Do not release or finish it. |
 | `runner_offline`, `no_project` | Say so in one line; do not retry. |

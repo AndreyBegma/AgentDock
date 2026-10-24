@@ -1,6 +1,6 @@
 {
   "name": "nautelle",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Reports Claude Code sessions to Nautelle through the local runner and gives the model fleet, queue and budget tools.",
   "author": { "name": "Nautelle" },
   "repository": "https://github.com/AndreyBegma/Nautelle",

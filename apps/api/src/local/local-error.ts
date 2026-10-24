@@ -1,6 +1,7 @@
 import { BUDGET_ERROR } from '@nautelle/shared';
 import {
   LOCAL_BOARD_REFUSALS,
+  LOCAL_DESIGN_REFUSALS,
   type LocalErrorCode,
 } from '@nautelle/shared/protocol';
 import { HttpException } from '@nestjs/common';
@@ -32,12 +33,17 @@ export const httpErrorBody = (
   return { code, message };
 };
 
-type LocalBoardRefusal = (typeof LOCAL_BOARD_REFUSALS)[number];
+type LocalRefusal =
+  | (typeof LOCAL_BOARD_REFUSALS)[number]
+  | (typeof LOCAL_DESIGN_REFUSALS)[number];
 
-const boardRefusalOf = (code: string | null): LocalBoardRefusal | null =>
-  code !== null && (LOCAL_BOARD_REFUSALS as readonly string[]).includes(code)
-    ? (code as LocalBoardRefusal)
-    : null;
+const REFUSALS: readonly string[] = [
+  ...LOCAL_BOARD_REFUSALS,
+  ...LOCAL_DESIGN_REFUSALS,
+];
+
+const refusalOf = (code: string | null): LocalRefusal | null =>
+  code !== null && REFUSALS.includes(code) ? (code as LocalRefusal) : null;
 
 /** A board error body's `reason`, when it has one. */
 const reasonOf = (error: HttpException): string | null => {
@@ -58,9 +64,9 @@ export const toLocalError = (error: unknown): LocalError => {
   }
   const { code, message } = httpErrorBody(error);
   const status = error.getStatus();
-  // #845 D3: the Board's own refusals keep their names; `move_refused`
-  // carries its `BoardMoveRefusal`.
-  const refusal = boardRefusalOf(code);
+  // #845 D3: the Board's own refusals keep their names, as do the design
+  // routes' (C-377); `move_refused` carries its `BoardMoveRefusal`.
+  const refusal = refusalOf(code);
   if (refusal) {
     const reason = reasonOf(error);
     return new LocalError(

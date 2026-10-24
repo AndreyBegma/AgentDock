@@ -34,7 +34,9 @@ import {
   type MoveBoardCardRequest,
   type RunBoardCardRequest,
   STACK_BODY_MAX,
+  STACK_STAGE_TITLE_MAX,
   STACK_TITLE_MAX,
+  type StackStageTitle,
   type UpdateBoardCardRequest,
   type UpdateBoardSettingsRequest,
   type UpdateBoardStackRequest,
@@ -264,7 +266,22 @@ export class AddCardDependencyDto implements AddCardDependencyRequest {
   dependsOn!: number;
 }
 
-/** `PATCH /board/stacks/:number` (#480). */
+/** C-377: one stage's new title in `PATCH /board/stacks/:number`. */
+export class StackStageTitleDto implements StackStageTitle {
+  /** 0-based. */
+  @IsInt()
+  @Min(0)
+  @Max(INTAKE_SPLIT_MAX)
+  position!: number;
+
+  /** Empty clears it: the stage is called "Stage N". */
+  @IsString()
+  @Matches(/^[^\r\n]*$/, { message: 'stage title must be one line' })
+  @MaxLength(STACK_STAGE_TITLE_MAX)
+  title!: string;
+}
+
+/** `PATCH /board/stacks/:number` (#480); stage titles since C-377. */
 export class UpdateBoardStackDto implements UpdateBoardStackRequest {
   @IsOptional()
   @IsString()
@@ -277,6 +294,14 @@ export class UpdateBoardStackDto implements UpdateBoardStackRequest {
   @IsString()
   @MaxLength(STACK_BODY_MAX)
   body?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(INTAKE_SPLIT_MAX + 1)
+  @ValidateNested({ each: true })
+  @Type(() => StackStageTitleDto)
+  stages?: StackStageTitleDto[];
 }
 
 /** `POST /board/stacks` (#588): cards grouped by hand into one stage. */

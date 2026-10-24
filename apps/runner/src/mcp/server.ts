@@ -152,6 +152,10 @@ export const buildMcpServer = (
       tool.name,
       { description: tool.description, inputSchema: tool.input },
       async (input: Record<string, unknown>): Promise<CallToolResult> => {
+        const call = tool.route?.(input) ?? {
+          method: tool.method,
+          args: input,
+        };
         // #845 D8: the tool's wait is a loop of short server holds.
         const result: LocalResult<unknown> =
           tool.method === 'board.wait'
@@ -164,7 +168,7 @@ export const buildMcpServer = (
                 },
                 options.waitClock,
               )
-            : await request(tool.method, input);
+            : await request(call.method, call.args);
         if (!result.ok)
           return errorResult(result.error.code, result.error.message);
         const data = z.record(z.string(), z.unknown()).safeParse(result.data);
