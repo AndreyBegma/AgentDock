@@ -16,7 +16,7 @@ appEnv: ''
 
 # A Secret whose every key becomes an environment variable of the API: the
 # place for anything of apps/api/.env.example that is a secret (DEEPL_API_KEY,
-# the GitHub App, the Telegram bot…), for APP_ENCRYPTION_KEY, AUDIT_HMAC_KEY
+# SPEECH_TO_TEXT_API_KEY…), for APP_ENCRYPTION_KEY, AUDIT_HMAC_KEY
 # and LLM_SECRETS_KEY when you keep them yourself instead of the generated
 # secrets.json, and for ADMIN_EMAIL / ADMIN_PASSWORD to create the first
 # administrator without the setup page (ADR-0087).
@@ -37,7 +37,7 @@ api:
     # Empty: the chart's appVersion.
     tag: ''
     pullPolicy: IfNotPresent
-  # Plain (non-secret) extra environment, as a map: { TELEGRAM_BOT_NAME: … }.
+  # Plain (non-secret) extra environment, as a map: { APP_TIMEZONE: Europe/Berlin }.
   env: {}
   # Express `trust proxy` (deploy/README.md, TRUST_PROXY per topology). The
   # API's peer is always the chart's proxy pod, on the cluster's private

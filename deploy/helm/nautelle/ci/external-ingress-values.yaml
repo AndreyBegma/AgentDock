@@ -4,7 +4,7 @@ nautelleUrl: https://dock.example.com
 existingSecret: nautelle-api-extra
 api:
   env:
-    TELEGRAM_BOT_NAME: nautelle_bot
+    APP_TIMEZONE: Europe/Berlin
 ingress:
   enabled: true
   className: nginx

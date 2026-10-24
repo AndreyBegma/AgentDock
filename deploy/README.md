@@ -61,6 +61,19 @@ secret, and `--redact` keeps a value it finds out of the public log.
 narrow allowlist entry in `.gitleaks.toml`, with a comment: name the file and,
 where possible, the rule.
 
+The `helm` step checks the Helm chart in `helm/nautelle` (ADR-0091) on every
+event: `helm/check-chart.sh` lints it with each value set in
+`helm/nautelle/ci`, renders them into `.helm-out`, checks that contradictory
+settings (a database bundled and external, two tunnel tokens…) are refused
+and that every third-party image is pinned by digest. `kubeconform` then
+validates the rendered manifests against the Kubernetes schemas. Both images
+are pinned by digest; neither step mounts anything or reads a secret. Run the
+same check locally with:
+
+```sh
+docker run --rm -v "$PWD":/w -w /w --entrypoint sh alpine/helm:3.19.0 deploy/helm/check-chart.sh .helm-out
+```
+
 The CI PostgreSQL is throwaway. Its data directory is on tmpfs, and it runs
 with `fsync`, `synchronous_commit` and `full_page_writes` off. The `test` step
 prints those three settings.
@@ -354,6 +367,14 @@ browser resolves against the page's own origin, and `API_URL=http://api:8180`,
 the API service in the compose file. One image therefore serves any host.
 Staging keeps building its own images (`build-staging.sh`).
 
+Once both images are pushed, the `chart` step runs
+`deploy/helm/release-chart.sh` (ADR-0091). It checks the tag the same way,
+stamps the chart's `version` and `appVersion` with `X.Y.Z` (`Chart.yaml` holds
+only the placeholders `0.0.0` and `latest`), lints and packages it and pushes
+it as `oci://ghcr.io/andreybegma/charts/nautelle:X.Y.Z` with the same
+`ghcr_token`. [docs/guides/kubernetes.md](../docs/guides/kubernetes.md)
+installs from it.
+
 ### One-time setup
 
 1. **Woodpecker secret.** Add `ghcr_token` to `AndreyBegma/Nautelle`,
@@ -361,19 +382,21 @@ Staging keeps building its own images (`build-staging.sh`).
    a GitHub token with *write:packages* for the `andreybegma` account.
 2. **GitHub tag ruleset.** Add the pattern `v*` to the tag ruleset of P-03, so
    only administrators can create, move or delete a product tag.
-3. **Package visibility.** After the first push, set both packages,
-   `nautelle-api` and `nautelle-web`, to *Public* in the account's package
-   settings, and link them to the repository. An install pulls them without a
-   login only once they are public.
+3. **Package visibility.** After the first push, set the three packages,
+   `nautelle-api`, `nautelle-web` and the chart `charts/nautelle`, to *Public*
+   in the account's package settings, and link them to the repository. An
+   install pulls them without a login only once they are public.
 
 ### Each release
 
 The `release` skill tags `vX.Y.Z` on `main` after the release pull request
 merges; the tag starts the workflow. To rehearse, run the pipeline by hand
 with a message that contains `[image-release]` on a branch other than
-`develop`: it builds both images on the host as `<APP_VERSION>-dev` and pushes
-nothing. Locally, `sh deploy/images/release-images.sh` does the same.
-`NAUTELLE_IMAGES_DRY_RUN=1` stops a tag run before it pushes.
+`develop`: it builds both images on the host as `<APP_VERSION>-dev`, packages
+the chart as `<APP_VERSION>-dev` and pushes nothing. Locally,
+`sh deploy/images/release-images.sh` and `sh deploy/helm/release-chart.sh` do
+the same. `NAUTELLE_IMAGES_DRY_RUN=1` and `NAUTELLE_CHART_DRY_RUN=1` stop a tag
+run before it pushes.
 
 To check a release, install it on a clean machine:
 
