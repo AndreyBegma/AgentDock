@@ -109,6 +109,38 @@ describe('releaseNotes', () => {
     expect(body).toContain('/releases/tag/runner-v0.16.0');
   });
 
+  test('lists the Docker Hub mirrors and the all-in-one try-out', () => {
+    const AIO_DIGEST = `sha256:${'c'.repeat(64)}`;
+    const mirrored = releaseNotes({
+      version: '0.16.0',
+      note: NOTE,
+      images: {
+        ...IMAGES,
+        images: [
+          {
+            name: 'ghcr.io/andreybegma/nautelle-api',
+            digest: API_DIGEST,
+            mirror: 'docker.io/abegma/nautelle-api',
+          },
+          {
+            name: 'ghcr.io/andreybegma/nautelle',
+            digest: AIO_DIGEST,
+            mirror: 'docker.io/abegma/nautelle',
+          },
+        ],
+      },
+      runnerVersion: '0.16.0',
+    });
+    expect(mirrored).toContain('| Image | Docker Hub | Digest |');
+    expect(mirrored).toContain(
+      `| \`ghcr.io/andreybegma/nautelle-api:0.16.0\` | \`docker.io/abegma/nautelle-api:0.16.0\` | \`${API_DIGEST}\` |`,
+    );
+    expect(mirrored).toContain(
+      'docker run -p 8000:8000 -v nautelle:/data docker.io/abegma/nautelle:0.16.0',
+    );
+    expect(body).not.toContain('docker run');
+  });
+
   test('refuses digests of another version', () => {
     expect(() =>
       releaseNotes({
