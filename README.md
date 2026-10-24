@@ -114,6 +114,17 @@ curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/co
 domain with automatic HTTPS. The first administrator, upgrades, backups and
 runner pairing are in **[Installing Nautelle](docs/guides/install.md)**.
 
+On Kubernetes, the Helm chart runs the control plane; runners stay on the
+developer machines:
+
+```sh
+helm install nautelle oci://ghcr.io/andreybegma/charts/nautelle --version X.Y.Z \
+  -n nautelle --create-namespace
+```
+
+Values, Ingress, external databases and backups are in
+**[Kubernetes (Helm)](docs/guides/kubernetes.md)**.
+
 ## Quick start
 
 To work on Nautelle itself. Requirements: [Bun](https://bun.sh) 1.4.0+,
