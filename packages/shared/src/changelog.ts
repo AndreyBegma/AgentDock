@@ -33,6 +33,44 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: '0.16.0',
+    date: '2026-10-24',
+    items: [
+      {
+        kind: 'new',
+        text: 'Nautelle installs with one command from published images, on localhost, behind a Cloudflare tunnel or on your own domain with HTTPS, and you create the first admin in the browser.',
+      },
+      {
+        kind: 'new',
+        text: 'A finished card that changes the UI can come with a demo video recorded on the runner, which you watch on the card or in Telegram before you merge.',
+      },
+      {
+        kind: 'new',
+        text: 'A project can run review steps, a peer review and its own review skills, on every green pull request before a card counts as Finished.',
+      },
+      {
+        kind: 'new',
+        text: 'Your own Claude Code session can also group cards into stacks, set their dependencies and drive their designs.',
+      },
+      {
+        kind: 'improved',
+        text: 'The Overview shows live agent sessions, projects with their live state, recent activity and a seven-day spend trend.',
+      },
+      {
+        kind: 'improved',
+        text: 'The card page is the full detail view, with each round’s pull request, commits, checks and run facts.',
+      },
+      {
+        kind: 'improved',
+        text: 'Designs open on a device canvas with a tab per frame, for the devices you choose.',
+      },
+      {
+        kind: 'fixed',
+        text: 'A card that finishes before its checks turn green is merged once they do.',
+      },
+    ],
+  },
+  {
     version: '0.15.0',
     date: '2026-10-23',
     items: [
