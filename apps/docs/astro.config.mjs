@@ -1,4 +1,4 @@
-// The Nautelle documentation site (ADR-0092). A static Starlight build,
+// The Nautelle documentation site (ADR-0093). A static Starlight build,
 // published to GitHub Pages by .woodpecker/release-docs.yml on a release tag.
 // DOCS_SITE and DOCS_BASE move it to another host, e.g. `DOCS_BASE=/`.
 import starlight from '@astrojs/starlight';

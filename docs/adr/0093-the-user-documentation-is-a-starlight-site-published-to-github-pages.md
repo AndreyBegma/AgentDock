@@ -1,9 +1,10 @@
-# ADR-0092: The user documentation is a Starlight site published to GitHub Pages
+# ADR-0093: The user documentation is a Starlight site published to GitHub Pages
 
 Status: accepted · Date: 2026-10-24 ·
 Card: C-373 ·
 Spec: [`docs/specs/card-373-open-source-polish-readme-and-a-document.md`](../specs/card-373-open-source-polish-readme-and-a-document.md) ·
 Amends [ADR-0088](0088-nautelle-installs-from-published-images-with-one-compose-file.md) (the install guide moves out of `docs/guides/`) ·
+Amends [ADR-0092](0092-nautelle-runs-on-kubernetes-from-a-helm-chart-published-with-each-release.md) (the Kubernetes guide moves out of `docs/guides/`) ·
 Keeps: [ADR-0053](0053-pull-request-pipelines-are-untrusted.md), [ADR-0071](0071-the-product-is-released-by-version-with-a-changelog-and-release-notes.md)
 
 ## Context
@@ -23,15 +24,16 @@ product pitch with contributor setup and internal staging details.
    statically, with light and dark themes and Starlight's built-in search.
    Its sections are Getting started (requirements, install, first run,
    pairing a runner, connecting a project), Configuration, Operations
-   (upgrade, backup and restore, reverse proxies, Kubernetes, troubleshooting,
+   (upgrade, backup and restore, reverse proxies, Kubernetes (Helm), troubleshooting,
    privacy) and Concepts. Concept pages explain in a few paragraphs and link to
    the ADRs for the reasoning.
 2. **`docs/` stays the engineering authority.** ADRs, specs, architecture and
    contributor guides stay where they are and are not copied into the site. The
    site is for people running Nautelle; when it and an ADR disagree, the ADR
-   wins and the site is fixed. `docs/guides/install.md` moves into the site
-   (Getting started and Operations) and is deleted, so the install has one
-   description.
+   wins and the site is fixed. The install guide (ADR-0088) moves into the
+   site (Getting started and Operations) and the Kubernetes guide (ADR-0092)
+   into Operations › Kubernetes (Helm); both are deleted from `docs/guides/`,
+   so each install has one description.
 3. **GitHub Pages, published by the release tag.** `vX.Y.Z` runs
    `.woodpecker/release-docs.yml`, which builds the site and pushes it to the
    `gh-pages` branch with `deploy/docs/publish-docs.sh`; GitHub Pages serves
@@ -71,4 +73,6 @@ product pitch with contributor setup and internal staging details.
 - A pull request that changes only Markdown skips `build` (pipeline.yml's
   docs-only filter), so a page that breaks the build is caught by the next
   pull request that builds, or by the release.
-- Links that pointed at `docs/guides/install.md` point at the site.
+- Links that pointed at the install and Kubernetes guides in `docs/guides/`,
+  including the Helm chart's comments and `deploy/README.md`, point at the
+  site.

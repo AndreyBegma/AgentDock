@@ -1,0 +1,107 @@
+{{- if .Values.redis.enabled -}}
+{{- $fullname := include "nautelle.fullname" . -}}
+{{- $values := .Values.redis -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-redis
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "redis") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "nautelle.selectorLabels" (dict "root" . "component" "redis") | nindent 4 }}
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}-redis
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "redis") | nindent 4 }}
+spec:
+  replicas: 1
+  serviceName: {{ $fullname }}-redis
+  selector:
+    matchLabels:
+      {{- include "nautelle.selectorLabels" (dict "root" . "component" "redis") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nautelle.selectorLabels" (dict "root" . "component" "redis") | nindent 8 }}
+    spec:
+      {{- with include "nautelle.imagePullSecrets" . | trim }}{{ . | nindent 6 }}{{ end }}
+      enableServiceLinks: false
+      # The alpine image's `redis` user.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: {{ include "nautelle.image" (dict "root" . "image" $values.image) | quote }}
+          imagePullPolicy: {{ $values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          # BullMQ backend (ADR-0015). AOF keeps pending timers over a restart.
+          args:
+            - --requirepass
+            - $(REDIS_PASSWORD)
+            - --appendonly
+            - 'yes'
+            - --appendfsync
+            - everysec
+            - --maxmemory-policy
+            - noeviction
+          command: [redis-server]
+          ports:
+            - name: redis
+              containerPort: 6379
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nautelle.redisSecret" . }}
+                  key: {{ include "nautelle.redisSecretKey" . }}
+            - name: REDISCLI_AUTH
+              value: $(REDIS_PASSWORD)
+          readinessProbe:
+            exec:
+              command: [sh, -c, 'redis-cli ping | grep -q PONG']
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: [sh, -c, 'redis-cli ping | grep -q PONG']
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            {{- toYaml $values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      {{- with include "nautelle.scheduling" (dict "root" . "values" $values) | trim }}{{ . | nindent 6 }}{{ end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "nautelle.selectorLabels" (dict "root" . "component" "redis") | nindent 10 }}
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with $values.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $values.persistence.size }}
+{{- end }}

@@ -1,0 +1,14 @@
+# CI: external database and Redis given as plain URLs, an existing claim.
+nautelleUrl: http://192.168.1.20:8000
+postgresql:
+  enabled: false
+externalDatabase:
+  url: postgresql://nautelle:secret@db.internal:5432/nautelle?schema=public
+redis:
+  enabled: false
+externalRedis:
+  url: redis://:secret@redis.internal:6379/0
+persistence:
+  existingClaim: nautelle-data
+ingress:
+  enabled: true

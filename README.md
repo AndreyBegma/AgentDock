@@ -69,6 +69,17 @@ covers the three modes, the
 [upgrades](https://andreybegma.github.io/Nautelle/operations/upgrade/) and
 [backups](https://andreybegma.github.io/Nautelle/operations/backup/).
 
+On Kubernetes, the Helm chart runs the control plane; runners stay on the
+developer machines:
+
+```sh
+helm install nautelle oci://ghcr.io/andreybegma/charts/nautelle --version X.Y.Z \
+  -n nautelle --create-namespace
+```
+
+Values, Ingress, external databases and backups are in
+**[Kubernetes (Helm)](https://andreybegma.github.io/Nautelle/operations/kubernetes/)**.
+
 ## Features
 
 | | |

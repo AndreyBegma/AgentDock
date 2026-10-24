@@ -1,0 +1,213 @@
+{{- $fullname := include "nautelle.fullname" . -}}
+{{- $url := include "nautelle.url" . -}}
+{{- /* Each derives from nautelleUrl; api.env overrides any of them. */}}
+{{- $defaults := dict
+  "APP_ENV" (include "nautelle.appEnv" .)
+  "API_URL" (printf "%s/api" $url)
+  "WEB_URL" $url
+  "APP_URL" $url
+  "PUBLIC_URL" (ternary (printf "%s/api" $url) "" (eq (include "nautelle.https" .) "true"))
+  "TRUST_PROXY" .Values.api.trustProxy
+  "NAUTELLE_DATA_DIR" "/data"
+  "ATTACHMENTS_DIR" "/data/attachments"
+-}}
+{{- $env := merge (deepCopy .Values.api.env) $defaults -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-api
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "nautelle.selectorLabels" (dict "root" . "component" "api") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8180
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-api
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
+  # One API: it holds the runners' sockets and the schedules in process, and
+  # /data is a ReadWriteOnce volume. Recreate never runs two at once.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "nautelle.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nautelle.selectorLabels" (dict "root" . "component" "api") | nindent 8 }}
+      annotations:
+        # A changed password, URL or Secret name restarts the API. The inputs,
+        # not the rendered Secret: a generated password renders anew each time.
+        checksum/secrets: {{ dict "existingSecret" .Values.existingSecret "postgresql" .Values.postgresql.auth "redis" .Values.redis.auth "externalDatabase" .Values.externalDatabase "externalRedis" .Values.externalRedis | toJson | sha256sum }}
+        {{- with .Values.api.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with include "nautelle.imagePullSecrets" . | trim }}{{ . | nindent 6 }}{{ end }}
+      # Service links would put <SERVICE>_PORT variables into the environment.
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        # The data volume becomes writable by the image's `node` user.
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if or .Values.postgresql.enabled .Values.redis.enabled }}
+      # The entrypoint migrates and exits when the database is not up yet; on
+      # a first install that would cost a few back-off restarts.
+      initContainers:
+        {{- if .Values.postgresql.enabled }}
+        - name: wait-for-postgresql
+          image: {{ include "nautelle.image" (dict "root" . "image" .Values.postgresql.image) | quote }}
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - until pg_isready -q -h {{ $fullname }}-postgresql -U nautelle -d nautelle; do sleep 2; done
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+        {{- end }}
+        {{- if .Values.redis.enabled }}
+        - name: wait-for-redis
+          image: {{ include "nautelle.image" (dict "root" . "image" .Values.redis.image) | quote }}
+          imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - until redis-cli -h {{ $fullname }}-redis ping | grep -q PONG; do sleep 2; done
+          env:
+            - name: REDISCLI_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nautelle.redisSecret" . }}
+                  key: {{ include "nautelle.redisSecretKey" . }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: api
+          image: {{ include "nautelle.image" (dict "root" . "image" .Values.api.image) | quote }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8180
+          {{- if .Values.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          {{- end }}
+          env:
+            {{- if .Values.postgresql.enabled }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nautelle.postgresSecret" . }}
+                  key: {{ include "nautelle.postgresSecretKey" . }}
+            - name: DATABASE_URL
+              value: {{ printf "postgresql://nautelle:$(POSTGRES_PASSWORD)@%s-postgresql:5432/nautelle?schema=public" $fullname | quote }}
+            {{- else }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalDatabase.existingSecret | default (include "nautelle.externalSecret" .) }}
+                  key: {{ ternary .Values.externalDatabase.existingSecretKey "DATABASE_URL" (not (empty .Values.externalDatabase.existingSecret)) }}
+            {{- end }}
+            {{- if .Values.redis.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nautelle.redisSecret" . }}
+                  key: {{ include "nautelle.redisSecretKey" . }}
+            - name: REDIS_URL
+              value: {{ printf "redis://:$(REDIS_PASSWORD)@%s-redis:6379/0" $fullname | quote }}
+            {{- else }}
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalRedis.existingSecret | default (include "nautelle.externalSecret" .) }}
+                  key: {{ ternary .Values.externalRedis.existingSecretKey "REDIS_URL" (not (empty .Values.externalRedis.existingSecret)) }}
+            {{- end }}
+            {{- range $name := keys $env | sortAlpha }}
+            - name: {{ $name }}
+              value: {{ get $env $name | toString | quote }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: {{ .Values.api.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.api.startupProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" $fullname) }}
+          {{- else }}
+          # Gone with the pod, and the generated keys with it: try-outs only.
+          emptyDir: {}
+          {{- end }}
+      {{- with include "nautelle.scheduling" (dict "root" . "values" .Values.api) | trim }}{{ . | nindent 6 }}{{ end }}
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullname }}-data
+  labels:
+    {{- include "nautelle.labels" (dict "root" . "component" "api") | nindent 4 }}
+  annotations:
+    # Deleting the release keeps the keys and the attachments.
+    helm.sh/resource-policy: keep
+    {{- with .Values.persistence.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.accessModes | nindent 4 }}
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

@@ -1,6 +1,6 @@
 /**
  * Generates the environment variable reference of the documentation site
- * (ADR-0092) from the `.env.example` files, its source of truth:
+ * (ADR-0093) from the `.env.example` files, its source of truth:
  *
  *   bun scripts/env-reference.ts          writes the page
  *   bun scripts/env-reference.ts --check  exits 1 when the page is stale

@@ -6,7 +6,8 @@ description: Install Nautelle with one command, in one of three exposure modes.
 Nautelle runs from two published images, `ghcr.io/andreybegma/nautelle-api`
 and `ghcr.io/andreybegma/nautelle-web`, with PostgreSQL, Redis and a Caddy
 proxy, all from one compose file. Check the [requirements](../requirements/)
-first.
+first. To run it on a Kubernetes cluster instead, use the Helm chart:
+[Kubernetes (Helm)](../../operations/kubernetes/).
 
 ## Quick start
 

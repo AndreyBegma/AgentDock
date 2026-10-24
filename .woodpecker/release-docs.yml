@@ -1,4 +1,4 @@
-# Publishes the documentation site (ADR-0092).
+# Publishes the documentation site (ADR-0093).
 #
 # Pushing the tag vX.Y.Z on main (ADR-0071) builds apps/docs and pushes the
 # build to the gh-pages branch, which GitHub Pages serves at

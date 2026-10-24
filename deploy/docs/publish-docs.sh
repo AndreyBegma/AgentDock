@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the documentation site (apps/docs) and, on a release tag, publishes
-# it to the gh-pages branch that GitHub Pages serves (ADR-0092). Run from the
+# it to the gh-pages branch that GitHub Pages serves (ADR-0093). Run from the
 # repository root after `bun install --frozen-lockfile`;
 # .woodpecker/release-docs.yml calls it.
 #
