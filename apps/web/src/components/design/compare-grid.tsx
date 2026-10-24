@@ -1,6 +1,7 @@
 'use client';
 
 import type { DesignTheme, ViewportPreset } from '@nautelle/shared';
+import { scaledBox, useZoomReachesFrames } from '../../lib/canvas/frame-zoom';
 import type { CompareColumn } from '../../lib/design/templates';
 import { useElementWidth } from '../../lib/design/use-element-width';
 import { MockupFrame } from './mockup-frame';
@@ -66,6 +67,8 @@ function CompareCell({
 }) {
   const [measure, width] = useElementWidth();
   const scale = width > 0 ? width / preset.width : 0;
+  // #907: zoomed, not scaled, so the mockup's glass is not torn.
+  const byZoom = useZoomReachesFrames();
   const { frame, revision, variant } = column;
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
@@ -84,11 +87,10 @@ function CompareCell({
       >
         {frame && width > 0 ? (
           <div
-            className="origin-top-left"
             style={{
               width: preset.width,
               height: preset.height,
-              transform: `scale(${scale})`,
+              ...scaledBox(scale, byZoom),
             }}
           >
             <MockupFrame
