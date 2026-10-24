@@ -79,6 +79,14 @@ export const zonedDueAt = (now: Date, time: string, timeZone: string): Date => {
   // The offset at the guess, then at the result: two readings settle DST.
   let due = wall - offsetAt(new Date(wall), zone);
   const settled = wall - offsetAt(new Date(due), zone);
-  if (settled !== due) due = Math.max(due, settled);
+  if (settled !== due) {
+    // A reading that does not land back on the wall time used the wrong side
+    // of a transition (the guess was read as UTC); keep the one that does.
+    // Neither does inside a skipped hour: the later one is after the jump.
+    const reads = (instant: number) =>
+      instant + offsetAt(new Date(instant), zone) === wall;
+    if (reads(settled) !== reads(due)) due = reads(settled) ? settled : due;
+    else due = Math.max(due, settled);
+  }
   return new Date(due);
 };

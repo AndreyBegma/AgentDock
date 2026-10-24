@@ -1,0 +1,46 @@
+# The one origin of the all-in-one image (ADR-0097), as in
+# deploy/compose/docker-compose.yml: /api/* → the API with the prefix stripped
+# (WebSockets included), everything else → the web app. Both listen on
+# loopback inside the container.
+{
+	admin off
+	auto_https off
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:8000 {
+	# Nothing above 10 MB reaches the API or web (C-134), but the runner's demo
+	# video upload: up to 100 MiB, checked by the API before it reads the body
+	# (ADR-0090).
+	@demoVideo path_regexp ^/api/runner/cards/[0-9]+/demos/[A-Za-z0-9_-]+/video$
+	@bounded not path_regexp ^/api/runner/cards/[0-9]+/demos/[A-Za-z0-9_-]+/video$
+	request_body @bounded {
+		max_size 10MB
+	}
+	request_body @demoVideo {
+		max_size 100MiB
+	}
+	header X-Content-Type-Options "nosniff"
+
+	# Pairing and hook responses carry a token or a decision.
+	@uncached path /api/runners/pair /api/hooks/*
+	header @uncached Cache-Control "no-store"
+
+	# While a service restarts or the API migrates, a request is held and
+	# retried instead of answered 502 (#368).
+	handle_path /api/* {
+		reverse_proxy 127.0.0.1:8180 {
+			lb_try_duration 60s
+			lb_try_interval 250ms
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3517 {
+			lb_try_duration 60s
+			lb_try_interval 250ms
+		}
+	}
+}

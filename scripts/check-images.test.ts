@@ -46,6 +46,18 @@ describe('checkDockerfile', () => {
     ).toHaveLength(1);
   });
 
+  test("allows Nautelle's own images by tag, nothing else of ghcr", () => {
+    const source = [
+      'ARG API_IMAGE=ghcr.io/andreybegma/nautelle-api:latest',
+      `FROM ${ref('API_IMAGE')} AS api`,
+      'FROM ghcr.io/andreybegma/nautelle:1.2.3',
+      'FROM ghcr.io/andreybegma/other:1',
+    ].join('\n');
+    expect(checkDockerfile(source)).toEqual([
+      '4: image `ghcr.io/andreybegma/other:1` is not pinned by @sha256:',
+    ]);
+  });
+
   test('ignores comments and a curl that is not piped to a shell', () => {
     const source = '# curl x | bash\nRUN curl -fsSL -o /tmp/f https://x';
     expect(checkDockerfile(source)).toEqual([]);
@@ -68,9 +80,15 @@ describe('checkCompose', () => {
       '    image: ghcr.io/andreybegma/nautelle-api:${NAUTELLE_VERSION:-latest}',
       '    image: ghcr.io/andreybegma/nautelle-web:0.15.0',
       '    image: ghcr.io/andreybegma/other:1',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: compose interpolation, not a template
+      '    image: ${NAUTELLE_REGISTRY:-ghcr.io/andreybegma}/nautelle-web:${NAUTELLE_VERSION:-latest}',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: compose interpolation, not a template
+      '    image: ${NAUTELLE_REGISTRY:-ghcr.io/andreybegma}/other:1',
     ].join('\n');
     expect(checkCompose(source)).toEqual([
       '3: image `ghcr.io/andreybegma/other:1` is not pinned by @sha256:',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: compose interpolation, not a template
+      '5: image `${NAUTELLE_REGISTRY:-ghcr.io/andreybegma}/other:1` is not pinned by @sha256:',
     ]);
   });
 });

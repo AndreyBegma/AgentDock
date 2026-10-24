@@ -19,6 +19,7 @@ These live in `nautelle/.env`, next to the compose file. `install.sh` writes the
 | `TUNNEL_TOKEN` | _empty_ | set | tunnel: the token of a remote-managed Cloudflare tunnel whose public hostname points at http://proxy:80. NAUTELLE_URL is that hostname's https URL. |
 | `NAUTELLE_DOMAIN` | _empty_ | set | tls: the domain Caddy gets a certificate for. Its DNS points at this host and ports 80 and 443 are open. NAUTELLE_URL is https://&lt;domain&gt;. |
 | `NAUTELLE_VERSION` | `latest` | set | Image tag: latest, or a release such as 0.15.0. |
+| `NAUTELLE_REGISTRY` | _empty_ | set | Where the images come from: empty for ghcr.io/andreybegma, or docker.io/abegma for the same images on Docker Hub (the same digests and signatures). |
 | `APP_ENV` | `production` | set | `production` marks cookies Secure. install.sh writes `development` for an http:// NAUTELLE_URL, where a browser would drop them. |
 | `POSTGRES_PASSWORD`<br/>`REDIS_PASSWORD` | _empty_<br/>_empty_ | set | Database and Redis passwords. Required: there is no default. |
 

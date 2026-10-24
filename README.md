@@ -13,6 +13,7 @@ _Nautelle, formerly AgentDock._
 [![CI](https://ci.luna-realm.com/api/badges/9/status.svg?branch=develop)](https://ci.luna-realm.com/repos/9)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Images on ghcr.io](https://img.shields.io/badge/ghcr.io-nautelle--api%20%C2%B7%20nautelle--web-2496ed?logo=docker&logoColor=white)](https://github.com/AndreyBegma?tab=packages&repo_name=Nautelle)
+[![Images on Docker Hub](https://img.shields.io/badge/Docker%20Hub-abegma%2Fnautelle-2496ed?logo=docker&logoColor=white)](https://hub.docker.com/u/abegma)
 [![nautelle-runner on npm](https://img.shields.io/npm/v/nautelle-runner?label=nautelle-runner)](https://www.npmjs.com/package/nautelle-runner)
 [![Docs](https://img.shields.io/badge/docs-andreybegma.github.io%2FNautelle-6d5dfc)](https://andreybegma.github.io/Nautelle/)
 
@@ -41,7 +42,18 @@ orchestrator, and GitHub issues and pull requests stay the source of truth.
 
 ## Quick start
 
-On a Linux host with Docker:
+To try it, one container is enough:
+
+```sh
+docker run -p 8000:8000 -v nautelle:/data abegma/nautelle
+```
+
+It runs a demo PostgreSQL and Redis inside, so it is **not for production**.
+Open the setup link it prints to create the first administrator. The
+[install guide](https://andreybegma.github.io/Nautelle/getting-started/install/#try-it-in-one-container)
+has the details.
+
+To install it for real, on a Linux host with Docker:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh
@@ -51,6 +63,11 @@ curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/co
    and starts it.
 2. Open <http://localhost:8000>.
 3. Create the first administrator on the setup page.
+
+The images are on ghcr.io (`ghcr.io/andreybegma/nautelle-*`, the default) and
+on Docker Hub as `abegma/nautelle-api`, `abegma/nautelle-web` and
+`abegma/nautelle`, with the same digests and signatures. Add
+`--registry docker.io/abegma` to pull them from Docker Hub.
 
 Then pair a runner on the machine that holds your repositories, with a code
 from **Admin › Runners › Add runner**:

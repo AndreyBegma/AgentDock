@@ -35,6 +35,14 @@ describe('zonedDueAt', () => {
     expect(skipped).toEqual(new Date('2026-03-08T07:30:00Z'));
   });
 
+  it('reads an early time on the day daylight saving time ends', () => {
+    // Kyiv leaves summer time at 01:00 UTC on 2026-10-25; 01:12 that morning
+    // is still UTC+3, which is 22:12 UTC the evening before.
+    expect(
+      zonedDueAt(new Date('2026-10-25T00:30:00Z'), '01:12', 'Europe/Kyiv'),
+    ).toEqual(new Date('2026-10-24T22:12:00Z'));
+  });
+
   it('falls back to 09:00 and UTC for values it cannot read', () => {
     expect(
       zonedDueAt(new Date('2026-10-19T15:00:00Z'), 'nine', 'Mars/Olympus'),

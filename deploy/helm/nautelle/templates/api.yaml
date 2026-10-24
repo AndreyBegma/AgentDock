@@ -104,7 +104,7 @@ spec:
       {{- end }}
       containers:
         - name: api
-          image: {{ include "nautelle.image" (dict "root" . "image" .Values.api.image) | quote }}
+          image: {{ include "nautelle.ownImage" (dict "root" . "image" .Values.api.image) | quote }}
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false

@@ -4,9 +4,12 @@
  *   - every `FROM` and `COPY --from=<image>` in a Dockerfile names its image
  *     with `@sha256:` (a build argument is resolved to its default first);
  *   - no Dockerfile pipes a download into a shell (`curl … | bash`, `| sh`);
- *   - every third-party `image:` in a compose file carries a digest. Nautelle's
- *     own images are exempt: the staging ones are built locally, and the
- *     public install picks a published release by tag (ADR-0088).
+ *   - every third-party `image:` in a compose file carries a digest.
+ *
+ * Nautelle's own images are exempt: the staging ones are built locally, the
+ * public install picks a published release by tag, from ghcr.io or the
+ * registry in NAUTELLE_REGISTRY (ADR-0088), and the all-in-one image is
+ * assembled from the digests release-images.sh has just pushed (ADR-0097).
  *
  *   bun scripts/check-images.ts [file ...]
  *
@@ -22,9 +25,10 @@ const root = resolve(import.meta.dir, '..');
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.next', 'dist']);
 /**
  * Nautelle's own images: built locally for staging (`agentdock-*`), or the
- * published ones the public install selects by release tag (ADR-0088).
+ * published ones selected by release tag (ADR-0088, ADR-0097).
  */
-const OWN_IMAGE = /^(agentdock-|ghcr\.io\/andreybegma\/nautelle-(api|web):)/;
+const OWN_IMAGE =
+  /^(agentdock-|(ghcr\.io\/andreybegma|\$\{NAUTELLE_REGISTRY:-ghcr\.io\/andreybegma\})\/nautelle(-api|-web)?:)/;
 
 const isDockerfile = (name: string) => /^Dockerfile(\..+)?$/.test(name);
 const isCompose = (name: string) => /^docker-compose(\..+)?\.ya?ml$/.test(name);
@@ -76,6 +80,7 @@ export const checkDockerfile = (source: string): string[] => {
   const checkImage = (line: number, image: string) => {
     const resolved = resolveImage(image);
     if (stages.has(resolved) || resolved === 'scratch') return;
+    if (OWN_IMAGE.test(resolved)) return;
     if (!DIGEST.test(resolved)) {
       problems.push(`${line}: image \`${image}\` is not pinned by @sha256:`);
     }

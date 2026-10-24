@@ -24,6 +24,8 @@ export interface ImageDigest {
   name: string;
   /** `sha256:…` of the multi-platform index. */
   digest: string;
+  /** The same index on Docker Hub, `docker.io/abegma/nautelle-api` (ADR-0097). */
+  mirror?: string;
 }
 
 export interface ImagesFile {
@@ -70,7 +72,8 @@ export const parseImages = (raw: string): ImagesFile => {
       (image: Partial<ImageDigest>) =>
         typeof image?.name === 'string' &&
         typeof image.digest === 'string' &&
-        DIGEST.test(image.digest),
+        DIGEST.test(image.digest) &&
+        (image.mirror === undefined || typeof image.mirror === 'string'),
     )
   ) {
     throw new Error('images.json does not list an image with a sha256 digest');
@@ -109,6 +112,26 @@ export const releaseNotes = ({
     .map((name) => `\`${name.trim()}\``)
     .join(', ');
   const [first] = images.images;
+  const mirrored = images.images.some((image) => image.mirror !== undefined);
+  const allInOne = images.images.find((image) =>
+    /\/nautelle$/.test(image.name),
+  );
+  const table = mirrored
+    ? [
+        '| Image | Docker Hub | Digest |',
+        '|---|---|---|',
+        ...images.images.map(
+          (image) =>
+            `| \`${image.name}:${version}\` | ${image.mirror === undefined ? '' : `\`${image.mirror}:${version}\``} | \`${image.digest}\` |`,
+        ),
+      ]
+    : [
+        '| Image | Digest |',
+        '|---|---|',
+        ...images.images.map(
+          (image) => `| \`${image.name}:${version}\` | \`${image.digest}\` |`,
+        ),
+      ];
 
   return [
     summary,
@@ -124,18 +147,26 @@ export const releaseNotes = ({
     '```',
     '',
     `To upgrade an install, set \`NAUTELLE_VERSION=${version}\` in \`nautelle/.env\` (or leave it at \`latest\`), then run \`docker compose pull && docker compose up -d\` in \`nautelle/\`. See the [install guide](https://andreybegma.github.io/Nautelle/getting-started/install/) and the [upgrade policy](${blob}/docs/guides/versioning.md).`,
+    ...(allInOne === undefined
+      ? []
+      : [
+          '',
+          'To try it in one container (a demo database inside, not for production):',
+          '',
+          '```sh',
+          `docker run -p 8000:8000 -v nautelle:/data ${allInOne.mirror ?? allInOne.name}:${version}`,
+          '```',
+        ]),
     '',
     '## Images',
     '',
     `Platforms: ${platforms}. Tags: ${tags}.`,
     '',
-    '| Image | Digest |',
-    '|---|---|',
-    ...images.images.map(
-      (image) => `| \`${image.name}:${version}\` | \`${image.digest}\` |`,
-    ),
+    ...table,
     '',
-    'Each image is signed with the key in `deploy/images/cosign.pub` and carries an SBOM and build provenance:',
+    mirrored
+      ? 'Docker Hub holds the same index, so the same digest. Each image is signed in both registries with the key in `deploy/images/cosign.pub` and carries an SBOM and build provenance:'
+      : 'Each image is signed with the key in `deploy/images/cosign.pub` and carries an SBOM and build provenance:',
     '',
     '```sh',
     `curl -fsSLO ${raw}/deploy/images/cosign.pub`,
