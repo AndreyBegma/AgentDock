@@ -49,7 +49,7 @@ const intHeader = (value: string | undefined): number | null => {
 };
 
 /**
- * A project's Demo videos settings and Demo env secrets (C-368, ADR-0089).
+ * A project's Demo videos settings and Demo env secrets (C-368, ADR-0090).
  * Any member reads them; writes need the project admin role. A secret's
  * value is write-only: every route answers with names.
  */
@@ -118,7 +118,7 @@ export class DemoSettingsController {
 }
 
 /**
- * A card's demo recordings (C-368, ADR-0089): every member lists them; an
+ * A card's demo recordings (C-368, ADR-0090): every member lists them; an
  * operator or above asks for one more with "Record again".
  */
 @Controller('projects/:projectId/board/cards/:number/demos')
@@ -153,7 +153,7 @@ export class CardDemosController {
 }
 
 /**
- * The runner's side of a demo (ADR-0089), with its runner token, never a
+ * The runner's side of a demo (ADR-0090), with its runner token, never a
  * session: it fetches the project's Demo env secrets for the `demoflow`
  * process and uploads the video it recorded. The token, the project's runner
  * and the demo's status are checked before a byte of the body is read.

@@ -62,7 +62,7 @@ export const sendAttachment = (
 };
 
 /**
- * ADR-0089: `sendAttachment` for a route that reads `Range` — 206 with
+ * ADR-0090: `sendAttachment` for a route that reads `Range` — 206 with
  * `Content-Range` for a range, 200 for the whole file, `Accept-Ranges` on
  * both. Written by hand: Nest's reply would set 200 over a 206.
  */
@@ -99,7 +99,7 @@ export const streamAttachment = async (
   }
 };
 
-/** ADR-0089: 416 for a `Range` past the end, with the file's size. */
+/** ADR-0090: 416 for a `Range` past the end, with the file's size. */
 export const sendUnsatisfiable = (
   res: Response,
   failure: AttachmentRangeFailure,

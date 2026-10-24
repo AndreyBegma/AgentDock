@@ -10,7 +10,7 @@ import { absolutePathSchema } from '../projects';
 import { cardIdSchema, cardShortIdSchema } from './cards';
 
 /**
- * Demo videos of finished cards (C-368, ADR-0089). `card.demo` asks the
+ * Demo videos of finished cards (C-368, ADR-0090). `card.demo` asks the
  * project's runner to record the card's DemoFlow scenario in the card's
  * worktree: the runner provisions DemoFlow itself (a pinned version through
  * npx, `demoflow setup` for Chromium), starts the app from the repository's

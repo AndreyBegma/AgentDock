@@ -1,6 +1,6 @@
 import { parseByteRange, UNSATISFIABLE } from './attachment-range';
 
-describe('parseByteRange (ADR-0089)', () => {
+describe('parseByteRange (ADR-0090)', () => {
   it('reads a closed, an open and a suffix range', () => {
     expect(parseByteRange('bytes=0-99', 1000)).toEqual({ start: 0, end: 99 });
     expect(parseByteRange('bytes=900-', 1000)).toEqual({

@@ -58,7 +58,7 @@ export class CsrfGuard implements CanActivate {
     return true;
   }
 
-  /** ADR-0089: a `@BearerBody()` route called with a bearer token. */
+  /** ADR-0090: a `@BearerBody()` route called with a bearer token. */
   private bearerBody(context: ExecutionContext, request: Request): boolean {
     const allowed = this.reflector.getAllAndOverride<boolean>(BEARER_BODY_KEY, [
       context.getHandler(),

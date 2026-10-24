@@ -8,7 +8,7 @@ export interface ByteRange {
 export const UNSATISFIABLE = 'unsatisfiable' as const;
 
 /**
- * ADR-0089: the one byte range a `Range` header asks of a file of `size`
+ * ADR-0090: the one byte range a `Range` header asks of a file of `size`
  * bytes, so a video player can seek. `null` serves the whole file with 200 —
  * no header, another unit, several ranges or a header that does not parse
  * (RFC 9110 lets a server ignore those). `unsatisfiable` is a well-formed

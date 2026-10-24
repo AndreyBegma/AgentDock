@@ -8,11 +8,11 @@ import { type AttachmentMime, isAttachmentVideo } from './types';
 /** D4: one file, in bytes (`too_large`) — every type but video. */
 export const ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
 
-/** ADR-0089 (amends ADR-0031 D4): one video, in bytes (`too_large`). */
+/** ADR-0090 (amends ADR-0031 D4): one video, in bytes (`too_large`). */
 export const ATTACHMENT_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 
 /**
- * ADR-0089: the largest upload of any type — what the upload stream is cut
+ * ADR-0090: the largest upload of any type — what the upload stream is cut
  * at, before its type is known. The type's own limit is checked after.
  */
 export const ATTACHMENT_UPLOAD_MAX_BYTES = Math.max(
@@ -20,13 +20,13 @@ export const ATTACHMENT_UPLOAD_MAX_BYTES = Math.max(
   ATTACHMENT_VIDEO_MAX_BYTES,
 );
 
-/** ADR-0089: the size limit of one file of type `mime`. */
+/** ADR-0090: the size limit of one file of type `mime`. */
 export const attachmentMaxBytes = (mime: AttachmentMime): number =>
   isAttachmentVideo(mime) ? ATTACHMENT_VIDEO_MAX_BYTES : ATTACHMENT_MAX_BYTES;
 
 /**
  * D4: attachments of one card, its rounds' feedback included (`too_many`).
- * ADR-0089: videos do not count.
+ * ADR-0090: videos do not count.
  */
 export const ATTACHMENTS_PER_CARD_MAX = 20;
 

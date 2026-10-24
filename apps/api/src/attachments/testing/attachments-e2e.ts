@@ -29,11 +29,11 @@ export const FILES = {
   html: bytes('<!doctype html><script>alert(1)</script>'),
   zip: bytes([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00]),
   elf: bytes([0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x00, 0x00]),
-  /** ADR-0089: `ftyp` at 4 with an allowlisted major brand. */
+  /** ADR-0090: `ftyp` at 4 with an allowlisted major brand. */
   mp4: bytes([0x00, 0x00, 0x00, 0x18], 'ftypisom', [0, 0, 2, 0], 'isommp42'),
-  /** ADR-0089: QuickTime is `ftyp` too, with a brand a browser cannot play. */
+  /** ADR-0090: QuickTime is `ftyp` too, with a brand a browser cannot play. */
   mov: bytes([0x00, 0x00, 0x00, 0x14], 'ftypqt  ', [0, 0, 2, 0], 'qt  '),
-  /** ADR-0089: the EBML magic, then the `webm` DocType. */
+  /** ADR-0090: the EBML magic, then the `webm` DocType. */
   webm: bytes(
     [0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 0x01, 0x42, 0x82, 0x84],
     'webm',

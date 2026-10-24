@@ -275,7 +275,7 @@ export const capabilitiesSchema = z.object({
    */
   prefixOverlays: z.boolean().optional(),
   /**
-   * ADR-0089: the runner records demo videos — `card.demo` provisions
+   * ADR-0090: the runner records demo videos — `card.demo` provisions
    * DemoFlow, records and uploads. `commands` lists `card.demo` on every
    * build (its handler answers `unsupported` before S-12 stage 2), so the API
    * sends it only when this is `true`. Absent means `false`.
@@ -342,7 +342,7 @@ export const cardStartBranchAvailable = (capabilities: Capabilities): boolean =>
 export const prefixOverlaysAvailable = (capabilities: Capabilities): boolean =>
   capabilities.tokenSaver === true && capabilities.prefixOverlays === true;
 
-/** Whether the API may send `card.demo` (ADR-0089); absent is `false`. */
+/** Whether the API may send `card.demo` (ADR-0090); absent is `false`. */
 export const cardDemoAvailable = (capabilities: Capabilities): boolean =>
   capabilities.cardDemo === true;
 

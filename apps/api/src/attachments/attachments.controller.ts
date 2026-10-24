@@ -108,7 +108,7 @@ export class AttachmentsController {
   }
 
   /**
-   * D8: the bytes, with the session cookie — never a public URL. ADR-0089:
+   * D8: the bytes, with the session cookie — never a public URL. ADR-0090:
    * one `Range` is answered with 206, so a video player can seek.
    */
   @Get(':id/content')

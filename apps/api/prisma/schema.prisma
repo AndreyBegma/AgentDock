@@ -3766,7 +3766,7 @@ model Attachment {
   name       String
   /// Detected from the content (D5), one of the shared `ATTACHMENT_MIMES`.
   mime       String
-  /// Bytes, at most 25 MiB; a video at most 100 MiB (ADR-0089).
+  /// Bytes, at most 25 MiB; a video at most 100 MiB (ADR-0090).
   size       Int
   /// Lower-case hex SHA-256 of the bytes.
   sha256     String
@@ -3781,7 +3781,7 @@ model Attachment {
   plan      Plan?                @relation(fields: [planId], references: [id], onDelete: SetNull)
   uploader  User?                @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
   assistant AssistantAttachment?
-  /// ADR-0089: the demo whose video this is.
+  /// ADR-0090: the demo whose video this is.
   demo      CardDemo?
 
   @@index([cardId, createdAt])
@@ -3819,13 +3819,13 @@ model BoardSettings {
   reviewEnabled          Boolean         @default(false)
   /// #862: mirror review findings as GitHub PR comments; opt-in.
   publishReviewComments  Boolean         @default(false)
-  /// C-368, ADR-0089: record a demo video of a finished card. Off for every
+  /// C-368, ADR-0090: record a demo video of a finished card. Off for every
   /// project until a person turns it on.
   demoVideosEnabled      Boolean         @default(false)
-  /// ADR-0089: globs of the paths that make a card's change a UI change —
+  /// ADR-0090: globs of the paths that make a card's change a UI change —
   /// shared `DEMO_UI_PATHS_DEFAULT`, at most `DEMO_UI_PATHS_MAX`.
   demoUiPaths            String[]        @default(["apps/web/**", "**/*.tsx", "**/*.css"])
-  /// ADR-0089: send a ready demo to the project's Telegram chats too.
+  /// ADR-0090: send a ready demo to the project's Telegram chats too.
   demoTelegram           Boolean         @default(true)
   updatedById            String?
   updatedAt              DateTime        @updatedAt
@@ -4560,9 +4560,9 @@ model BoardCardReviewRun {
   @@map("board_card_review_runs")
 }
 
-// ─── Demo videos (C-368, ADR-0089) ──────────────────────────────────────────
+// ─── Demo videos (C-368, ADR-0090) ──────────────────────────────────────────
 
-/// ADR-0089: one "Demo env" secret of a project — a value a demo scenario
+/// ADR-0090: one "Demo env" secret of a project — a value a demo scenario
 /// reads with `valueFrom.env`. The API returns names only; the runner fetches
 /// the values over HTTPS for a demo it records.
 model ProjectDemoSecret {
@@ -4598,7 +4598,7 @@ enum CardDemoTrigger {
   manual
 }
 
-/// ADR-0089: one demo recording of a card's round. A failed or skipped demo
+/// ADR-0090: one demo recording of a card's round. A failed or skipped demo
 /// is a warning on the card, never a gate on Finished or the merge. Lives as
 /// long as the card; its video is the card's attachment.
 model CardDemo {

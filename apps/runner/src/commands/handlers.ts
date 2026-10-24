@@ -170,7 +170,7 @@ const noPlanner = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve plans');
 };
 
-// ADR-0089: S-12 stage 2 records; until then the runner says so.
+// ADR-0090: S-12 stage 2 records; until then the runner says so.
 const noDemo = (): never => {
   throw new CommandFailure(
     'unsupported',

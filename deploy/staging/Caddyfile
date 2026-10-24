@@ -13,8 +13,17 @@
 :80 {
 	# Nothing above 10 MB reaches the API or web: Caddy answers 413 itself, so a
 	# large body cannot exhaust the upstreams (C-134, F-32).
-	request_body {
+	#
+	# ADR-0090: the runner's demo video upload, a raw body of at most 100 MiB,
+	# is the one exception. The API checks the runner token, the project's runner
+	# and the demo before it reads a byte, and streams the body to disk.
+	@demoVideo path_regexp ^/api/runner/cards/[0-9]+/demos/[A-Za-z0-9_-]+/video$
+	@bounded not path_regexp ^/api/runner/cards/[0-9]+/demos/[A-Za-z0-9_-]+/video$
+	request_body @bounded {
 		max_size 10MB
+	}
+	request_body @demoVideo {
+		max_size 100MiB
 	}
 
 	# TLS ends at Cloudflare, so HSTS is set here for the browser.

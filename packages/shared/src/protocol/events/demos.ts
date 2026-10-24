@@ -7,7 +7,7 @@ import {
 import { cardIdSchema } from '../commands/cards';
 
 /**
- * Demo recording events (C-368, ADR-0089). A recording outlives the
+ * Demo recording events (C-368, ADR-0090). A recording outlives the
  * `card.demo` command that started it, so its progress travels in the event
  * stream. `source: "runner"`; `data.projectId` repeats the envelope's project.
  *

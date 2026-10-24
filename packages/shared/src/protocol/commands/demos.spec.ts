@@ -14,7 +14,7 @@ const args = {
   env: ['DEMO_ADMIN_EMAIL', 'DEMO_ADMIN_PASSWORD'],
 };
 
-describe('card.demo (ADR-0089)', () => {
+describe('card.demo (ADR-0090)', () => {
   it('is in the allowlist and takes the typed args', () => {
     const parsed = parseCommand('card.demo', args);
     expect(parsed.ok).toBe(true);
@@ -46,7 +46,7 @@ describe('card.demo (ADR-0089)', () => {
   });
 });
 
-describe('demo.status (ADR-0089)', () => {
+describe('demo.status (ADR-0090)', () => {
   const base = {
     cardId: 'card_1',
     projectId: 'p1',

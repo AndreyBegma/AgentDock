@@ -105,7 +105,7 @@ export interface ClaimAttachmentsRequest {
  * (413 for `pending_exceeded`).
  */
 export const ATTACHMENT_REFUSAL = {
-  /** Over `attachmentMaxBytes` of its type (ADR-0089). */
+  /** Over `attachmentMaxBytes` of its type (ADR-0090). */
   tooLarge: 'too_large',
   /** Not in the allowlist by its content (D5). */
   unsupportedType: 'unsupported_type',
@@ -131,7 +131,7 @@ export const ATTACHMENT_ERROR = {
   attachmentError: 'attachment_error',
   /** 409: delete of an attachment on a card in Completed. */
   cardCompleted: 'card_completed',
-  /** ADR-0089: 416, a `Range` past the end of the file. */
+  /** ADR-0090: 416, a `Range` past the end of the file. */
   rangeNotSatisfiable: 'range_not_satisfiable',
 } as const;
 export type AttachmentErrorCode =

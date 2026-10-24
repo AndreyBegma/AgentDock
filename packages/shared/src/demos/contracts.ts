@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { cardLabel, cardSlug } from '../board/naming';
 
 /**
- * Demo videos of finished cards (C-368, ADR-0089). DemoFlow records a short
+ * Demo videos of finished cards (C-368, ADR-0090). DemoFlow records a short
  * video of a UI card on the project's runner; the video is a card attachment
  * and a `card_demos` row tracks each recording. A failed demo never blocks
  * Finished or a merge — it is a warning with its reason.

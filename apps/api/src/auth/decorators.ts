@@ -15,7 +15,7 @@ export const BEARER_BODY_KEY = 'auth:bearer-body';
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 /**
- * ADR-0089: a public route that authenticates with `Authorization: Bearer`
+ * ADR-0090: a public route that authenticates with `Authorization: Bearer`
  * and takes a body that is not JSON — the runner's demo video upload. With
  * that header the CSRF guard lets any content type through: a cross-site
  * form cannot set `Authorization`. Without it the route is refused like any

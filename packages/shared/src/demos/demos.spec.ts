@@ -9,7 +9,7 @@ import {
   runnerDemoVideoPath,
 } from './contracts';
 
-describe('demo contracts (ADR-0089)', () => {
+describe('demo contracts (ADR-0090)', () => {
   it('names the scenario after the card label and slug', () => {
     const path = demoScenarioPath({
       number: 412,

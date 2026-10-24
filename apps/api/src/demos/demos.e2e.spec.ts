@@ -30,7 +30,7 @@ const json = (value: unknown): string =>
 const sha256 = (body: Buffer): string =>
   createHash('sha256').update(body).digest('hex');
 
-describe('demo videos (e2e, C-368, ADR-0089)', () => {
+describe('demo videos (e2e, C-368, ADR-0090)', () => {
   const w = new BoardWorld();
   let previousKey: string | undefined;
 

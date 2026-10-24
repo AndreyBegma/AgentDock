@@ -34,7 +34,7 @@ export abstract class AttachmentStore {
   /** Moves a checked temporary file into place, atomically. */
   abstract put(projectId: string, id: string, tempPath: string): Promise<void>;
   /**
-   * The bytes — only `range`'s, inclusive, when given (ADR-0089); rejects
+   * The bytes — only `range`'s, inclusive, when given (ADR-0090); rejects
    * when the file is missing.
    */
   abstract open(

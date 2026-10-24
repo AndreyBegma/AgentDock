@@ -14,7 +14,7 @@ import {
 import { DemosSink } from './demos-sink';
 
 /**
- * Demo videos of finished cards (C-368, ADR-0089): the per-project settings
+ * Demo videos of finished cards (C-368, ADR-0090): the per-project settings
  * and Demo env secrets, a card's recordings, the runner's video upload and
  * secret fetch, and the `demo.status` sink. `AttachmentsService` comes from
  * the global `AttachmentsModule`; recording is the runner's (DemoFlow).

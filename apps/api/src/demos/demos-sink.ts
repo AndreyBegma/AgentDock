@@ -15,7 +15,7 @@ import {
 import { CardDemosService } from './card-demos.service';
 
 /**
- * Sink `demos` (C-368, ADR-0089): `demo.status` moves a card's demo while it
+ * Sink `demos` (C-368, ADR-0090): `demo.status` moves a card's demo while it
  * is queued or recording. A malformed event is logged and skipped.
  */
 @Injectable()

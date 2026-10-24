@@ -62,7 +62,7 @@ import { type ScannedUpload, scanBytes } from './upload-storage';
 type Db = PrismaService | Prisma.TransactionClient;
 
 /**
- * ADR-0089: the attachments a card's room counts and a worker gets — every
+ * ADR-0090: the attachments a card's room counts and a worker gets — every
  * one but a video. A worker cannot watch a video, and up to 100 MiB of it
  * would slow every round's download.
  */
@@ -148,7 +148,7 @@ export interface AttachmentContent {
   mime: AttachmentMime;
   /** The whole file's bytes. */
   size: number;
-  /** `range`'s bytes when one is set (ADR-0089), else the whole file. */
+  /** `range`'s bytes when one is set (ADR-0090), else the whole file. */
   stream: Readable;
   range?: ByteRange;
 }
@@ -232,7 +232,7 @@ export class AttachmentsService {
   }
 
   /**
-   * D5, ADR-0089: the type an upload is stored with, from its content, and
+   * D5, ADR-0090: the type an upload is stored with, from its content, and
    * within that type's size limit.
    */
   mimeOfUpload(file: UploadedAttachment): AttachmentMime {
@@ -321,7 +321,7 @@ export class AttachmentsService {
   }
 
   /**
-   * ADR-0089: a demo video the runner uploaded, stored straight onto its card
+   * ADR-0090: a demo video the runner uploaded, stored straight onto its card
    * inside the caller's transaction — no uploader, never pending. Only a video
    * by its content, within the video limit and the project's quota. The
    * caller removes `file.path` whatever happens.
@@ -357,7 +357,7 @@ export class AttachmentsService {
     return created;
   }
 
-  /** D4, ADR-0089: over the type's limit — or, unknown, the largest of any. */
+  /** D4, ADR-0090: over the type's limit — or, unknown, the largest of any. */
   tooLarge(mime?: AttachmentMime): AttachmentFailure {
     const max =
       mime === undefined
@@ -373,7 +373,7 @@ export class AttachmentsService {
   /**
    * `GET …/content` (D8): any member reads a claimed attachment; a pending
    * one is its uploader's alone until a card claims it. An Inbox card's is
-   * only an operator's (#244 D8). ADR-0089: `range` — the `Range` header —
+   * only an operator's (#244 D8). ADR-0090: `range` — the `Range` header —
    * reads one byte range of it, so a video player can seek.
    */
   async content(
@@ -709,7 +709,7 @@ export class AttachmentsService {
   }
 
   /**
-   * ADR-0089: how many of `ids` count toward a card's room — every one but a
+   * ADR-0090: how many of `ids` count toward a card's room — every one but a
    * video.
    */
   private counted(ids: readonly string[], db: Db): Promise<number> {
@@ -720,7 +720,7 @@ export class AttachmentsService {
 
   /**
    * D4: at most `ATTACHMENTS_PER_CARD_MAX` on a card, its rounds' included.
-   * ADR-0089: videos do not count.
+   * ADR-0090: videos do not count.
    */
   private async assertRoom(
     cardId: string | null,
@@ -757,7 +757,7 @@ export class AttachmentsService {
   /**
    * D9: what a card will hold once `claimIds` — already checked with
    * `assertClaimable` — are claimed onto it, in upload order: what the worker
-   * gets, so never a video (ADR-0089).
+   * gets, so never a video (ADR-0090).
    */
   async withClaim(
     cardId: string,

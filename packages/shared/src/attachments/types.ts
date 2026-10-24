@@ -21,7 +21,7 @@ export const ATTACHMENT_TEXT_MIMES = [
 ] as const;
 
 /**
- * ADR-0089 (amends ADR-0031 §5): demo videos, recorded by DemoFlow on the
+ * ADR-0090 (amends ADR-0031 §5): demo videos, recorded by DemoFlow on the
  * runner. Each has its own size limit (`attachmentMaxBytes`) and does not
  * count toward `ATTACHMENTS_PER_CARD_MAX`.
  */
@@ -57,7 +57,7 @@ export const isAttachmentMime = (value: string): value is AttachmentMime =>
 
 const VIDEO_MIMES: ReadonlySet<string> = new Set(ATTACHMENT_VIDEO_MIMES);
 
-/** ADR-0089: a demo video type — its own size limit, outside the per-card count. */
+/** ADR-0090: a demo video type — its own size limit, outside the per-card count. */
 export const isAttachmentVideo = (
   value: string,
 ): value is AttachmentVideoMime => VIDEO_MIMES.has(value);
@@ -89,7 +89,7 @@ const contains = (
 };
 
 /**
- * ADR-0089: the ISO base media major brands of an MP4 a browser plays. A
+ * ADR-0090: the ISO base media major brands of an MP4 a browser plays. A
  * brand list, not just `ftyp`, so HEIC, AVIF and QuickTime files — `ftyp`
  * too — stay refused.
  */
@@ -216,7 +216,7 @@ const INLINE: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * D8: raster images and (ADR-0089) demo videos are served `inline`;
+ * D8: raster images and (ADR-0090) demo videos are served `inline`;
  * everything else as `attachment`, with `Content-Security-Policy: sandbox`.
  */
 export const attachmentDisposition = (

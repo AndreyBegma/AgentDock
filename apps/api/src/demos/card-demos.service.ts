@@ -89,7 +89,7 @@ export interface DemoVideoUpload {
 const SHA256 = /^[a-f0-9]{64}$/;
 
 /**
- * A card's demo recordings (C-368, ADR-0089): the list any member reads,
+ * A card's demo recordings (C-368, ADR-0090): the list any member reads,
  * "Record again" (operator and above), the runner's video upload and secret
  * fetch, and the `demo.status` events that move a demo. A demo moves only
  * while it is queued or recording, so a late event or a second upload never

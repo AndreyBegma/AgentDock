@@ -38,7 +38,7 @@ export const demoSecretName = (value: string): string => {
 
 /**
  * A project's Demo videos settings and its Demo env secrets (C-368,
- * ADR-0089). Any member reads them; a project admin writes them. A secret's
+ * ADR-0090). Any member reads them; a project admin writes them. A secret's
  * value is sealed with `APP_ENCRYPTION_KEY` and never returned — every route
  * answers with names. Every write is audited, never with a value.
  */

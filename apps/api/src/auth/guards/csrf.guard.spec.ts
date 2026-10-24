@@ -42,7 +42,7 @@ const statusOf = (guard: CsrfGuard, context: ExecutionContext): number => {
   }
 };
 
-describe('CsrfGuard (ADR-0089 @BearerBody)', () => {
+describe('CsrfGuard (ADR-0090 @BearerBody)', () => {
   const guard = new CsrfGuard(new Reflector());
 
   it('lets a @BearerBody route take a raw body with a bearer token', () => {

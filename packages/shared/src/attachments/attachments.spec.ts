@@ -63,7 +63,7 @@ describe('limits (#309 D4)', () => {
     expect(ATTACHMENTS_PROJECT_QUOTA_DEFAULT_BYTES).toBe(1_073_741_824);
   });
 
-  it('ADR-0089: a video may be 100 MiB, every other type 25 MiB', () => {
+  it('ADR-0090: a video may be 100 MiB, every other type 25 MiB', () => {
     expect(ATTACHMENT_VIDEO_MAX_BYTES).toBe(104_857_600);
     expect(ATTACHMENT_UPLOAD_MAX_BYTES).toBe(ATTACHMENT_VIDEO_MAX_BYTES);
     expect(attachmentMaxBytes('video/mp4')).toBe(ATTACHMENT_VIDEO_MAX_BYTES);
@@ -141,7 +141,7 @@ describe('detectAttachmentMime — the allowlist by content (#309 D5)', () => {
     expect(detectAttachmentMime(WEBM.slice(0, 4), 'x.webm')).toBeNull();
   });
 
-  it('ADR-0089: detects MP4 and WebM by signature, whatever the name', () => {
+  it('ADR-0090: detects MP4 and WebM by signature, whatever the name', () => {
     expect(detectAttachmentMime(MP4, 'demo.mp4')).toBe('video/mp4');
     expect(detectAttachmentMime(ftyp('mp42'), 'demo.bin')).toBe('video/mp4');
     expect(detectAttachmentMime(ftyp('avc1'), 'demo')).toBe('video/mp4');
@@ -149,7 +149,7 @@ describe('detectAttachmentMime — the allowlist by content (#309 D5)', () => {
     expect(detectAttachmentMime(WEBM, 'demo.txt')).toBe('video/webm');
   });
 
-  it('ADR-0089: refuses HEIC, AVIF, QuickTime and Matroska that is not WebM', () => {
+  it('ADR-0090: refuses HEIC, AVIF, QuickTime and Matroska that is not WebM', () => {
     expect(detectAttachmentMime(ftyp('heic'), 'photo.mp4')).toBeNull();
     expect(detectAttachmentMime(ftyp('avif'), 'pic.mp4')).toBeNull();
     expect(detectAttachmentMime(ftyp('qt  '), 'clip.mp4')).toBeNull();
@@ -198,7 +198,7 @@ describe('attachmentDisposition (#309 D8)', () => {
     expect(attachmentDisposition('text/plain')).toBe('attachment');
   });
 
-  it('ADR-0089: names a video as one', () => {
+  it('ADR-0090: names a video as one', () => {
     expect(isAttachmentVideo('video/mp4')).toBe(true);
     expect(isAttachmentVideo('video/webm')).toBe(true);
     expect(isAttachmentVideo('image/png')).toBe(false);

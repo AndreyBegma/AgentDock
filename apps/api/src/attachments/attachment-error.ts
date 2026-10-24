@@ -40,7 +40,7 @@ export const attachmentNotFound = (): AttachmentFailure =>
   new AttachmentFailure(404, ATTACHMENT_ERROR.notFound, 'Attachment not found');
 
 /**
- * ADR-0089: 416 — a `Range` no byte of the file satisfies. The route sends
+ * ADR-0090: 416 — a `Range` no byte of the file satisfies. The route sends
  * `Content-Range: bytes *` with the file's `size`.
  */
 export class AttachmentRangeFailure extends AttachmentFailure {

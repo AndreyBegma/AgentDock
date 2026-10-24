@@ -245,7 +245,7 @@ describe('attachments (e2e, #309)', () => {
       }
     });
 
-    it('answers one Range with 206 and Content-Range, past the end with 416 (ADR-0089)', async () => {
+    it('answers one Range with 206 and Content-Range, past the end with 416 (ADR-0090)', async () => {
       const text = await uploaded(w, 'trace.log', FILES.text);
       const whole = await content(text.id);
       expect(whole.status).toBe(200);
@@ -280,7 +280,7 @@ describe('attachments (e2e, #309)', () => {
     });
   });
 
-  describe('videos (ADR-0089)', () => {
+  describe('videos (ADR-0090)', () => {
     it('stores an MP4 and a WebM by their content, whatever the name', async () => {
       const mp4 = await uploaded(w, 'clip.bin', FILES.mp4);
       expect(mp4.mime).toBe('video/mp4');
