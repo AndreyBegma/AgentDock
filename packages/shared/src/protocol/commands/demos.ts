@@ -25,8 +25,9 @@ import { cardIdSchema, cardShortIdSchema } from './cards';
  * checked against the watched project, the worktree is derived from
  * `shortId`, and `scenario` is repository-relative under `demoflow/cards/`.
  *
- * The runner's handler answers `unsupported` until it records (S-12 stage 2);
- * the API sends the command only to a runner that advertises it.
+ * The API sends the command (C-370, ADR-0095) when a feature card's green PR
+ * touches the project's `demoUiPaths`, and on "Record again" — only to a
+ * connected runner that advertises it; otherwise the demo is `skipped`.
  */
 
 /** The command returns once the recording is queued on the runner. */

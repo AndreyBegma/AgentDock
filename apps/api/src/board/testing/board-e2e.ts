@@ -4,6 +4,7 @@ import type {
   IssueCreateArgs,
   RunnerEvent,
 } from '@nautelle/shared/protocol';
+import { DemoRunner } from '../../demos/demo-runner';
 import { seedProject } from '../../fleet/testing/fleet-e2e';
 import { RunnerConnectHooks } from '../../runners/runner-connect-hooks';
 import { RunnerEventSinks } from '../../runners/runner-event-sinks';
@@ -30,6 +31,7 @@ type WorldCommand =
   | CardCommandName
   | 'card.checks'
   | 'card.ciRetrigger'
+  | 'card.demo'
   | 'card.prClose'
   | 'card.prRetarget'
   | 'card.prOpen'
@@ -102,6 +104,8 @@ export class BoardWorld {
   ctx!: E2eContext;
   commands!: BoardCommands;
   work!: BoardWork;
+  /** C-370: `card.demo` goes through it; `handlers['card.demo']` answers. */
+  demoRunner!: DemoRunner;
   sinks!: RunnerEventSinks;
   runnerId!: string;
   a!: string;
@@ -143,6 +147,7 @@ export class BoardWorld {
     this.ctx = await create();
     this.commands = this.ctx.app.get(BoardCommands);
     this.work = this.ctx.app.get(BoardWork);
+    this.demoRunner = this.ctx.app.get(DemoRunner);
     this.sinks = this.ctx.app.get(RunnerEventSinks);
     const real = this.commands.assertReady.bind(this.commands);
     jest
@@ -259,6 +264,21 @@ export class BoardWorld {
         this.commands.assertReady(runnerId, 'pr.inspect');
         return this.answer('pr.inspect', { ...args });
       });
+    // C-370: an offline runner, or one that does not serve `card.demo`
+    // (`unserved`), cannot take a demo.
+    jest.spyOn(this.demoRunner, 'unavailable').mockImplementation(async () => {
+      if (this.offline) return 'The runner is offline';
+      if (this.unserved.has('card.demo')) {
+        return 'The runner does not record demos; update it';
+      }
+      return null;
+    });
+    jest
+      .spyOn(this.demoRunner, 'record')
+      .mockImplementation(
+        async (_runnerId, args) =>
+          this.answer('card.demo', { ...args }) as never,
+      );
   }
 
   private answer(
@@ -271,6 +291,7 @@ export class BoardWorld {
       'pr.inspect': prInspection(),
       'card.checks': cardChecks(),
       'card.ciRetrigger': { retriggered: true },
+      'card.demo': { status: 'queued' },
       'card.prRetarget': { retargeted: true, alreadyThere: false },
       'card.prOpen': {
         opened: true,
@@ -346,6 +367,7 @@ export class BoardWorld {
     jest.mocked(this.commands.review).mockClear();
     jest.mocked(this.commands.stopReview).mockClear();
     jest.mocked(this.commands.publishReview).mockClear();
+    jest.mocked(this.demoRunner.record).mockClear();
     this.handlers = {};
     this.reviewServed = true;
     this.offline = false;
@@ -436,6 +458,13 @@ export class BoardWorld {
       .mocked(this.commands.send)
       .mock.calls.filter(([, n]) => n === name)
       .map(([, , args]) => args as Record<string, unknown>);
+  }
+
+  /** C-370: the `card.demo` commands sent, oldest first. */
+  demosSent(): Record<string, unknown>[] {
+    return jest
+      .mocked(this.demoRunner.record)
+      .mock.calls.map(([, args]) => args as unknown as Record<string, unknown>);
   }
 
   /** #379: the `docs.publish_specs` commands sent, oldest first. */

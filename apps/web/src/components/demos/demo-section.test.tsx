@@ -20,6 +20,7 @@ const demo = (over: Partial<CardDemoView> = {}): CardDemoView => ({
   createdAt: '2026-10-24T10:00:00.000Z',
   startedAt: '2026-10-24T10:00:05.000Z',
   finishedAt: '2026-10-24T10:01:00.000Z',
+  outdated: false,
   ...over,
 });
 
@@ -50,6 +51,14 @@ describe('Demo section states (C-371)', () => {
       'href="https://github.com/o/r/blob/card/c7-thing/demoflow/cards/C-7-thing.demo.json"',
     );
     expect(html).toContain('Ready');
+  });
+
+  test('a ready demo of an older head reads Outdated, and still plays', () => {
+    const html = render([demo({ outdated: true })]);
+    expect(html).toContain('Outdated');
+    expect(html).toContain('This demo is outdated.');
+    expect(html).toContain('<video');
+    expect(html).not.toContain('>Ready<');
   });
 
   test('a recording in flight shows Recording… and no player, and Record again is disabled', () => {

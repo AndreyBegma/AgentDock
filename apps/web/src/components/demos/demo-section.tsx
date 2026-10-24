@@ -42,11 +42,15 @@ function demoFacts(demo: CardDemoView): string {
     .join(' · ');
 }
 
+/** A ready demo of a head the card's PR has moved past (C-370). */
+const isStale = (demo: CardDemoView): boolean =>
+  demo.outdated && demo.status === 'ready';
+
 export function DemoStatusPill({ demo }: { demo: CardDemoView }) {
   return (
     <StatusPill
-      status={DEMO_PILL_STATUS[demo.status]}
-      label={DEMO_STATUS_LABEL[demo.status]}
+      status={isStale(demo) ? 'idle' : DEMO_PILL_STATUS[demo.status]}
+      label={isStale(demo) ? 'Outdated' : DEMO_STATUS_LABEL[demo.status]}
     />
   );
 }
@@ -66,6 +70,9 @@ export function demoPlaceholder(demo: CardDemoView): string {
 function demoDescription(demo: CardDemoView): string {
   if (isDemoActive(demo.status)) {
     return "DemoFlow is walking the change on the project's runner.";
+  }
+  if (isStale(demo)) {
+    return 'The pull request has a newer commit than this video shows.';
   }
   if (demo.status === 'ready') {
     return 'Recorded on the runner when the checks turned green. Watch it before you merge.';
@@ -197,6 +204,13 @@ export function DemoPanel({
       }
     >
       <div className="flex min-w-0 flex-col gap-4">
+        {isStale(shown) ? (
+          <Banner tone="warn" title="This demo is outdated.">
+            It shows an earlier commit of the pull request. Record again to see
+            the current one.
+          </Banner>
+        ) : null}
+
         {shown.status === 'ready' && shown.contentUrl ? (
           <VideoPlayer
             key={shown.id}

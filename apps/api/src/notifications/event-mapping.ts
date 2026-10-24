@@ -1,6 +1,7 @@
 import {
   blockingDialogText,
   CARD_BACKGROUND_STALLED_EVENT,
+  CARD_DEMO_EVENT,
   CARD_FINISHED_EVENT,
   CARD_WAITING_EVENT,
   CARDS_SUGGESTED_EVENT,
@@ -317,6 +318,38 @@ export const draftFor = (event: MatchableEvent): NotificationDraft | null => {
         issue: null,
         title: cardBackgroundStalledTitle(number, minutes),
         body: 'Its worker ended its turn waiting on a background task that has not finished. Check the task in its session.',
+        page: 'board',
+        card: number,
+      };
+    }
+    // C-372: only the API records it, while the project's `demoTelegram` is
+    // on. The Telegram message carries the video; the draft names the card.
+    case CARD_DEMO_EVENT: {
+      if (event.source !== API_EVENT_SOURCE) return null;
+      const number = positiveInt(data.number);
+      if (!number) return null;
+      const title = oneLine(data.title, 120);
+      const card = title
+        ? `${cardLabel(number)} "${title}"`
+        : `Card ${cardLabel(number)}`;
+      if (data.status === 'failed') {
+        return {
+          kind: 'card.demo',
+          slot: null,
+          issue: null,
+          title: `The demo of ${card} failed`,
+          body: oneLine(data.reason) ?? 'The recording did not finish.',
+          page: 'board',
+          card: number,
+        };
+      }
+      if (data.status !== 'ready') return null;
+      return {
+        kind: 'card.demo',
+        slot: null,
+        issue: null,
+        title: `The demo of ${card} is ready`,
+        body: 'Watch it, then merge it or send feedback.',
         page: 'board',
         card: number,
       };

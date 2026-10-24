@@ -12,6 +12,7 @@ import {
   TelegramClient,
   type TelegramReplyMarkup,
 } from './telegram-client';
+import { TelegramDemoService } from './telegram-demo.service';
 import { TELEGRAM_OPTIONS, type TelegramOptions } from './telegram-options';
 import { TelegramSessionMessageService } from './telegram-session-message.service';
 
@@ -75,6 +76,7 @@ export class TelegramDeliveryService {
     private readonly actionRequests: TelegramActionRequestService,
     private readonly sessions: TelegramSessionMessageService,
     private readonly cards: TelegramCardService,
+    private readonly demos: TelegramDemoService,
     @Inject(TELEGRAM_OPTIONS) private readonly options: TelegramOptions,
   ) {}
 
@@ -88,8 +90,42 @@ export class TelegramDeliveryService {
     const bot = await this.tokens.read();
     if (!bot.ok) return pass;
     const claim = await this.ledger.claim(now);
+    // C-372: each demo video is uploaded once a pass, then sent by file_id.
+    const uploaded = new Map<string, string>();
 
     for (const message of claim.messages) {
+      if (message.content.kind === 'card.demo') {
+        try {
+          // C-372: the demo itself; the plain notification when it cannot be.
+          const sent = await this.demos.deliver(
+            bot.token,
+            message.chatId,
+            message.notificationId,
+            message.content,
+            uploaded,
+          );
+          if (sent === 'sent') {
+            await this.ledger.markSent(message.id, now);
+            pass.sent += 1;
+            continue;
+          }
+          if (sent === 'outdated') {
+            // Never retried: a newer head or demo has its own message.
+            await this.ledger.markFailed(
+              message.id,
+              'The demo no longer shows the PR',
+              { permanent: true },
+              now,
+            );
+            continue;
+          }
+        } catch (error) {
+          if (await this.messageFailed(pass, message.id, error, now)) {
+            return pass;
+          }
+          continue;
+        }
+      }
       // D12: a PR awaiting approval goes out with the buttons when its head is known.
       const offer =
         message.content.kind === 'pr.awaiting_approval'
@@ -135,13 +171,9 @@ export class TelegramDeliveryService {
         await this.ledger.markSent(message.id, now);
         pass.sent += 1;
       } catch (error) {
-        pass.stopped = this.stopReason(error);
-        if (pass.stopped === 'token_rejected') return pass;
-        const { message: reason, options } = failure(error);
-        this.logger.warn(`Telegram delivery ${message.id} failed: ${reason}`);
-        await this.ledger.markFailed(message.id, reason, options, now);
-        pass.failed += 1;
-        if (pass.stopped) return pass;
+        if (await this.messageFailed(pass, message.id, error, now)) {
+          return pass;
+        }
       }
     }
 
@@ -172,6 +204,22 @@ export class TelegramDeliveryService {
       }
     }
     return pass;
+  }
+
+  /** Records a message's failed send; true when the pass stops. */
+  private async messageFailed(
+    pass: DeliveryPass,
+    id: string,
+    error: unknown,
+    now: Date,
+  ): Promise<boolean> {
+    pass.stopped = this.stopReason(error);
+    if (pass.stopped === 'token_rejected') return true;
+    const { message: reason, options } = failure(error);
+    this.logger.warn(`Telegram delivery ${id} failed: ${reason}`);
+    await this.ledger.markFailed(id, reason, options, now);
+    pass.failed += 1;
+    return pass.stopped !== null;
   }
 
   private stopReason(error: unknown): DeliveryPass['stopped'] {

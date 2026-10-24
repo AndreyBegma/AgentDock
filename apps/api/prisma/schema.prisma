@@ -4606,6 +4606,9 @@ model CardDemo {
   cardId        String
   /// The card round whose head it records.
   round         Int
+  /// C-370: the PR head it records, 40 hex; null before C-370 or when unknown.
+  /// One `auto` demo per head: a poll never queues a second one.
+  headSha       String?
   status        CardDemoStatus  @default(queued)
   trigger       CardDemoTrigger
   /// Why it failed or was skipped, at most `DEMO_REASON_MAX` characters.

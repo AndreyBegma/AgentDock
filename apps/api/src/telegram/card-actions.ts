@@ -2,6 +2,7 @@ import {
   BOARD_ERROR,
   type BoardCardDetail,
   type CardCollectOutcome,
+  type CardPrTarget,
   type CardPullRequestView,
   type CardReviewAction,
   cardLabel,
@@ -144,9 +145,29 @@ export const parseCardPrompt = (
   return { action: match[1] as ReplyAction, card: match[2] };
 };
 
+/**
+ * Where Accept and merge merges the PR (ADR-0064, #636): the dependency's
+ * branch for a card stacked on it, said with what follows; else the project
+ * base. `null` when neither is known.
+ */
+const mergeTarget = (
+  target: CardPrTarget | null,
+  baseBranch: string | null,
+): { into: string | null; note: string | null } => {
+  if (!target) return { into: baseBranch, note: null };
+  if (!target.stackedOn) return { into: target.branch, note: null };
+  const { label, merged } = target.stackedOn;
+  return {
+    into: `${label}'s branch (${target.branch})`,
+    note: merged
+      ? `${label}'s own pull request has already merged, so Nautelle moves this one onto the base before it merges.`
+      : `Its work reaches the base when ${label}'s pull request merges.`,
+  };
+};
+
 /** The confirm step of Accept: what it does, and its buttons. */
 export const acceptConfirm = (
-  card: Pick<BoardCardDetail, 'label' | 'source' | 'prNumber'> & {
+  card: Pick<BoardCardDetail, 'label' | 'source' | 'prNumber' | 'prTarget'> & {
     shortId: string;
     baseBranch: string | null;
   },
@@ -177,10 +198,12 @@ export const acceptConfirm = (
   const title = `Accept ${card.label}?`;
   const moves = 'and moves the card to Completed.';
   if (card.source !== 'fleet' && pr?.state === 'open' && pr.canMerge) {
+    const target = mergeTarget(card.prTarget, card.baseBranch);
     return {
       text: [
         title,
-        `This merges PR #${pr.number}${card.baseBranch ? ` into ${card.baseBranch}` : ''} ${moves}`,
+        `This merges PR #${pr.number}${target.into ? ` into ${target.into}` : ''} ${moves}`,
+        ...(target.note ? [target.note] : []),
       ].join('\n'),
       keyboard: [
         [cancel, merge('Accept and merge', pr.headSha)],
@@ -290,6 +313,9 @@ const MERGE_REFUSED: Record<string, string> = {
     'The pull request has new commits since this message. Tap Accept again to see them.',
   not_mergeable: 'GitHub cannot merge the pull request as it is.',
   closed: 'The pull request is closed.',
+  // #709: the same words as the web's.
+  base_merged:
+    'The pull request goes into a dependency branch whose own pull request has already merged, and it could not be moved onto the base. Retarget it on GitHub first.',
 };
 
 /** A Board service's refusal, in the bot's words; its own message is not echoed. */
