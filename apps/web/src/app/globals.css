@@ -2,6 +2,7 @@
 @import "@andrewbehma/glass-ui/tokens.css";
 @import "@andrewbehma/glass-ui/material.css";
 @import "@andrewbehma/glass-ui/base.css";
+@import "luna-player/player.css";
 
 /* Code, ids, hashes and commands: JetBrains Mono, injected by `next/font` in
    the root layout. glass-ui defines no mono stack of its own. Unlayered, so it

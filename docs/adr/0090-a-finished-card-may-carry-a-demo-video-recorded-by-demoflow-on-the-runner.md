@@ -66,6 +66,10 @@ The decisions below were settled with the person on 2026-10-24.
    and `Content-Range` (416 past the end), so a player can seek.
 7. **Playback.** The web app plays a demo with luna-player, falling back to a
    native `<video>` element.
+   *Amendment (C-382):* luna-player 0.2.0 ships `<Player>`, so Luna is now
+   used (`luna-player/player`, imported dynamically; `luna-player/hls` is not
+   imported, because demos are progressive MP4/WebM). The native element stays
+   the fallback when Luna fails to load or reports a playback error.
 8. **A failed demo never blocks.** Finished and merge never wait for a demo.
    A failed or skipped demo shows as a warning with its reason, next to the
    card's other facts. It is a step after CI and review, not a gate in the
