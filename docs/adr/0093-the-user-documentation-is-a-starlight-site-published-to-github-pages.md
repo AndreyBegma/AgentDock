@@ -76,3 +76,11 @@ product pitch with contributor setup and internal staging details.
 - Links that pointed at the install and Kubernetes guides in `docs/guides/`,
   including the Helm chart's comments and `deploy/README.md`, point at the
   site.
+
+## Update — 2026-10-24
+
+The docs step pushes `gh-pages` with the existing `github_release_token`
+secret (contents write on this repository, tag event only) instead of a
+`pages_token` of its own: one token with the same scope and the same event
+restriction, and one secret less to create and rotate. Read `pages_token` in
+decision 4 and in the consequences as `github_release_token`.
