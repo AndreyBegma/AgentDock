@@ -51,6 +51,7 @@ import { TerminalSetupModule } from './terminal-setup';
 import { TextModule } from './text';
 import { TokenEconomyModule } from './token-economy';
 import { TokenSaverModule } from './token-saver';
+import { UpdatesModule } from './updates/updates.module';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks';
 import { WorkModule } from './work';
@@ -148,6 +149,8 @@ import { WorkflowsModule } from './workflows';
     SummariesModule,
     // #660: Ask the Board and triage hints.
     BoardAiModule,
+    // C-374: the daily check for a newer Nautelle release (ADR-0090).
+    UpdatesModule,
   ],
   controllers: [HealthController],
 })
