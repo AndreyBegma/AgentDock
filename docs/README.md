@@ -17,6 +17,7 @@ decision (`adr/`) in the same pull request that makes it.
 | [`adr/`](adr/) | architecture decision records, numbered, never rewritten — superseded |
 | [`specs/`](specs/) | one specification per issue, `<issue>-<slug>.md` (`orchestrator.specDir`) |
 | [`ui/`](ui/) | [glass-ui usage and gaps](ui/glass-ui.md), [screens](ui/screens.md) |
+| [`guides/`](guides/) | how to run and work on Nautelle: [install](https://andreybegma.github.io/Nautelle/getting-started/install/), [versioning and upgrades](guides/versioning.md), [agent rules](guides/agent-rules.md) |
 | [`releases/`](releases/) | one note per product release, `vX.Y.Z.md`, and the [index](releases/README.md) (ADR-0071) |
 | [`research/`](research/) | surveys that inform decisions, e.g. the [token-saving survey](research/token-saving-survey.md) |
 | [`plugin/`](plugin/) | [changes Nautelle needs in code-sentinel](plugin/code-sentinel-changes.md) |

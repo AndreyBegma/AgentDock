@@ -12,6 +12,8 @@ out/
 
 # Runner release assets (apps/runner/scripts/build-release.sh)
 apps/runner/release/
+# Image digests and the GitHub Release body (deploy/images/release-images.sh)
+.release/
 
 # Turbo
 .turbo/

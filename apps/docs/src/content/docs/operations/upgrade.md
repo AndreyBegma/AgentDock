@@ -38,6 +38,13 @@ docker compose up -d
 release is not supported once a newer one has migrated the database: restore
 the [backup](../backup/) you took before the upgrade instead.
 
+Read a release's notes before you skip a minor version: the
+[versioning policy](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/guides/versioning.md)
+says what a release may break and which upgrades are supported. Every release
+lists its image digests and how to check them: the images are signed with
+cosign and carry an SBOM and build provenance
+([ADR-0091](https://github.com/AndreyBegma/Nautelle/blob/develop/docs/adr/0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md)).
+
 ## Before you upgrade
 
 Take a [backup](../backup/). A migration cannot be undone by starting the

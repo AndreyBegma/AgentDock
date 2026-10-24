@@ -332,14 +332,16 @@ git fetch origin main --quiet
 SHA=$(gh pr view <N> --repo AndreyBegma/Nautelle --json mergeCommit --jq .mergeCommit.oid)
 git tag -a vX.Y.Z "$SHA" -m "Nautelle vX.Y.Z"
 git push origin vX.Y.Z
-gh release create vX.Y.Z --repo AndreyBegma/Nautelle --verify-tag \
-  --title "Nautelle vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md --latest=false
 ```
 
-`--latest=false` keeps the runner's release as the repository's latest, which
-is what a person downloading the runner from the releases page expects. A
-`vX.Y.Z` tag triggers no pipeline (the release pipeline matches `runner-v*`
-only).
+Do not create the GitHub Release yourself. The tag runs
+`.woodpecker/release-images.yml` (ADR-0091): it builds, pushes and signs the
+images for amd64 and arm64, then creates the `vX.Y.Z` release as the
+repository's latest, with the "Summary" and "What changed" sections of
+`docs/releases/vX.Y.Z.md`, the install command, the image digests and the
+runner version. So the note must have both sections before the tag. Tell the
+person the pipeline is running; when it fails, report the failing step and
+leave the tag as it is: a re-run of the pipeline resumes.
 
 Never move or delete a pushed tag. A wrong release is followed by a new
 PATCH release.

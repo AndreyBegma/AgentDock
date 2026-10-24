@@ -13,8 +13,8 @@ ones:
 
 ## Server
 
-- A Linux host on **amd64** (x86-64). The published images are amd64 only for
-  now.
+- A Linux host on **amd64** (x86-64) or **arm64**. The published images are
+  multi-arch.
 - **Docker** with **Docker Compose 2.24** or newer, and a user that can run
   `docker` (root, or a member of the `docker` group). The install checks both.
 - `curl` or `wget`, to fetch the install script.

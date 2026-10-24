@@ -16,6 +16,7 @@ once you configure the feature.
 | Destination | When | What |
 |---|---|---|
 | `registry.npmjs.org` | Once an hour | Reads the latest released `nautelle-runner` version, to tell you when a runner is behind. Sends nothing about your install. |
+| GitHub (`api.github.com`) | Once a day | Reads the latest Nautelle release, to tell administrators when a newer one is out. Sends nothing about your install. Set `NAUTELLE_UPDATE_CHECK=false` in `api.env` to turn it off. |
 | GitHub (`api.github.com`) | Once a GitHub App is registered | Reads issues, pull requests and checks of the connected repositories. GitHub delivers webhooks to your server. |
 | Telegram (`api.telegram.org`) | Once a Telegram bot is set up | The messages the bot sends and receives. |
 | An AI provider (Anthropic, OpenAI, xAI, OpenRouter) | Once an administrator adds a provider key | The text of the assistant features you use: board search, triage hints, digests and summaries. |
