@@ -6,6 +6,7 @@ import type {
   OrchestratorPermissionMode,
 } from '@nautelle/shared/protocol';
 import type { ConfigProfile } from '../config';
+import { demoflowMcpConfig } from '../demos/pin';
 import { type TokenSaverLaunch, tokenSaverLaunch } from '../launch/token-saver';
 import { SESSION_TOKEN_ENV } from '../local/session-tokens';
 import { CARD_ESCALATE_ENV } from '../mcp/tools';
@@ -77,7 +78,7 @@ export const cardSessionFlags = (session: CardSession): string[] =>
 export const cardArgv = (
   profile: ConfigProfile,
   args: Pick<CardRunArgs, 'session' | 'model' | 'permissionMode' | 'prompt'> &
-    Partial<Pick<CardRunArgs, 'effort'>>,
+    Partial<Pick<CardRunArgs, 'effort' | 'demo'>>,
   wiring?: CardWiringFiles,
   tokenSaver?: TokenSaverLaunch | null,
 ): { binary: string; args: string[] } => ({
@@ -94,6 +95,9 @@ export const cardArgv = (
       : wiring
         ? ['--settings', wiring.settings, '--mcp-config', wiring.mcp]
         : []),
+    // C-369: DemoFlow's MCP server, inline. `--mcp-config` adds to the
+    // configs before it, so it joins Token saver's strict set as well.
+    ...(args.demo ? ['--mcp-config', demoflowMcpConfig()] : []),
     '--model',
     args.model,
     // #663: checked against Claude Code's `--help`: `--effort <level>`.
@@ -145,7 +149,7 @@ export const cardLaunchSpec = (
     | 'runId'
     | 'shortId'
   > &
-    Partial<Pick<CardRunArgs, 'effort' | 'escalate'>>,
+    Partial<Pick<CardRunArgs, 'effort' | 'escalate' | 'demo'>>,
   worktree: string,
   otlp: OtlpEndpoint | null,
   wiring?: CardWiringFiles,

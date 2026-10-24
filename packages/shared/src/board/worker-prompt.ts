@@ -37,9 +37,10 @@ import type { BoardCardKind } from './types';
  * Nautelle. Version 21 (C-297, ADR-0073): the `NAUTELLE_*` variables.
  * Version 22 (#747 D10): the terse register behind `terse-register`; its
  * control arm gets the #445 D7 two-register lines. Version 23 (#750 D8):
- * with `escalate`, when to call `escalate_card`.
+ * with `escalate`, when to call `escalate_card`. Version 24 (C-369): with
+ * `demo`, the DemoFlow scenario to write.
  */
-export const CARD_WORKER_PROMPT_VERSION = 23;
+export const CARD_WORKER_PROMPT_VERSION = 24;
 
 /** #389: the env the runner sets in the card's session — its short id. */
 export const CARD_ENV_ID = 'NAUTELLE_CARD';
@@ -184,6 +185,20 @@ export interface CardWorkerPromptInput {
    * `escalate_card`. Absent is off.
    */
   escalate?: boolean;
+  /**
+   * C-369: the project records demo videos and the round is launched with
+   * `demo` (DemoFlow's MCP server); the prompt then asks for the scenario.
+   * Absent or `null` is off.
+   */
+  demo?: CardWorkerDemo | null;
+}
+
+/** C-369: where the card's DemoFlow scenario goes and which secrets it may read. */
+export interface CardWorkerDemo {
+  /** `demoScenarioPath(card)`, repository-relative. */
+  scenarioPath: string;
+  /** The project's Demo env secret names; never a value. */
+  env: readonly string[];
 }
 
 const utf8Bytes = (text: string): number =>
@@ -509,6 +524,22 @@ const ESCALATE_LINES = [
 ];
 
 /**
+ * C-369 (ADR-0090 §2): the project records a demo of finished UI features, so
+ * the worker writes the scenario through DemoFlow's MCP server and commits it.
+ * Only secret names are listed — a value never reaches the worker.
+ */
+const demoLines = (demo: CardWorkerDemo): string[] => [
+  '## Demo video',
+  '',
+  `This project records a demo of finished UI features. Before finishing, write a scenario that shows the feature in \`${demo.scenarioPath}\` (DemoFlow MCP validates it) and commit it with the change.`,
+  "- Start the app from the repository's `demoflow.config.json`; the runner assigns the port when it records, so do not hard-code one in the scenario.",
+  demo.env.length > 0
+    ? `- Read secrets only via \`valueFrom.env\`, using these names: ${demo.env.map((name) => `\`${name}\``).join(', ')}. Never write a secret's value into the scenario.`
+    : '- The project has no demo secrets: a scenario that needs to sign in cannot be recorded, so show what works without them. Never write a credential into the scenario.',
+  '- If the card changes no UI, skip the scenario.',
+];
+
+/**
  * #445 D10: the stable sections — the same for every card — come first, so
  * the prompt cache hits; the card's own sections come last.
  */
@@ -542,6 +573,7 @@ const assemblePrompt = (
     ...(card.tokenSaver ? [...HANDOFF_LINES, ''] : []),
     ...(card.projectRules ? [card.projectRules, ''] : []),
     ...(card.escalate ? [...ESCALATE_LINES, ''] : []),
+    ...(card.demo ? [...demoLines(card.demo), ''] : []),
     '## When you are done',
     '',
     `Write the pull request description the last section of this prompt asks for. Then call the \`${FINISH_CARD_TOOL}\` tool with a summary of what you changed and how you checked it, in at least two full sentences; if it says what is missing, write that and call it again. Without the tool, reply with the summary and the word DONE, then stop.`,

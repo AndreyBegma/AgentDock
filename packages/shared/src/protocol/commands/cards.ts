@@ -267,6 +267,12 @@ export const cardRunArgsSchema = z
      * result. Sent only to a runner that advertises `cardStartBranch`.
      */
     startBranch: cardBranchSchema.optional(),
+    /**
+     * C-369: the project records demo videos (`demoVideosEnabled`), so the
+     * session gets DemoFlow's MCP server to write the card's scenario. Sent
+     * only to a runner that advertises `cardDemo`.
+     */
+    demo: z.literal(true).optional(),
   })
   .refine(
     (a) =>

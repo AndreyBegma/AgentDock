@@ -60,6 +60,11 @@ export const cardRecordSchema = z.object({
    */
   permissionMode: orchestratorPermissionModeSchema.optional(),
   /**
+   * C-369: the round's `card.run` carried `demo` — the session has DemoFlow's
+   * MCP server, and `card.resume` relaunches it with it. Absent is off.
+   */
+  demo: z.literal(true).optional(),
+  /**
    * #445 D8, DR-10: set when the round launched with Token saver on — the
    * daemon then guards its `finish_card`, asking for `Closes #issueNumber`.
    */

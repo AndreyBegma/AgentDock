@@ -390,7 +390,7 @@ describe('next round prompt — card edits reach the worker (#273 D1–D4)', () 
   };
 
   it('is version 23', () => {
-    expect(CARD_WORKER_PROMPT_VERSION).toBe(23);
+    expect(CARD_WORKER_PROMPT_VERSION).toBe(24);
   });
 
   it('cardChange is null for identical text, whitespace around it aside', () => {
@@ -785,6 +785,33 @@ describe('worker prompt v23 — escalate_card (#750 D8)', () => {
     expect(prompt.indexOf(ESCALATE_CARD_TOOL)).toBeLessThan(
       prompt.indexOf('## Card C-12'),
     );
+  });
+});
+
+describe('worker prompt v24 — demo video (C-369)', () => {
+  const plain = { ...card, design: null };
+  const scenarioPath = 'demoflow/cards/C-12-login.demo.json';
+
+  it('asks for a scenario only on a demo round', () => {
+    expect(cardWorkerPrompt(plain)).not.toContain('## Demo video');
+    const prompt = cardWorkerPrompt({
+      ...plain,
+      demo: { scenarioPath, env: ['DEMO_EMAIL', 'DEMO_PASSWORD'] },
+    });
+    expect(prompt).toContain('## Demo video');
+    expect(prompt).toContain(`\`${scenarioPath}\``);
+    expect(prompt).toContain('DemoFlow MCP validates it');
+    expect(prompt).toContain('`valueFrom.env`');
+    expect(prompt).toContain('`DEMO_EMAIL`, `DEMO_PASSWORD`');
+  });
+
+  it('says there are no secrets when the project has none', () => {
+    const prompt = cardWorkerPrompt({
+      ...plain,
+      demo: { scenarioPath, env: [] },
+    });
+    expect(prompt).toContain('The project has no demo secrets');
+    expect(prompt).not.toContain('using these names');
   });
 });
 

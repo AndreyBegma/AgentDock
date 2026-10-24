@@ -27,6 +27,7 @@ import {
   type StopReason,
 } from './connection';
 import { TmuxServerGuard } from './control/tmux-server';
+import { createDemoHandlers, DemoflowProvisioner, DemoRecorder } from './demos';
 import {
   commandsCapability,
   detectCapabilities,
@@ -206,6 +207,9 @@ export const runDaemon = async (
       );
     }
 
+    // C-369: DemoFlow is provisioned on the first demo; its state is a capability.
+    const demoflow = new DemoflowProvisioner({ exec, log });
+
     const redetect = async (): Promise<Capabilities> => {
       const [capabilities, github] = await Promise.all([
         detectCapabilities({
@@ -236,6 +240,8 @@ export const runDaemon = async (
         gitAuth: { github },
         ...commandsCapability(handlers(), config.disabledCommands),
         policy: reportedPolicy(policy.current()),
+        cardDemo: !config.disabledCommands.includes('card.demo'),
+        demoflow: demoflow.status(),
       };
     };
 
@@ -552,6 +558,23 @@ export const runDaemon = async (
       log,
     });
 
+    // C-369: `card.demo` records in the card's worktree, one demo at a time.
+    const demos = new DemoRecorder({
+      exec,
+      log,
+      clock,
+      emit: (event) => connection?.emit(event),
+      watchedProjects: () => watchList.current,
+      provisioner: demoflow,
+      api: {
+        server: config.server,
+        insecureServer: config.insecureServer,
+        token: config.token,
+      },
+      env: options.env ?? process.env,
+      workDir: join(dirname(options.spoolDir), 'demos'),
+    });
+
     builtHandlers = createHandlers({
       clock,
       runnerVersion: RUNNER_VERSION,
@@ -579,6 +602,7 @@ export const runDaemon = async (
       docs: createDocsHandlers(skillsDeps),
       steward: { ...stewardActions.handlers(), ...stewardDigest.handlers() },
       handoff: createHandoffHandlers(handoff),
+      demos: createDemoHandlers(demos),
       // #622: the assistant reads the checkout; `code.ask` is read-only.
       repo: createRepoHandlers(
         {

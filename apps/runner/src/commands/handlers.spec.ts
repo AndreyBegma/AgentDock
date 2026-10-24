@@ -90,6 +90,40 @@ describe('cards.extract handler (#244)', () => {
   });
 });
 
+describe('card.demo handler (C-369)', () => {
+  const args = {
+    cardId: 'card_1',
+    projectId: 'prj_a',
+    card: 7,
+    round: 1,
+    demoId: 'demo_1',
+    worktree: { root: '/srv/app', shortId: 'ab12cd34' },
+    scenario: 'demoflow/cards/C-7-login.demo.json',
+    env: [],
+  };
+
+  it('answers unsupported on a runner that does not record', async () => {
+    const handlers = createHandlers(context());
+    const outcome = await Promise.resolve()
+      .then(() => handlers['card.demo'](args))
+      .then(
+        () => 'resolved',
+        (error: unknown) =>
+          error instanceof CommandFailure ? error.code : String(error),
+      );
+    expect(outcome).toBe('unsupported');
+  });
+
+  it('hands the command to the demo recorder', async () => {
+    const handlers = createHandlers(
+      context({
+        demos: { 'card.demo': async () => ({ status: 'queued' as const }) },
+      }),
+    );
+    expect(await handlers['card.demo'](args)).toEqual({ status: 'queued' });
+  });
+});
+
 describe('card command handlers (#242)', () => {
   it('answers unsupported on a runner without the card executor', async () => {
     const handlers = createHandlers(context());
