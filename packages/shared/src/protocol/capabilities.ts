@@ -29,7 +29,7 @@ export type ProfileAgentdock = z.infer<typeof profileAgentdockSchema>;
 /**
  * C-369: the runner's DemoFlow, as `demoflow` in capabilities. `version` is
  * the pinned one; `ready` is `demoflow setup` passing; `reason` (not ready
- * only) is the short cause, without a path or a stack trace.
+ * only) is the short cause, redacted, without a stack trace.
  */
 export const demoflowStatusSchema = z.object({
   version: boundedName(TEXT_NAME_MAX),
@@ -297,8 +297,10 @@ export const capabilitiesSchema = z.object({
   cardDemo: z.boolean().optional(),
   /**
    * C-369: the runner's pinned DemoFlow — the version it runs through `npx`
-   * and whether `demoflow setup` succeeded (Chromium and FFmpeg found).
-   * `reason` says why it is not ready. Absent: a runner that does not record.
+   * and whether it is set up (Node new enough, the package fetched,
+   * `demoflow setup` installed Chromium). `reason` says why it is not ready —
+   * before the first demo, that it has not been set up yet. Absent: a runner
+   * that does not record.
    */
   demoflow: demoflowStatusSchema.optional(),
   /**

@@ -96,9 +96,22 @@ The decisions below were settled with the person on 2026-10-24.
 - The attachment volume grows faster: up to 100 MiB per recording, kept for the
   card's lifetime. The project quota bounds it.
 - Stage 1 (C-368) ships the data model, the API, the attachment changes and the
-  shared contracts; the runner's handler answers `unsupported` and "Record
-  again" only queues the row. Recording, dispatch and the UI follow in the
-  stack's later cards.
+  shared contracts; "Record again" only queues the row. Dispatch and the UI
+  follow in the stack's later cards.
+- C-369 ships the runner side. The runner pins `demoflow@0.4.0`, fetches it
+  and runs `demoflow setup` on the first demo (not at start), and reports
+  `demoflow: { version, ready, reason }` in its capabilities. A round of a
+  project with `demoVideosEnabled`, on a runner that advertises `cardDemo`,
+  carries `demo: true` on `card.run`: the session gets DemoFlow's MCP server
+  and the prompt a "Demo video" section with the scenario path and the secret
+  names. `card.demo` answers at once (`recording` or `queued`); one demo
+  records at a time, at most 16 wait, and a recording is stopped after
+  10 minutes with every process DemoFlow started. DemoFlow 0.4.0 has neither
+  port templating nor `--fresh-app`, so until a pinned version does the runner
+  does not assign a port: it records only an app DemoFlow starts itself
+  (`devCommand`) on a loopback `readyUrl`, and refuses with `failed` when that
+  port is already in use, rather than record another app. The upload is tried
+  three times on a network error, 408, 429 or 5xx.
 - Rejected:
   - **Recording in the API container.** It would need the project's code and a
     browser on the control plane (ADR-0001).

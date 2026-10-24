@@ -26,6 +26,7 @@ import {
   stopOrchestrator,
 } from '../control/orchestrator';
 import { messageSlot, stopSlot } from '../control/slot';
+import type { DemoHandlers } from '../demos';
 import type { Exec } from '../detect/exec';
 import type { DocsHandlers } from '../docs';
 import type { HandoffHandlers } from '../handoff';
@@ -110,6 +111,8 @@ export interface HandlerContext {
   repo?: RepoHandlers;
   /** The launch prefix's calls (#751); absent means this runner does not serve them. */
   prefix?: PrefixHandlers;
+  /** Demo videos (C-369); absent means this runner does not record them. */
+  demos?: DemoHandlers;
 }
 
 const noRepo = (): never => {
@@ -170,11 +173,10 @@ const noPlanner = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve plans');
 };
 
-// ADR-0090: S-12 stage 2 records; until then the runner says so.
 const noDemo = (): never => {
   throw new CommandFailure(
     'unsupported',
-    'this runner does not record demo videos yet',
+    'this runner does not record demo videos',
   );
 };
 
@@ -340,7 +342,7 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
-    'card.demo': () => noDemo(),
+    'card.demo': (args) => context.demos?.['card.demo'](args) ?? noDemo(),
     'cards.extract': (args) =>
       context.capture?.['cards.extract'](args) ?? noCapture(),
     'text.normalize': (args) =>

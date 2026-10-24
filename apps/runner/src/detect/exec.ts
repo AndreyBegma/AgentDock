@@ -30,7 +30,8 @@ export interface ExecOptions {
 /** Capability probes give up after this long (D5). */
 export const EXEC_TIMEOUT_MS = 5_000;
 
-const definedOnly = (env: Env): Record<string, string> =>
+/** `env` without its unset variables, as a child process takes it. */
+export const definedOnly = (env: Env): Record<string, string> =>
   Object.fromEntries(
     Object.entries(env).filter(
       (e): e is [string, string] => e[1] !== undefined,

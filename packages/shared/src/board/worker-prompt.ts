@@ -532,7 +532,7 @@ const demoLines = (demo: CardWorkerDemo): string[] => [
   '## Demo video',
   '',
   `This project records a demo of finished UI features. Before finishing, write a scenario that shows the feature in \`${demo.scenarioPath}\` (DemoFlow MCP validates it) and commit it with the change.`,
-  '- Start the app from the repository\'s `demoflow.config.json`; the runner assigns the port when it records, so do not hard-code one in the scenario.',
+  "- Start the app from the repository's `demoflow.config.json`; the runner assigns the port when it records, so do not hard-code one in the scenario.",
   demo.env.length > 0
     ? `- Read secrets only via \`valueFrom.env\`, using these names: ${demo.env.map((name) => `\`${name}\``).join(', ')}. Never write a secret's value into the scenario.`
     : '- The project has no demo secrets: a scenario that needs to sign in cannot be recorded, so show what works without them. Never write a credential into the scenario.',

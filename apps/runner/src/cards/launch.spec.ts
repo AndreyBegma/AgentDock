@@ -169,6 +169,27 @@ describe('card worker launch (#242 D5)', () => {
     expect(argv).not.toContain('--mcp-config');
   });
 
+  it("C-369: a demo round adds DemoFlow's MCP server after the wiring, on both rounds", () => {
+    const wiring = { settings: '/s.json', mcp: '/m.json' };
+    for (const resume of [false, true]) {
+      const { args: argv } = cardArgv(
+        profile,
+        { ...args(resume), demo: true },
+        wiring,
+      );
+      const at = argv.lastIndexOf('--mcp-config');
+      expect(argv[at - 1]).toBe('/m.json');
+      expect(JSON.parse(argv[at + 1]).mcpServers.demoflow).toMatchObject({
+        type: 'stdio',
+        command: 'npx',
+      });
+      expect(argv[at + 2]).toBe('--model');
+    }
+    expect(cardArgv(profile, args(false), wiring).args.join(' ')).not.toContain(
+      'demoflow',
+    );
+  });
+
   // #389: two cards running the e2e suite at once wiped each other's test
   // database — the session now says which card it is, on every round.
   it('#389: tells the session its card and a port of its own, on every round', () => {
