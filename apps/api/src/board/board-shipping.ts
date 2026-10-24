@@ -14,6 +14,7 @@ import {
   cardCiMergeable,
   cardCiStateOf,
   cardLabel,
+  DEMO_MERGE_WAIT_MS,
   failedCardChecks,
   isActiveRoundPhase,
 } from '@nautelle/shared';
@@ -31,6 +32,7 @@ import { AuditService } from '../audit/audit.service';
 import { SYSTEM_ACTOR } from '../audit/audit.types';
 import { BudgetExceededError } from '../budgets/budget-error';
 import { PrismaService } from '../database/prisma.service';
+import { CardDemosService, type DemoPrFiles } from '../demos/card-demos.service';
 import { BoardCommands, boardOutput } from './board-commands';
 import { BoardFailure } from './board-error';
 import type { CardWithRounds } from './board-mapper';
@@ -161,7 +163,8 @@ const roundSinceMove = (card: CardWithRounds): boolean => {
  * card that ships itself, either In progress with its round over — CI
  * decides where it goes (D7) — or with checks still running.
  */
-const WATCHED = {
+const watched = (now: number) =>
+  ({
   source: { notIn: ['fleet', 'terminal'] },
   prNumber: { not: null },
   prState: { in: ['open', 'draft'] },
@@ -189,8 +192,23 @@ const WATCHED = {
     // #709: any stacked PR — its dependency, or the PR itself, may merge on
     // GitHub unseen.
     { column: { in: ['in_progress', 'finished'] }, prBase: { not: null } },
+    // C-370 (ADR-0095): a green Finished card whose merge waits for its demo
+    // — merged once the demo ends, or once the wait is over.
+    {
+      column: 'finished',
+      ciState: 'green',
+      protectedPaths: { isEmpty: true },
+      prBaseCardId: null,
+      demos: {
+        some: {
+          createdAt: {
+            gte: new Date(now - DEMO_MERGE_WAIT_MS - 2 * CARD_CI_POLL_MS),
+          },
+        },
+      },
+    },
   ],
-} satisfies Prisma.BoardCardWhereInput;
+}) satisfies Prisma.BoardCardWhereInput;
 
 /**
  * A card ships itself (issue #359, ADR-0035), the API's half: Nautelle
@@ -219,6 +237,7 @@ export class BoardShipping
     private readonly commands: BoardCommands,
     private readonly audit: AuditService,
     private readonly review: BoardReview,
+    private readonly demos: CardDemosService,
   ) {}
 
   onModuleInit(): void {
@@ -238,6 +257,15 @@ export class BoardShipping
           );
         }, REVIEW_GATE_DELAY_MS);
         timer.unref();
+      });
+      // C-370: a demo that ended lets a merge that waited for it go on.
+      this.demos.onSettled((cardId) => {
+        void this.check(cardId).catch((error: unknown) =>
+          this.logger.error(
+            `the merge of ${cardId} after its demo failed`,
+            error instanceof Error ? error.stack : String(error),
+          ),
+        );
       });
     }
   }
@@ -269,7 +297,7 @@ export class BoardShipping
     this.polling = true;
     try {
       const cards = await this.prisma.boardCard.findMany({
-        where: WATCHED,
+        where: watched(Date.now()),
         select: { id: true, project: { select: { runnerId: true } } },
         orderBy: { updatedAt: 'asc' },
       });
@@ -437,6 +465,10 @@ export class BoardShipping
       card.ciHeadSha === result.headSha &&
       card.ciCheckedAt !== null;
     const noneSince = await this.store(card, result, state);
+    // C-370: a demo of an older head is no longer the PR's.
+    if (result.state === 'open' || result.state === 'draft') {
+      await this.demos.supersede(project.id, card.id, result.headSha);
+    }
 
     if (result.state === 'merged') {
       await this.mergedOutside(project, card, result);
@@ -466,7 +498,18 @@ export class BoardShipping
       return;
     }
     // #894: a Finished card whose checks went red is fixed, merge or not.
-    if (mergeOnly && !(card.column === 'finished' && state === 'red')) return;
+    if (mergeOnly && !(card.column === 'finished' && state === 'red')) {
+      // C-370: a Finished card that is not merged here still gets its demo.
+      if (
+        card.column === 'finished' &&
+        state === 'green' &&
+        !card.needsPerson &&
+        !isActiveRoundPhase(card.rounds[0]?.phase)
+      ) {
+        await this.recordDemo(project, card, result.headSha);
+      }
+      return;
+    }
     // D6: a fix round waits for the worker's round to be over.
     if (isActiveRoundPhase(card.rounds[0]?.phase) || card.needsPerson) return;
 
@@ -503,7 +546,62 @@ export class BoardShipping
       if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))
         return;
     }
+    // C-370 (ADR-0095): the head that ships is recorded first, so the merge
+    // can wait for its demo.
+    await this.recordDemo(project, card, result.headSha);
     await this.autoMerge(project, card.number, result);
+  }
+
+  /**
+   * C-370 (ADR-0095): a feature card's head that ships, recorded as a demo
+   * when its PR touches the project's UI paths. A demo never holds the card
+   * up: whatever goes wrong here is logged, and shipping goes on.
+   */
+  private async recordDemo(
+    project: BoardProject,
+    card: CardWithRounds,
+    headSha: string,
+  ): Promise<void> {
+    try {
+      await this.demos.autoRecord(project, card, headSha, () =>
+        this.prFiles(project, card),
+      );
+    } catch (error) {
+      this.logger.error(
+        `the demo of ${cardLabel(card.number)} was not recorded`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  /** C-370: the files the card's PR changes, read on the runner. */
+  private async prFiles(
+    project: BoardProject,
+    card: CardWithRounds,
+  ): Promise<DemoPrFiles> {
+    if (card.prNumber === null) return { error: 'the card has no PR' };
+    try {
+      const result = await this.commands.inspectPr(
+        project.runnerId,
+        { projectId: project.id, root: project.rootPath, pr: card.prNumber },
+        { role: 'operator', ctx: { actor: SYSTEM_ACTOR } },
+      );
+      if (result.status === 'ok') {
+        return {
+          files: result.output.files.map((file) => file.path),
+          truncated: result.output.filesTruncated,
+        };
+      }
+      return {
+        error:
+          result.status === 'error'
+            ? (result.error.message ?? result.error.code)
+            : 'the runner did not answer',
+      };
+    } catch (error) {
+      if (!(error instanceof BoardFailure)) throw error;
+      return { error: error.message };
+    }
   }
 
   /**
@@ -812,7 +910,8 @@ export class BoardShipping
    * (`protectedPaths`) — only a person merges it, whatever the setting.
    * C-182 (ADR-0080): nor a head whose checks are not all passed
    * (`cardCiMergeable`) — none, a cancelled or a skipped one: `needsPerson`
-   * with `ci_not_green`, as for #542.
+   * with `ci_not_green`, as for #542. C-370 (ADR-0095): a demo in flight
+   * holds the merge, at most `DEMO_MERGE_WAIT_MS`.
    */
   private async autoMerge(
     project: BoardProject,
@@ -842,6 +941,9 @@ export class BoardShipping
       await this.refuseMerge(project, card, headSha, unshippable);
       return;
     }
+    // C-370 (ADR-0095): the merge waits for a demo in flight — at most
+    // `DEMO_MERGE_WAIT_MS`; the demo's end, or the poll, asks again.
+    if (await this.demos.holdsMerge(card.id)) return;
     try {
       await this.work.mergePr(project, card, headSha, true, BOARD_SYSTEM_ACTOR);
     } catch (error) {
