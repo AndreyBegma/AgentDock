@@ -31,10 +31,16 @@ import {
   ProjectRole,
   type ResolvedProjectAccess,
 } from '../projects';
-import { attachmentNotFound } from './attachment-error';
-import { sendAttachment, UploadTooLargeFilter } from './attachment-http';
+import { AttachmentRangeFailure, attachmentNotFound } from './attachment-error';
+import {
+  sendAttachment,
+  sendUnsatisfiable,
+  streamAttachment,
+  UploadTooLargeFilter,
+} from './attachment-http';
 import {
   type AttachmentActor,
+  type AttachmentContent,
   AttachmentsService,
   type UploadedAttachment,
 } from './attachments.service';
@@ -101,21 +107,35 @@ export class AttachmentsController {
     if (cardId !== null) this.publish(access.projectId, cardId);
   }
 
-  /** D8: the bytes, with the session cookie — never a public URL. */
+  /**
+   * D8: the bytes, with the session cookie — never a public URL. ADR-0090:
+   * one `Range` is answered with 206, so a video player can seek.
+   */
   @Get(':id/content')
   async content(
     @ProjectAccess() access: ResolvedProjectAccess,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile> {
-    const content = await this.attachments.content(
-      access.projectId,
-      attachmentId(id),
-      user.id,
-      access.role,
-    );
-    return sendAttachment(res, content);
+    @Headers('range') range: string | undefined,
+    @Res() res: Response,
+  ): Promise<void> {
+    let content: AttachmentContent;
+    try {
+      content = await this.attachments.content(
+        access.projectId,
+        attachmentId(id),
+        user.id,
+        access.role,
+        range,
+      );
+    } catch (error) {
+      if (error instanceof AttachmentRangeFailure) {
+        sendUnsatisfiable(res, error);
+        return;
+      }
+      throw error;
+    }
+    await streamAttachment(res, content);
   }
 
   /** The card sheet refreshes its attachments, as on any card change. */

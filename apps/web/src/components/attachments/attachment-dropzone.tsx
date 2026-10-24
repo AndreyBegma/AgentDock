@@ -8,7 +8,7 @@ import {
 import { FileItem } from '@andrewbehma/glass-ui/file-item';
 import type { UploadItem } from '@andrewbehma/glass-ui/use-file-upload';
 import {
-  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_UPLOAD_MAX_BYTES,
   ATTACHMENTS_PER_CARD_MAX,
 } from '@nautelle/shared';
 import { useState } from 'react';
@@ -139,7 +139,7 @@ export function AttachmentDropzone({
       <FileDropzone
         label={label}
         accept={ATTACHMENT_ACCEPT}
-        maxSize={ATTACHMENT_MAX_BYTES}
+        maxSize={ATTACHMENT_UPLOAD_MAX_BYTES}
         maxFiles={ATTACHMENTS_PER_CARD_MAX}
         disabled={disabled}
         pasteTarget={pasteTarget}
@@ -156,7 +156,7 @@ export function AttachmentDropzone({
           Drop files here, paste a screenshot, or click to choose
         </span>
         <span className="text-xs text-ink-2">
-          Images, PDF and text files, up to 25 MiB each.
+          Images, PDF and text files up to 25 MiB, videos up to 100 MiB.
         </span>
       </FileDropzone>
       <p className="text-xs text-ink-3">{ATTACHMENT_NOTE}</p>

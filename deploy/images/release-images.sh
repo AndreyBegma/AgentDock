@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the published Nautelle images and, on a release tag, pushes and signs
-# them (ADR-0088, ADR-0090). Run from the repository root;
+# them (ADR-0088, ADR-0091). Run from the repository root;
 # .woodpecker/release-images.yml calls it.
 #
 #   ghcr.io/andreybegma/nautelle-api:X.Y.Z, :X.Y, :X and :latest
@@ -99,7 +99,7 @@ if [ "$push" = 1 ]; then
 fi
 
 # QEMU for the arm64 half. The registration is in the host kernel's
-# binfmt_misc table and outlives this container (ADR-0090).
+# binfmt_misc table and outlives this container (ADR-0091).
 docker run --privileged --rm "$BINFMT" --install arm64
 docker buildx create --name "$BUILDER" --driver docker-container \
   --driver-opt "image=$BUILDKIT" --bootstrap >/dev/null

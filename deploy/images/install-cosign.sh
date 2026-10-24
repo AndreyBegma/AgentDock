@@ -1,6 +1,6 @@
 #!/bin/sh
 # Installs a pinned cosign into a directory (default /usr/local/bin) for
-# deploy/images/release-images.sh (ADR-0090). The binary is checked against
+# deploy/images/release-images.sh (ADR-0091). The binary is checked against
 # the checksums pinned here, not against a file fetched from the same place.
 #
 #   sh deploy/images/install-cosign.sh [dir]

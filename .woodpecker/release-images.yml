@@ -1,4 +1,4 @@
-# Publishes the Nautelle images and the GitHub Release (ADR-0088, ADR-0090).
+# Publishes the Nautelle images and the GitHub Release (ADR-0088, ADR-0091).
 #
 # Pushing the tag vX.Y.Z on main (ADR-0071) builds ghcr.io/andreybegma/
 # nautelle-api and nautelle-web for linux/amd64 and linux/arm64, pushes them as

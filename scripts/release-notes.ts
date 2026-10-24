@@ -1,5 +1,5 @@
 /**
- * Composes the body of a product GitHub Release (ADR-0090):
+ * Composes the body of a product GitHub Release (ADR-0091):
  *
  *   - the summary and the "What changed" section of the release note the
  *     release skill commits, `docs/releases/vX.Y.Z.md` (ADR-0071);

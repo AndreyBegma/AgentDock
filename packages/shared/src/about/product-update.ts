@@ -2,7 +2,7 @@ import { compareVersions, parseVersion } from '../runners/release';
 
 /**
  * C-374: whether a newer Nautelle release is out. The API reads the latest
- * GitHub release at most once a day (ADR-0090); admins see the answer in the
+ * GitHub release at most once a day (ADR-0091); admins see the answer in the
  * web app.
  */
 

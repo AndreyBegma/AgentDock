@@ -47,7 +47,7 @@ const readStored = (value: Prisma.JsonValue | null): StoredCheck | null => {
 
 /**
  * C-374: the latest Nautelle release, read from GitHub at most once a day
- * (ADR-0090). Every attempt counts toward the day, a failed one too, so an
+ * (ADR-0091). Every attempt counts toward the day, a failed one too, so an
  * install without internet access asks once a day and not on every start.
  * With `NAUTELLE_UPDATE_CHECK=false` GitHub is never asked.
  */
