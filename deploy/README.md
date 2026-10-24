@@ -331,3 +331,46 @@ A step that fails can be re-run. The Release assets are replaced, a version
 already on npm is skipped, and an unchanged formula is not committed again.
 `RUNNER_RELEASE_DRY_RUN=1` in the environment stops a tag run before it
 publishes; it is the way to rehearse the signature with the real key.
+
+## Releasing the images
+
+Decision: [ADR-0087](../docs/adr/0087-nautelle-installs-from-published-images-with-one-compose-file.md).
+A product tag `vX.Y.Z` (ADR-0071) runs `.woodpecker/release-images.yml`. It
+calls `deploy/images/release-images.sh`, which checks that `X.Y.Z` is
+`APP_VERSION`, builds `ghcr.io/andreybegma/nautelle-api` and `nautelle-web`
+for amd64, runs `check-api-image.sh` on the API image and pushes both as
+`:X.Y.Z` and `:latest`. A pre-release tag (`vX.Y.Z-rc.1`) is pushed without
+`:latest`. The public install, `deploy/compose/` and
+[docs/guides/install.md](../docs/guides/install.md), pulls these images.
+
+The web image is built with `NEXT_PUBLIC_LIVE_URL=/api/live`, a path the
+browser resolves against the page's own origin, and `API_URL=http://api:8180`,
+the API service in the compose file. One image therefore serves any host.
+Staging keeps building its own images (`build-staging.sh`).
+
+### One-time setup
+
+1. **Woodpecker secret.** Add `ghcr_token` to `AndreyBegma/Nautelle`,
+   restricted to the **tag** event only, like the runner secrets above. It is
+   a GitHub token with *write:packages* for the `andreybegma` account.
+2. **GitHub tag ruleset.** Add the pattern `v*` to the tag ruleset of P-03, so
+   only administrators can create, move or delete a product tag.
+3. **Package visibility.** After the first push, set both packages,
+   `nautelle-api` and `nautelle-web`, to *Public* in the account's package
+   settings, and link them to the repository. An install pulls them without a
+   login only once they are public.
+
+### Each release
+
+The `release` skill tags `vX.Y.Z` on `main` after the release pull request
+merges; the tag starts the workflow. To rehearse, run the pipeline by hand
+with a message that contains `[image-release]` on a branch other than
+`develop`: it builds both images on the host as `<APP_VERSION>-dev` and pushes
+nothing. Locally, `sh deploy/images/release-images.sh` does the same.
+`NAUTELLE_IMAGES_DRY_RUN=1` stops a tag run before it pushes.
+
+To check a release, install it on a clean machine:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh -s -- --version X.Y.Z
+```

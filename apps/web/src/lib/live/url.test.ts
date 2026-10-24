@@ -34,7 +34,11 @@ describe('liveSocketUrl', () => {
   });
 
   it('puts a configured path on the page origin, keeping its port', () => {
-    const local = { protocol: 'http:', host: 'localhost:8000', hostname: 'localhost' };
+    const local = {
+      protocol: 'http:',
+      host: 'localhost:8000',
+      hostname: 'localhost',
+    };
     expect(liveSocketUrl('/api/live', local)).toBe(
       'ws://localhost:8000/api/live',
     );

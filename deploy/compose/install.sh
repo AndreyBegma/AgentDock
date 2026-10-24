@@ -263,4 +263,4 @@ say "Nautelle is up: $URL"
 say ''
 say 'Create the first administrator:'
 say "  cd $(pwd) && docker compose exec api node dist/src/cli/admin-create.js"
-say 'then sign in, and pair a runner from Runners → Pair a runner.'
+say 'then sign in, and pair a runner from Admin › Runners › Add runner.'

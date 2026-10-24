@@ -64,6 +64,7 @@ describe('checkCompose', () => {
 
   test('allows the published Nautelle images by tag, nothing else of ghcr', () => {
     const source = [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: compose interpolation, not a template
       '    image: ghcr.io/andreybegma/nautelle-api:${NAUTELLE_VERSION:-latest}',
       '    image: ghcr.io/andreybegma/nautelle-web:0.15.0',
       '    image: ghcr.io/andreybegma/other:1',
