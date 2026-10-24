@@ -3,6 +3,7 @@ import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { Inject, Injectable } from '@nestjs/common';
+import type { ByteRange } from './attachment-range';
 import {
   ATTACHMENTS_OPTIONS,
   type AttachmentsOptions,
@@ -32,8 +33,15 @@ export abstract class AttachmentStore {
   abstract tempDir(): Promise<string>;
   /** Moves a checked temporary file into place, atomically. */
   abstract put(projectId: string, id: string, tempPath: string): Promise<void>;
-  /** The bytes; rejects when the file is missing. */
-  abstract open(projectId: string, id: string): Promise<Readable>;
+  /**
+   * The bytes — only `range`'s, inclusive, when given (ADR-0089); rejects
+   * when the file is missing.
+   */
+  abstract open(
+    projectId: string,
+    id: string,
+    range?: ByteRange,
+  ): Promise<Readable>;
   /** Idempotent: a missing file is not an error. */
   abstract remove(projectId: string, id: string): Promise<void>;
   /** Every stored file (the orphan sweep). */
@@ -83,11 +91,15 @@ export class FsAttachmentStore extends AttachmentStore {
     await rename(tempPath, target);
   }
 
-  async open(projectId: string, id: string): Promise<Readable> {
+  async open(
+    projectId: string,
+    id: string,
+    range?: ByteRange,
+  ): Promise<Readable> {
     const path = this.path(projectId, id);
     // `createReadStream` reports a missing file only once read; ask first.
     await stat(path);
-    return createReadStream(path);
+    return createReadStream(path, range);
   }
 
   async remove(projectId: string, id: string): Promise<void> {

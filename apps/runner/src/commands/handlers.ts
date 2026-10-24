@@ -170,6 +170,14 @@ const noPlanner = (): never => {
   throw new CommandFailure('unsupported', 'this runner does not serve plans');
 };
 
+// ADR-0089: S-12 stage 2 records; until then the runner says so.
+const noDemo = (): never => {
+  throw new CommandFailure(
+    'unsupported',
+    'this runner does not record demo videos yet',
+  );
+};
+
 const noUiProfile = (): never => {
   throw new CommandFailure(
     'unsupported',
@@ -332,6 +340,7 @@ export const createHandlers = (context: HandlerContext): CommandHandlers => {
             watchedProjects: context.watchedProjects,
           })
         : noCards(),
+    'card.demo': () => noDemo(),
     'cards.extract': (args) =>
       context.capture?.['cards.extract'](args) ?? noCapture(),
     'text.normalize': (args) =>

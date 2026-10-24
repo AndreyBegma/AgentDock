@@ -38,3 +38,17 @@ export const attachmentRefused = (
 
 export const attachmentNotFound = (): AttachmentFailure =>
   new AttachmentFailure(404, ATTACHMENT_ERROR.notFound, 'Attachment not found');
+
+/**
+ * ADR-0089: 416 — a `Range` no byte of the file satisfies. The route sends
+ * `Content-Range: bytes *` with the file's `size`.
+ */
+export class AttachmentRangeFailure extends AttachmentFailure {
+  constructor(readonly size: number) {
+    super(
+      416,
+      ATTACHMENT_ERROR.rangeNotSatisfiable,
+      'The requested range is past the end of the attachment',
+    );
+  }
+}

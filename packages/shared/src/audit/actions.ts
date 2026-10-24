@@ -260,6 +260,16 @@ export const AUDIT_ACTIONS = [
   'llm.provider_updated',
   /** ADR-0059: the instance default model changed. */
   'llm.default_model_set',
+  /** ADR-0089: the project's Demo videos settings (`before`/`after`: the changed fields). */
+  'demo.settings_updated',
+  /** ADR-0089: a Demo env secret set or replaced (`after: { name, replaced }`), never its value. */
+  'demo.secret_set',
+  /** ADR-0089: a Demo env secret deleted (`before: { name }`). */
+  'demo.secret_deleted',
+  /** ADR-0089: "Record again" queued a manual demo (`after: { cardId, number, demoId, round }`). */
+  'demo.requested',
+  /** ADR-0089: the runner uploaded a demo's video (`after: { cardId, demoId, attachmentId, size }`). */
+  'demo.video_uploaded',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

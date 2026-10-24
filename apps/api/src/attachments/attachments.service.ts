@@ -7,12 +7,15 @@ import {
   ATTACHMENT_MAX_BYTES,
   ATTACHMENT_PENDING_TTL_MS,
   ATTACHMENT_REFUSAL,
+  ATTACHMENT_UPLOAD_MAX_BYTES,
+  ATTACHMENT_VIDEO_MIMES,
   ATTACHMENTS_PER_CARD_MAX,
   type AttachmentMime,
   type AttachmentRef,
   type AttachmentView,
   attachmentContentPath,
   attachmentDisplayName,
+  attachmentMaxBytes,
   type CardAttachmentBrief,
   detectScannedAttachmentMime,
   isAttachmentMime,
@@ -38,9 +41,15 @@ import {
 } from '../runners/credentials';
 import {
   AttachmentFailure,
+  AttachmentRangeFailure,
   attachmentNotFound,
   attachmentRefused,
 } from './attachment-error';
+import {
+  type ByteRange,
+  parseByteRange,
+  UNSATISFIABLE,
+} from './attachment-range';
 import { AttachmentStore } from './attachment-store';
 import {
   ATTACHMENTS_OPTIONS,
@@ -50,6 +59,15 @@ import { ATTACHMENT_ID_PATTERN } from './dto';
 import { type ScannedUpload, scanBytes } from './upload-storage';
 
 type Db = PrismaService | Prisma.TransactionClient;
+
+/**
+ * ADR-0089: the attachments a card's room counts and a worker gets — every
+ * one but a video. A worker cannot watch a video, and up to 100 MiB of it
+ * would slow every round's download.
+ */
+const NOT_VIDEO: Prisma.AttachmentWhereInput = {
+  mime: { notIn: [...ATTACHMENT_VIDEO_MIMES] },
+};
 
 /** Who acts — the board's `BoardActor`, structurally. */
 export interface AttachmentActor {
@@ -127,8 +145,11 @@ export const toAttachmentView = (
 export interface AttachmentContent {
   name: string;
   mime: AttachmentMime;
+  /** The whole file's bytes. */
   size: number;
+  /** `range`'s bytes when one is set (ADR-0089), else the whole file. */
   stream: Readable;
+  range?: ByteRange;
 }
 
 /**
@@ -166,15 +187,9 @@ export class AttachmentsService {
       throw new BadRequestException('multipart field `file` is required');
     }
     try {
-      if (file.size > ATTACHMENT_MAX_BYTES) throw this.tooLarge();
+      if (file.size > ATTACHMENT_UPLOAD_MAX_BYTES) throw this.tooLarge();
       const name = attachmentDisplayName(file.originalname);
-      const mime = detectScannedAttachmentMime(file, file.originalname);
-      if (mime === null) {
-        throw attachmentRefused(
-          ATTACHMENT_REFUSAL.unsupportedType,
-          'Only PNG, JPEG, GIF, WebP, PDF and plain text files (.txt .md .log .csv .json .diff .patch) can be attached',
-        );
-      }
+      const mime = this.mimeOfUpload(file);
       const now = new Date();
       const row = await this.prisma.$transaction(async (tx) => {
         // Always the user's lock before the project's: no lock-order deadlock.
@@ -224,6 +239,22 @@ export class AttachmentsService {
       // Moved into place on success; anything else is not kept.
       await rm(file.path, { force: true });
     }
+  }
+
+  /**
+   * D5, ADR-0089: the type an upload is stored with, from its content, and
+   * within that type's size limit.
+   */
+  mimeOfUpload(file: UploadedAttachment): AttachmentMime {
+    const mime = detectScannedAttachmentMime(file, file.originalname);
+    if (mime === null) {
+      throw attachmentRefused(
+        ATTACHMENT_REFUSAL.unsupportedType,
+        'Only PNG, JPEG, GIF, WebP, PDF, MP4, WebM and plain text files (.txt .md .log .csv .json .diff .patch) can be attached',
+      );
+    }
+    if (file.size > attachmentMaxBytes(mime)) throw this.tooLarge(mime);
+    return mime;
   }
 
   /**
@@ -280,23 +311,31 @@ export class AttachmentsService {
     );
   }
 
-  tooLarge(): AttachmentFailure {
+  /** D4, ADR-0089: over the type's limit — or, unknown, the largest of any. */
+  tooLarge(mime?: AttachmentMime): AttachmentFailure {
+    const max =
+      mime === undefined
+        ? ATTACHMENT_UPLOAD_MAX_BYTES
+        : attachmentMaxBytes(mime);
+    const what = mime === undefined ? 'An attachment' : 'A file of this type';
     return attachmentRefused(
       ATTACHMENT_REFUSAL.tooLarge,
-      `A file can be at most ${ATTACHMENT_MAX_BYTES / (1024 * 1024)} MiB`,
+      `${what} can be at most ${max / (1024 * 1024)} MiB`,
     );
   }
 
   /**
    * `GET …/content` (D8): any member reads a claimed attachment; a pending
    * one is its uploader's alone until a card claims it. An Inbox card's is
-   * only an operator's (#244 D8).
+   * only an operator's (#244 D8). ADR-0089: `range` — the `Range` header —
+   * reads one byte range of it, so a video player can seek.
    */
   async content(
     projectId: string,
     id: string,
     userId: string,
     role: Role,
+    range?: string,
   ): Promise<AttachmentContent> {
     const row = await this.prisma.attachment.findFirst({
       where: { id, projectId },
@@ -309,7 +348,9 @@ export class AttachmentsService {
     ) {
       throw attachmentNotFound();
     }
-    return this.bytesOf(row);
+    const wanted = parseByteRange(range, row.size);
+    if (wanted === UNSATISFIABLE) throw new AttachmentRangeFailure(row.size);
+    return this.bytesOf(row, wanted ?? undefined);
   }
 
   /**
@@ -338,7 +379,7 @@ export class AttachmentsService {
   }
 
   /** `RunnerIngestService.authenticate`: the runner's id, or `null`. */
-  private async runnerOf(token: string): Promise<string | null> {
+  async runnerOf(token: string): Promise<string | null> {
     const runner = await this.prisma.runner.findUnique({
       where: { tokenPrefix: tokenPrefix(token) },
       select: { id: true, tokenHash: true, revokedAt: true },
@@ -349,17 +390,26 @@ export class AttachmentsService {
       : null;
   }
 
-  private async bytesOf(row: Attachment): Promise<AttachmentContent> {
+  private async bytesOf(
+    row: Attachment,
+    range?: ByteRange,
+  ): Promise<AttachmentContent> {
     let stream: Readable;
     try {
-      stream = await this.store.open(row.projectId, row.id);
+      stream = await this.store.open(row.projectId, row.id, range);
     } catch (error) {
       this.logger.error(
         `attachment ${row.id} has a row and no file: ${(error as Error).message}`,
       );
       throw attachmentNotFound();
     }
-    return { name: row.name, mime: mimeOf(row), size: row.size, stream };
+    return {
+      name: row.name,
+      mime: mimeOf(row),
+      size: row.size,
+      stream,
+      ...(range ? { range } : {}),
+    };
   }
 
   /**
@@ -421,7 +471,7 @@ export class AttachmentsService {
       where: this.pendingOf(projectId, ids, actor.userId),
     });
     if (claimable !== ids.length) throw this.notClaimable();
-    await this.assertRoom(cardId, ids.length, db);
+    await this.assertRoom(cardId, ids, db);
   }
 
   /**
@@ -437,7 +487,7 @@ export class AttachmentsService {
     actor: Pick<AttachmentActor, 'userId'>,
   ): Promise<void> {
     if (ids.length === 0) return;
-    await this.assertRoom(target.cardId, ids.length, tx);
+    await this.assertRoom(target.cardId, ids, tx);
     const { count } = await tx.attachment.updateMany({
       where: this.pendingOf(target.projectId, ids, actor.userId),
       data: {
@@ -486,7 +536,7 @@ export class AttachmentsService {
       where: this.pendingOf(projectId, ids, actor.userId),
     });
     if (claimable !== ids.length) throw this.notClaimable();
-    await this.assertPlanRoom(planId, ids.length, this.prisma);
+    await this.assertPlanRoom(planId, ids, this.prisma);
   }
 
   /**
@@ -501,7 +551,7 @@ export class AttachmentsService {
     actor: Pick<AttachmentActor, 'userId'>,
   ): Promise<void> {
     if (ids.length === 0) return;
-    await this.assertPlanRoom(target.planId, ids.length, tx);
+    await this.assertPlanRoom(target.planId, ids, tx);
     const { count } = await tx.attachment.updateMany({
       where: this.pendingOf(target.projectId, ids, actor.userId),
       data: { planId: target.planId, expiresAt: null },
@@ -524,6 +574,7 @@ export class AttachmentsService {
           { planId },
           ...(claiming.length > 0 ? [{ id: { in: [...claiming] } }] : []),
         ],
+        ...NOT_VIDEO,
       },
       orderBy: UPLOAD_ORDER,
     });
@@ -542,7 +593,7 @@ export class AttachmentsService {
 
   /** #594: how many attachments the plan holds — its card's room. */
   countOfPlan(planId: string): Promise<number> {
-    return this.prisma.attachment.count({ where: { planId } });
+    return this.prisma.attachment.count({ where: { planId, ...NOT_VIDEO } });
   }
 
   /**
@@ -579,12 +630,14 @@ export class AttachmentsService {
 
   private async assertPlanRoom(
     planId: string | null,
-    adding: number,
+    ids: readonly string[],
     db: Db,
   ): Promise<void> {
     const held =
-      planId === null ? 0 : await db.attachment.count({ where: { planId } });
-    if (held + adding > ATTACHMENTS_PER_CARD_MAX) {
+      planId === null
+        ? 0
+        : await db.attachment.count({ where: { planId, ...NOT_VIDEO } });
+    if (held + (await this.counted(ids, db)) > ATTACHMENTS_PER_CARD_MAX) {
       throw attachmentRefused(
         ATTACHMENT_REFUSAL.tooMany,
         `A card holds at most ${ATTACHMENTS_PER_CARD_MAX} attachments`,
@@ -609,15 +662,30 @@ export class AttachmentsService {
     };
   }
 
-  /** D4: at most `ATTACHMENTS_PER_CARD_MAX` on a card, its rounds' included. */
+  /**
+   * ADR-0089: how many of `ids` count toward a card's room — every one but a
+   * video.
+   */
+  private counted(ids: readonly string[], db: Db): Promise<number> {
+    return db.attachment.count({
+      where: { id: { in: [...ids] }, ...NOT_VIDEO },
+    });
+  }
+
+  /**
+   * D4: at most `ATTACHMENTS_PER_CARD_MAX` on a card, its rounds' included.
+   * ADR-0089: videos do not count.
+   */
   private async assertRoom(
     cardId: string | null,
-    adding: number,
+    ids: readonly string[],
     db: Db,
   ): Promise<void> {
     const held =
-      cardId === null ? 0 : await db.attachment.count({ where: { cardId } });
-    if (held + adding > ATTACHMENTS_PER_CARD_MAX) {
+      cardId === null
+        ? 0
+        : await db.attachment.count({ where: { cardId, ...NOT_VIDEO } });
+    if (held + (await this.counted(ids, db)) > ATTACHMENTS_PER_CARD_MAX) {
       throw attachmentRefused(
         ATTACHMENT_REFUSAL.tooMany,
         `A card holds at most ${ATTACHMENTS_PER_CARD_MAX} attachments`,
@@ -642,7 +710,8 @@ export class AttachmentsService {
 
   /**
    * D9: what a card will hold once `claimIds` — already checked with
-   * `assertClaimable` — are claimed onto it, in upload order.
+   * `assertClaimable` — are claimed onto it, in upload order: what the worker
+   * gets, so never a video (ADR-0089).
    */
   async withClaim(
     cardId: string,
@@ -656,6 +725,7 @@ export class AttachmentsService {
             ? [{ id: { in: [...claimIds] }, cardId: null }]
             : []),
         ],
+        ...NOT_VIDEO,
       },
       orderBy: UPLOAD_ORDER,
     });

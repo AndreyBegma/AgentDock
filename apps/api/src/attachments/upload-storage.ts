@@ -6,8 +6,8 @@ import { type Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { TextDecoder } from 'node:util';
 import {
-  ATTACHMENT_MAX_BYTES,
   ATTACHMENT_SIGNATURE_BYTES,
+  ATTACHMENT_UPLOAD_MAX_BYTES,
   type AttachmentScan,
 } from '@nautelle/shared';
 import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
@@ -158,7 +158,7 @@ export const uploadOptions = (store: AttachmentStore): MulterOptions => ({
   // Names arrive as UTF-8 from browsers; busboy's default is latin1.
   defParamCharset: 'utf8',
   limits: {
-    fileSize: ATTACHMENT_MAX_BYTES,
+    fileSize: ATTACHMENT_UPLOAD_MAX_BYTES,
     files: 1,
     // A client may send a few plain fields beside the file; they are ignored.
     fields: 10,

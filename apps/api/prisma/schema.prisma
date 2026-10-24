@@ -96,6 +96,8 @@ model User {
   boardCardsAutoRunArmed      BoardCard[]                   @relation("BoardCardAutoRunArmedBy")
   boardCardRounds             BoardCardRound[]
   boardSettingsUpdated        BoardSettings[]
+  demoSecretsUpdated          ProjectDemoSecret[]
+  cardDemosRequested          CardDemo[]
   cardDismissals              CardDismissal[]
   textNormalizations          TextNormalization[]
   textSettingsUpdated         TextSettings[]
@@ -523,6 +525,7 @@ model Project {
   handoffNotes           HandoffNote[]
   rules                  ProjectRule[]
   reviewSteps            ProjectReviewStep[]
+  demoSecrets            ProjectDemoSecret[]
   telegramLinks          TelegramLink[]
   telegramIntakes        TelegramIntake[]
 
@@ -3423,6 +3426,7 @@ model BoardCard {
   handoffNotes         HandoffNote[]
   /// #884: every review step run on the card's PRs.
   reviewRuns           BoardCardReviewRun[]
+  demos                CardDemo[]
 
   @@unique([projectId, number])
   @@unique([projectId, fleetIssue, fleetSlot])
@@ -3762,7 +3766,7 @@ model Attachment {
   name       String
   /// Detected from the content (D5), one of the shared `ATTACHMENT_MIMES`.
   mime       String
-  /// Bytes, at most 25 MiB.
+  /// Bytes, at most 25 MiB; a video at most 100 MiB (ADR-0089).
   size       Int
   /// Lower-case hex SHA-256 of the bytes.
   sha256     String
@@ -3777,6 +3781,8 @@ model Attachment {
   plan      Plan?                @relation(fields: [planId], references: [id], onDelete: SetNull)
   uploader  User?                @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
   assistant AssistantAttachment?
+  /// ADR-0089: the demo whose video this is.
+  demo      CardDemo?
 
   @@index([cardId, createdAt])
   @@index([planId])
@@ -3813,6 +3819,14 @@ model BoardSettings {
   reviewEnabled          Boolean         @default(false)
   /// #862: mirror review findings as GitHub PR comments; opt-in.
   publishReviewComments  Boolean         @default(false)
+  /// C-368, ADR-0089: record a demo video of a finished card. Off for every
+  /// project until a person turns it on.
+  demoVideosEnabled      Boolean         @default(false)
+  /// ADR-0089: globs of the paths that make a card's change a UI change —
+  /// shared `DEMO_UI_PATHS_DEFAULT`, at most `DEMO_UI_PATHS_MAX`.
+  demoUiPaths            String[]        @default(["apps/web/**", "**/*.tsx", "**/*.css"])
+  /// ADR-0089: send a ready demo to the project's Telegram chats too.
+  demoTelegram           Boolean         @default(true)
   updatedById            String?
   updatedAt              DateTime        @updatedAt
 
@@ -4544,6 +4558,78 @@ model BoardCardReviewRun {
   @@unique([cardId, headSha, pass, stepId])
   @@index([state])
   @@map("board_card_review_runs")
+}
+
+// ─── Demo videos (C-368, ADR-0089) ──────────────────────────────────────────
+
+/// ADR-0089: one "Demo env" secret of a project — a value a demo scenario
+/// reads with `valueFrom.env`. The API returns names only; the runner fetches
+/// the values over HTTPS for a demo it records.
+model ProjectDemoSecret {
+  id              String   @id @default(cuid())
+  projectId       String
+  /// An environment variable name (shared `DEMO_SECRET_NAME_PATTERN`).
+  name            String
+  /// The value sealed with `APP_ENCRYPTION_KEY` (`SecretCipher`'s v1 format).
+  valueCiphertext String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  updatedById     String?
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, name])
+  @@map("project_demo_secrets")
+}
+
+/// Mirrors `DEMO_STATUSES` of the shared contract.
+enum CardDemoStatus {
+  queued
+  recording
+  ready
+  failed
+  skipped
+}
+
+/// Mirrors `DEMO_TRIGGERS` of the shared contract.
+enum CardDemoTrigger {
+  auto
+  manual
+}
+
+/// ADR-0089: one demo recording of a card's round. A failed or skipped demo
+/// is a warning on the card, never a gate on Finished or the merge. Lives as
+/// long as the card; its video is the card's attachment.
+model CardDemo {
+  id            String          @id @default(cuid())
+  cardId        String
+  /// The card round whose head it records.
+  round         Int
+  status        CardDemoStatus  @default(queued)
+  trigger       CardDemoTrigger
+  /// Why it failed or was skipped, at most `DEMO_REASON_MAX` characters.
+  reason        String?
+  /// The scenario, relative to the worktree (`demoScenarioPath`).
+  scenarioPath  String?
+  /// The video, once uploaded; `ready` has one.
+  attachmentId  String?         @unique
+  durationMs    Int?
+  /// The video's bytes.
+  size          Int?
+  /// The person whose "Record again" queued it; null for `auto`.
+  requestedById String?
+  createdAt     DateTime        @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+
+  card        BoardCard   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  attachment  Attachment? @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  requestedBy User?       @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([cardId, createdAt])
+  @@index([status])
+  @@map("card_demos")
 }
 
 // ─── LLM gateway (ADR-0059, #598) ───────────────────────────────────────────
