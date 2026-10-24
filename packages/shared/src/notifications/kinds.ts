@@ -26,7 +26,7 @@ import type { Role } from '../auth';
  * (C-147): only the user it is about receives it, in the app only — the chat
  * is not linked until they confirm it.
  * `card.demo` comes from a card's demo video becoming ready or failing while
- * the project's `demoTelegram` is on (C-372, ADR-0095): the video itself, with
+ * the project's `demoTelegram` is on (C-372, ADR-0096): the video itself, with
  * Merge and Feedback buttons, so it is Telegram only and goes to operators and
  * admins only — the people who can act on it.
  */

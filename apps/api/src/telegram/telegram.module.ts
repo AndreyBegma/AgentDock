@@ -56,7 +56,7 @@ import { TelegramWebAppService } from './telegram-web-app.service';
  * transcribed by `SpeechToText`. #620: any other text goes to the AI
  * assistant as the linked user (`TelegramAssistantService`, ADR-0061).
  * C-372: a card's demo video goes to the chat with Merge and Feedback
- * (`TelegramDemoService`, ADR-0095).
+ * (`TelegramDemoService`, ADR-0096).
  */
 @Module({
   imports: [

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BoardAttachmentsController } from '../attachments/board-attachments.controller';
+import { DemosModule } from '../demos/demos.module';
 import { LiveModule } from '../live/live.module';
 import { ProjectsModule } from '../projects';
 import { ReadinessModule } from '../readiness';
@@ -38,6 +39,8 @@ import { CollectRetryTimer } from './collect-retry-timer';
 @Module({
   // #309: `AttachmentsService` comes from the global `AttachmentsModule`.
   imports: [
+    // C-370: a feature card's green head is recorded as a demo video.
+    DemosModule,
     LiveModule,
     ProjectsModule,
     ReadinessModule,

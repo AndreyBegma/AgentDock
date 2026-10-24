@@ -12,7 +12,7 @@ import type {
 } from './telegram-client';
 
 /**
- * C-372 (ADR-0095): the Telegram message of a card's demo video — the video
+ * C-372 (ADR-0096): the Telegram message of a card's demo video — the video
  * with its caption, the text that stands in for a video over Telegram's
  * upload limit, the one line of a failed demo, and the Merge / Feedback /
  * Open card buttons. Pure: `TelegramDemoService` reads the card and sends.

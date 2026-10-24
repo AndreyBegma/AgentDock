@@ -1,8 +1,8 @@
-# ADR-0095: A card's demo video goes to Telegram as a notification with Merge and Feedback
+# ADR-0096: A card's demo video goes to Telegram as a notification with Merge and Feedback
 
 Status: accepted · Date: 2026-10-24 ·
 Spec: [`docs/specs/card-372-demo-videos-send-a-ready-demo-to-telegra.md`](../specs/card-372-demo-videos-send-a-ready-demo-to-telegra.md) ·
-Relates to: [ADR-0090](0090-a-finished-card-may-carry-a-demo-video-recorded-by-demoflow-on-the-runner.md), [ADR-0046](0046-the-telegram-bot-acts-on-the-board-through-a-command-router.md), [ADR-0064](0064-a-dependent-card-branches-from-its-dependency-with-a-stacked-pr.md), [ADR-0014](0014-server-originated-events-live-in-events.md) ·
+Relates to: [ADR-0090](0090-a-finished-card-may-carry-a-demo-video-recorded-by-demoflow-on-the-runner.md), [ADR-0046](0046-the-telegram-bot-acts-on-the-board-through-a-command-router.md), [ADR-0064](0064-a-dependent-card-branches-from-its-dependency-with-a-stacked-pr.md), [ADR-0014](0014-server-originated-events-live-in-events.md), [ADR-0095](0095-auto-merge-waits-up-to-fifteen-minutes-for-a-cards-demo-video.md) ·
 Card: C-372 (stack S-12, stage 2)
 
 ## Context
@@ -60,6 +60,15 @@ Three constraints shape how it is sent:
    frame as a photo above 50 MB. The API cannot make one (see Context), so the
    text message stands in for it. A poster frame made by the runner next to
    the video is the follow-up that lets the bot send the photo.
+5. **Only the demo of the PR's current head is sent.** ADR-0095 records one
+   demo per head and supersedes (skips) a demo in flight when a newer head
+   lands; a skipped demo sends nothing. A demo that finished for a head the PR
+   no longer shows, or one the card already has a newer demo for (not a
+   skipped one), is outdated: no event is recorded for it, and a notification
+   already queued for it is dropped at delivery and never retried. A demo
+   failed because its runner lost it (replaced by "Record again" after
+   `DEMO_STALE_MS`) sends nothing either. A failure the runner reports, or a
+   refusal of the card's own `card.demo` command, sends its line.
 
 ## Consequences
 

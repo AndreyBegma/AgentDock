@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   CARD_DEMO_EVENT,
   type CardDemoView,
+  DEMO_STALE_MS,
   TELEGRAM_BOT_UPLOAD_MAX_BYTES,
 } from '@nautelle/shared';
 import {
@@ -43,7 +44,7 @@ const sha256 = (body: Buffer): string =>
   createHash('sha256').update(body).digest('hex');
 
 /**
- * C-372 (ADR-0095): a card's demo video sent to Telegram, on the fake Bot API,
+ * C-372 (ADR-0096): a card's demo video sent to Telegram, on the fake Bot API,
  * from the runner's upload through the notification matcher to the delivery
  * pass, and its Merge and Feedback buttons through #578's card actions.
  */
@@ -396,6 +397,77 @@ describe('Telegram: a card demo with Merge and Feedback (C-372, e2e)', () => {
       await w.ctx.prisma.event.count({ where: { type: CARD_DEMO_EVENT } }),
     ).toBe(0);
     expect(await demoNotifications()).toEqual([]);
+  });
+
+  /** The card's PR now shows another head than demo `demoId` recorded. */
+  const prMovedOn = async (demoId: string) => {
+    await w.ctx.prisma.cardDemo.update({
+      where: { id: demoId },
+      data: { headSha: HEAD_SHA },
+    });
+    await w.ctx.prisma.boardCard.updateMany({
+      where: { projectId: w.a, number: 1 },
+      data: { ciHeadSha: 'b'.repeat(40) },
+    });
+  };
+
+  it('records nothing for a demo that finished for a head the PR no longer shows', async () => {
+    await link([w.operatorId, OPERATOR_CHAT]);
+    await finishedCard();
+    const demo = await requested();
+    await prMovedOn(demo.id);
+    await uploaded(demo.id);
+
+    await deliver();
+    noDemoTo(OPERATOR_CHAT);
+    expect(
+      await w.ctx.prisma.event.count({ where: { type: CARD_DEMO_EVENT } }),
+    ).toBe(0);
+  });
+
+  it('drops a queued demo message once a newer head or demo makes it outdated, and never retries it', async () => {
+    await link([w.operatorId, OPERATOR_CHAT]);
+    await finishedCard();
+    const demo = await uploaded((await requested()).id);
+    for (let i = 0; i < 20; i += 1) {
+      if ((await matcher.tick()) === 0) break;
+    }
+    // A new head landed while the message waited for the delivery pass.
+    await prMovedOn(demo.id);
+
+    await delivery.deliverOnce();
+    noDemoTo(OPERATOR_CHAT);
+    const rows = await w.ctx.prisma.notificationDelivery.findMany({
+      where: { notification: { kind: 'card.demo' } },
+      select: { status: true, nextAttemptAt: true, lastError: true },
+    });
+    expect(rows).toEqual([
+      {
+        status: 'failed',
+        nextAttemptAt: null,
+        lastError: 'The demo no longer shows the PR',
+      },
+    ]);
+  });
+
+  it('sends no failure line for a demo its runner lost, replaced by Record again', async () => {
+    await link([w.operatorId, OPERATOR_CHAT]);
+    await finishedCard();
+    const lost = await requested();
+    await w.ctx.prisma.cardDemo.update({
+      where: { id: lost.id },
+      data: { createdAt: new Date(Date.now() - DEMO_STALE_MS - 1_000) },
+    });
+    await requested();
+    expect(
+      await w.ctx.prisma.cardDemo.findUniqueOrThrow({ where: { id: lost.id } }),
+    ).toMatchObject({ status: 'failed' });
+
+    await deliver();
+    noDemoTo(OPERATOR_CHAT);
+    expect(
+      await w.ctx.prisma.event.count({ where: { type: CARD_DEMO_EVENT } }),
+    ).toBe(0);
   });
 
   it('sends no message to an operator who never linked Telegram, and keeps no row for them', async () => {

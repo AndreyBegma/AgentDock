@@ -104,9 +104,19 @@ export class TelegramDeliveryService {
             message.content,
             uploaded,
           );
-          if (sent) {
+          if (sent === 'sent') {
             await this.ledger.markSent(message.id, now);
             pass.sent += 1;
+            continue;
+          }
+          if (sent === 'outdated') {
+            // Never retried: a newer head or demo has its own message.
+            await this.ledger.markFailed(
+              message.id,
+              'The demo no longer shows the PR',
+              { permanent: true },
+              now,
+            );
             continue;
           }
         } catch (error) {

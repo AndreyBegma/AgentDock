@@ -5,7 +5,8 @@ import { cardLabel, cardSlug } from '../board/naming';
  * Demo videos of finished cards (C-368, ADR-0090). DemoFlow records a short
  * video of a UI card on the project's runner; the video is a card attachment
  * and a `card_demos` row tracks each recording. A failed demo never blocks
- * Finished or a merge — it is a warning with its reason.
+ * Finished or a merge — it is a warning with its reason. C-370 (ADR-0095):
+ * auto-merge waits for a demo in flight, at most `DEMO_MERGE_WAIT_MS`.
  *
  * Browser routes are under `/projects/:projectId`, behind the project guard;
  * the runner uploads the video and reads the demo's secrets with its runner
@@ -68,6 +69,28 @@ export const demoSecretNameSchema = z
 
 /** `card_demos.reason`: why a demo failed or was skipped, without a stack trace. */
 export const DEMO_REASON_MAX = 500;
+
+/**
+ * C-370, ADR-0095: how long auto-merge waits for a demo of the card to end
+ * (`ready`, `failed` or `skipped`). A demo older than this no longer holds the
+ * merge, whatever its status.
+ */
+export const DEMO_MERGE_WAIT_MS = 15 * 60_000;
+
+/**
+ * A demo queued or recording for longer than this is one the runner never
+ * finished: "Record again" fails it instead of answering `demo_in_flight`.
+ */
+export const DEMO_STALE_MS = 30 * 60_000;
+
+/**
+ * Activity events the API records itself (ADR-0014) when a card's demo ends.
+ * A failed demo is a warning only: it never makes the card need a person.
+ */
+export const CARD_DEMO_EVENTS = {
+  ready: 'card.demo_ready',
+  failed: 'card.demo_failed',
+} as const;
 
 /** Where card workers commit their DemoFlow scenarios, repository-relative. */
 export const DEMO_SCENARIO_DIR = 'demoflow/cards';
@@ -147,7 +170,7 @@ export interface CardDemoView {
 
 /**
  * Server event (ADR-0014) of a demo that became `ready` or `failed` while the
- * project's `demoTelegram` is on (C-372, ADR-0095). The `card.demo`
+ * project's `demoTelegram` is on (C-372, ADR-0096). The `card.demo`
  * notification comes from it, on Telegram only. It names the card and the
  * demo — never the scenario or the video.
  */
@@ -183,6 +206,10 @@ export const DEMO_ERROR = {
   notActive: 'demo_not_active',
   /** 409: the card has never run, so there is nothing to record. */
   noRound: 'no_round',
+  /** 409 (C-370): the card has no pull request to record. */
+  noPullRequest: 'no_pull_request',
+  /** 409 (C-370): the card is Completed; its demos are history. */
+  completed: 'card_completed',
   /** 409: `APP_ENCRYPTION_KEY` is not set, so a secret cannot be stored. */
   encryptionUnavailable: 'encryption_unavailable',
   /** 422: over `DEMO_SECRETS_MAX`. */

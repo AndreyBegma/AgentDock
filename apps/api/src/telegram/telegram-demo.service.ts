@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AttachmentStore } from '../attachments/attachment-store';
 import { BoardService } from '../board/board.service';
 import { PrismaService } from '../database/prisma.service';
+import { demoOutdated } from '../demos/demo-outdated';
 import type { DeliveryContent } from '../notifications';
 import {
   type DemoFacts,
@@ -33,7 +34,13 @@ const read = async (stream: AsyncIterable<Buffer>): Promise<Buffer> => {
 };
 
 /**
- * C-372 (ADR-0095): sends a `card.demo` notification as the demo itself. A
+ * What `deliver` did: sent the demo, dropped one that no longer shows the
+ * card's PR, or left the plain notification to the caller.
+ */
+export type DemoDelivery = 'sent' | 'outdated' | 'plain';
+
+/**
+ * C-372 (ADR-0096): sends a `card.demo` notification as the demo itself. A
  * ready demo goes as the video — or, over Telegram's 50 MB upload limit for a
  * bot, as a message that sends the person to the card — with the card's PR
  * and CI state and the Merge, Feedback and Open card buttons; a failed demo
@@ -53,9 +60,10 @@ export class TelegramDemoService {
   ) {}
 
   /**
-   * Sends notification `notificationId` to `chatId`. False when it is not a
+   * Sends notification `notificationId` to `chatId`. `plain` when it is not a
    * demo this service can send — its event, card or video is gone — and the
-   * caller sends the plain notification instead. `uploaded` maps a demo to
+   * caller sends the plain notification instead; `outdated` when the PR moved
+   * on since the demo (another head, or a newer demo), and nothing is sent. `uploaded` maps a demo to
    * the `file_id` Telegram gave its video, so a pass uploads each video once.
    * Telegram's errors are the caller's to handle.
    */
@@ -65,12 +73,12 @@ export class TelegramDemoService {
     notificationId: bigint,
     content: DeliveryContent,
     uploaded: Map<string, string>,
-  ): Promise<boolean> {
+  ): Promise<DemoDelivery> {
     const notification = await this.prisma.notification.findUnique({
       where: { id: notificationId },
       select: { userId: true, projectId: true, eventId: true },
     });
-    if (!notification?.projectId || !notification.eventId) return false;
+    if (!notification?.projectId || !notification.eventId) return 'plain';
     const { projectId } = notification;
     const event = await this.prisma.event.findUnique({
       where: { id: notification.eventId },
@@ -78,35 +86,51 @@ export class TelegramDemoService {
     });
     const data = record(event?.data);
     const demoId = text(data?.demoId);
-    if (event?.type !== CARD_DEMO_EVENT || !data || !demoId) return false;
-
-    if (data.status === 'failed') {
-      if (typeof data.number !== 'number') return false;
-      await this.client.sendMessage(
-        token,
-        chatId,
-        demoFailedLine(data.number, text(data.reason)),
-        true,
-      );
-      return true;
-    }
+    if (event?.type !== CARD_DEMO_EVENT || !data || !demoId) return 'plain';
 
     const demo = await this.prisma.cardDemo.findUnique({
       where: { id: demoId },
       select: {
+        id: true,
+        cardId: true,
+        headSha: true,
+        createdAt: true,
         attachment: {
           select: { id: true, name: true, mime: true, size: true },
         },
-        card: { select: { projectId: true, number: true, shortId: true } },
+        card: {
+          select: {
+            projectId: true,
+            number: true,
+            shortId: true,
+            ciHeadSha: true,
+          },
+        },
       },
     });
-    if (!demo?.attachment || demo.card.projectId !== projectId) return false;
+    if (!demo || demo.card.projectId !== projectId) return 'plain';
+    // C-370 may have pushed a newer head while this waited in the queue.
+    if (await demoOutdated(this.prisma, demo, demo.card.ciHeadSha)) {
+      return 'outdated';
+    }
+
+    if (data.status === 'failed') {
+      await this.client.sendMessage(
+        token,
+        chatId,
+        demoFailedLine(demo.card.number, text(data.reason)),
+        true,
+      );
+      return 'sent';
+    }
+
+    if (!demo.attachment) return 'plain';
     const member = await this.guard.member(
       notification.userId,
       projectId,
       'write',
     );
-    if (!member.ok) return false;
+    if (!member.ok) return 'plain';
     const card = await this.board.detail(
       projectId,
       demo.card.number,
@@ -143,7 +167,7 @@ export class TelegramDemoService {
         true,
         markup,
       );
-      return true;
+      return 'sent';
     }
     const fileId = uploaded.get(demoId);
     const sent = await this.client.sendVideo(
@@ -160,6 +184,6 @@ export class TelegramDemoService {
       markup,
     );
     if (sent.fileId) uploaded.set(demoId, sent.fileId);
-    return true;
+    return 'sent';
   }
 }

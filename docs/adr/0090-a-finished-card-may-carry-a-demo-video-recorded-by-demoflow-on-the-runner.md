@@ -5,7 +5,7 @@ Card: C-368 (stack S-12, stage 1) ·
 Spec: [`docs/specs/card-368-demo-videos-adr-data-model-and-api-for-a.md`](../specs/card-368-demo-videos-adr-data-model-and-api-for-a.md) ·
 Amends: [ADR-0031](0031-attachments-are-stored-by-the-api-on-a-local-volume.md) (video types and limit) ·
 Relates to: [ADR-0084](0084-a-card-passes-its-review-steps-before-finished.md), [ADR-0035](0035-a-card-ships-itself.md) ·
-Telegram delivery: [ADR-0095](0095-a-cards-demo-video-goes-to-telegram-as-a-notification-with-merge-and-feedback.md)
+Telegram delivery: [ADR-0096](0096-a-cards-demo-video-goes-to-telegram-as-a-notification-with-merge-and-feedback.md)
 
 ## Context
 
