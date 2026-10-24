@@ -183,6 +183,15 @@ describe('security headers (F-27)', () => {
     expect(directives(csp).get('script-src')).toBe("'self' 'nonce-n'");
   });
 
+  test('a same-origin live path needs nothing beyond self (ADR-0087)', () => {
+    const csp = contentSecurityPolicy({
+      nonce: 'n',
+      liveUrl: '/api/live',
+      dev: false,
+    });
+    expect(directives(csp).get('connect-src')).toBe("'self'");
+  });
+
   test('a malformed live URL only drops the extra origin', () => {
     const csp = contentSecurityPolicy({
       nonce: 'n',

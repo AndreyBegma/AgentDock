@@ -14,7 +14,9 @@ export function createNonce(): string {
 
 /**
  * The origin of the live / terminal WebSocket (`NEXT_PUBLIC_LIVE_URL`). In
- * development it is the API's own port, another origin than the page.
+ * development it is the API's own port, another origin than the page. A path
+ * (`/api/live`, the published image) is the page's own origin: `'self'`
+ * already covers it.
  */
 function liveOrigin(liveUrl: string): string | null {
   try {
