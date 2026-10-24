@@ -22,7 +22,9 @@
     "admin:create": "bun run --cwd apps/api admin:create",
     "format": "biome format --write .",
     "check:secrets": "sh scripts/check-secrets.sh",
-    "check": "biome check . && bun scripts/check-ci.ts && bun scripts/check-images.ts && bun scripts/check-brand.ts && bun scripts/check-pins.ts && bun scripts/check-numbering.ts && bun test ./scripts"
+    "docs:env": "bun scripts/env-reference.ts",
+    "docs:dev": "bun run --cwd apps/docs start:docs",
+    "check": "biome check . && bun scripts/check-ci.ts && bun scripts/check-images.ts && bun scripts/check-brand.ts && bun scripts/check-pins.ts && bun scripts/check-numbering.ts && bun scripts/env-reference.ts --check && bun test ./scripts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.10",

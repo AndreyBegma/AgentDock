@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .tile { fill: #18181b; }
+    @media (prefers-color-scheme: dark) { .tile { fill: #f2f2f6; } }
+  </style>
+  <path class="tile" fill-rule="evenodd" d="M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H10a8 8 0 0 1-8-8V10a8 8 0 0 1 8-8zM14.5 6v14H7zM16.5 9.5V20h6zM7 22h18l-2.5 3.5h-13zM20 8.25a2.25 2.25 0 1 0 4.5 0a2.25 2.25 0 1 0-4.5 0z"/>
+  <circle cx="22.25" cy="8.25" r="2.25" fill="#5b5bf6"/>
+</svg>
