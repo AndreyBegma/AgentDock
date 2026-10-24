@@ -28,7 +28,7 @@ interface Design {
 }
 
 /**
- * C-377 (ADR-0087): stacks, designs and dependencies from a person's session —
+ * C-377 (ADR-0089): stacks, designs and dependencies from a person's session —
  * through the real router, so its authorization, the refusals' names and the
  * result schemas are the ones a runner gets. Writes answer only a person's
  * own `manual` session; Approve from any other is `needs_person`.

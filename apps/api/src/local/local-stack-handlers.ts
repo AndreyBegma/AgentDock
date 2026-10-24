@@ -118,7 +118,7 @@ const commentedRevisionOf = (view: TaskDesignView): string => {
 };
 
 /**
- * C-377 (ADR-0087): stacks, designs and dependencies from a person's session.
+ * C-377 (ADR-0089): stacks, designs and dependencies from a person's session.
  * Writes answer only a person's own `manual` session and act through the
  * services the web routes use, so every rule and refusal is the web app's.
  * The design views answer any session; Approve from any other session is

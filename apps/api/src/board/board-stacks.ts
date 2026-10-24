@@ -298,7 +298,7 @@ export class BoardStacks {
   }
 
   /**
-   * C-377 (ADR-0087): `group` with stages — every card of a stage depends on
+   * C-377 (ADR-0089): `group` with stages — every card of a stage depends on
    * every card of the stage before, as an intake's stack. One transaction:
    * a card that breaks the rules of `group`, or a stage link that would close
    * a dependency cycle with the project's dependencies, refuses the whole

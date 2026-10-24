@@ -72,14 +72,14 @@ export const LOCAL_BOARD_REFUSALS = [
   'no_profile',
   'command_unavailable',
   'policy_refused',
-  // C-377 (ADR-0087): stacks and dependencies.
+  // C-377 (ADR-0089): stacks and dependencies.
   'stack_refused',
   'dependency_cycle',
   'invalid_dependency',
 ] as const;
 
 /**
- * C-377 (ADR-0087): the design routes' own refusals (`DESIGN_ERROR`) the
+ * C-377 (ADR-0089): the design routes' own refusals (`DESIGN_ERROR`) the
  * design tools answer with unchanged. The design module checks each is a
  * `DesignErrorCode`.
  */
@@ -142,7 +142,7 @@ export const localErrorCodeSchema = z.enum([
   /** #845: `card.release` of a card the calling session neither holds nor queued. */
   'not_taken',
   /**
-   * C-377 (ADR-0087): a design approve from a session that is not a person's
+   * C-377 (ADR-0089): a design approve from a session that is not a person's
    * own `manual` one — approving stays a person's gate.
    */
   'needs_person',
@@ -504,7 +504,7 @@ export const localCardTakenSchema = z.object({
 });
 export type LocalCardTaken = z.infer<typeof localCardTakenSchema>;
 
-// C-377 (ADR-0087): a person's session works stacks, designs and dependencies.
+// C-377 (ADR-0089): a person's session works stacks, designs and dependencies.
 
 /** `STACK_TITLE_MAX` in the planner module. */
 export const LOCAL_STACK_TITLE_MAX = 80;
@@ -870,7 +870,7 @@ export const localCardReleaseResultSchema = z.object({
   next: localTakenCardSchema.nullable(),
 });
 
-// C-377 (ADR-0087): the stack, design and dependency methods.
+// C-377 (ADR-0089): the stack, design and dependency methods.
 
 /**
  * `stack.create` (C-377): one call groups the cards into a new stack with
@@ -1212,7 +1212,7 @@ export const localMethods = {
     minRole: 'operator',
     needsProject: true,
   },
-  // C-377 (ADR-0087): the design views answer any session of the project;
+  // C-377 (ADR-0089): the design views answer any session of the project;
   // the rest only a person's own `manual` one, as the #845 control methods.
   'stack.create': {
     args: localStackCreateArgsSchema,
