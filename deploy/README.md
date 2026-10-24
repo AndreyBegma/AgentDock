@@ -355,9 +355,14 @@ publishes; it is the way to rehearse the signature with the real key.
 
 Decisions: [ADR-0088](../docs/adr/0088-nautelle-installs-from-published-images-with-one-compose-file.md),
 [ADR-0091](../docs/adr/0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md),
-[ADR-0092](../docs/adr/0092-nautelle-runs-on-kubernetes-from-a-helm-chart-published-with-each-release.md).
+[ADR-0092](../docs/adr/0092-nautelle-runs-on-kubernetes-from-a-helm-chart-published-with-each-release.md),
+[ADR-0097](../docs/adr/0097-an-all-in-one-image-and-a-docker-hub-mirror-under-abegma.md).
 A product tag `vX.Y.Z` (ADR-0071) runs `.woodpecker/release-images.yml`. It
-calls `deploy/images/release-images.sh`, which:
+first runs `scripts/dockerhub.ts` (the `dockerhub-repos` step), which
+creates `abegma/nautelle-api`, `abegma/nautelle-web` and `abegma/nautelle` on
+Docker Hub as public repositories if they are missing, refuses one that is
+private, and sets their descriptions from `README.md`. Then it calls
+`deploy/images/release-images.sh`, which:
 
 1. checks that `X.Y.Z` is `APP_VERSION` and that the signing key in the
    `cosign_private_key` secret belongs to `deploy/images/cosign.pub`;
@@ -370,8 +375,21 @@ calls `deploy/images/release-images.sh`, which:
    `revision`, `created`, `title`, `licenses`), an SBOM and `mode=max`
    provenance, and pushes them as `:X.Y.Z`, `:X.Y`, `:X` and `:latest`. A
    pre-release tag (`vX.Y.Z-rc.1`) is pushed as its own version only;
-5. signs each image by digest with cosign and writes the digests to
-   `.release/images.json`.
+5. signs each image by digest with cosign;
+6. builds the all-in-one image `ghcr.io/andreybegma/nautelle` from
+   `deploy/all-in-one/Dockerfile` with the two digests just pushed, runs
+   `deploy/all-in-one/check-image.sh` on the host's build (demo mode must
+   become healthy and print the setup link), then pushes and signs it the
+   same way;
+7. copies each of the three indexes to Docker Hub with
+   `docker buildx imagetools create` (the same bytes, so the same digest, SBOM
+   and provenance), checks the digest there, signs it there with the same key,
+   and writes the digests and the mirrors to `.release/images.json`.
+
+The Docker Hub namespace and the repository prefix are in
+`deploy/images/dockerhub.env` (`DOCKERHUB_NAMESPACE=abegma`,
+`DOCKERHUB_REPO_PREFIX=nautelle-`); both scripts read it, and moving to an
+organization changes those two lines.
 
 Once both images are pushed, the `chart` step runs
 `deploy/helm/release-chart.sh` (ADR-0092). It checks the tag the same way,
@@ -413,17 +431,23 @@ keeps building its own images (`build-staging.sh`).
      account;
    - `cosign_private_key`: the content of `cosign.key`;
    - `cosign_password`: its password;
+   - `dockerhub_username`: `abegma`, the Docker Hub account;
+   - `dockerhub_token`: a Docker Hub personal access token of that account
+     with *Read, Write, Delete* (the Hub API needs it to create a repository
+     and set its description, the push to copy the images);
    - `github_release_token`: the runner's token (*contents: write* on the
      repository) also creates the product release.
 
-   A tag run without the cosign secrets, or with a key that does not match
-   `cosign.pub`, stops before it builds anything.
+   A tag run without the cosign or Docker Hub secrets, with a key that does
+   not match `cosign.pub`, or with a Docker Hub login that is refused, stops
+   before it builds anything.
 3. **GitHub tag ruleset.** Add the pattern `v*` to the tag ruleset of P-03, so
    only administrators can create, move or delete a product tag.
-4. **Package visibility.** After the first push, set the three packages,
-   `nautelle-api`, `nautelle-web` and the chart `charts/nautelle`, to *Public*
+4. **Package visibility.** After the first push, set the four packages,
+   `nautelle-api`, `nautelle-web`, `nautelle` and the chart `charts/nautelle`, to *Public*
    in the account's package settings, and link them to the repository. An
-   install pulls them without a login only once they are public.
+   install pulls them without a login only once they are public. The Docker
+   Hub repositories are created public by the release itself.
 
 ### Each release
 
@@ -431,7 +455,8 @@ The `release` skill tags `vX.Y.Z` on `main` after the release pull request
 merges; the tag starts the workflow, and the release note must already have its
 "Summary" and "What changed" sections. To rehearse, run the pipeline by hand
 with a message that contains `[image-release]` on a branch other than
-`develop`: it builds both images for both platforms as `<APP_VERSION>-dev`,
+`develop`: it builds the three images for both platforms as `<APP_VERSION>-dev`
+(the all-in-one one from the other two on disk, and checked on the host),
 packages the chart as `<APP_VERSION>-dev` and pushes, signs and releases
 nothing. Locally, `sh deploy/images/release-images.sh` and
 `sh deploy/helm/release-chart.sh` do the same. `NAUTELLE_IMAGES_DRY_RUN=1` and
@@ -442,6 +467,8 @@ To check a release, verify an image and install it on a clean machine:
 
 ```sh
 cosign verify --key deploy/images/cosign.pub ghcr.io/andreybegma/nautelle-api:X.Y.Z
+cosign verify --key deploy/images/cosign.pub docker.io/abegma/nautelle-api:X.Y.Z
+docker run --rm -p 8000:8000 abegma/nautelle:X.Y.Z
 docker buildx imagetools inspect ghcr.io/andreybegma/nautelle-api:X.Y.Z --format '{{ json .SBOM }}'
 curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh -s -- --version X.Y.Z
 ```

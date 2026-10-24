@@ -44,6 +44,12 @@ the chart keeps in the Secret `nautelle-bundled` across upgrades.
 From a checkout of the repository, `helm install nautelle deploy/helm/nautelle`
 installs the chart as it is on that branch, with the `:latest` images.
 
+The images come from `ghcr.io/andreybegma`. The same images, with the same
+digests and signatures, are on Docker Hub: `--set image.registry=docker.io/abegma`
+pulls `docker.io/abegma/nautelle-api` and `nautelle-web` instead. An
+`api.image.repository` or `web.image.repository` that names a full path, such
+as a mirror of your own, ignores `image.registry`.
+
 ## First run
 
 Open the one-time setup link the API logs and create the first administrator
