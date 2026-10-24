@@ -89,28 +89,61 @@ const signal = (pid: number, name: NodeJS.Signals): void => {
   }
 };
 
-/** pid → parent pid and command line. */
-export type ProcessTable = ReturnType<typeof parseProcessTable>;
+/**
+ * One process: its parent, its command line and, from `/proc`, its session
+ * and start time.
+ */
+export interface ProcessEntry {
+  ppid: number;
+  args: string;
+  /** The session id; unknown when the table came from `ps`. */
+  sid?: number;
+  /** When it started, in clock ticks since boot; kept across `exec`. */
+  start?: number;
+}
+
+/**
+ * Whether `entry` is still the process seen as `was`: the same start time
+ * when both have one (a process may `exec` another command line), else the
+ * same command line. A reused pid fails both.
+ */
+const sameProcess = (was: ProcessEntry, entry: ProcessEntry): boolean =>
+  was.start !== undefined && entry.start !== undefined
+    ? was.start === entry.start
+    : was.args === entry.args;
+
+/** pid → its entry. */
+export type ProcessTable = Map<number, ProcessEntry>;
 
 /** Lists the machine's processes; `null` when it cannot. */
 export type ProcessLister = () => Promise<ProcessTable | null>;
 
 /**
- * The parent pid in a `/proc/<pid>/stat` line, `pid (comm) state ppid …`.
+ * The numeric field `index` after the command name of a `/proc/<pid>/stat`
+ * line, `pid (comm) state ppid pgrp session …` (`ppid` is 1, `session` 3,
+ * `starttime` 19).
  * `comm` may hold spaces and parentheses, so the fields start after the last
  * `)`.
  */
-export const parseProcStat = (stat: string): number | null => {
+const statField = (stat: string, index: number): number | null => {
   const close = stat.lastIndexOf(')');
   if (close < 0) return null;
-  const ppid = Number(
+  const value = Number(
     stat
       .slice(close + 1)
       .trim()
-      .split(/\s+/)[1],
+      .split(/\s+/)[index],
   );
-  return Number.isInteger(ppid) && ppid >= 0 ? ppid : null;
+  return Number.isInteger(value) && value >= 0 ? value : null;
 };
+
+/** The parent pid in a `/proc/<pid>/stat` line. */
+export const parseProcStat = (stat: string): number | null =>
+  statField(stat, 1);
+
+/** The session id in a `/proc/<pid>/stat` line. */
+export const parseProcSession = (stat: string): number | null =>
+  statField(stat, 3);
 
 /** The command name in a `/proc/<pid>/stat` line, between the parentheses. */
 const procComm = (stat: string): string =>
@@ -127,7 +160,12 @@ const readProcess = async (procRoot: string, pid: number) => {
     const words = cmdline.split('\0').filter((word) => word.length > 0);
     // A kernel thread or a zombie has no command line; `ps` shows `[comm]`.
     const args = words.length > 0 ? words.join(' ') : `[${procComm(stat)}]`;
-    return { ppid, args };
+    const entry: ProcessEntry = { ppid, args };
+    const sid = parseProcSession(stat);
+    if (sid !== null) entry.sid = sid;
+    const start = statField(stat, 19);
+    if (start !== null) entry.start = start;
+    return entry;
   } catch {
     // The process exited between the listing and the read.
     return null;
@@ -185,18 +223,32 @@ const groupAlive = (pgid: number): boolean => {
  * DemoFlow's process group would leave the app running; the runner keeps the
  * pid and command line of each descendant it has seen, so a process whose
  * parent already exited (reparented to init) is still found, and a reused
- * pid with another command line is never signalled. When the table cannot be
+ * pid is never signalled (C-384: told apart by start time from `/proc`, so a
+ * process that `exec`s another command line stays known; by command line
+ * from `ps`). When the table cannot be
  * listed at all, `onUnlisted` is told and only the root's process group is
  * killed.
+ *
+ * C-384: a process is also part of the tree when it is in a session the tree
+ * owns: the root's (the root leads it, being `detached`) and the session of
+ * every descendant seen. Linux keeps a pid out of reuse while it names a live
+ * session, so this finds, from `/proc`, a process whose parent exited before
+ * any listing saw it, as long as it kept its session. Still not caught: a
+ * process that called `setsid` and whose parent exited before any listing saw
+ * it, and, on a table from `ps` (no session ids), anything reparented unseen
+ * outside the root's process group.
  */
 export class ProcessTree {
-  private readonly seen = new Map<number, string>();
+  private readonly seen = new Map<number, ProcessEntry>();
+  private readonly sessions = new Set<number>();
 
   constructor(
     private readonly list: ProcessLister,
     readonly rootPid: number,
     private readonly onUnlisted: () => void = () => {},
-  ) {}
+  ) {
+    this.sessions.add(rootPid);
+  }
 
   private async table() {
     const table = await this.list();
@@ -204,35 +256,48 @@ export class ProcessTree {
     return table;
   }
 
-  /** Adds the root's live descendants to what it has seen. */
+  /**
+   * Adds the root's live descendants, and every process in a session the
+   * tree owns, to what it has seen; records the sessions of what it adds.
+   */
   async poll(): Promise<void> {
     const table = await this.table();
     if (!table) return;
+    const root = table.get(this.rootPid);
+    if (root && !this.seen.has(this.rootPid)) {
+      this.seen.set(this.rootPid, root);
+    }
     const known = new Set([this.rootPid, ...this.seen.keys()]);
+    for (const [pid, was] of this.seen) {
+      // A reused pid is not ours, nor its session.
+      const entry = table.get(pid);
+      if (entry?.sid && sameProcess(was, entry)) this.sessions.add(entry.sid);
+    }
+    const owned = (entry: ProcessEntry) =>
+      known.has(entry.ppid) ||
+      (entry.sid !== undefined && this.sessions.has(entry.sid));
     let grew = true;
     while (grew) {
       grew = false;
       for (const [pid, entry] of table) {
-        if (known.has(entry.ppid) && !known.has(pid)) {
+        if (!known.has(pid) && pid !== process.pid && owned(entry)) {
           known.add(pid);
-          this.seen.set(pid, entry.args);
+          this.seen.set(pid, entry);
+          if (entry.sid) this.sessions.add(entry.sid);
           grew = true;
         }
       }
     }
-    const root = table.get(this.rootPid);
-    if (root && !this.seen.has(this.rootPid)) {
-      this.seen.set(this.rootPid, root.args);
-    }
   }
 
-  /** Seen processes still running with the command line they had. */
+  /** Seen processes still running, their pid not reused. */
   async alive(): Promise<number[] | null> {
     const table = await this.table();
     if (!table) return null;
-    return [...this.seen].flatMap(([pid, args]) =>
-      table.get(pid)?.args === args ? [pid] : [],
-    );
+    return [...this.seen].flatMap(([pid, was]) => {
+      const entry = table.get(pid);
+      return entry && sameProcess(was, entry) ? [pid] : [];
+    });
   }
 
   /** Without a process table: the root's process group, which it leads. */
@@ -245,24 +310,29 @@ export class ProcessTree {
   }
 
   /**
-   * SIGTERM to every seen process and its process group, SIGKILL to what is
-   * left after `graceMs`. Returns how many were still running at the start.
+   * SIGTERM to every seen process and its process group, and to the root's
+   * process group, which outlives the root while a member runs; SIGKILL to
+   * what is left after `graceMs`. Returns how many were still running at the
+   * start.
    */
   async kill(graceMs = KILL_GRACE_MS): Promise<number> {
     await this.poll();
     const running = await this.alive();
     if (running === null) return this.killGroup(graceMs);
-    if (running.length === 0) return 0;
+    const group = groupAlive(this.rootPid);
+    if (running.length === 0 && !group) return 0;
+    if (group) signal(-this.rootPid, 'SIGTERM');
     for (const pid of running) {
       signal(-pid, 'SIGTERM');
       signal(pid, 'SIGTERM');
     }
     await delay(graceMs);
+    if (groupAlive(this.rootPid)) signal(-this.rootPid, 'SIGKILL');
     for (const pid of (await this.alive()) ?? running) {
       signal(-pid, 'SIGKILL');
       signal(pid, 'SIGKILL');
     }
-    return running.length;
+    return Math.max(running.length, group ? 1 : 0);
   }
 }
 
@@ -334,6 +404,8 @@ export const createDemoflowSpawn = (
       // A process that outlives DemoFlow may hold its pipes open; its output
       // is complete once DemoFlow has exited and the pipes had a moment.
       child.once('exit', (code) => {
+        // The table now, before what DemoFlow left running moves on.
+        void tree.poll();
         setTimeout(() => end(code), PIPE_DRAIN_MS);
       });
     });
