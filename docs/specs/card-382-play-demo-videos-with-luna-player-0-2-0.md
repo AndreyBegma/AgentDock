@@ -15,3 +15,10 @@ C-371 (stack S-12) shipped the demo `VideoPlayer` adapter with a native `<video>
 
 ## Done when
 On a Finished card with a ready demo, the video plays in luna-player and seeks over Range. The native fallback works when Luna fails. glass-ui is 0.38.0. `bun run check`, the web tests and the build all pass.
+
+## Decisions log
+- 2026-10-24: glass-ui is pinned to 0.38.0 and luna-player to 0.2.0 in `apps/web`. All of luna-player's peers (react, react-dom, hls.js is optional, glass-ui, lucide-react, motion, tailwindcss, and glass-ui's Radix slider and tooltip) were already installed, so no peer was added.
+- `luna-player/player.css` is imported from `globals.css`, after glass-ui's imports; its `@source` makes Tailwind generate the player's classes. No JS import of the CSS.
+- `loadLunaPlayer` wraps `<Player>` with `aspectRatio="16:9"` and `storage={null}`, so the card writes nothing to localStorage. `luna-player/hls` is not imported, so hls.js stays out of the bundle.
+- A playback error is remembered per source (`failedSrc`): that recording falls back to the native `<video>`, while another demo on the card gets Luna again.
+- The web tests have no DOM library, so the swap is a pure `PlayerSwitch` component tested with server rendering; the `onError` wiring is checked by calling the prop the switch passes to Luna.
