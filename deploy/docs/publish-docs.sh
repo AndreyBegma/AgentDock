@@ -33,7 +33,7 @@ if [ "${NAUTELLE_DOCS_DRY_RUN:-}" = 1 ]; then
   exit 0
 fi
 [ -n "${PAGES_TOKEN:-}" ] ||
-  fail 'PAGES_TOKEN is needed to publish (the pages_token secret, tag event only)'
+  fail 'PAGES_TOKEN is needed to publish (the github_release_token secret, tag event only)'
 
 # GitHub Pages runs no Jekyll on the build: Astro's _astro/ would be dropped.
 touch "$OUT/.nojekyll"

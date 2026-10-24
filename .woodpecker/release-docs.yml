@@ -15,7 +15,7 @@
 # is mounted, `bun install` starts from an empty cache and keeps to bun.lock,
 # and only `ci-image` mounts the Docker socket. Pull requests never run this
 # workflow; they build the site in pipeline.yml's `build` step. The boundary is
-# in settings a pusher cannot change (deploy/README.md): the secret pages_token
+# in settings a pusher cannot change (deploy/README.md): the secret github_release_token
 # is restricted to the tag event only, never manual, and v* tags are protected
 # by a GitHub ruleset and cut from main.
 
@@ -51,7 +51,7 @@ steps:
         ref: refs/tags/v*
     environment:
       PAGES_TOKEN:
-        from_secret: pages_token
+        from_secret: github_release_token
     commands:
       - sh deploy/docs/publish-docs.sh
 
