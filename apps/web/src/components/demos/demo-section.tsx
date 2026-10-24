@@ -1,5 +1,6 @@
 'use client';
 
+import { Banner } from '@andrewbehma/glass-ui/banner';
 import { Button } from '@andrewbehma/glass-ui/button';
 import { Section } from '@andrewbehma/glass-ui/section';
 import { Skeleton } from '@andrewbehma/glass-ui/skeleton';
@@ -9,7 +10,14 @@ import {
   type CardDemoView,
   isDemoActive,
 } from '@nautelle/shared';
-import { useCallback, useEffect, useState } from 'react';
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
+import { attachmentHref } from '../../lib/attachments/format';
 import { fetchCardDemos, requestCardDemo } from '../../lib/demos/actions';
 import {
   DEMO_PILL_STATUS,
@@ -22,7 +30,7 @@ import { Time } from '../../lib/format/time';
 import { useErrorToast } from '../../lib/section/use-error-toast';
 import { VideoPlayer } from './video-player';
 
-/** `Round 2 · Automatic · 0:42`: the facts under the video, minus an unknown one. */
+/** `Round 2 · Automatic · 0:42`: one earlier demo, minus an unknown fact. */
 function demoFacts(demo: CardDemoView): string {
   return [
     `Round ${demo.round}`,
@@ -51,6 +59,44 @@ export function demoPlaceholder(demo: CardDemoView): string {
   return demo.status === 'failed'
     ? 'The recording failed.'
     : 'No demo was recorded.';
+}
+
+/** The line under the section title, as in the S-12 states. */
+function demoDescription(demo: CardDemoView): string {
+  if (isDemoActive(demo.status)) {
+    return "DemoFlow is walking the change on the project's runner.";
+  }
+  if (demo.status === 'ready') {
+    return 'Recorded on the runner when the checks turned green. Watch it before you merge.';
+  }
+  return `Round ${demo.round}`;
+}
+
+/** Where the video would be, for a demo that has none. */
+function DemoStand({ demo }: { demo: CardDemoView }) {
+  if (isDemoActive(demo.status)) {
+    return (
+      <div
+        role="status"
+        className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-md bg-black px-4 text-center text-sm text-white/80"
+      >
+        <span
+          aria-hidden="true"
+          className="size-3 animate-pulse rounded-full bg-danger"
+        />
+        {demoPlaceholder(demo)}
+      </div>
+    );
+  }
+  return demo.status === 'failed' ? (
+    <Banner tone="danger" title="The recording failed.">
+      {demo.reason ?? 'The runner gave no reason.'}
+    </Banner>
+  ) : (
+    <Banner tone="info" title="No demo was recorded.">
+      {demo.reason ?? 'The runner gave no reason.'}
+    </Banner>
+  );
 }
 
 /**
@@ -86,46 +132,86 @@ export function DemoPanel({
   const shown = demos.find((d) => d.id === pickedId) ?? latest;
   const earlier = demos.filter((d) => d.id !== shown.id);
   const scenario = scenarioUrl(prUrl, branch, shown.scenarioPath);
+  const length = formatDuration(shown.durationMs);
+  const facts: { term: string; detail: ReactNode }[] = [
+    {
+      term: isDemoActive(shown.status)
+        ? 'Started'
+        : shown.status === 'ready'
+          ? 'Recorded'
+          : DEMO_STATUS_LABEL[shown.status],
+      detail: (
+        <>
+          Round {shown.round} ·{' '}
+          <Time value={shown.finishedAt ?? shown.createdAt} />
+        </>
+      ),
+    },
+    {
+      term: 'Trigger',
+      detail:
+        shown.trigger === 'manual'
+          ? `Recorded again${shown.requestedByName ? ` by ${shown.requestedByName}` : ''}`
+          : 'Checks turned green',
+    },
+    ...(length ? [{ term: 'Length', detail: length }] : []),
+    ...(scenario
+      ? [
+          {
+            term: 'Scenario',
+            detail: (
+              <a
+                href={scenario}
+                target="_blank"
+                rel="noreferrer"
+                className="break-all font-mono text-accent-ink underline underline-offset-2"
+              >
+                {shown.scenarioPath}
+              </a>
+            ),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Section
-      title="Demo"
-      description="A recording of the card's change, made when its checks passed."
-      actions={
-        <div className="flex items-center gap-2">
+      title={
+        <span className="flex items-center gap-2">
+          Demo
           <DemoStatusPill demo={shown} />
-          {canOperate ? (
-            <Button
-              variant="glass"
-              disabled={asking || isDemoActive(latest.status)}
-              onClick={onRecordAgain}
-            >
-              Record again
-            </Button>
-          ) : null}
-        </div>
+        </span>
+      }
+      description={demoDescription(shown)}
+      actions={
+        canOperate ? (
+          <Button
+            variant="glass"
+            disabled={asking || isDemoActive(latest.status)}
+            onClick={onRecordAgain}
+          >
+            Record again
+          </Button>
+        ) : null
       }
     >
-      <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-4">
         {shown.status === 'ready' && shown.contentUrl ? (
           <VideoPlayer
             key={shown.id}
-            src={shown.contentUrl}
+            src={attachmentHref({ contentUrl: shown.contentUrl })}
             title={`Demo of ${cardTitle}, round ${shown.round}`}
           />
         ) : (
-          <p
-            className="rounded-md bg-hover px-3 py-6 text-center text-ink-2 text-sm"
-            role="status"
-          >
-            {demoPlaceholder(shown)}
-          </p>
+          <DemoStand demo={shown} />
         )}
 
         {accept ? (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-ink-3 text-xs">
-              Watched it? Accept merges the pull request.
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-ink-2 text-sm">
+              {shown.status === 'ready'
+                ? 'Watched it? Accept merges the pull request.'
+                : 'Accept merges the pull request; a demo never blocks it.'}
             </span>
             <Button variant="solid" disabled={accept.busy} onClick={accept.run}>
               Accept
@@ -133,28 +219,13 @@ export function DemoPanel({
           </div>
         ) : null}
 
-        <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-3 text-xs">
-          <dt className="sr-only">Recording</dt>
-          <dd>{demoFacts(shown)}</dd>
-          <dt className="sr-only">Recorded</dt>
-          <dd>
-            <Time value={shown.finishedAt ?? shown.createdAt} />
-          </dd>
-          {scenario ? (
-            <>
-              <dt className="sr-only">Scenario</dt>
-              <dd className="min-w-0 truncate">
-                <a
-                  href={scenario}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent-ink underline underline-offset-2"
-                >
-                  {shown.scenarioPath}
-                </a>
-              </dd>
-            </>
-          ) : null}
+        <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
+          {facts.map((fact) => (
+            <Fragment key={fact.term}>
+              <dt className="text-ink-3">{fact.term}</dt>
+              <dd className="min-w-0 text-ink-1">{fact.detail}</dd>
+            </Fragment>
+          ))}
         </dl>
 
         {earlier.length > 0 ? (

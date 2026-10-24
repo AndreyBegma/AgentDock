@@ -1413,22 +1413,24 @@ export function CardDetailBody({
     </>
   ) : null;
 
+  // C-371: first, so watching the demo and accepting is one place.
+  const demoSection = card.demo ? (
+    <DemoSection
+      projectId={projectId}
+      card={card}
+      canOperate={canOperate}
+      accept={
+        canOperate && canAccept(card)
+          ? { busy: actions.busy, run: () => actions.accept(card) }
+          : null
+      }
+    />
+  ) : null;
   // A section with nothing to show is `null`, and its tab is not drawn.
   const overview = (
     <div className="flex min-w-0 flex-col gap-6">
-      {card.demo ? (
-        // C-371: first, so watching the demo and accepting is one place.
-        <DemoSection
-          projectId={projectId}
-          card={card}
-          canOperate={canOperate}
-          accept={
-            canOperate && canAccept(card)
-              ? { busy: actions.busy, run: () => actions.accept(card) }
-              : null
-          }
-        />
-      ) : null}
+      {/* The wide page draws the demo in its main column instead. */}
+      {wide ? null : demoSection}
       {triageSection}
       {runSection}
       {summarySection}
@@ -1517,6 +1519,7 @@ export function CardDetailBody({
             className="grid min-w-0 grid-cols-[minmax(0,1fr)_22rem] items-start gap-8"
           >
             <div className="flex min-w-0 flex-col gap-8">
+              {demoSection}
               {card.rounds.length > 0 ? roundsSection : null}
               {cardForm}
             </div>

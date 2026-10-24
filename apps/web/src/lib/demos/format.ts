@@ -56,7 +56,7 @@ export function demoChip(brief: CardDemoBrief): {
       };
     default:
       return {
-        label: 'Recording',
+        label: 'Recording demo',
         tone: 'warn',
         title: 'Recording the demo',
       };

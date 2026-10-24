@@ -49,10 +49,10 @@ export function DemoSecretsList({
       {secrets.map((secret) => (
         <li
           key={secret.name}
-          className="flex items-center justify-between gap-2 py-2"
+          className="flex flex-wrap items-center justify-between gap-2 py-2"
         >
-          <span className="flex min-w-0 flex-col">
-            <code className="truncate text-sm">{secret.name}</code>
+          <span className="flex min-w-0 flex-1 basis-56 flex-col">
+            <code className="break-all text-sm">{secret.name}</code>
             <span className="text-ink-3 text-xs">
               Value hidden · set <Time value={secret.updatedAt} />
               {secret.updatedByName ? ` by ${secret.updatedByName}` : ''}

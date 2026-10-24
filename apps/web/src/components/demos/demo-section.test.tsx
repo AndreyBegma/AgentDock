@@ -13,7 +13,7 @@ const demo = (over: Partial<CardDemoView> = {}): CardDemoView => ({
   reason: null,
   scenarioPath: 'demoflow/cards/C-7-thing.demo.json',
   attachmentId: 'a1',
-  contentUrl: '/api/projects/p1/attachments/a1/content',
+  contentUrl: '/projects/p1/attachments/a1/content',
   durationMs: 42_000,
   size: 1024,
   requestedByName: null,
@@ -42,6 +42,8 @@ describe('Demo section states (C-371)', () => {
   test('a ready demo plays the video with round, length and the scenario link', () => {
     const html = render([demo()]);
     expect(html).toContain('<video');
+    // The API's path, read through the web app's `/api` rewrite.
+    expect(html).toContain('src="/api/projects/p1/attachments/a1/content"');
     expect(html).toContain('Round 2');
     expect(html).toContain('0:42');
     expect(html).toContain(
@@ -85,6 +87,8 @@ describe('Demo section states (C-371)', () => {
     ]);
     expect(html).toContain('Skipped');
     expect(html).toContain('No UI files changed.');
+    // Nothing was recorded, so the facts do not say it was.
+    expect(html).not.toContain('Recorded');
   });
 
   test('Accept sits right under the video, before the facts', () => {
@@ -123,8 +127,8 @@ describe('demo chip and links', () => {
     expect(
       statuses.map((s) => demoChip({ status: s, durationMs: 65_000 })),
     ).toEqual([
-      expect.objectContaining({ label: 'Recording', tone: 'warn' }),
-      expect.objectContaining({ label: 'Recording', tone: 'warn' }),
+      expect.objectContaining({ label: 'Recording demo', tone: 'warn' }),
+      expect.objectContaining({ label: 'Recording demo', tone: 'warn' }),
       expect.objectContaining({ label: '1:05', tone: 'ok' }),
       expect.objectContaining({ label: 'Demo failed', tone: 'danger' }),
       expect.objectContaining({ label: 'Demo skipped', tone: 'neutral' }),
