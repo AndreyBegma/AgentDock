@@ -1,0 +1,24 @@
+  (description: "Stop now; run this card again once PR #905 has merged into
+  develop"), "Build against the draft" (description: "Fetch C-368's branch and
+  import its shared types as they are today"), "Provisioning only"
+  (description: "Do the DemoFlow pinning and capability now, leave card.demo
+  for later"). Do nothing else.
+────────────────────────────────────────────────────────────────────────────────
+ ☐ C-369 order
+
+│ C-368 hasn't landed yet: its draft PR #905 holds the card.demo command schema,
+│ the demoVideosEnabled setting, the demo secrets route and the upload route
+│ this card builds on. Building the runner side now means inventing those
+│ contracts and reworking them when C-368 merges. How should C-369 go ahead?
+
+❯ 1. Wait for C-368
+     Stop now; run this card again once PR #905 has merged into develop
+  2. Build against the draft
+     Fetch C-368's branch and import its shared types as they are today
+  3. Provisioning only
+     Do the DemoFlow pinning and capability now, leave card.demo for later
+  4. Type something.
+────────────────────────────────────────────────────────────────────────────────
+  5. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
