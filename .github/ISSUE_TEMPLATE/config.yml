@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/AndreyBegma/Nautelle/discussions
+    about: Ask how something works or float an idea before it becomes a feature request.
+  - name: Documentation and guides
+    url: https://github.com/AndreyBegma/Nautelle/wiki
+    about: Setup, self-hosting and every feature are explained in the wiki.
+  - name: Report a security vulnerability
+    url: https://github.com/AndreyBegma/Nautelle/security/advisories/new
+    about: Report it privately. Do not open a public issue for a vulnerability.

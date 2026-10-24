@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a change or an addition to Nautelle.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a question or a half-formed idea, start a Discussion instead. A larger feature becomes a spec in `docs/specs/`, and a change of architecture needs an ADR (see CONTRIBUTING.md).
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what stops you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: The behavior you want, as concretely as you can.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web app
+        - API
+        - Runner
+        - Claude Code plugin
+        - Telegram
+        - Install and deployment
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to work on this myself.
