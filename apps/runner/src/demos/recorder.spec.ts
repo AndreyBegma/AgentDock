@@ -361,7 +361,7 @@ describe('DemoRecorder', () => {
     expect(reason).not.toContain(SECRET);
   });
 
-  it('fails when DemoFlow is not ready', async () => {
+  it('skips when DemoFlow is not ready (C-370)', async () => {
     const { recorder, args, events, calls } = setup({
       provisioned: { version: '0.4.0', ready: false, reason: 'no Chromium' },
     });
@@ -370,7 +370,7 @@ describe('DemoRecorder', () => {
     expect(calls).toHaveLength(0);
     expect(statuses(events)).toEqual([
       'recording',
-      'failed: DemoFlow is not ready: no Chromium',
+      'skipped: DemoFlow is not ready: no Chromium',
     ]);
   });
 

@@ -307,8 +307,13 @@ export class DemoRecorder {
 
     started(args.scenario);
     const demoflow = await this.deps.provisioner.ensure();
+    // C-370: a runner that cannot record is not the card's fault, so the
+    // demo is skipped with the reason rather than failed.
     if (!demoflow.ready) {
-      return failed(`DemoFlow is not ready: ${demoflow.reason ?? 'unknown'}`);
+      return {
+        status: 'skipped',
+        reason: `DemoFlow is not ready: ${demoflow.reason ?? 'unknown'}`,
+      };
     }
 
     let secrets: Record<string, string>;

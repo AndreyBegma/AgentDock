@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import {
+  CARD_DEMO_EVENTS,
   type CardDemoView,
   DEMO_SECRETS_MAX,
+  DEMO_STALE_MS,
   DEMO_UI_PATHS_DEFAULT,
   type DemoSecretView,
 } from '@nautelle/shared';
@@ -60,12 +62,18 @@ describe('demo videos (e2e, C-368, ADR-0090)', () => {
   const putSecret = (name: string, value = SECRET, session = w.admin) =>
     session.send('put', secretUrl(name), { value });
 
-  /** Card 1, run once, with demo videos on. */
+  /** Card 1, run once with PR #77 open, with demo videos on. */
   const ranCard = async () => {
     await enable();
     await w.createCard();
     expect((await w.runCard(1)).status).toBe(200);
+    await w.ctx.prisma.boardCard.updateMany({
+      data: { prNumber: 77, prState: 'open' },
+    });
   };
+  /** C-370: the activity rows the API recorded of `type`. */
+  const events = (type: string) =>
+    w.ctx.prisma.event.findMany({ where: { type }, orderBy: { seq: 'asc' } });
   const requested = async (): Promise<CardDemoView> => {
     const response = await w.operator.send('post', demosUrl());
     expect(response.status).toBe(201);
@@ -227,19 +235,26 @@ describe('demo videos (e2e, C-368, ADR-0090)', () => {
   });
 
   describe('Record again', () => {
-    it('is 409 with demo videos off, and for a card that never ran', async () => {
+    it('is 409 with demo videos off, for a card without a PR and for one that never ran', async () => {
       await w.createCard();
       const off = await w.operator.send('post', demosUrl());
       expect(off.status).toBe(409);
       expect(off.body.error).toBe('demos_disabled');
 
       await enable();
+      const noPr = await w.operator.send('post', demosUrl());
+      expect(noPr.status).toBe(409);
+      expect(noPr.body.error).toBe('no_pull_request');
+
+      await w.ctx.prisma.boardCard.updateMany({ data: { prNumber: 77 } });
       const never = await w.operator.send('post', demosUrl());
       expect(never.status).toBe(409);
       expect(never.body.error).toBe('no_round');
+      expect(w.demosSent()).toEqual([]);
     });
 
-    it('queues a manual demo of the latest round, audited; a second one waits', async () => {
+    it('queues a manual demo of the latest round and sends card.demo, audited; a second one waits', async () => {
+      await putSecret('LOGIN_PASSWORD');
       await ranCard();
       const demo = await requested();
       expect(demo).toMatchObject({
@@ -255,6 +270,20 @@ describe('demo videos (e2e, C-368, ADR-0090)', () => {
       const [record] = await w.audit('demo.requested');
       expect(record.after).toMatchObject({ number: 1, demoId: demo.id });
 
+      const card = await w.card(1);
+      expect(w.demosSent()).toEqual([
+        {
+          cardId: card.id,
+          projectId: w.a,
+          card: 1,
+          round: 1,
+          demoId: demo.id,
+          worktree: { root: '/srv/dev/widget', shortId: card.shortId },
+          scenario: demo.scenarioPath,
+          env: ['LOGIN_PASSWORD'],
+        },
+      ]);
+
       const again = await w.operator.send('post', demosUrl());
       expect(again.status).toBe(409);
       expect(again.body.error).toBe('demo_in_flight');
@@ -262,6 +291,78 @@ describe('demo videos (e2e, C-368, ADR-0090)', () => {
       const list = await w.viewer.get(demosUrl());
       expect(list.status).toBe(200);
       expect((list.body as CardDemoView[]).map((d) => d.id)).toEqual([demo.id]);
+    });
+
+    it.each([
+      'todo',
+      'in_progress',
+      'finished',
+    ] as const)('works on a card with a PR in %s', async (column) => {
+      await ranCard();
+      await w.ctx.prisma.boardCard.updateMany({ data: { column } });
+      expect((await requested()).status).toBe('queued');
+      expect(w.demosSent()).toHaveLength(1);
+    });
+
+    it('is 409 for a Completed card', async () => {
+      await ranCard();
+      await w.ctx.prisma.boardCard.updateMany({
+        data: { column: 'completed' },
+      });
+      const response = await w.operator.send('post', demosUrl());
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('card_completed');
+      expect(await w.ctx.prisma.cardDemo.count()).toBe(0);
+    });
+
+    it('skips the demo with the reason when the runner is offline or does not record', async () => {
+      await ranCard();
+      w.offline = true;
+      expect(await requested()).toMatchObject({
+        status: 'skipped',
+        reason: 'The runner is offline',
+      });
+      w.offline = false;
+      w.unserved.add('card.demo');
+      expect(await requested()).toMatchObject({
+        status: 'skipped',
+        reason: 'The runner does not record demos; update it',
+      });
+      expect(w.demosSent()).toEqual([]);
+    });
+
+    it("fails a demo the runner refuses for the card's own reason, with an activity entry", async () => {
+      await ranCard();
+      w.handlers['card.demo'] = () => ({
+        status: 'error',
+        error: { code: 'path_not_allowed', message: 'not a watched project' },
+      });
+      expect(await requested()).toMatchObject({
+        status: 'failed',
+        reason:
+          'The runner refused the demo (path_not_allowed): not a watched project',
+      });
+      expect(await events(CARD_DEMO_EVENTS.failed)).toHaveLength(1);
+      expect((await w.card(1)).needsPerson).toBe(false);
+    });
+
+    it('fails a demo its runner never finished instead of waiting on it', async () => {
+      await ranCard();
+      const lost = await requested();
+      await w.ctx.prisma.cardDemo.update({
+        where: { id: lost.id },
+        data: { createdAt: new Date(Date.now() - DEMO_STALE_MS - 1_000) },
+      });
+      const next = await requested();
+      expect(next.id).not.toBe(lost.id);
+      expect(
+        await w.ctx.prisma.cardDemo.findUniqueOrThrow({
+          where: { id: lost.id },
+        }),
+      ).toMatchObject({
+        status: 'failed',
+        reason: 'The runner never finished the demo',
+      });
     });
 
     it('is 403 for a viewer, 404 for an outsider and an unknown card', async () => {
@@ -346,6 +447,14 @@ describe('demo videos (e2e, C-368, ADR-0090)', () => {
         demoId: demo.id,
         attachmentId: ready.attachmentId,
       });
+      // C-370: one activity entry, by the system.
+      const [entry] = await events(CARD_DEMO_EVENTS.ready);
+      expect(entry).toMatchObject({ source: 'api' });
+      expect(entry.data).toMatchObject({
+        number: 1,
+        demoId: demo.id,
+        trigger: 'manual',
+      });
 
       // A finished demo takes no second video.
       const second = await video(demo.id, token, FILES.webm, {
@@ -426,6 +535,14 @@ describe('demo videos (e2e, C-368, ADR-0090)', () => {
         status: 'failed',
         reason: 'readyUrl never answered',
       });
+      // C-370: an activity entry, never the card's needsPerson.
+      const failedEntries = await events(CARD_DEMO_EVENTS.failed);
+      expect(failedEntries).toHaveLength(1);
+      expect(failedEntries[0].data).toMatchObject({
+        demoId: demo.id,
+        reason: 'readyUrl never answered',
+      });
+      expect((await w.card(1)).needsPerson).toBe(false);
 
       await status({ status: 'recording' });
       expect(await row()).toMatchObject({ status: 'failed' });

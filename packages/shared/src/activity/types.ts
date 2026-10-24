@@ -2,6 +2,7 @@ import { AI_DIGEST_EVENT_RULES } from '../ai/activity-rules';
 import type { AuditActorType, AuditResult } from '../audit/actions';
 import { CARD_BACKGROUND_STALLED_EVENT } from '../board/contracts';
 import { cardBackgroundStalledTitle } from '../board/naming';
+import { DEMO_EVENT_RULES } from '../demos/activity-rules';
 import { API_EVENT_SOURCE } from '../protocol/envelope';
 import { STEWARD_EVENT_RULES } from '../steward/activity-rules';
 import type {
@@ -351,6 +352,8 @@ const EVENT_RULES: Record<string, EventRule> = {
         : null;
     },
   },
+  // C-370: a card's demo video ready or failed.
+  ...DEMO_EVENT_RULES,
   ...STEWARD_EVENT_RULES,
   // #658: the daily AI digest, sent or skipped.
   ...AI_DIGEST_EVENT_RULES,
