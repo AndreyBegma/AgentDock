@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { boardError } from '../board/board-error';
+import { designError } from '../design/design-error';
 import { LocalError, toLocalError } from './local-error';
 
 const of = (error: unknown) => {
@@ -19,6 +20,27 @@ describe('toLocalError', () => {
     expect(
       of(boardError(503, 'command_unavailable', 'Update the runner')),
     ).toEqual({ code: 'command_unavailable', message: 'Update the runner' });
+  });
+
+  it('keeps the stack, dependency and design refusals by name (C-377)', () => {
+    expect(
+      of(boardError(409, 'stack_refused', 'C-3 is in S-1 already', {})),
+    ).toEqual({ code: 'stack_refused', message: 'C-3 is in S-1 already' });
+    expect(
+      of(boardError(409, 'dependency_cycle', 'C-1 would close a cycle')).code,
+    ).toBe('dependency_cycle');
+    expect(
+      of(boardError(400, 'invalid_dependency', 'C-1 is in Inbox')).code,
+    ).toBe('invalid_dependency');
+    expect(
+      of(designError(409, 'no_open_comments', 'Leave a comment first')),
+    ).toEqual({ code: 'no_open_comments', message: 'Leave a comment first' });
+    expect(of(designError(409, 'design_busy', 'A turn runs')).code).toBe(
+      'design_busy',
+    );
+    expect(of(designError(409, 'design_approved', 'Approved')).code).toBe(
+      'design_approved',
+    );
   });
 
   it('carries the BoardMoveRefusal of move_refused as its message', () => {

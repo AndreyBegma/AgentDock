@@ -44,6 +44,14 @@ export interface StackStageInput {
   cardIds: readonly string[];
 }
 
+/** C-377: a stack grouped by hand with its stages, by card number. */
+export interface StagedStackRequest {
+  title: string;
+  body?: string;
+  design?: boolean;
+  stages: readonly { title?: string; cards: readonly number[] }[];
+}
+
 export interface CreateStackInput {
   projectId: string;
   planId: string | null;
@@ -277,12 +285,31 @@ export class BoardStacks {
    * on its own. The rules of `addCard` hold for every card; one card that
    * breaks them refuses the whole request and nothing is made.
    */
-  async group(
+  group(
     projectId: string,
     request: CreateBoardStackRequest,
     actor: BoardActor,
   ): Promise<BoardStackDetail> {
-    const numbers = [...new Set(request.cards)];
+    return this.groupStaged(
+      projectId,
+      { ...request, stages: [{ title: '', cards: request.cards }] },
+      actor,
+    );
+  }
+
+  /**
+   * C-377 (ADR-0087): `group` with stages — every card of a stage depends on
+   * every card of the stage before, as an intake's stack. One transaction:
+   * a card that breaks the rules of `group`, or a stage link that would close
+   * a dependency cycle with the project's dependencies, refuses the whole
+   * request and nothing is made.
+   */
+  async groupStaged(
+    projectId: string,
+    request: StagedStackRequest,
+    actor: BoardActor,
+  ): Promise<BoardStackDetail> {
+    const numbers = [...new Set(request.stages.flatMap((s) => s.cards))];
     const design = request.design ?? false;
     const { stack, cards } = await this.prisma.$transaction(async (tx) => {
       const found = await tx.boardCard.findMany({
@@ -322,7 +349,27 @@ export class BoardStacks {
           { cards: broken.map((b) => b.number) },
         );
       }
-      const ordered = numbers.flatMap((n) => byNumber.get(n) ?? []);
+      const stages = request.stages.map((s) => ({
+        title: s.title?.trim() ?? '',
+        cards: [...new Set(s.cards)].flatMap((n) => byNumber.get(n) ?? []),
+      }));
+      const links = stageLinks(stages.map((s) => s.cards));
+      if (links.length > 0) {
+        const edges = await tx.boardCardDependency.findMany({
+          where: { card: { projectId } },
+          select: { cardId: true, dependsOnId: true },
+        });
+        for (const [card, dependsOn] of links) {
+          if (findDependencyCycle(edges, card.id, dependsOn.id)) {
+            throw boardError(
+              409,
+              BOARD_ERROR.dependencyCycle,
+              `${cardLabel(card.number)} after ${cardLabel(dependsOn.number)} would close a dependency cycle`,
+            );
+          }
+          edges.push({ cardId: card.id, dependsOnId: dependsOn.id });
+        }
+      }
       const stack = await this.create(tx, {
         projectId,
         planId: null,
@@ -330,11 +377,14 @@ export class BoardStacks {
         title: request.title.trim(),
         body: request.body ?? '',
         design,
-        stages: [{ title: '', cardIds: ordered.map((c) => c.id) }],
+        stages: stages.map((s) => ({
+          title: s.title,
+          cardIds: s.cards.map((c) => c.id),
+        })),
       });
-      return { stack, cards: ordered };
+      return { stack, cards: stages.flatMap((s) => s.cards) };
     });
-    await this.announce(stack, cards, 1, design, actor);
+    await this.announce(stack, cards, request.stages.length, design, actor);
     for (const card of cards) this.work.publish(projectId, card.id);
     return this.detail(projectId, stack.number);
   }
@@ -469,7 +519,10 @@ export class BoardStacks {
     };
   }
 
-  /** `PATCH /board/stacks/:number`: the title and the description. */
+  /**
+   * `PATCH /board/stacks/:number`: the title, the description and — C-377 —
+   * stage titles. A position that is not a stage refuses the whole change.
+   */
   async update(
     projectId: string,
     number: number,
@@ -481,17 +534,53 @@ export class BoardStacks {
       ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
       ...(dto.body !== undefined ? { body: dto.body } : {}),
     };
-    await this.prisma.boardStack.update({ where: { id: row.id }, data });
+    const titles = (dto.stages ?? []).map((s) => ({
+      position: s.position,
+      title: s.title.trim(),
+    }));
+    const missing = titles.find(
+      (t) => !row.stages.some((s) => s.position === t.position),
+    );
+    if (missing) {
+      throw refused(
+        `${stackLabel(number)} has no stage ${missing.position + 1}`,
+      );
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.boardStack.update({ where: { id: row.id }, data });
+      for (const t of titles) {
+        await tx.boardStackStage.update({
+          where: {
+            stackId_position: { stackId: row.id, position: t.position },
+          },
+          data: { title: t.title },
+        });
+      }
+    });
     await this.audit.record({
       ...actor.ctx,
       action: 'stack.updated',
       target: { type: 'board_stack', id: row.id },
       projectId,
-      before: { number, title: row.title },
+      before: {
+        number,
+        title: row.title,
+        ...(titles.length > 0
+          ? {
+              stages: titles.map((t) => ({
+                position: t.position,
+                title:
+                  row.stages.find((s) => s.position === t.position)?.title ??
+                  '',
+              })),
+            }
+          : {}),
+      },
       after: {
         number,
         ...(data.title !== undefined ? { title: data.title } : {}),
         body: dto.body !== undefined,
+        ...(titles.length > 0 ? { stages: titles } : {}),
       },
       result: 'ok',
     });

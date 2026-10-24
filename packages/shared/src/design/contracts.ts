@@ -1,3 +1,4 @@
+import type { LOCAL_DESIGN_REFUSALS } from '../protocol/local';
 import type { NoProfileReason, ProfileSource } from '../readiness';
 import type {
   DesignBatchMode,
@@ -447,6 +448,10 @@ export const DESIGN_ERROR = {
   noProfile: 'no_profile',
 } as const;
 export type DesignErrorCode = (typeof DESIGN_ERROR)[keyof typeof DESIGN_ERROR];
+
+/** C-377: every refusal a design tool passes through is one of the design routes'. */
+type DesignCodes<T extends readonly DesignErrorCode[]> = T[number];
+export type LocalDesignRefusal = DesignCodes<typeof LOCAL_DESIGN_REFUSALS>;
 
 export interface DesignErrorBody {
   statusCode: number;

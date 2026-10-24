@@ -2,17 +2,22 @@ import {
   BOARD_ERROR,
   type BoardCardView,
   type BoardColumn,
+  type BoardStackDetail,
+  type BoardStackView,
   captureFingerprint,
   cardLabel,
   isActiveRoundPhase,
   type Role,
+  type TaskDesignSummary,
 } from '@nautelle/shared';
 import {
   LOCAL_BOARD_CARD_ROUNDS_MAX,
   LOCAL_BOARD_LIST_COMPLETED_MAX,
   type LocalBoardListCard,
+  type LocalDesignBrief,
   type LocalMethodArgs,
   type LocalMethodResult,
+  type LocalStack,
 } from '@nautelle/shared/protocol';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { BoardCard } from '@prisma/client';
@@ -81,6 +86,57 @@ export const localListCardOf = (card: BoardCardView): LocalBoardListCard => {
   };
 };
 
+/** C-377: a design as the stack and design tools brief it. */
+export const localDesignBriefOf = (
+  design: TaskDesignSummary,
+): LocalDesignBrief => ({
+  needed: design.needed,
+  status: design.status,
+  variantCount: design.variantCount,
+  approvedRevisionId: design.approvedRevisionId,
+  busy:
+    design.busySince !== null ||
+    design.status === 'generating' ||
+    design.status === 'revising',
+});
+
+/**
+ * C-377: one stack as `board.list` and the stack methods answer it — its
+ * stages with their cards by number.
+ */
+export const localStackOf = (
+  stack: BoardStackView | BoardStackDetail,
+): LocalStack => ({
+  number: stack.number,
+  label: stack.label,
+  title: stack.title,
+  column: stack.column,
+  accepted: stack.accepted,
+  total: stack.total,
+  currentStage: stack.currentStage,
+  stages: stack.stages.map((s) => ({
+    position: s.position,
+    title: s.title,
+    cards: s.cards.map((c) => (typeof c === 'number' ? c : c.number)),
+  })),
+  design: stack.design ? localDesignBriefOf(stack.design) : null,
+  run: stack.run
+    ? {
+        state: stack.run.state,
+        queued: stack.run.queued,
+        waiting: stack.run.waiting,
+        running: stack.run.running,
+        pause: stack.run.pause
+          ? {
+              code: stack.run.pause.code,
+              message: stack.run.pause.message,
+              card: stack.run.pause.card,
+            }
+          : null,
+      }
+    : null,
+});
+
 const takenCardOf = (
   card: Pick<BoardCard, 'number' | 'title' | 'body' | 'kind' | 'takenBranch'>,
 ): TakenCard => ({
@@ -125,6 +181,10 @@ export class BoardSessionService {
           : c.cards,
       )
       .map(localListCardOf);
+    // C-377: the stacks, with a column those whose collapsed face sits in it.
+    const stacks = (view.stacks ?? [])
+      .filter((s) => column === undefined || s.column === column)
+      .map(localStackOf);
     return {
       settings: {
         maxRunning: view.settings.maxRunning,
@@ -132,6 +192,7 @@ export class BoardSessionService {
         cardMergePolicy: view.settings.cardMergePolicy,
       },
       cards,
+      stacks,
     };
   }
 
