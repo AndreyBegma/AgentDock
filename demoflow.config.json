@@ -1,0 +1,10 @@
+{
+  "baseUrl": "http://127.0.0.1:3517",
+  "allowedOrigins": ["http://127.0.0.1:3517", "http://127.0.0.1:4517"],
+  "devCommand": {
+    "command": "sh",
+    "args": ["scripts/demo-dev.sh"],
+    "readyUrl": "http://127.0.0.1:3517/login",
+    "timeoutMs": 300000
+  }
+}
