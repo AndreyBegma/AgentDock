@@ -5,6 +5,41 @@ what to do on every machine that runs the runner.
 
 ## Unreleased
 
+## 0.16.0
+
+**Upgrade note — demo videos need Node.js 22 or later on the machine.** The
+runner fetches the pinned DemoFlow (0.4.0) with `npx` on the first demo and
+runs `demoflow setup` once (Chromium and FFmpeg). Nothing else to install. A
+project records demos only after its owner turns on *Settings → Automation →
+Demo videos* and the repository has a `demoflow.config.json`.
+
+- **Demo videos of finished cards.** `card.demo` records a card's DemoFlow
+  scenario in the card's worktree on a free local port, with the project's
+  demo secrets in the DemoFlow process environment only, and uploads the MP4
+  with its SHA-256. One demo runs at a time, it is stopped after ten minutes
+  with its whole process tree (the sessions it started, read from `/proc` on
+  Linux and `ps` elsewhere, so a process that `exec`s another is still caught),
+  and a skipped or failed demo is reported with a masked reason. The runner
+  reports DemoFlow's state in the new `demoflow` capability, and a card
+  session of a project with demo videos on gets DemoFlow's MCP server and a
+  brief to write and commit the scenario
+  ([ADR-0090](../../docs/adr/0090-a-finished-card-may-carry-a-demo-video-recorded-by-demoflow-on-the-runner.md)).
+  Needs an API with the same release (#906).
+- **A card session's question reaches the Board on every project.** The
+  question selector a card session shows — header, text and options,
+  redacted and capped on the runner — is reported whether or not the project
+  ships session content, so the Board, `board_wait`, the web app and Telegram
+  see it and `card_message` can answer it
+  ([ADR-0094](../../docs/adr/0094-a-card-sessions-question-selector-is-reported-on-every-project.md), #914).
+- **Stacks, designs and dependencies from a Claude Code session.** The
+  `nautelle` MCP server gains `stack_create`, `stack_add_card`,
+  `stack_remove_card`, `stack_update` (stage names too), `stack_run`,
+  `stack_stop`, `stack_design`, `card_design`, `card_depend` and
+  `card_undepend`; `board_list` returns stacks
+  ([ADR-0089](../../docs/adr/0089-a-persons-session-may-work-stacks-designs-and-dependencies.md), #904).
+- **A round's push reports how far it is ahead.** `card_run.pushed` carries
+  `ahead` and `card.collect` returns the `headSha` it pushed, so a card shows
+  each round's pull request head and its CI (#839).
 - **Review steps before Finished.** `card.review` starts a review session for
   a card's pull request once its CI is green: a new Claude session in its own
   tmux session (`nautelle-review-<shortId>`) and its own detached worktree
