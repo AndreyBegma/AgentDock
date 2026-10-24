@@ -258,9 +258,8 @@ describe('attachments (e2e, #309)', () => {
       );
       expect(part.headers['content-length']).toBe('4');
       expect(part.headers['x-content-type-options']).toBe('nosniff');
-      expect(Buffer.from(part.body as Buffer).toString()).toBe(
-        FILES.text.subarray(2, 6).toString(),
-      );
+      // A text type is parsed as text, not a Buffer.
+      expect(part.text).toBe(FILES.text.subarray(2, 6).toString());
 
       const tail = await content(text.id).set('Range', 'bytes=-3');
       expect(tail.status).toBe(206);
