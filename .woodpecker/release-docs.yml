@@ -1,0 +1,64 @@
+# Publishes the documentation site (ADR-0093).
+#
+# Pushing the tag vX.Y.Z on main (ADR-0071) builds apps/docs and pushes the
+# build to the gh-pages branch, which GitHub Pages serves at
+# https://andreybegma.github.io/Nautelle/. A pre-release tag builds and
+# publishes nothing; deploy/docs/publish-docs.sh decides.
+#
+# A manual run is a dry run: it builds the site and publishes nothing. It
+# starts only when the message given to the manual run contains
+# [docs-release] (the gate reads the message, as release-runner.yml explains).
+# Rehearse on a branch other than develop: a manual run on develop also
+# deploys staging through pipeline.yml.
+#
+# Nothing another pipeline wrote reaches the release (ADR-0053): no host cache
+# is mounted, `bun install` starts from an empty cache and keeps to bun.lock,
+# and only `ci-image` mounts the Docker socket. Pull requests never run this
+# workflow; they build the site in pipeline.yml's `build` step. The boundary is
+# in settings a pusher cannot change (deploy/README.md): the secret pages_token
+# is restricted to the tag event only, never manual, and v* tags are protected
+# by a GitHub ruleset and cut from main.
+
+when:
+  - event: tag
+    ref: refs/tags/v*
+  - event: manual
+    evaluate: 'CI_COMMIT_MESSAGE contains "[docs-release]"'
+
+variables:
+  - &ci_image agentdock-ci:node-bun
+  - &docker_image docker:28-cli
+
+steps:
+  # The same image pipeline.yml builds; built here too, so this workflow does
+  # not depend on another one (pipeline.yml does not run on tags).
+  - name: ci-image
+    image: *docker_image
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - docker build --pull -t agentdock-ci:node-bun deploy/ci-image
+
+  - name: install
+    image: *ci_image
+    commands:
+      - bun install --frozen-lockfile
+
+  - name: docs
+    image: *ci_image
+    when:
+      - event: tag
+        ref: refs/tags/v*
+    environment:
+      PAGES_TOKEN:
+        from_secret: pages_token
+    commands:
+      - sh deploy/docs/publish-docs.sh
+
+  # No tag and no secret: builds the site and stops before the push.
+  - name: docs-dry-run
+    image: *ci_image
+    when:
+      - event: manual
+    commands:
+      - sh deploy/docs/publish-docs.sh

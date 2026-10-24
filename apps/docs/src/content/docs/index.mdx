@@ -1,0 +1,44 @@
+---
+title: Nautelle
+description: A self-hosted control plane for Claude Code agent fleets.
+template: splash
+hero:
+  tagline: A self-hosted control plane for Claude Code agent fleets. Write a card, press Run, review the pull request.
+  image:
+    light: ../../assets/logo-light.svg
+    dark: ../../assets/logo-dark.svg
+  actions:
+    - text: Install
+      link: getting-started/install/
+      icon: right-arrow
+    - text: How it works
+      link: concepts/board/
+      variant: minimal
+    - text: GitHub
+      link: https://github.com/AndreyBegma/Nautelle
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <Card title="Install in one command" icon="rocket">
+    `install.sh` writes a Docker Compose stack — PostgreSQL, Redis, the API,
+    the web app and Caddy — on localhost, behind a Cloudflare tunnel or on your
+    own domain with HTTPS. [Install](getting-started/install/)
+  </Card>
+  <Card title="Your machines do the work" icon="laptop">
+    A small runner on each machine dials out to the server and starts Claude
+    Code next to your repositories. Code and credentials never leave it. [Pair a runner](getting-started/pair-a-runner/)
+  </Card>
+  <Card title="A Board, not a terminal" icon="list-format">
+    Each card gets its own worker, worktree and branch, opens a pull request,
+    fixes CI and lands when the checks pass. [Board and cards](concepts/board/)
+  </Card>
+  <Card title="You stay in charge" icon="approve-check">
+    Answer questions and approve tool calls from the browser or Telegram. The
+    runner enforces a local policy the server cannot change.
+    [Runner security](concepts/runner-security/)
+  </Card>
+</CardGrid>

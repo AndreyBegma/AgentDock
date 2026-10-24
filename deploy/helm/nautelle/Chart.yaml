@@ -1,0 +1,21 @@
+apiVersion: v2
+name: nautelle
+description: >-
+  The Nautelle control plane (API, web app and their proxy) on Kubernetes,
+  with an optional bundled PostgreSQL and Redis. Runners stay on the machines
+  that hold the repositories and pair against the chart's address.
+type: application
+# Placeholders. The version lives only in packages/shared/src/changelog.ts
+# (ADR-0071): deploy/helm/release-chart.sh sets both to X.Y.Z when it
+# publishes the chart for the tag vX.Y.Z. The image tag defaults to
+# appVersion, so a chart installed from a checkout runs the :latest images.
+version: 0.0.0
+appVersion: latest
+kubeVersion: '>=1.25.0-0'
+home: https://github.com/AndreyBegma/Nautelle
+sources:
+  - https://github.com/AndreyBegma/Nautelle
+keywords:
+  - claude-code
+  - codex
+  - agents

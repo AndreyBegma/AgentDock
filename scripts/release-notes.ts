@@ -123,7 +123,7 @@ export const releaseNotes = ({
     `curl -fsSL https://raw.githubusercontent.com/${REPO}/main/deploy/compose/install.sh | sh -s -- --version ${version}`,
     '```',
     '',
-    `To upgrade an install, set \`NAUTELLE_VERSION=${version}\` in \`nautelle/.env\` (or leave it at \`latest\`), then run \`docker compose pull && docker compose up -d\` in \`nautelle/\`. See the [install guide](${blob}/docs/guides/install.md) and the [upgrade policy](${blob}/docs/guides/versioning.md).`,
+    `To upgrade an install, set \`NAUTELLE_VERSION=${version}\` in \`nautelle/.env\` (or leave it at \`latest\`), then run \`docker compose pull && docker compose up -d\` in \`nautelle/\`. See the [install guide](https://andreybegma.github.io/Nautelle/getting-started/install/) and the [upgrade policy](${blob}/docs/guides/versioning.md).`,
     '',
     '## Images',
     '',

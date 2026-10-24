@@ -1,0 +1,31 @@
+{{- $fullname := include "nautelle.fullname" . -}}
+{{- $url := include "nautelle.url" . -}}
+Nautelle is starting ({{ include "nautelle.image" (dict "root" . "image" .Values.api.image) }}).
+The API migrates the database before it answers; that can take a minute on
+the first install.
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ $fullname }}-api
+
+Address: {{ $url }}
+{{- if not (or .Values.ingress.enabled (include "nautelle.tunnel" .)) }}
+No Ingress and no tunnel is set. To open it from this machine:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ $fullname }} 8000:{{ .Values.service.port }}
+{{- end }}
+
+First run: open the one-time setup link the API logs and create the first
+administrator (each API start logs a new one):
+
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ $fullname }}-api | grep -o 'http[^ ]*/setup?token=[^ ]*' | tail -n 1
+
+Runners stay on the machines that hold your repositories:
+
+  nautelle-runner pair --server {{ $url }}/api --code XXXX-XXXX --allow-root ~/dev
+
+Back up the database together with the {{ .Values.persistence.existingClaim | default (printf "%s-data" $fullname) }} volume: it holds
+secrets.json, the keys without which the stored secrets cannot be read.
+{{- if not .Values.persistence.enabled }}
+
+WARNING: persistence.enabled is false. The generated keys and the attachments
+are lost with the API pod; use this for a try-out only.
+{{- end }}

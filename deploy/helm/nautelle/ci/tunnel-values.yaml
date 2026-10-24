@@ -1,0 +1,15 @@
+# CI: a Cloudflare tunnel sidecar, the bundled database with a given password
+# and the bundled Redis with an existing Secret, no persistence.
+nautelleUrl: https://dock.example.com/
+tunnel:
+  token: ci-not-a-real-token
+postgresql:
+  auth:
+    password: ci-postgres
+redis:
+  auth:
+    existingSecret: nautelle-redis-password
+persistence:
+  enabled: false
+web:
+  replicaCount: 2
