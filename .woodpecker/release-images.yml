@@ -1,22 +1,27 @@
-# Publishes the Nautelle images (ADR-0088).
+# Publishes the Nautelle images and the GitHub Release (ADR-0088, ADR-0091).
 #
 # Pushing the tag vX.Y.Z on main (ADR-0071) builds ghcr.io/andreybegma/
-# nautelle-api and nautelle-web and pushes them as :X.Y.Z and :latest. The
-# public install (deploy/compose/) pulls them. The tag must equal APP_VERSION;
-# deploy/images/release-images.sh refuses anything else.
+# nautelle-api and nautelle-web for linux/amd64 and linux/arm64, pushes them as
+# :X.Y.Z, :X.Y, :X and :latest with an SBOM and provenance, signs them with
+# cosign, and creates the vX.Y.Z GitHub Release from docs/releases/vX.Y.Z.md
+# with the install command, the image digests and the runner version. The
+# public install (deploy/compose/) pulls the images. The tag must equal
+# APP_VERSION; deploy/images/release-images.sh refuses anything else.
 #
-# A manual run is a dry run: it builds both images on the host and pushes
-# nothing. It starts only when the message given to the manual run contains
-# [image-release] (the gate reads the message, as release-runner.yml explains).
-# Rehearse on a branch other than develop: a manual run on develop also
-# deploys staging through pipeline.yml.
+# A manual run is a dry run: it builds both images for both platforms and
+# pushes, signs and releases nothing. It starts only when the message given to
+# the manual run contains [image-release] (the gate reads the message, as
+# release-runner.yml explains). Rehearse on a branch other than develop: a
+# manual run on develop also deploys staging through pipeline.yml.
 #
 # Pull requests never run this workflow (ADR-0053). The gating in this file is
 # not the security boundary: whoever pushes a commit can edit it. The boundary
-# is in settings a pusher cannot change (deploy/README.md): the secret
-# ghcr_token is restricted to the tag event only, never manual, and v* tags are
-# protected by a GitHub ruleset and cut from main. Each build runs with
-# --pull, and the Dockerfiles pin their bases by digest.
+# is in settings a pusher cannot change (deploy/README.md): the secrets
+# ghcr_token, cosign_private_key, cosign_password and github_release_token are
+# restricted to the tag event only, never manual, and v* tags are protected by
+# a GitHub ruleset and cut from main. Each build runs with --pull, the
+# Dockerfiles pin their bases by digest, and the build tooling (buildkit,
+# binfmt, the SBOM scanner, cosign) is pinned in release-images.sh.
 
 when:
   - event: tag
@@ -25,25 +30,64 @@ when:
     evaluate: 'CI_COMMIT_MESSAGE contains "[image-release]"'
 
 variables:
+  - &ci_image agentdock-ci:node-bun
   - &docker_image docker:28-cli
   - &socket
     - /var/run/docker.sock:/var/run/docker.sock
+  - &publish_when
+    - event: tag
+      ref: refs/tags/v*
 
 steps:
+  # The same image pipeline.yml builds; built here too, so this workflow does
+  # not depend on another one (pipeline.yml does not run on tags).
+  - name: ci-image
+    image: *docker_image
+    when: *publish_when
+    volumes: *socket
+    commands:
+      - docker build --pull -t agentdock-ci:node-bun deploy/ci-image
+
   - name: images
     image: *docker_image
-    when:
-      - event: tag
-        ref: refs/tags/v*
+    when: *publish_when
     volumes: *socket
     environment:
       GHCR_USER: andreybegma
       GHCR_TOKEN:
         from_secret: ghcr_token
+      COSIGN_PRIVATE_KEY:
+        from_secret: cosign_private_key
+      COSIGN_PASSWORD:
+        from_secret: cosign_password
     commands:
       - sh deploy/images/release-images.sh
 
-  # No tag and no secret: builds both images and stops before the push.
+  # The body comes from the release note and the digests images wrote to
+  # .release/images.json. A re-run edits the release instead of failing.
+  - name: github-release
+    image: *ci_image
+    when: *publish_when
+    environment:
+      GH_TOKEN:
+        from_secret: github_release_token
+    commands:
+      - if [ "$${NAUTELLE_IMAGES_DRY_RUN:-}" = 1 ]; then echo 'dry run, not releasing'; exit 0; fi
+      - sh apps/runner/scripts/install-gh.sh
+      - bun scripts/release-notes.ts "$${CI_COMMIT_TAG}" .release/notes.md
+      - version=$${CI_COMMIT_TAG#v}
+      - case "$${version}" in *-*) kind=--prerelease ;; *) kind=--latest ;; esac
+      - |
+        if gh release view "$${CI_COMMIT_TAG}" --repo AndreyBegma/Nautelle >/dev/null 2>&1; then
+          gh release edit "$${CI_COMMIT_TAG}" --repo AndreyBegma/Nautelle \
+            --title "Nautelle $${CI_COMMIT_TAG}" --notes-file .release/notes.md "$${kind}"
+        else
+          gh release create "$${CI_COMMIT_TAG}" --repo AndreyBegma/Nautelle --verify-tag \
+            --title "Nautelle $${CI_COMMIT_TAG}" --notes-file .release/notes.md "$${kind}"
+        fi
+
+  # No tag and no secret: builds both images for both platforms and stops
+  # before the push.
   - name: images-dry-run
     image: *docker_image
     when:
