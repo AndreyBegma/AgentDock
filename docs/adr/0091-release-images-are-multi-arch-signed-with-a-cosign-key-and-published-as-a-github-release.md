@@ -1,4 +1,4 @@
-# ADR-0090: Release images are multi-arch, signed with a cosign key, and published as a GitHub Release
+# ADR-0091: Release images are multi-arch, signed with a cosign key, and published as a GitHub Release
 
 Status: accepted · Date: 2026-10-24 ·
 Card: C-374 ·

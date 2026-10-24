@@ -5,7 +5,7 @@ Card: C-365 ·
 Spec: [`docs/specs/card-365-install-in-one-command-published-images.md`](../specs/card-365-install-in-one-command-published-images.md) ·
 Amends [ADR-0071](0071-the-product-is-released-by-version-with-a-changelog-and-release-notes.md) (its consequence that `vX.Y.Z` tags trigger nothing in CI) ·
 Keeps: [ADR-0016](0016-staging-on-the-agent-host-behind-a-cloudflare-tunnel.md), [ADR-0053](0053-pull-request-pipelines-are-untrusted.md), [ADR-0087](0087-the-first-admin-is-created-in-the-browser-with-a-one-time-setup-token.md) ·
-Amended by [ADR-0090](0090-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md) (multi-arch signed images; the tag pipeline creates the GitHub Release)
+Amended by [ADR-0091](0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md) (multi-arch signed images; the tag pipeline creates the GitHub Release)
 
 ## Context
 

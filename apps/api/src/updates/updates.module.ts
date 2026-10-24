@@ -7,7 +7,7 @@ import {
 import { ProductReleaseService } from './product-release.service';
 import { UpdatesController } from './updates.controller';
 
-/** C-374: the daily check for a newer Nautelle release (ADR-0090). */
+/** C-374: the daily check for a newer Nautelle release (ADR-0091). */
 @Module({
   imports: [SettingsModule],
   controllers: [UpdatesController],

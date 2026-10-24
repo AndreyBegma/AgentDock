@@ -1,6 +1,7 @@
 # ADR-0031: Attachments are stored by the API on a local volume and reach the card worker through the runner
 
 Status: accepted · Date: 2026-10-15 ·
+Amended by [ADR-0090](0090-a-finished-card-may-carry-a-demo-video-recorded-by-demoflow-on-the-runner.md) (MP4 and WebM by signature, 100 MiB per video, videos outside the 20 per card, `Range` on the content route) ·
 Issue: [#309](https://github.com/AndreyBegma/AgentDock/issues/309)
 
 ## Context

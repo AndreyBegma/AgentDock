@@ -6,7 +6,7 @@ and the runner (`runner-vX.Y.Z`: the `nautelle-runner` npm package and
 Homebrew formula). Both follow [Semantic Versioning](https://semver.org/).
 How a release is cut is in [ADR-0071](../adr/0071-the-product-is-released-by-version-with-a-changelog-and-release-notes.md)
 and the `release` skill; how it is built and published is in
-[ADR-0090](../adr/0090-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md).
+[ADR-0091](../adr/0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md).
 
 ## The version number
 

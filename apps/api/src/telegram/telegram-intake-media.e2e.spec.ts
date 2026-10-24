@@ -331,7 +331,7 @@ describe('Telegram /new: photos and voice messages (e2e, #594)', () => {
       );
       const [answer] = texts(calls);
       expect(answer).toMatch(
-        /^widget · That file was not stored: Only PNG, JPEG, GIF, WebP, PDF and plain text files/,
+        /^widget · That file was not stored: Only PNG, JPEG, GIF, WebP, PDF, MP4, WebM and plain text files/,
       );
       expect(await ctx.prisma.attachment.count()).toBe(0);
       expect(await ctx.prisma.plan.count()).toBe(0);

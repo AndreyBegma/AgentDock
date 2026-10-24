@@ -12,7 +12,7 @@ import { guardedGet, TargetAllowlist } from '../webhooks/common/ssrf-guard';
  */
 export type FetchProductRelease = () => Promise<ProductRelease>;
 
-/** How the update check reaches GitHub and paces itself (C-374, ADR-0090). */
+/** How the update check reaches GitHub and paces itself (C-374, ADR-0091). */
 export interface ProductReleaseOptions {
   fetchLatest: FetchProductRelease;
   /** False when `NAUTELLE_UPDATE_CHECK=false`: GitHub is never asked. */

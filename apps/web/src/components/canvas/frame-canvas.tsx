@@ -15,6 +15,11 @@ import {
   useState,
 } from 'react';
 import {
+  canvasDrawing,
+  useDevicePixelRatio,
+  useZoomReachesFrames,
+} from '../../lib/canvas/frame-zoom';
+import {
   CANVAS_GAP_PX,
   type CanvasView,
   centreOn,
@@ -193,6 +198,8 @@ export function FrameCanvas({
   const view: CanvasView =
     zoom === 'fit' ? (held ?? fitted) : { scale: clampZoom(zoom), pan };
   const [grabbing, setGrabbing] = useState(false);
+  const byZoom = useZoomReachesFrames();
+  const dpr = useDevicePixelRatio();
 
   // Gestures read the view through a ref: several events can arrive between
   // two renders, and each must build on the one before.
@@ -388,6 +395,8 @@ export function FrameCanvas({
 
   const { scale } = view;
   const hairline = 1 / scale;
+  // #907: frames are zoomed, not scaled, where zoom reaches into an iframe.
+  const drawing = canvasDrawing(scale, view.pan, layout.size, byZoom, dpr);
 
   return (
     <FrameCanvasContext.Provider value={api}>
@@ -416,9 +425,7 @@ export function FrameCanvas({
         <div
           className="absolute top-0 left-0 origin-top-left will-change-transform"
           style={{
-            width: layout.size.width,
-            height: layout.size.height,
-            transform: `translate(${view.pan.x}px, ${view.pan.y}px) scale(${scale})`,
+            ...drawing.world,
             visibility: measured || zoom !== 'fit' ? undefined : 'hidden',
           }}
         >
@@ -436,6 +443,7 @@ export function FrameCanvas({
                   top: box.top,
                   width: frame.width,
                   height: frame.height,
+                  ...drawing.frame,
                 }}
               >
                 {/* Drawn at 1 / scale, so the label keeps its size on screen. */}
@@ -444,7 +452,7 @@ export function FrameCanvas({
                   className={`absolute bottom-full left-0 flex origin-bottom-left items-center gap-1.5 pb-2 text-xs whitespace-nowrap ${
                     frame.active ? 'text-accent-ink' : 'text-ink-2'
                   }`}
-                  style={{ transform: `scale(${hairline})` }}
+                  style={drawing.caption}
                 >
                   {frame.icon ? (
                     <span className="flex size-3.5 items-center [&_svg]:size-3.5">

@@ -142,7 +142,7 @@ are supported; read a release's notes before you skip a minor version.
 
 Every release lists its image digests and how to check them: the images are
 signed with cosign and carry an SBOM and build provenance
-([ADR-0090](../adr/0090-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md)).
+([ADR-0091](../adr/0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md)).
 
 ## Backup
 

@@ -13,6 +13,7 @@ export * from './board-ai';
 export * from './budgets';
 export * from './changelog';
 export * from './control';
+export * from './demos';
 export * from './design';
 export * from './fleet';
 export * from './github-app';

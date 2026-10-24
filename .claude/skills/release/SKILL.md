@@ -335,7 +335,7 @@ git push origin vX.Y.Z
 ```
 
 Do not create the GitHub Release yourself. The tag runs
-`.woodpecker/release-images.yml` (ADR-0090): it builds, pushes and signs the
+`.woodpecker/release-images.yml` (ADR-0091): it builds, pushes and signs the
 images for amd64 and arm64, then creates the `vX.Y.Z` release as the
 repository's latest, with the "Summary" and "What changed" sections of
 `docs/releases/vX.Y.Z.md`, the install command, the image digests and the

@@ -341,7 +341,7 @@ publishes; it is the way to rehearse the signature with the real key.
 ## Releasing the images
 
 Decisions: [ADR-0088](../docs/adr/0088-nautelle-installs-from-published-images-with-one-compose-file.md),
-[ADR-0090](../docs/adr/0090-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md).
+[ADR-0091](../docs/adr/0091-release-images-are-multi-arch-signed-with-a-cosign-key-and-published-as-a-github-release.md).
 A product tag `vX.Y.Z` (ADR-0071) runs `.woodpecker/release-images.yml`. It
 calls `deploy/images/release-images.sh`, which:
 
