@@ -154,7 +154,7 @@ CREATE TRIGGER audit_records_no_truncate
 | `runner.rename` | rename | user (admin) | runner | `name` |
 | `runner.revoke` | revoke | user (admin) | runner | `revokedAt` |
 | `runner.command` / `runner.command.result` | every `RunnerCommandService.send` | user / system | runner | after: `{ name, args }` / `{ ok, error? }` |
-| `user.create` | `bun run admin:create` | system | user | after: `{ email, role, status }`; `meta.via: "cli"` |
+| `user.create` | `bun run admin:create`; the first-run setup (C-367, ADR-0087) | system (`cli`, `env`) / the new admin (`setup`) | user | after: `{ email, role, status }`; `meta.via: "cli"`, `"env"` (`ADMIN_EMAIL` on boot) or `"setup"` (`POST /setup/admin`) |
 | `project.connect` | connect a project ([#10](10-projects.md)) | user (admin) | project | after: `{ runnerId, rootPath, repo, displayName, docsKind }` |
 | `project.delete` | delete a project | user (admin) | project | before: `{ runnerId, rootPath, repo, displayName }` |
 | `project.update` | project settings | user (admin) | project | changed fields only |

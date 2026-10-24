@@ -24,7 +24,7 @@ describe('proxy', () => {
   });
 
   test('the sign-in pages are public', () => {
-    for (const path of ['/login', '/register', '/pending']) {
+    for (const path of ['/login', '/register', '/pending', '/setup']) {
       expect(redirectOf(visit(path))).toBeNull();
     }
   });
