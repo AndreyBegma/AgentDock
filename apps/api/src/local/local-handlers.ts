@@ -44,6 +44,10 @@ import {
   projectOf,
 } from './local-call';
 import { LocalError } from './local-error';
+import {
+  LocalStackHandlers,
+  type LocalStackMethod,
+} from './local-stack-handlers';
 
 const strings = (value: unknown): string[] =>
   Array.isArray(value)
@@ -125,14 +129,23 @@ export class LocalHandlers {
     private readonly sessions: BoardSessionService,
     private readonly review: BoardReview,
     boardHandlers: LocalBoardHandlers,
+    stackHandlers: LocalStackHandlers,
   ) {
-    // #845: the Board methods have their own handlers.
-    this.table = { ...this.own, ...boardHandlers.table };
+    // #845: the Board methods have their own handlers; C-377: so do stacks,
+    // designs and dependencies.
+    this.table = {
+      ...this.own,
+      ...boardHandlers.table,
+      ...stackHandlers.table,
+    };
   }
 
   readonly table: LocalHandlerTable;
 
-  private readonly own: Omit<LocalHandlerTable, LocalBoardMethod> = {
+  private readonly own: Omit<
+    LocalHandlerTable,
+    LocalBoardMethod | LocalStackMethod
+  > = {
     'context.sessionStart': (args, call) => this.sessionStart(args, call),
     'fleet.status': (_args, call) => this.fleetStatus(call),
     'queue.list': (args, call) => this.queueList(args.limit, call),

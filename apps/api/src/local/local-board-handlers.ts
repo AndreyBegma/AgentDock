@@ -4,16 +4,11 @@ import { Injectable } from '@nestjs/common';
 import { BoardService } from '../board/board.service';
 import { BoardRoundsService } from '../board/board-rounds.service';
 import {
-  BoardSessionRefusal,
   BoardSessionService,
   type SessionBoardProject,
 } from '../board/board-session.service';
 import { BoardSessionMessages } from '../board/board-session-message.service';
-import {
-  BoardTerminalService,
-  type ManualSession,
-  NotAManualSession,
-} from '../board/board-terminal.service';
+import type { ManualSession } from '../board/board-terminal.service';
 import { BoardWaitService } from '../board/board-wait.service';
 import type { BoardActor } from '../board/board-work';
 import {
@@ -22,6 +17,7 @@ import {
   projectOf,
 } from './local-call';
 import { LocalError } from './local-error';
+import { LocalManualGate } from './local-manual-gate';
 
 /** The Board methods a person's session works the Board with (#845). */
 export type LocalBoardMethod = Extract<
@@ -42,7 +38,7 @@ export type LocalBoardMethod = Extract<
 /** `card.move` without an `index`: the bottom (the board clamps it). */
 const BOTTOM = 1_000_000;
 
-const actorOf = (call: LocalCall): BoardActor => ({
+export const actorOf = (call: LocalCall): BoardActor => ({
   userId: call.user.id,
   role: call.role,
   ctx: call.ctx,
@@ -52,12 +48,6 @@ const sessionProjectOf = (call: LocalCall): SessionBoardProject => {
   const project = projectOf(call);
   return { id: project.id, runnerId: call.runnerId, repo: project.repo };
 };
-
-const notManual = () =>
-  new LocalError(
-    'not_a_manual_session',
-    "not a person's own Claude Code session",
-  );
 
 /**
  * #845 (ADR-0083): the Board from a person's session. Reads answer any
@@ -72,7 +62,7 @@ export class LocalBoardHandlers {
     private readonly rounds: BoardRoundsService,
     private readonly messages: BoardSessionMessages,
     private readonly sessions: BoardSessionService,
-    private readonly terminal: BoardTerminalService,
+    private readonly gate: LocalManualGate,
     private readonly waits: BoardWaitService,
   ) {}
 
@@ -163,35 +153,12 @@ export class LocalBoardHandlers {
       ),
   };
 
-  /**
-   * §2: a control tool answers only a person's own `manual` session of this
-   * project; a card worker, a fleet slot or an unknown session is refused
-   * `not_a_manual_session` before anything changes.
-   */
-  private async control<T>(
+  /** §2: a control tool answers only a person's own `manual` session. */
+  private control<T>(
     call: LocalCall,
     work: (session: ManualSession) => Promise<T>,
   ): Promise<T> {
-    const asking = call.session;
-    if (!asking || asking.runtime !== 'claude') throw notManual();
-    let session: ManualSession;
-    try {
-      session = await this.terminal.manualSession(
-        { id: projectOf(call).id, runnerId: call.runnerId },
-        asking.id,
-      );
-    } catch (error) {
-      if (error instanceof NotAManualSession) throw notManual();
-      throw error;
-    }
-    try {
-      return await work(session);
-    } catch (error) {
-      if (error instanceof BoardSessionRefusal) {
-        throw new LocalError(error.code, error.message);
-      }
-      throw error;
-    }
+    return this.gate.control(call, work);
   }
 
   /** The round a Run or feedback just started. */

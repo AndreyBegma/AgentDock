@@ -3,6 +3,7 @@
 import type { ViewportPreset } from '@nautelle/shared';
 import { Maximize2 } from 'lucide-react';
 import Link from 'next/link';
+import { scaledBox, useZoomReachesFrames } from '../../lib/canvas/frame-zoom';
 import { previewBox } from '../../lib/design/mobile-preview';
 import { useElementWidth } from '../../lib/design/use-element-width';
 import { MockupFrame } from './mockup-frame';
@@ -26,6 +27,8 @@ export function ScaledPreview({
 }) {
   const [measure, width] = useElementWidth();
   const { scale, height } = previewBox(preset, width);
+  // #907: zoomed, not scaled, so the mockup's glass is not torn.
+  const byZoom = useZoomReachesFrames();
   return (
     <div
       ref={measure}
@@ -34,11 +37,10 @@ export function ScaledPreview({
     >
       {width > 0 ? (
         <div
-          className="origin-top-left"
           style={{
             width: preset.width,
             height: preset.height,
-            transform: `scale(${scale})`,
+            ...scaledBox(scale, byZoom),
           }}
         >
           <MockupFrame

@@ -16,6 +16,7 @@ import {
   TestRunnerSocket,
 } from '../runners/testing/runner-e2e';
 import { createUser, resetDatabase, type Session } from '../test/e2e-app';
+import type { LocalStackMethod } from './local-stack-handlers';
 
 const ROOT = '/srv/dev/widget';
 const OTHER_ROOT = '/srv/dev/gadget';
@@ -25,8 +26,27 @@ const CARD_SESSION = '0b7e7c1e-5d0f-4c1a-9a51-2f3c4d5e6f70';
 /** #884: a review step's Claude session on that card's pull request. */
 const REVIEW_SESSION = '7d0c2a4e-9b1f-4e3a-8c5d-6f7a8b9c0d1e';
 
+/**
+ * C-377: the stack, design and dependency methods have their own sweep
+ * (`board-session-stacks.e2e.spec.ts`), on a board with stacks and designs.
+ */
+const STACK_METHODS = new Set<LocalMethodName>([
+  'stack.create',
+  'stack.addCard',
+  'stack.removeCard',
+  'stack.update',
+  'stack.run',
+  'stack.stop',
+  'stack.designView',
+  'stack.design',
+  'card.designView',
+  'card.design',
+  'card.depend',
+  'card.undepend',
+] satisfies LocalStackMethod[]);
+
 /** The args each method is called with in the all-methods sweep. */
-const ARGS: Record<LocalMethodName, unknown> = {
+const ARGS: Record<Exclude<LocalMethodName, LocalStackMethod>, unknown> = {
   'context.sessionStart': { gitBranch: 'feat/12-pairing' },
   'fleet.status': {},
   'queue.list': { limit: 5 },
@@ -404,13 +424,14 @@ describe('local requests over the runner socket (e2e)', () => {
           (m) =>
             m !== 'action.request' &&
             m !== 'card.escalate' &&
-            !BOARD_CONTROL_ORDER.includes(m),
+            !BOARD_CONTROL_ORDER.includes(m) &&
+            !STACK_METHODS.has(m),
         )
         .flatMap((m) =>
           m === 'card.finish' ? (['card.escalate', m] as const) : [m],
         ),
       ...BOARD_CONTROL_ORDER,
-    ] as LocalMethodName[];
+    ] as Exclude<LocalMethodName, LocalStackMethod>[];
     for (const method of order) {
       const args = method === 'action.status' ? { id: actionId } : ARGS[method];
       const response = await ask(
@@ -437,7 +458,7 @@ describe('local requests over the runner socket (e2e)', () => {
         actionId = (response.data as { id: string }).id;
       }
     }
-    expect(responses.size).toBe(localMethodNames.length);
+    expect(responses.size).toBe(localMethodNames.length - STACK_METHODS.size);
 
     const context = responses.get('context.sessionStart')?.data as {
       text: string;

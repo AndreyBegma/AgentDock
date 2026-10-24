@@ -1,6 +1,6 @@
 # ADR-0083: A person's own Claude Code session may work the Board through MCP; Completed stays a person's
 
-Status: accepted · Date: 2026-10-23 ·
+Status: accepted; extended by [ADR-0089](0089-a-persons-session-may-work-stacks-designs-and-dependencies.md) (stacks, designs, dependencies) · Date: 2026-10-23 ·
 Issue: [#845](https://github.com/AndreyBegma/Nautelle/issues/845) ·
 Spec: [`docs/specs/845-board-from-a-session.md`](../specs/845-board-from-a-session.md) ·
 Extends: [ADR-0020](0020-claude-code-integration-through-the-runner.md) §3, [ADR-0030](0030-terminal-work-and-fleet-work-appear-on-the-board.md) ·

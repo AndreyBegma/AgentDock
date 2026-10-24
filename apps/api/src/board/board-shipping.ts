@@ -173,6 +173,18 @@ const WATCHED = {
       rounds: { none: { phase: { in: [...ACTIVE_CARD_ROUND_PHASES] } } },
     },
     { column: { in: ['in_progress', 'finished'] }, ciState: 'pending' },
+    // #894: a Finished card whose checks have not reported yet, or went red
+    // while it waited, is still decided by its CI — a merge, or a fix round.
+    // One that holds a protected path is never merged, so it is not read.
+    {
+      column: 'finished',
+      ciState: { in: ['none', 'red'] },
+      protectedPaths: { isEmpty: true },
+      // A stacked card is landed through its dependency, not read here; a
+      // card whose checks were never read has no CI to wait for.
+      prBaseCardId: null,
+      ciCheckedAt: { not: null },
+    },
     // #636: stacked on a dependency that merged — still to be retargeted.
     // #709: any stacked PR — its dependency, or the PR itself, may merge on
     // GitHub unseen.
@@ -453,7 +465,8 @@ export class BoardShipping
       await this.work.forwardConflict(project, card);
       return;
     }
-    if (mergeOnly) return;
+    // #894: a Finished card whose checks went red is fixed, merge or not.
+    if (mergeOnly && !(card.column === 'finished' && state === 'red')) return;
     // D6: a fix round waits for the worker's round to be over.
     if (isActiveRoundPhase(card.rounds[0]?.phase) || card.needsPerson) return;
 
@@ -477,6 +490,14 @@ export class BoardShipping
       if (gate === 'wait') return;
       if (!(await this.toFinished(project, card))) return;
       if (gate === 'needs_person') return;
+    } else if (state === 'red') {
+      // #894: the checks of a card that finished while they ran went red.
+      await this.fix(project, card, result, false);
+      return;
+    } else if (result.mergeable === 'CONFLICTING') {
+      // A PR that cannot merge is not tried; a person or a conflict round
+      // deals with it.
+      return;
     } else if (state !== 'green') {
       if (!noChecks) return;
       if (!(await this.shipsWithoutChecks(project, card, result, noneSince)))

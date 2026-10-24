@@ -3,6 +3,7 @@ import {
   ATTACHMENT_IMAGE_MIMES,
   ATTACHMENT_MAX_BYTES,
   ATTACHMENT_REFUSAL,
+  ATTACHMENT_VIDEO_MAX_BYTES,
   ATTACHMENTS_PER_CARD_MAX,
   type AttachmentRefusal,
   type AttachmentView,
@@ -26,9 +27,9 @@ export const isImageMime = (mime: string): boolean =>
 
 /** Each refusal code has its own sentence (spec "Refusals"). */
 export const REFUSAL_TEXT: Record<AttachmentRefusal, string> = {
-  [ATTACHMENT_REFUSAL.tooLarge]: `That file is over ${ATTACHMENT_MAX_BYTES / (1024 * 1024)} MiB.`,
+  [ATTACHMENT_REFUSAL.tooLarge]: `That file is over ${ATTACHMENT_MAX_BYTES / (1024 * 1024)} MiB (${ATTACHMENT_VIDEO_MAX_BYTES / (1024 * 1024)} MiB for a video).`,
   [ATTACHMENT_REFUSAL.unsupportedType]:
-    'That file type is not accepted. Use PNG, JPEG, GIF, WebP, PDF or a text file (.txt .md .log .csv .json .diff .patch).',
+    'That file type is not accepted. Use PNG, JPEG, GIF, WebP, PDF, MP4, WebM or a text file (.txt .md .log .csv .json .diff .patch).',
   [ATTACHMENT_REFUSAL.tooMany]: `A card holds at most ${ATTACHMENTS_PER_CARD_MAX} attachments, feedback included.`,
   [ATTACHMENT_REFUSAL.quotaExceeded]:
     'This project has used up its attachment storage. Remove some attachments first.',

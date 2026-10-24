@@ -1,6 +1,6 @@
 # ADR-0054: A person may group Board cards into a stack by hand
 
-Status: accepted · Date: 2026-10-17 · Amends [ADR-0044](0044-stacks-staged-cards-under-one-shared-design.md) §3 ·
+Status: accepted; §1 and §4 amended by [ADR-0089](0089-a-persons-session-may-work-stacks-designs-and-dependencies.md) (stages in one call, stage titles) · Date: 2026-10-17 · Amends [ADR-0044](0044-stacks-staged-cards-under-one-shared-design.md) §3 ·
 Card: C-229 · Issue: #588 ·
 Spec: [`docs/specs/588-let-users-group-board-cards-into-a-manua.md`](../specs/588-let-users-group-board-cards-into-a-manua.md)
 

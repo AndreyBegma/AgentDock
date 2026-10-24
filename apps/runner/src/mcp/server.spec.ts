@@ -29,7 +29,7 @@ const text = (result: unknown): string =>
   (result as { content: { text: string }[] }).content[0]?.text ?? '';
 
 describe('nautelle MCP server (spec 201 D20)', () => {
-  it('answers tools/list with the twenty-six tools, named agentdock', async () => {
+  it('answers tools/list with the thirty-six tools, named agentdock', async () => {
     const { client } = await connect(() => ({ ok: true, data: {} }));
     expect(client.getServerVersion()?.name).toBe(MCP_SERVER_NAME);
     const { tools } = await client.listTools();
@@ -61,6 +61,16 @@ describe('nautelle MCP server (spec 201 D20)', () => {
         'card_stop',
         'take_card',
         'release_card',
+        'stack_create',
+        'stack_add_card',
+        'stack_remove_card',
+        'stack_update',
+        'stack_run',
+        'stack_stop',
+        'stack_design',
+        'card_design',
+        'card_depend',
+        'card_undepend',
       ].sort(),
     );
     expect(tools.every((tool) => tool.description)).toBe(true);
@@ -198,6 +208,82 @@ describe('nautelle MCP server (spec 201 D20)', () => {
         'release_card',
         { card: 3 },
         { method: 'card.release', args: { card: 3 } },
+      ],
+      [
+        'stack_create',
+        {
+          title: 'Export',
+          design: true,
+          stages: [{ title: 'API', cards: [1, 2] }, { cards: [3] }],
+        },
+        {
+          method: 'stack.create',
+          args: {
+            title: 'Export',
+            design: true,
+            stages: [{ title: 'API', cards: [1, 2] }, { cards: [3] }],
+          },
+        },
+      ],
+      [
+        'stack_add_card',
+        { stack: 1, card: 4, stage: 1 },
+        { method: 'stack.addCard', args: { stack: 1, card: 4, stage: 1 } },
+      ],
+      [
+        'stack_remove_card',
+        { stack: 1, card: 4 },
+        { method: 'stack.removeCard', args: { stack: 1, card: 4 } },
+      ],
+      [
+        'stack_update',
+        { stack: 1, stages: [{ position: 0, title: 'API' }] },
+        {
+          method: 'stack.update',
+          args: { stack: 1, stages: [{ position: 0, title: 'API' }] },
+        },
+      ],
+      ['stack_run', { stack: 1 }, { method: 'stack.run', args: { stack: 1 } }],
+      [
+        'stack_stop',
+        { stack: 1 },
+        { method: 'stack.stop', args: { stack: 1 } },
+      ],
+      [
+        'stack_design',
+        { stack: 1, action: 'status' },
+        { method: 'stack.designView', args: { stack: 1 } },
+      ],
+      [
+        'stack_design',
+        { stack: 1, action: 'revise', comments: ['Wider table.'] },
+        {
+          method: 'stack.design',
+          args: { stack: 1, action: 'revise', comments: ['Wider table.'] },
+        },
+      ],
+      [
+        'card_design',
+        { card: 3, action: 'status' },
+        { method: 'card.designView', args: { card: 3 } },
+      ],
+      [
+        'card_design',
+        { card: 3, action: 'approve', revisionId: 'rev_1' },
+        {
+          method: 'card.design',
+          args: { card: 3, action: 'approve', revisionId: 'rev_1' },
+        },
+      ],
+      [
+        'card_depend',
+        { card: 3, dependsOn: 2 },
+        { method: 'card.depend', args: { card: 3, dependsOn: 2 } },
+      ],
+      [
+        'card_undepend',
+        { card: 3, dependsOn: 2 },
+        { method: 'card.undepend', args: { card: 3, dependsOn: 2 } },
       ],
       [
         'request_action',
