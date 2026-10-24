@@ -167,7 +167,8 @@ export class DemoRecorder {
   private readonly probes: PortProbes;
 
   constructor(private readonly deps: DemoRecorderDeps) {
-    this.spawn = deps.spawn ?? createDemoflowSpawn(deps.exec);
+    this.spawn =
+      deps.spawn ?? createDemoflowSpawn(deps.exec, { log: deps.log });
     this.probes = deps.probes ?? { portInUse, freePort };
   }
 
