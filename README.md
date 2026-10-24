@@ -101,9 +101,23 @@ flowchart LR
 
 More in **[Architecture](https://github.com/AndreyBegma/Nautelle/wiki/Architecture)**.
 
+## Install
+
+On a host with Docker, one command runs Nautelle from its published images at
+<http://localhost:8000>:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh
+```
+
+`--tunnel-token` puts it behind a Cloudflare tunnel and `--domain` serves a
+domain with automatic HTTPS. The first administrator, upgrades, backups and
+runner pairing are in **[Installing Nautelle](docs/guides/install.md)**.
+
 ## Quick start
 
-Requirements: [Bun](https://bun.sh) 1.4.0+, Node.js 24+ and Docker.
+To work on Nautelle itself. Requirements: [Bun](https://bun.sh) 1.4.0+,
+Node.js 24+ and Docker.
 
 ```sh
 git clone https://github.com/AndreyBegma/Nautelle && cd Nautelle
@@ -136,7 +150,8 @@ and **[Self-hosting](https://github.com/AndreyBegma/Nautelle/wiki/Self-Hosting)*
 | [**Wiki**](https://github.com/AndreyBegma/Nautelle/wiki) | User guides: setup, every feature, self-hosting, FAQ |
 | [`docs/`](docs/README.md) | The engineering source of truth: [ADRs](docs/adr), [specs](docs/specs), [architecture](docs/architecture), [product](docs/product) |
 | [`apps/runner`](apps/runner/README.md) | Runner commands, files and environment |
-| [`deploy/`](deploy/README.md) | CI pipelines, the reference deployment, runner releases |
+| [`deploy/`](deploy/README.md) | CI pipelines, the reference deployment, runner and image releases |
+| [Install guide](docs/guides/install.md) | Running Nautelle from the published images: modes, upgrade, backup |
 
 ## Contributing
 
