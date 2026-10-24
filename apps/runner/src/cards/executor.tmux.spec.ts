@@ -470,7 +470,7 @@ describe.skipIf(!tmuxInstalled)(
       }
     });
 
-    it('#913: reports C-369\'s selector in an 80x24 pane on a project that ships no content', async () => {
+    it("#913: reports C-369's selector in an 80x24 pane on a project that ships no content", async () => {
       const t = await setup({ shipContent: false });
       await t.executor.run(
         t.args({
@@ -488,10 +488,15 @@ describe.skipIf(!tmuxInstalled)(
       expect(screens).toEqual([
         expect.objectContaining({
           header: 'C-369 order',
-          text: expect.stringMatching(/^C-368 hasn't landed yet: .* go ahead\?$/s),
+          text: expect.stringMatching(
+            /^C-368 hasn't landed yet: .* go ahead\?$/s,
+          ),
           options: [
             expect.objectContaining({ index: 1, label: 'Wait for C-368' }),
-            expect.objectContaining({ index: 2, label: 'Build against the draft' }),
+            expect.objectContaining({
+              index: 2,
+              label: 'Build against the draft',
+            }),
             expect.objectContaining({ index: 3, label: 'Provisioning only' }),
           ],
           other: true,

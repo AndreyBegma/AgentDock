@@ -1,4 +1,5 @@
 import type {
+  BoardCardDetail,
   BoardCardView,
   BoardSettingsView,
   BoardView,
@@ -7,12 +8,14 @@ import type {
 import type {
   LocalBoardWaitEvent,
   LocalResponseMessage,
+  SessionMessageArgs,
 } from '@nautelle/shared/protocol';
 import { LocalRequestRouter } from '../local/local-request-router';
 import {
   type CommandSendResult,
   RunnerCommandService,
 } from '../runners/runner-command.service';
+import { capabilities } from '../runners/testing/runner-e2e';
 import { SessionMessageService } from '../session-message/session-message.service';
 import { BOARD_WAIT_TICK_MS } from './board-wait.service';
 import { BoardWorld, ROOT_A } from './testing/board-e2e';
@@ -595,6 +598,195 @@ describe('the Board from a session (#845, e2e)', () => {
           question: QUESTION,
         },
       ]);
+    });
+  });
+
+  describe('#913: a card session’s question on a project that ships no content', () => {
+    type Wait = { events: LocalBoardWaitEvent[]; cursor: string };
+
+    /** C-369's selector as the runner reads it from an 80x24 pane. */
+    const C369: PendingQuestion = {
+      key: 'a1b2c3d4e5f60718',
+      header: 'C-369 order',
+      text: 'C-369 depends on C-367 and C-368. Run it now on top of develop, or wait until both are accepted?',
+      options: [
+        {
+          index: 1,
+          label: 'Wait for both',
+          description: 'Run C-369 after C-367 and C-368 are accepted.',
+        },
+        { index: 2, label: 'Run now', description: 'Start on develop.' },
+        { index: 3, label: 'Stack it', description: 'Branch from C-368.' },
+      ],
+      other: true,
+    };
+
+    const messagesSent = () =>
+      jest
+        .mocked(commands.send)
+        .mock.calls.filter(([, name]) => name === 'session.message')
+        .map(([, , args]) => args as SessionMessageArgs);
+
+    /** The runner's events for a worker that asks C-369's question. */
+    const asks = async () => {
+      await manualSession();
+      await w.createCard({ title: 'Add login' });
+      await data(ask('card.run', { card: 1 }));
+      const card = await w.card(1);
+      const { runId } = card.rounds[0];
+      const at = new Date().toISOString();
+      await w.deliver('card_run.question', {
+        cardId: card.id,
+        runId,
+        projectId: w.a,
+        at,
+      });
+      await w.deliver('card_run.pending_question', {
+        cardId: card.id,
+        runId,
+        projectId: w.a,
+        at,
+        question: C369,
+      });
+      return { cardId: card.id, runId };
+    };
+
+    beforeEach(() => jest.mocked(commands.send).mockClear());
+
+    it('board.list, board.card, board.wait and the card show it, and card.message answers it', async () => {
+      const project = await w.ctx.prisma.project.findUniqueOrThrow({
+        where: { id: w.a },
+      });
+      expect(project.shipSessionContent).toBe(false);
+      const start = await data<Wait>(ask('board.wait', {}));
+      const { cardId, runId } = await asks();
+
+      const list = await data<{
+        cards: { number: number; waitingOnQuestion: boolean }[];
+      }>(ask('board.list', {}));
+      expect(list.cards.find((c) => c.number === 1)?.waitingOnQuestion).toBe(
+        true,
+      );
+      const detail = await data<{ question: PendingQuestion | null }>(
+        ask('board.card', { card: 1 }),
+      );
+      expect(detail.question).toEqual(C369);
+      const woken = await data<Wait>(
+        ask('board.wait', { cursor: start.cursor, cards: [1], timeoutSec: 10 }),
+      );
+      expect(woken.events).toContainEqual({
+        type: 'question',
+        card: 1,
+        label: 'C-1',
+        title: 'Add login',
+        question: C369,
+      });
+      const web = await w.viewer.get(`${w.path()}/board/cards/1`);
+      expect((web.body as BoardCardDetail).round?.pendingQuestion).toEqual(
+        C369,
+      );
+      expect((web.body as BoardCardDetail).sessionMessageRefusal).toBeNull();
+
+      expect(
+        await data(
+          ask('card.message', {
+            card: 1,
+            kind: 'option',
+            questionKey: C369.key,
+            index: 3,
+          }),
+        ),
+      ).toEqual({ outcome: 'answered' });
+      expect(
+        await data(
+          ask('card.message', {
+            card: 1,
+            kind: 'other',
+            questionKey: C369.key,
+            text: 'Stack it on C-368 and say so in the PR',
+          }),
+        ),
+      ).toEqual({ outcome: 'answered' });
+      const target = { kind: 'card_round', cardId, runId };
+      expect(messagesSent()).toEqual([
+        {
+          projectId: w.a,
+          target,
+          message: { kind: 'option', questionKey: C369.key, index: 3 },
+        },
+        {
+          projectId: w.a,
+          target,
+          message: {
+            kind: 'other',
+            questionKey: C369.key,
+            text: 'Stack it on C-368 and say so in the PR',
+          },
+        },
+      ]);
+    });
+
+    it('card.message says which runner policy refuses it, and the card says so before; nothing is sent', async () => {
+      await w.ctx.prisma.runner.update({
+        where: { id: w.runnerId },
+        data: {
+          capabilities: {
+            ...capabilities,
+            policy: {
+              allowedRoots: [ROOT_A],
+              maxPermissionMode: 'auto',
+              terminal: { write: false },
+              skills: { profileInstall: false },
+              commands: { 'session.message': false },
+            },
+          },
+        },
+      });
+      await asks();
+      const fix = '`nautelle-runner policy set commands.session.message true`';
+
+      const web = await w.viewer.get(`${w.path()}/board/cards/1`);
+      expect((web.body as BoardCardDetail).sessionMessageRefusal).toContain(
+        fix,
+      );
+      const answer = await ask('card.message', {
+        card: 1,
+        kind: 'option',
+        questionKey: C369.key,
+        index: 3,
+      });
+      expect(answer.ok).toBe(false);
+      expect(answer.error?.code).toBe('policy_refused');
+      expect(answer.error?.message).toBe(
+        `refused by this runner's policy (commands): session.message is off on this runner. On the runner's machine: ${fix}`,
+      );
+      expect(messagesSent()).toEqual([]);
+      const records = await w.audit('card.message');
+      expect(records.at(-1)).toMatchObject({ result: 'error' });
+      expect(records.at(-1)?.after).toMatchObject({ error: 'policy_refused' });
+    });
+
+    it('passes on the runner’s own policy refusal when its policy changed since hello', async () => {
+      await asks();
+      jest.mocked(commands.send).mockImplementationOnce(
+        async () =>
+          ({
+            status: 'error',
+            error: {
+              code: 'policy_refused',
+              message:
+                "refused by this runner's policy (commands): session.message is off on this runner. On the runner's machine: `nautelle-runner policy set commands.session.message true`",
+            },
+          }) satisfies CommandSendResult<'session.message'> as never,
+      );
+      const answer = await ask('card.message', {
+        card: 1,
+        kind: 'option',
+        questionKey: C369.key,
+        index: 1,
+      });
+      expect(answer.error?.code).toBe('policy_refused');
+      expect(answer.error?.message).toContain('commands.session.message true');
     });
   });
 

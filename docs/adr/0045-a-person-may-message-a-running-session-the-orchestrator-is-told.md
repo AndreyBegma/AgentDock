@@ -3,7 +3,7 @@
 Status: accepted · Date: 2026-10-16 ·
 Issue: [#489](https://github.com/AndreyBegma/AgentDock/issues/489) ·
 Spec: [`docs/specs/489-message-a-running-session-and-answer-its.md`](../specs/489-message-a-running-session-and-answer-its.md) ·
-Amends [ADR-0005](0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md) · Scopes [ADR-0040](0040-steward.md) §4 · Scoped by [ADR-0047](0047-a-runner-local-security-policy-the-server-cannot-change.md) §6
+Amends [ADR-0005](0005-drive-the-cs-orchestrator-skill-do-not-reimplement-it.md) · Scopes [ADR-0040](0040-steward.md) §4 · Scoped by [ADR-0047](0047-a-runner-local-security-policy-the-server-cannot-change.md) §6 · §4 amended by [ADR-0094](0094-a-card-sessions-question-selector-is-reported-on-every-project.md)
 
 ## Context
 
@@ -23,7 +23,7 @@ For a fleet worker this conflicts with how ADR-0005 has been read so far. The fl
 
 3. **Busy is queued, not interrupted.** Text sent while the agent works is typed into Claude Code's input. Claude Code queues it and reads it at its next step. The runner types nothing into a question selector, a dialog or a permission prompt, and the result says so.
 
-4. **Question selectors.** The runner reads a round's question selector from its pane, using the #473 detector extended to parse the screen. It reports the screen as `card_run.pending_question`, so the Board and Telegram can show the options. The question is session content (ADR-0021), so it is reported only for a project that ships content.
+4. **Question selectors.** The runner reads a round's question selector from its pane, using the #473 detector extended to parse the screen. It reports the screen as `card_run.pending_question`, so the Board and Telegram can show the options. The question is session content (ADR-0021), so it is reported only for a project that ships content. *Amended by [ADR-0094](0094-a-card-sessions-question-selector-is-reported-on-every-project.md): the selector is reported on every project, redacted and capped.*
 
 5. **Fleet workers (amends ADR-0005).** A person's message to a `cs-*` slot is typed into that worker's pane. In the same step it is appended to the orchestrator's own `events.jsonl` as `slot.message_sent` with `by: person`, in the format the plugin writes. The file-based `slot.message` now writes the same line. The orchestrator therefore stays the one that knows what each of its workers was told. It reads that from its own log, not from AgentDock.
 

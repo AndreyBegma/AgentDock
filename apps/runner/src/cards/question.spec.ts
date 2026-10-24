@@ -165,9 +165,7 @@ describe('reading and answering the selector (#489 M4)', () => {
     );
     const screen = readQuestion(pane);
     expect(screen?.question.text).toBe('Push with •••?');
-    const other = readQuestion(
-      pane.replace(token, `ghp_${'b'.repeat(36)}`),
-    );
+    const other = readQuestion(pane.replace(token, `ghp_${'b'.repeat(36)}`));
     expect(other?.question.key).toBe(screen?.question.key);
   });
 

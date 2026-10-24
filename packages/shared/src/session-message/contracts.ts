@@ -66,8 +66,8 @@ export type PendingQuestionOption = z.infer<typeof pendingQuestionOptionSchema>;
 
 /**
  * M4: the question selector a session shows (#473), read from its pane. It
- * is session content (ADR-0021): the runner reports it only for a project
- * that ships content.
+ * is the worker addressing the person, not session content: the runner
+ * reports it on every project, redacted and capped (ADR-0094).
  */
 export const pendingQuestionSchema = z.object({
   /**

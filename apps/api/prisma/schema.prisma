@@ -3680,8 +3680,8 @@ model BoardCardRound {
   /// #390: when this stall raised `card.background_stalled` — once per stall.
   backgroundStalledAt DateTime?
   /// #489 M4: the question selector the round's session shows now — shared
-  /// `pendingQuestionSchema` — from `card_run.pending_question`; only for a
-  /// project that ships content (ADR-0021). Cleared once it is gone.
+  /// `pendingQuestionSchema` — from `card_run.pending_question`; on every
+  /// project, redacted by the runner (ADR-0094). Cleared once it is gone.
   pendingQuestion     Json?
   /// #482: the local error the API answered the round's last refused
   /// `finish_card` with (shared `localErrorCodeSchema`), from
