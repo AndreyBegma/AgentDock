@@ -5,15 +5,18 @@
 #   curl -fsSL …/install.sh | sh -s -- --domain dock.example.com
 #
 # It checks Docker and Compose v2, puts docker-compose.yml and .env.example
-# into ./nautelle, writes .env with random passwords and keys, starts the
-# stack and waits until the API is healthy. Running it again is safe: an
-# existing .env keeps its passwords and keys, and only the flags given change
-# it. Needs Docker, curl or wget, and base64.
+# into ./nautelle, writes .env with random database and Redis passwords,
+# starts the stack, waits until the API is healthy and prints the first-run
+# setup link. The API generates its own keys on the first boot. Running it
+# again is safe: an existing .env keeps its passwords, and only the flags given
+# change it. Needs Docker, and curl or wget.
 #
 # Options:
 #   --url <url>            the address people open (default http://localhost:8000)
 #   --tunnel-token <token> run behind a Cloudflare tunnel; --url is its https hostname
 #   --domain <domain>      serve <domain> with automatic HTTPS on ports 80 and 443
+#   --admin-email <email>  with --admin-password: create the first admin, no setup page
+#   --admin-password <pw>  (both are passed to this start only, never written to .env)
 #   --port <port>          local mode: the host port (default 8000, or the --url port)
 #   --dir <dir>            where to install (default ./nautelle)
 #   --version <tag>        image tag (default latest)
@@ -27,6 +30,8 @@ DIR=./nautelle
 URL=
 TUNNEL_TOKEN=
 DOMAIN=
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
 PORT=
 VERSION=
 START=1
@@ -49,6 +54,8 @@ while [ $# -gt 0 ]; do
     --url) URL=$(value "$@"); shift 2 ;;
     --tunnel-token) TUNNEL_TOKEN=$(value "$@"); shift 2 ;;
     --domain) DOMAIN=$(value "$@"); shift 2 ;;
+    --admin-email) ADMIN_EMAIL=$(value "$@"); shift 2 ;;
+    --admin-password) ADMIN_PASSWORD=$(value "$@"); shift 2 ;;
     --port) PORT=$(value "$@"); shift 2 ;;
     --dir) DIR=$(value "$@"); shift 2 ;;
     --version) VERSION=$(value "$@"); shift 2 ;;
@@ -65,6 +72,8 @@ done
 
 [ -z "$TUNNEL_TOKEN" ] || [ -z "$DOMAIN" ] ||
   fail '--tunnel-token and --domain are two different modes; pick one'
+{ [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_PASSWORD" ]; } || [ -z "$ADMIN_EMAIL$ADMIN_PASSWORD" ] ||
+  fail '--admin-email and --admin-password go together'
 
 # ─── Docker ──────────────────────────────────────────────────────────────────
 
@@ -137,7 +146,6 @@ unset_env() {
 }
 
 password() { od -An -tx1 -N24 /dev/urandom | tr -d ' \n'; }
-key() { head -c 32 /dev/urandom | base64 | tr -d '\n'; }
 
 fresh=0
 if [ ! -f .env ]; then
@@ -151,12 +159,10 @@ for name in $(sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' .env.example); do
   grep -q "^$name=" .env || set_env "$name" "$(sed -n "s/^$name=//p" .env.example)"
 done
 
-# Secrets are filled only where empty: never replaced.
+# Passwords are filled only where empty: never replaced. The API's own keys
+# live in the data volume (C-366), not here.
 for name in POSTGRES_PASSWORD REDIS_PASSWORD; do
   [ -n "$(get_env "$name")" ] || set_env "$name" "$(password)"
-done
-for name in APP_ENCRYPTION_KEY AUDIT_HMAC_KEY LLM_SECRETS_KEY; do
-  [ -n "$(get_env "$name")" ] || set_env "$name" "$(key)"
 done
 
 previous_mode=$(get_env COMPOSE_PROFILES)
@@ -241,7 +247,13 @@ fi
 # NAUTELLE_PULL=0 starts from images already on the host (a locally built
 # release candidate); otherwise a re-run also upgrades to the newest tag.
 [ "${NAUTELLE_PULL:-1}" = 0 ] || docker compose pull
-docker compose up -d --remove-orphans
+# The admin's credentials reach the API through this start's environment only;
+# the next `docker compose up -d` recreates the API without them.
+if [ -n "$ADMIN_EMAIL" ]; then
+  ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASSWORD="$ADMIN_PASSWORD" docker compose up -d --remove-orphans
+else
+  docker compose up -d --remove-orphans
+fi
 
 say 'Waiting for the API (it migrates the database on its first start)…'
 api=$(docker compose ps -q api)
@@ -261,6 +273,23 @@ done
 say ''
 say "Nautelle is up: $URL"
 say ''
-say 'Create the first administrator:'
-say "  cd $(pwd) && docker compose exec api node dist/src/cli/admin-create.js"
-say 'then sign in, and pair a runner from Admin › Runners › Add runner.'
+# With no user yet the API logs a one-time setup link on each boot; the latest
+# one works until it is used. A container kept from an earlier run may still
+# hold a spent link in its log, so ask the API first.
+needs_setup=$(docker compose exec -T api node -e "fetch('http://127.0.0.1:8180/setup/status').then((r) => r.json()).then((s) => console.log(s.needsSetup))" 2>/dev/null || true)
+if [ "$needs_setup" = true ]; then
+  [ -z "$ADMIN_EMAIL" ] ||
+    say 'The admin was not created from --admin-email; `docker compose logs api` says why.'
+  setup=$(docker compose logs --no-color api 2>/dev/null | grep -o 'http[^ ]*/setup?token=[^ ]*' | tail -n 1 || true)
+  if [ -n "$setup" ]; then
+    say 'Create the first administrator here (the link works once):'
+    say "  $setup"
+  else
+    say "No setup link in the API log: \`docker compose restart api\` in $(pwd) logs a new one."
+  fi
+elif [ -n "$ADMIN_EMAIL" ]; then
+  say "Sign in as $ADMIN_EMAIL."
+else
+  say 'Sign in with your account.'
+fi
+say 'Then pair a runner from Admin › Runners › Add runner.'

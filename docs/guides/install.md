@@ -14,15 +14,32 @@ and `curl` or `wget`.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/AndreyBegma/Nautelle/main/deploy/compose/install.sh | sh
-cd nautelle
-docker compose exec api node dist/src/cli/admin-create.js
 ```
 
-The first command creates `./nautelle`, writes `.env` with random passwords
-and keys, pulls the images, starts everything and waits until the API answers.
-The API migrates the database on its first start. The last command creates
-the first administrator; it asks for an email and a password. Then open
-<http://localhost:8000> and sign in.
+It creates `./nautelle`, writes `.env` with random database and Redis
+passwords, pulls the images, starts everything and waits until the API
+answers. On its first start the API migrates the database and generates its
+encryption and audit keys into the `data` volume. The script ends with the
+first-run setup link.
+
+## First run
+
+Open the setup link the install printed, for example
+`http://localhost:8000/setup?token=…`, and create the first administrator
+there; you are signed in right after
+([ADR-0087](../adr/0087-the-first-admin-is-created-in-the-browser-with-a-one-time-setup-token.md)).
+The link works once, and only while Nautelle has no user. Each start of the
+API logs a new one and the older one stops working; to find the current link:
+
+```sh
+cd nautelle
+docker compose logs api | grep -o 'http[^ ]*/setup?token=[^ ]*' | tail -n 1
+```
+
+For an install nobody opens a browser on, pass the administrator instead:
+`--admin-email you@example.com --admin-password '…'`. The API creates that
+account on its first start. `install.sh` hands the two values to that start
+only and writes neither into `.env`.
 
 `install.sh` takes these options; pass them after `sh -s --`:
 
@@ -31,6 +48,7 @@ the first administrator; it asks for an email and a password. Then open
 | `--url <url>` | the address people open (default `http://localhost:8000`) |
 | `--tunnel-token <token>` | run behind a Cloudflare tunnel |
 | `--domain <domain>` | serve a domain with automatic HTTPS |
+| `--admin-email <email>`, `--admin-password <password>` | create the first administrator without the setup page |
 | `--port <port>` | the host port in local mode (default 8000, or the `--url` port) |
 | `--dir <dir>` | where to install (default `./nautelle`) |
 | `--version <X.Y.Z>` | a release instead of `latest` |
@@ -98,9 +116,10 @@ GitHub App, goes in `nautelle/api.env`, one `KEY=value` per line. See
 [`apps/api/.env.example`](../../apps/api/.env.example) for the list. Apply a
 change with `docker compose up -d`.
 
-Keep `.env` safe and never change its keys once set: `APP_ENCRYPTION_KEY`,
-`AUDIT_HMAC_KEY` and `LLM_SECRETS_KEY` seal stored secrets, and a database
-cannot be read without them.
+The API generates `APP_ENCRYPTION_KEY`, `AUDIT_HMAC_KEY` and `LLM_SECRETS_KEY`
+on its first start and keeps them in `secrets.json` in the `data` volume. They
+seal stored secrets, and the database cannot be read without them. A key set
+in `api.env` wins over the generated one; never change one once set.
 
 ## Upgrading
 
@@ -116,32 +135,39 @@ it fetches the current compose file, keeps `.env` and pulls the images.
 
 ## Backup
 
-Back up three things: the database, the attachments and `.env`.
+Back up two things together: the database and the `data` volume. The `data`
+volume holds `secrets.json`, the keys that unseal the secrets in the database,
+and the board card attachments. `secrets.json` is as important as the
+database: a dump without it cannot be read back. Keep `.env` too, for the
+database and Redis passwords.
 
 ```sh
 cd nautelle
 docker compose exec -T postgres pg_dump -U nautelle nautelle > nautelle.sql
-docker compose exec -T api tar -cf - -C /data/attachments . > attachments.tar
+docker compose exec -T api tar -cf - -C /data . > data.tar
 cp .env env-backup
 ```
 
-Store `env-backup` apart from the dump: it holds the keys that unseal the
-secrets in the database. Redis holds only job queues and is not part of the
+Store `data.tar` apart from the dump, and as safely: whoever holds both can
+read every stored secret. Redis holds only job queues and is not part of the
 backup; a restored install starts with empty queues.
 
 To restore on a new host, run `install.sh --no-start`, put the saved `.env`
-in place of the new one, then:
+in place of the new one, then put the data back before the API starts:
 
 ```sh
 docker compose up -d postgres
 docker compose exec -T postgres psql -U nautelle nautelle < nautelle.sql
+docker compose run --rm --no-deps -T --entrypoint tar api -xf - -C /data < data.tar
 docker compose up -d
-docker compose exec -T api tar -xf - -C /data/attachments < attachments.tar
 ```
 
-The volumes are `nautelle_pgdata`, `nautelle_attachments`, `nautelle_redis`
-and, in domain mode, `nautelle_caddy-data`, if you prefer to back them up
-with your own tooling while the stack is stopped.
+The API must not start before `secrets.json` is back: it would generate new
+keys that do not fit the restored database.
+
+The volumes are `nautelle_pgdata`, `nautelle_data`, `nautelle_redis` and, in
+domain mode, `nautelle_caddy-data`, if you prefer to back them up with your
+own tooling while the stack is stopped.
 
 ## Pairing a runner
 
@@ -165,6 +191,9 @@ refuses plain HTTP to any host but localhost unless `pair` gets `--insecure`
 - **The install stops at "Waiting for the API".** It prints the API's log.
   `docker compose logs api` shows it again; `docker compose ps` shows which
   service is not healthy.
+- **The setup link says the token is invalid.** The API was restarted since
+  the link was printed; take the current one from the log (see
+  [First run](#first-run)).
 - **Signing in does nothing on an http:// address.** Check that `.env` says
   `APP_ENV=development`; `install.sh --url http://…` writes it.
 - **Domain mode has no certificate.** `docker compose logs proxy-tls` shows
