@@ -136,9 +136,9 @@ describe('track-work skill (#282)', () => {
     expect(skill).toContain('take_card');
   });
 
-  test('plugin version is bumped for the board skill (#845)', () => {
+  test('plugin version is bumped for the board skill (#845, C-377)', () => {
     const p = readJson(join(pluginDir, '.claude-plugin/plugin.json'));
-    expect(p.version).toBe('0.6.0');
+    expect(p.version).toBe('0.7.0');
   });
 });
 
@@ -183,8 +183,23 @@ describe('board skill (#845)', () => {
       'card_stop',
       'take_card',
       'release_card',
+      'stack_create',
+      'stack_add_card',
+      'stack_remove_card',
+      'stack_update',
+      'stack_run',
+      'stack_stop',
+      'stack_design',
+      'card_design',
+      'card_depend',
+      'card_undepend',
     ];
     for (const tool of tools) expect(skill).toContain(tool);
+  });
+
+  test('keeps design approval the person’s (C-377)', () => {
+    expect(skill).toContain('needs_person');
+    expect(skill).toContain('revisionId');
   });
 });
 

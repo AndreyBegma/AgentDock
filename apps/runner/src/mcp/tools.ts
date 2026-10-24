@@ -4,6 +4,7 @@ import {
   CARD_ESCALATION_NOTE_MAX,
   CARD_ESCALATION_REASONS,
   CARD_RECOMMENDABLE_MODELS,
+  DESIGN_COMMENT_MAX,
   ESCALATE_CARD_TOOL,
   REVIEW_FINDING_BODY_MAX,
   REVIEW_FINDING_SEVERITIES,
@@ -23,7 +24,13 @@ import {
   LOCAL_CARD_KINDS,
   LOCAL_CARD_SUMMARY_MAX,
   LOCAL_CARD_TITLE_MAX,
+  LOCAL_DESIGN_ACTIONS,
+  LOCAL_DESIGN_COMMENTS_MAX,
   LOCAL_NOTE_MAX,
+  LOCAL_STACK_CARDS_MAX,
+  LOCAL_STACK_STAGE_TITLE_MAX,
+  LOCAL_STACK_STAGES_MAX,
+  LOCAL_STACK_TITLE_MAX,
   type LocalMethodName,
 } from '@nautelle/shared/protocol';
 import { z } from 'zod';
@@ -45,6 +52,17 @@ export interface McpToolDefinition {
    * request titles), so the server fences it as untrusted data.
    */
   untrusted?: true;
+  /**
+   * C-377: the call for this input when it is not `method` with the input
+   * as args — `stack_design`'s `status` is the read method `stack.designView`.
+   */
+  route?: (input: Record<string, unknown>) => McpToolCall | undefined;
+}
+
+/** The local method a tool call makes, and its args. */
+export interface McpToolCall {
+  method: LocalMethodName;
+  args: Record<string, unknown>;
 }
 
 const limit = z
@@ -64,6 +82,51 @@ const cardNumber = z
 /** #845 D9: said by every control tool. */
 const MANUAL_ONLY =
   'Only for a person’s own terminal session and an operator or better; a card session is refused not_a_manual_session, a viewer forbidden.';
+
+const stackNumber = z
+  .number()
+  .int()
+  .positive()
+  .describe('The stack’s per-project number: S-3 is 3.');
+
+/** C-377: the design tools' actions; `status` reads, the others write. */
+const DESIGN_ACTIONS = ['status', ...LOCAL_DESIGN_ACTIONS] as const;
+
+const designInput = {
+  action: z
+    .enum(DESIGN_ACTIONS)
+    .describe(
+      'status: the design’s state, revisions and open comments. generate: draw it. revise: leave comments (optional) and redraw. approve: approve a revision.',
+    ),
+  comments: z
+    .array(z.string().trim().min(1).max(DESIGN_COMMENT_MAX))
+    .min(1)
+    .max(LOCAL_DESIGN_COMMENTS_MAX)
+    .optional()
+    .describe(
+      'For revise: what to change, one comment each, left on revisionId.',
+    ),
+  revisionId: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .describe(
+      'For approve: the revision (from status); needed when several variants are in play. For revise: the revision the comments go on (default the newest).',
+    ),
+};
+
+/** C-377: a design tool's `status` calls the read method `view`. */
+const designStatus =
+  (view: LocalMethodName) =>
+  (input: Record<string, unknown>): McpToolCall | undefined => {
+    const { action, ...args } = input;
+    return action === 'status' ? { method: view, args } : undefined;
+  };
+
+/** C-377: said by the design tools. */
+const DESIGN_RULES =
+  'The design page’s rules come back unchanged — design_off, design_busy, no_open_comments, design_approved, task_frozen. Approve is a person’s gate: any session but a person’s own terminal one is refused needs_person. status is a read: any session of the project may call it; generate and revise are for a person’s own terminal session and an operator or better — a card session is refused not_a_manual_session, a viewer forbidden.';
 
 export const MCP_TOOLS = [
   {
@@ -186,7 +249,7 @@ export const MCP_TOOLS = [
   {
     name: 'board_list',
     description:
-      'The Board of this project: its settings (merge policy, maxRunning, active rounds) and the cards in board order, with number, title, kind, column, running round, pull request state and CI state. Optional column filter. Read tool: any session of the project may call it.',
+      'The Board of this project: its settings (merge policy, maxRunning, active rounds), the cards in board order, with number, title, kind, column, running round, pull request state and CI state, and the stacks, with number, title, stages and their card numbers, design status and run. Optional column filter. Read tool: any session of the project may call it.',
     method: 'board.list',
     untrusted: true,
     input: {
@@ -350,6 +413,117 @@ export const MCP_TOOLS = [
         .optional()
         .describe('feature or bug, only when it is obvious.'),
     },
+  },
+  {
+    name: 'stack_create',
+    description: `Group board cards into a new stack with its stages, in one call: every card of a stage runs after every card of the stage before. A card in the Inbox, in a stack already or not of this project is refused stack_refused, a stage order that closes a dependency cycle dependency_cycle — and nothing is made. With design: true no card of the stack runs until its shared design is approved (stack_design). ${MANUAL_ONLY}`,
+    method: 'stack.create',
+    untrusted: true,
+    input: {
+      title: z.string().trim().min(1).max(LOCAL_STACK_TITLE_MAX),
+      body: z
+        .string()
+        .max(LOCAL_CARD_BODY_MAX)
+        .optional()
+        .describe('What the stack delivers; markdown.'),
+      design: z
+        .boolean()
+        .optional()
+        .describe('True for a shared design that holds every card’s Run.'),
+      stages: z
+        .array(
+          z.object({
+            title: z.string().max(LOCAL_STACK_STAGE_TITLE_MAX).optional(),
+            cards: z.array(cardNumber).min(1).max(LOCAL_STACK_CARDS_MAX),
+          }),
+        )
+        .min(1)
+        .max(LOCAL_STACK_STAGES_MAX)
+        .describe(
+          'In order; a card is in one stage only; at least two cards in all.',
+        ),
+    },
+  },
+  {
+    name: 'stack_add_card',
+    description: `Add a card that is in no stack to a stage of a stack: an existing stage (0-based) or a new last one (stage = the number of stages). Refusals come back unchanged (stack_refused). ${MANUAL_ONLY}`,
+    method: 'stack.addCard',
+    untrusted: true,
+    input: {
+      stack: stackNumber,
+      card: cardNumber,
+      stage: z.number().int().min(0).max(LOCAL_STACK_STAGES_MAX),
+    },
+  },
+  {
+    name: 'stack_remove_card',
+    description: `Take a card out of its stack; it stays on the Board. ${MANUAL_ONLY}`,
+    method: 'stack.removeCard',
+    untrusted: true,
+    input: { stack: stackNumber, card: cardNumber },
+  },
+  {
+    name: 'stack_update',
+    description: `Rename a stack, rewrite its description, or name its stages by 0-based position (an empty title clears one). A position that is no stage is refused stack_refused. ${MANUAL_ONLY}`,
+    method: 'stack.update',
+    untrusted: true,
+    input: {
+      stack: stackNumber,
+      title: z.string().trim().min(1).max(LOCAL_STACK_TITLE_MAX).optional(),
+      body: z.string().max(LOCAL_CARD_BODY_MAX).optional(),
+      stages: z
+        .array(
+          z.object({
+            position: z.number().int().min(0).max(LOCAL_STACK_STAGES_MAX),
+            title: z.string().max(LOCAL_STACK_STAGE_TITLE_MAX),
+          }),
+        )
+        .min(1)
+        .max(LOCAL_STACK_STAGES_MAX + 1)
+        .optional(),
+    },
+  },
+  {
+    name: 'stack_run',
+    description: `Run a stack: its cards start stage by stage as the Board allows. The Board’s refusals come back unchanged — stack_design_not_approved, budget_exceeded, max_running — obey them, never work around them. ${MANUAL_ONLY}`,
+    method: 'stack.run',
+    untrusted: true,
+    input: { stack: stackNumber },
+  },
+  {
+    name: 'stack_stop',
+    description: `Stop a stack’s run: no further card starts; running rounds go on. ${MANUAL_ONLY}`,
+    method: 'stack.stop',
+    untrusted: true,
+    input: { stack: stackNumber },
+  },
+  {
+    name: 'stack_design',
+    description: `A stack’s shared design: status, generate, revise or approve, as its design page does. ${DESIGN_RULES}`,
+    method: 'stack.design',
+    route: designStatus('stack.designView'),
+    untrusted: true,
+    input: { stack: stackNumber, ...designInput },
+  },
+  {
+    name: 'card_design',
+    description: `A card’s own design: status, generate, revise or approve, as its design page does. ${DESIGN_RULES}`,
+    method: 'card.design',
+    route: designStatus('card.designView'),
+    untrusted: true,
+    input: { card: cardNumber, ...designInput },
+  },
+  {
+    name: 'card_depend',
+    description: `Make a card run after another (dependsOn). A link that closes a cycle is refused dependency_cycle; an Inbox card or a number that is no card invalid_dependency. ${MANUAL_ONLY}`,
+    method: 'card.depend',
+    input: { card: cardNumber, dependsOn: cardNumber },
+  },
+  {
+    name: 'card_undepend',
+    description: `Remove one dependency of a card; one that is not there is no change. ${MANUAL_ONLY}`,
+    method: 'card.undepend',
+    input: { card: cardNumber, dependsOn: cardNumber },
   },
   {
     name: 'away',
