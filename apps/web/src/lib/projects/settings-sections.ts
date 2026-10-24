@@ -21,6 +21,7 @@ export const SETTINGS_SECTIONS = [
       { id: 'orchestrator', label: 'Orchestrator' },
       { id: 'board', label: 'Board' },
       { id: 'review', label: 'Review' },
+      { id: 'demo-videos', label: 'Demo videos' },
       { id: 'sessions', label: 'Sessions' },
       { id: 'steward', label: 'Steward' },
     ],

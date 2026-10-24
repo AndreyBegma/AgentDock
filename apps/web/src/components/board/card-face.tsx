@@ -47,6 +47,7 @@ import { SESSION_ENDED_TEXT, takenState } from '../../lib/board/taken';
 import { hintsLabel } from '../../lib/board-ai/triage';
 import { formatCost } from '../../lib/format';
 import { githubUrl } from '../../lib/url';
+import { DemoChip } from '../demos/demo-chip';
 import { StewardChip } from '../steward/steward-chip';
 import { ApproveRunLink, CardFaceDesign } from './card-design';
 import { RestartChip } from './handoff/restart-chip';
@@ -253,6 +254,7 @@ export function CardFace({
             <HooksChip projectId={projectId} card={card} round={card.round} />
           ) : null}
           {card.steward ? <StewardChip chip={card.steward} /> : null}
+          {card.demo ? <DemoChip demo={card.demo} /> : null}
           <RestartChip card={card} />
           {card.autoRunFailure ? (
             <Tooltip content={autoRunFailureText(card.autoRunFailure)}>

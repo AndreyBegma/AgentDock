@@ -166,6 +166,30 @@ export interface CardDemoView {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /**
+   * C-370 `headSha`: the demo recorded another head than the one the card's PR
+   * shows now. `false` when either head is unknown.
+   */
+  outdated: boolean;
+}
+
+/**
+ * `BoardCardView.demo` (C-371): the card's newest recording, for the board
+ * tile's chip. `null` while the card has none.
+ */
+export interface CardDemoBrief {
+  status: DemoStatus;
+  durationMs: number | null;
+}
+
+/**
+ * `GET /projects/:projectId/demos/runner` (C-371): what the project's runner
+ * reports about recording. `demoflow` is its pinned DemoFlow, `null` for a
+ * runner that never reported one; `supported` is `capabilities.cardDemo`.
+ */
+export interface DemoRunnerView {
+  supported: boolean;
+  demoflow: { version: string; ready: boolean; reason: string | null } | null;
 }
 
 /**

@@ -26,6 +26,7 @@ import { useErrorToast } from '../../../../../lib/section/use-error-toast';
 import { AiDigestTab } from './ai-digest-tab';
 import { BoardTab } from './board-tab';
 import { BudgetTab } from './budget/budget-tab';
+import { DemoVideosTab } from './demo-videos-tab';
 import { DesignTab } from './design/design-tab';
 import { DocsTab } from './docs-tab';
 import { GeneralTab } from './general-tab';
@@ -102,6 +103,9 @@ const BLOCKS: Readonly<
   ),
   review: ({ project, isAdmin }) => (
     <ReviewTab projectId={project.id} isAdmin={isAdmin} />
+  ),
+  'demo-videos': ({ project, isAdmin }) => (
+    <DemoVideosTab projectId={project.id} isAdmin={isAdmin} />
   ),
   'token-saver': ({ project, isAdmin, canOperate }) => (
     <TokenSaverTab

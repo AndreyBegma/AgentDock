@@ -4,10 +4,15 @@ import {
   DEMO_SECRET_NAME_PATTERN,
   DEMO_SECRETS_MAX,
   DEMO_UI_PATHS_DEFAULT,
+  type DemoRunnerView,
   type DemoSecretView,
   type DemoSettingsView,
   type UpdateDemoSettingsRequest,
 } from '@nautelle/shared';
+import {
+  capabilitiesSchema,
+  cardDemoAvailable,
+} from '@nautelle/shared/protocol';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuditContext } from '../audit/audit.types';
@@ -63,6 +68,32 @@ export class DemoSettingsService {
       enabled: row?.demoVideosEnabled ?? false,
       uiPaths: row?.demoUiPaths ?? [...DEMO_UI_PATHS_DEFAULT],
       telegram: row?.demoTelegram ?? true,
+    };
+  }
+
+  /**
+   * What the project's runner reports about recording (C-369): its pinned
+   * DemoFlow and whether it takes `card.demo`. A runner that never reported
+   * capabilities, or reported them in a shape this API does not know, reads
+   * as one that does not record.
+   */
+  async runner(projectId: string): Promise<DemoRunnerView> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { runner: { select: { capabilities: true } } },
+    });
+    const parsed = capabilitiesSchema.safeParse(project?.runner.capabilities);
+    if (!parsed.success) return { supported: false, demoflow: null };
+    const { demoflow } = parsed.data;
+    return {
+      supported: cardDemoAvailable(parsed.data),
+      demoflow: demoflow
+        ? {
+            version: demoflow.version,
+            ready: demoflow.ready,
+            reason: demoflow.reason ?? null,
+          }
+        : null,
     };
   }
 

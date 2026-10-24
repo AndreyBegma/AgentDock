@@ -98,6 +98,7 @@ import {
   takenSessionHref,
   takenState,
 } from '../../lib/board/taken';
+import { withoutDemoVideos } from '../../lib/demos/format';
 import { formatCost } from '../../lib/format';
 import { Time } from '../../lib/format/time';
 import { useReadiness } from '../../lib/readiness/use-readiness';
@@ -110,6 +111,7 @@ import { AttachmentDropzone } from '../attachments/attachment-dropzone';
 import { AttachmentList } from '../attachments/attachment-list';
 import { CardAttachmentsSection } from '../attachments/card-attachments-section';
 import { useRemoveAttachment } from '../attachments/use-remove-attachment';
+import { DemoSection } from '../demos/demo-section';
 import { PageHeader } from '../page-header/page-header';
 import { ReadinessNotice } from '../readiness/readiness-notice';
 import { SessionMessageLine } from '../session/session-message-line';
@@ -739,11 +741,14 @@ export function CardDetailBody({
   const terminalCard = isTerminalCard(card);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [demoVideoIds, setDemoVideoIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const user = useCurrentUser();
   const feedbackFiles = useAttachmentUploads(projectId);
   const { removing, remove } = useRemoveAttachment(projectId, onSaved);
-  const { card: cardFiles, byRound } = splitByRound(card.attachments);
+  const { card: cardFiles, byRound } = splitByRound(
+    withoutDemoVideos(card.attachments, demoVideoIds),
+  );
   const filesEditable = canOperate && card.column !== 'completed';
   const notes = useTextNotes(
     projectId,
@@ -1412,9 +1417,25 @@ export function CardDetailBody({
     </>
   ) : null;
 
+  // C-371: first, so watching the demo and accepting is one place.
+  const demoSection = card.demo ? (
+    <DemoSection
+      onVideoIds={setDemoVideoIds}
+      projectId={projectId}
+      card={card}
+      canOperate={canOperate}
+      accept={
+        canOperate && canAccept(card)
+          ? { busy: actions.busy, run: () => actions.accept(card) }
+          : null
+      }
+    />
+  ) : null;
   // A section with nothing to show is `null`, and its tab is not drawn.
   const overview = (
     <div className="flex min-w-0 flex-col gap-6">
+      {/* The wide page draws the demo in its main column instead. */}
+      {wide ? null : demoSection}
       {triageSection}
       {runSection}
       {summarySection}
@@ -1503,6 +1524,7 @@ export function CardDetailBody({
             className="grid min-w-0 grid-cols-[minmax(0,1fr)_22rem] items-start gap-8"
           >
             <div className="flex min-w-0 flex-col gap-8">
+              {demoSection}
               {card.rounds.length > 0 ? roundsSection : null}
               {cardForm}
             </div>

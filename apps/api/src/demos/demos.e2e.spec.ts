@@ -17,6 +17,7 @@ import {
   hashRunnerToken,
   tokenPrefix,
 } from '../runners/credentials';
+import { capabilities } from '../runners/testing/runner-e2e';
 
 useTempAttachmentsDir();
 
@@ -163,6 +164,60 @@ describe('demo videos (e2e, C-368, ADR-0090)', () => {
           400,
         );
       }
+    });
+  });
+
+  describe('runner status (C-371)', () => {
+    const runnerUrl = () => `${w.path()}/demos/runner`;
+
+    it('reads as not recording for a runner that reports no DemoFlow', async () => {
+      const response = await w.viewer.get(runnerUrl());
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ supported: false, demoflow: null });
+      expect((await w.outsider.get(runnerUrl())).status).toBe(404);
+    });
+
+    it("shows the runner's pinned DemoFlow and why it is not ready", async () => {
+      await w.ctx.prisma.runner.update({
+        where: { id: w.runnerId },
+        data: {
+          capabilities: {
+            ...capabilities,
+            cardDemo: true,
+            demoflow: {
+              version: '0.4.0',
+              ready: false,
+              reason: 'Node 18 is too old',
+            },
+          },
+        },
+      });
+      const response = await w.viewer.get(runnerUrl());
+      expect(response.body).toEqual({
+        supported: true,
+        demoflow: {
+          version: '0.4.0',
+          ready: false,
+          reason: 'Node 18 is too old',
+        },
+      });
+    });
+  });
+
+  describe('board chip (C-371)', () => {
+    it('carries the newest demo of a card, and null before any', async () => {
+      await ranCard();
+      const cardUrl = `${w.path()}/board/cards/1`;
+      const before = await w.viewer.get(cardUrl);
+      expect(before.status).toBe(200);
+      expect(before.body.demo).toBeNull();
+
+      await requested();
+      const after = await w.viewer.get(cardUrl);
+      expect(after.body.demo).toEqual({
+        status: 'queued',
+        durationMs: null,
+      });
     });
   });
 

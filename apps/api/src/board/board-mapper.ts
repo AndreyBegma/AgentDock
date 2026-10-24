@@ -11,6 +11,7 @@ import {
   CARD_HOOKS_GRACE_MS,
   CARD_MERGE_POLICY_DEFAULT,
   type CardDecidingSignal,
+  type CardDemoBrief,
   type CardDependencyRef,
   type CardEscalationView,
   type CardEvidenceView,
@@ -216,6 +217,8 @@ export interface CardFacts {
    * (`commandPolicyRefusalOf`), by project id; absent is not refused.
    */
   messagesRefused?: ReadonlyMap<string, string>;
+  /** C-371: each card's newest demo recording, by card id; absent is none. */
+  demos?: ReadonlyMap<string, CardDemoBrief>;
   now: Date;
 }
 
@@ -580,6 +583,7 @@ export const toCardView = (
   ),
   protectedPaths: card.protectedPaths,
   mergedAt: iso(card.mergedAt),
+  demo: facts.demos?.get(card.id) ?? null,
   prTarget: facts.prTargets?.get(card.id) ?? null,
   round: brief(card, card.rounds[0], facts),
   design: designOf(card.design),

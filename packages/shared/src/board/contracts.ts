@@ -7,6 +7,7 @@ import type {
   CardWorkClass,
 } from '../assess/limits';
 import type { AttachmentRefusal, AttachmentView } from '../attachments';
+import type { CardDemoBrief } from '../demos/contracts';
 import type { TaskDesignSummary, TaskDesignView } from '../design';
 import type { DesignTemplateChoice } from '../design/templates';
 import type { FleetStage } from '../fleet';
@@ -248,6 +249,11 @@ export interface BoardCardView {
   protectedPaths: string[];
   /** #359 D8: the latest PR merged (ISO) — the Merged badge; `null` otherwise. */
   mergedAt: string | null;
+  /**
+   * C-371 (ADR-0090): the card's newest demo recording — the tile's chip.
+   * `null` while it has none; optional so older fixtures stay valid.
+   */
+  demo?: CardDemoBrief | null;
   /**
    * #636: the branch the card's PR targets — its worktree's start. `null`
    * before the card has a branch.

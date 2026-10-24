@@ -61,7 +61,11 @@ type DemoRow = CardDemo & {
   requestedBy: { name: string | null; email: string } | null;
 };
 
-const toView = (projectId: string, row: DemoRow): CardDemoView => ({
+const toView = (
+  projectId: string,
+  row: DemoRow,
+  prHeadSha: string | null = null,
+): CardDemoView => ({
   id: row.id,
   round: row.round,
   status: row.status,
@@ -80,6 +84,8 @@ const toView = (projectId: string, row: DemoRow): CardDemoView => ({
   createdAt: row.createdAt.toISOString(),
   startedAt: row.startedAt?.toISOString() ?? null,
   finishedAt: row.finishedAt?.toISOString() ?? null,
+  outdated:
+    row.headSha !== null && prHeadSha !== null && row.headSha !== prHeadSha,
 });
 
 /** The demo a runner acts on, with what the upload needs of its card. */
@@ -189,7 +195,7 @@ export class CardDemosService {
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       include: REQUESTED_BY,
     });
-    return rows.map((row) => toView(projectId, row));
+    return rows.map((row) => toView(projectId, row, card.ciHeadSha));
   }
 
   /**
