@@ -17,7 +17,8 @@ Demo videos* and the repository has a `demoflow.config.json`.
   scenario in the card's worktree on a free local port, with the project's
   demo secrets in the DemoFlow process environment only, and uploads the MP4
   with its SHA-256. One demo runs at a time, it is stopped after ten minutes
-  with its whole process tree (read from `/proc` on Linux, `ps` elsewhere),
+  with its whole process tree (the sessions it started, read from `/proc` on
+  Linux and `ps` elsewhere, so a process that `exec`s another is still caught),
   and a skipped or failed demo is reported with a masked reason. The runner
   reports DemoFlow's state in the new `demoflow` capability, and a card
   session of a project with demo videos on gets DemoFlow's MCP server and a
